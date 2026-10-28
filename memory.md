@@ -112,6 +112,21 @@ From plan §15, still unanswered as of 2026-10-28:
 - **TypeScript is pinned to 6.0.x:** typescript-eslint and @nestjs/swagger don't support
   TS 7 yet. **ESLint is pinned to 9.x:** eslint-config-next pulls eslint-plugin-import,
   which doesn't support ESLint 10.
+- **Playwright MCP (2026-10-28):** `.mcp.json` runs `@playwright/mcp` (an exact-pinned root
+  devDependency) with `node node_modules/@playwright/mcp/cli.js`, not `npx`. On native
+  Windows, `npx` needs a `cmd /c` wrapper, and that wrapper breaks the config on macOS and
+  Linux. The lockfile also pins the version, so nothing is fetched at launch. The browser is
+  isolated (fresh profile each session) and limited to the local origins with
+  `--allowed-origins`. That stops stray navigation to real sites, but it is not a security
+  boundary and it doesn't apply to redirects. The app's CSP allows only `'self'`, so adding
+  an external origin there also means updating that list. `--no-webmcp` stops pages, which
+  during XSS testing can include injected scripts, from registering tools with the agent.
+  When a Playwright MCP tool takes a `filename`, put the file under `.playwright-mcp/`.
+  Explicit filenames resolve against the repo root, which git does not ignore, so a network
+  dump of the sign-in request saved there would put credentials in reach of `git add`.
+  `browser_run_code_unsafe` is in the core tool set and can't be turned off from
+  `.mcp.json`. It runs code in the server's Node process, past the origin and file limits.
+  We chose to keep it but approve each call by hand. Never allow-list it.
 
 ## Performance baselines
 

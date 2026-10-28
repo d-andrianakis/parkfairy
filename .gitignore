@@ -21,3 +21,6 @@ Thumbs.db
 
 # Playwright auth state for the smoke suite
 tests/smoke/.auth/
+
+# Screenshots, snapshots and traces from the Playwright MCP server
+.playwright-mcp/
