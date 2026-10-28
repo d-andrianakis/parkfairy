@@ -1,0 +1,10 @@
+pnpm-lock.yaml
+dist/
+.next/
+.turbo/
+coverage/
+playwright-report/
+test-results/
+packages/database/migrations/meta/
+packages/api-client/openapi.json
+packages/api-client/src/generated/

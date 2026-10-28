@@ -1,0 +1,9 @@
+{
+  "extends": "@parkfairy/config/tsconfig/nest.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "noEmit": true
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

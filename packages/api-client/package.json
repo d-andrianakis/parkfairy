@@ -1,0 +1,25 @@
+{
+  "name": "@parkfairy/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react-query": "./src/react-query.ts"
+  },
+  "scripts": {
+    "openapi:generate": "pnpm --filter @parkfairy/api openapi:emit && openapi-ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.100.0"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "@parkfairy/config": "workspace:*",
+    "@tanstack/react-query": "5.105.0",
+    "eslint": "9.39.5",
+    "typescript": "6.0.3"
+  }
+}

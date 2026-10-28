@@ -1,0 +1,12 @@
+{
+  "extends": "@parkfairy/config/tsconfig/node.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["specs", "support", "playwright.config.ts"]
+}

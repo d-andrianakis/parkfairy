@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+  - tests/*
+
+onlyBuiltDependencies:
+  - esbuild
+  - msgpackr-extract
+  - unrs-resolver
+
+ignoredBuiltDependencies:
+  - '@scarf/scarf'

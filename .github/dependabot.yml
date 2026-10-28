@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Upgrade framework families together; they share peer ranges.
+      nestjs:
+        patterns: ['@nestjs/*']
+      nextjs:
+        patterns: ['next', 'eslint-config-next', '@next/*', 'react', 'react-dom', '@types/react*']
+      better-auth:
+        patterns: ['better-auth', '@better-auth/*']
+      drizzle:
+        patterns: ['drizzle-orm', 'drizzle-kit']
+      testing:
+        patterns:
+          ['vitest', '@playwright/test', '@testing-library/*', 'axe-core', '@axe-core/*', 'jsdom']
+    ignore:
+      # Pinned on purpose; see memory.md ("Gotchas").
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      - dependency-name: eslint
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@eslint/js'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

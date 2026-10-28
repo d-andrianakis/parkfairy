@@ -1,0 +1,19 @@
+{
+  "name": "@parkfairy/smoke-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:smoke": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@parkfairy/config": "workspace:^",
+    "@playwright/test": "1.64.1",
+    "@types/node": "24.19.2",
+    "eslint": "9.39.5",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "extends": "@parkfairy/config/tsconfig/base.json",
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,105 @@
+{
+  "Metadata": {
+    "title": "Parkfairy",
+    "description": "Find and book parking ahead of time."
+  },
+  "Layout": {
+    "skipToContent": "Skip to main content",
+    "brand": "Parkfairy",
+    "homeLink": "Parkfairy home"
+  },
+  "Header": {
+    "accountNav": "Account",
+    "account": "Account",
+    "signIn": "Sign in",
+    "signUp": "Create account"
+  },
+  "LocaleSwitcher": {
+    "label": "Language"
+  },
+  "Home": {
+    "title": "Parking, booked before you arrive.",
+    "lead": "Reserve a spot at garages and private spaces near where you are going, with the full price shown up front.",
+    "ctaSignUp": "Create an account",
+    "ctaSignIn": "Sign in"
+  },
+  "SignUp": {
+    "metaTitle": "Create account",
+    "title": "Create your account",
+    "description": "Book parking and manage your reservations.",
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "passwordHint": "At least {min} characters.",
+    "submit": "Create account",
+    "submitting": "Creating account…",
+    "haveAccount": "Already have an account?",
+    "signInLink": "Sign in"
+  },
+  "SignIn": {
+    "metaTitle": "Sign in",
+    "title": "Sign in",
+    "description": "Welcome back to Parkfairy.",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "noAccount": "First time here?",
+    "signUpLink": "Create an account"
+  },
+  "TwoFactor": {
+    "metaTitle": "Two-factor verification",
+    "title": "Two-factor verification",
+    "description": "Enter the 6-digit code from your authenticator app.",
+    "code": "Authentication code",
+    "submit": "Verify",
+    "submitting": "Verifying…"
+  },
+  "Account": {
+    "metaTitle": "Account",
+    "greeting": "Hi, {name}",
+    "signedInAs": "Signed in as {email}",
+    "apiHeading": "Verified by the API",
+    "checking": "Checking your session with the API…",
+    "apiError": "The API could not verify your session.",
+    "userId": "User ID",
+    "role": "Role",
+    "roleName": "{role, select, admin {Administrator} other {Member}}",
+    "preferredLanguage": "Preferred language",
+    "twoFactor": "Two-factor authentication",
+    "twoFactorStatus": "{enabled, select, true {Enabled} other {Not enabled}}",
+    "memberSince": "Member since",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…"
+  },
+  "Validation": {
+    "nameRequired": "Enter your name",
+    "nameTooLong": "Use at most {max} characters",
+    "emailInvalid": "Enter a valid email address",
+    "passwordTooShort": "Use at least {min} characters",
+    "passwordTooLong": "Use at most {max} characters",
+    "passwordRequired": "Enter your password",
+    "codeInvalid": "Enter the 6-digit code",
+    "invalid": "Check this field"
+  },
+  "AuthErrors": {
+    "USER_ALREADY_EXISTS": "An account with this email already exists.",
+    "INVALID_EMAIL_OR_PASSWORD": "The email or password is incorrect.",
+    "INVALID_EMAIL": "Enter a valid email address.",
+    "PASSWORD_TOO_SHORT": "That password is too short.",
+    "PASSWORD_TOO_LONG": "That password is too long.",
+    "INVALID_CODE": "That code is not valid. Try again.",
+    "OTP_HAS_EXPIRED": "That code has expired. Try a new one.",
+    "TOO_MANY_ATTEMPTS": "Too many attempts. Sign in again to get a new code.",
+    "INVALID_TWO_FACTOR_COOKIE": "Your verification session expired. Sign in again.",
+    "INVALID_LOCALE": "That language is not supported.",
+    "TOO_MANY_REQUESTS": "Too many attempts. Wait a moment and try again.",
+    "UNKNOWN": "Something went wrong. Please try again."
+  },
+  "NotFound": {
+    "metaTitle": "Page not found",
+    "title": "We couldn’t find that page",
+    "description": "The link may be broken or the page may have moved.",
+    "home": "Go to the home page"
+  }
+}

@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import '@parkfairy/ui/globals.css';
+
+/* Shared components live outside this app, so point Tailwind at them explicitly. */
+@source '../../../packages/ui/src';

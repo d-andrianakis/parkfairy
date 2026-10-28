@@ -1,0 +1,51 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "globalDependencies": [".env"],
+  "globalPassThroughEnv": [
+    "NODE_ENV",
+    "CI",
+    "DATABASE_URL",
+    "TEST_DATABASE_URL",
+    "REDIS_URL",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "API_URL",
+    "API_PORT",
+    "WORKER_HEALTH_PORT",
+    "TRUSTED_ORIGINS",
+    "API_CORS_ORIGINS",
+    "TRUST_PROXY",
+    "LOG_LEVEL",
+    "SMOKE_WEB_URL",
+    "SMOKE_API_URL",
+    "SMOKE_WORKER_URL",
+    "SMOKE_USER_EMAIL",
+    "SMOKE_USER_PASSWORD"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "test:smoke": {
+      "dependsOn": ["@parkfairy/api#build", "@parkfairy/web#build", "@parkfairy/worker#build"],
+      "cache": false
+    }
+  }
+}

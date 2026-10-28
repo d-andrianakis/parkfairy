@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgres://parkfairy:parkfairy@localhost:5432/parkfairy
+  TEST_DATABASE_URL: postgres://parkfairy:parkfairy@localhost:5432/parkfairy_test
+  REDIS_URL: redis://localhost:6379
+  # CI-only value; real secrets live in each environment's secret store.
+  BETTER_AUTH_SECRET: ci-only-secret-never-used-outside-ci-0123456789
+  BETTER_AUTH_URL: http://localhost:3000
+  TRUSTED_ORIGINS: http://localhost:3000
+  API_URL: http://localhost:4000
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  verify:
+    name: Lint, typecheck, migrations, unit + integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgis/postgis:17-3.6
+        env:
+          POSTGRES_USER: parkfairy
+          POSTGRES_PASSWORD: parkfairy
+          POSTGRES_DB: parkfairy
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U parkfairy -d parkfairy"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Create test database
+        run: psql "$DATABASE_URL" -c 'CREATE DATABASE parkfairy_test'
+
+      - run: pnpm format:check
+      - run: pnpm build
+      - run: pnpm lint
+      - run: pnpm typecheck
+
+      - name: Migrations apply cleanly and re-run as a no-op
+        run: |
+          pnpm db:migrate
+          pnpm db:migrate
+
+      - name: Drizzle schema has no unmigrated changes
+        run: |
+          pnpm --filter @parkfairy/database exec drizzle-kit check
+          pnpm db:generate
+          git diff --exit-code -- packages/database/migrations
+          test -z "$(git status --porcelain -- packages/database/migrations)"
+
+      - name: Generated API client matches the API
+        run: |
+          pnpm api:generate
+          git diff --exit-code -- packages/api-client
+
+      - name: Unit and integration tests
+        run: pnpm test
+
+  smoke:
+    name: Smoke tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgis/postgis:17-3.6
+        env:
+          POSTGRES_USER: parkfairy
+          POSTGRES_PASSWORD: parkfairy
+          POSTGRES_DB: parkfairy
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U parkfairy -d parkfairy"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+      redis:
+        image: redis:8.8-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @parkfairy/smoke-tests exec playwright install --with-deps chromium
+      - run: pnpm db:migrate
+      - run: pnpm test:smoke
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: tests/smoke/playwright-report
+          retention-days: 7
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # Fails on high/critical advisories in production dependencies.
+      - run: pnpm audit --prod --audit-level high
