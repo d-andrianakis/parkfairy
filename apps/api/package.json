@@ -39,7 +39,7 @@
     "@nestjs/testing": "12.3.2",
     "@parkfairy/config": "workspace:*",
     "@types/express": "5.0.6",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.5",
     "@types/supertest": "7.2.1",
     "eslint": "9.39.5",
     "pino-pretty": "13.2.0",
