@@ -105,7 +105,7 @@ test.describe('signed in', () => {
   for (const locale of locales) {
     test(`/${locale}/account has no WCAG 2.2 AA violations`, async ({ page }) => {
       await page.goto(`/${locale}/account`);
-      await expect(page.getByTestId('api-user-id')).toBeVisible();
+      await expect(page.getByTestId('api-user-id')).toHaveText(/^[0-9a-f-]{36}$/);
       await expectAccessible(page);
     });
   }
@@ -113,14 +113,14 @@ test.describe('signed in', () => {
   test('/el/account reflows at 320px', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('/el/account');
-    await expect(page.getByTestId('api-user-id')).toBeVisible(); // long UUID and email
+    await expect(page.getByTestId('api-user-id')).toHaveText(/^[0-9a-f-]{36}$/); // long UUID and email
     await expectNoSidewaysScroll(page, 'el', 1);
   });
 
   test('/en/account has no WCAG 2.2 AA violations in dark mode', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('/en/account');
-    await expect(page.getByTestId('api-user-id')).toBeVisible();
+    await expect(page.getByTestId('api-user-id')).toHaveText(/^[0-9a-f-]{36}$/);
     await expectAccessible(page);
   });
 });

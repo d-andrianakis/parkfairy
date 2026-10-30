@@ -10,11 +10,13 @@ export const RATE_LIMIT_REDIS = Symbol('RATE_LIMIT_REDIS');
 /**
  * The rate-limit Redis client. At start-up commands wait briefly for the connection (no free
  * pass for the first requests); once connected, they fail at once while Redis is away instead
- * of queueing behind the 500 ms timeout (and being replayed, stale, on reconnect).
+ * of queueing behind the 500 ms timeout (and being replayed, stale, on reconnect). A hung
+ * connection (no reset, e.g. a failover) is dropped after a second without data.
  */
 export function createRateLimitRedis(url: string): Redis {
   const redis = new Redis(url, {
     commandTimeout: 500,
+    socketTimeout: 1000,
     maxRetriesPerRequest: 1,
     connectionName: 'parkfairy-api-rate-limit',
   });

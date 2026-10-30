@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AUTH_ERROR_KEYS, authErrorKey } from './auth-errors';
+import { AUTH_ERROR_KEYS, authErrorKey, authErrorValues } from './auth-errors';
 
 describe('authErrorKey', () => {
   it('maps Better Auth codes to catalog keys', () => {
@@ -10,7 +10,12 @@ describe('authErrorKey', () => {
 
   it('maps the two-factor settings codes', () => {
     expect(authErrorKey({ code: 'INVALID_PASSWORD', status: 400 })).toBe('INVALID_PASSWORD');
-    expect(authErrorKey({ code: 'ACCOUNT_TEMPORARILY_LOCKED' })).toBe('ACCOUNT_TEMPORARILY_LOCKED');
+    // Better Auth sends the lockout as a 429; the specific code must win over the status.
+    expect(authErrorKey({ code: 'ACCOUNT_TEMPORARILY_LOCKED', status: 429 })).toBe(
+      'ACCOUNT_TEMPORARILY_LOCKED',
+    );
+    expect(authErrorValues('ACCOUNT_TEMPORARILY_LOCKED')).toEqual({ minutes: 15 });
+    expect(authErrorKey({ code: 'INVALID_BACKUP_CODE', status: 401 })).toBe('INVALID_BACKUP_CODE');
   });
 
   it('folds code variants into one message', () => {

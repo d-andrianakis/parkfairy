@@ -11,8 +11,11 @@ import { TwoFactorForm } from './two-factor-form';
 // Only the catalog namespaces this subtree ships to the browser.
 const renderInSubtree = rendererFor(CLIENT_NAMESPACES.auth);
 
-vi.mock('@/lib/auth-client', () => ({ authClient: { twoFactor: { verifyTotp: vi.fn() } } }));
+vi.mock('@/lib/auth-client', () => ({
+  authClient: { twoFactor: { verifyTotp: vi.fn(), verifyBackupCode: vi.fn() } },
+}));
 const verifyTotp = vi.mocked(authClient.twoFactor.verifyTotp);
+const verifyBackupCode = vi.mocked(authClient.twoFactor.verifyBackupCode);
 
 async function enter(code: string) {
   await userEvent.type(screen.getByLabelText('Authentication code'), code);
@@ -22,6 +25,7 @@ async function enter(code: string) {
 describe('TwoFactorForm', () => {
   beforeEach(() => {
     verifyTotp.mockReset(); // braces: a returned function would run as a cleanup hook
+    verifyBackupCode.mockReset();
   });
 
   it('asks for a 6-digit code before calling the server', async () => {
@@ -110,5 +114,56 @@ describe('TwoFactorForm', () => {
     } finally {
       raf.mockRestore();
     }
+  });
+
+  it('signs in with a backup code when the phone is lost', async () => {
+    verifyBackupCode.mockResolvedValue({ data: {}, error: null } as never);
+    const { container } = renderInSubtree(<TwoFactorForm />);
+    await userEvent.click(screen.getByRole('button', { name: 'Use a backup code instead' }));
+
+    const field = screen.getByLabelText('Backup code');
+    await waitFor(() => expect(field).toHaveFocus());
+    await expectNoAxeViolations(container);
+    await userEvent.type(field, ' AbCdE-12345 ');
+    await userEvent.click(screen.getByRole('button', { name: 'Verify' }));
+
+    expect(verifyBackupCode).toHaveBeenCalledWith({ code: 'AbCdE-12345' });
+    expect(verifyTotp).not.toHaveBeenCalled();
+    expect(routerMock.replace).toHaveBeenCalledWith('/account');
+  });
+
+  it('says when a backup code is wrong or used, and can go back to the app code', async () => {
+    verifyBackupCode.mockResolvedValue({
+      data: null,
+      error: { code: 'INVALID_BACKUP_CODE', status: 401 },
+    } as never);
+    renderInSubtree(<TwoFactorForm />, { locale: 'el' });
+    await userEvent.click(screen.getByRole('button', { name: 'Χρήση εφεδρικού κωδικού' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Επαλήθευση' }));
+    expect(screen.getByLabelText('Εφεδρικός κωδικός')).toHaveAccessibleDescription(
+      'Εισαγάγετε έναν από τους εφεδρικούς κωδικούς σας',
+    );
+
+    await userEvent.type(screen.getByLabelText('Εφεδρικός κωδικός'), 'used-code');
+    await userEvent.click(screen.getByRole('button', { name: 'Επαλήθευση' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('έχει ήδη χρησιμοποιηθεί');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Χρήση εφαρμογής ελέγχου ταυτότητας' }),
+    );
+    await waitFor(() => expect(screen.getByLabelText('Κωδικός ελέγχου ταυτότητας')).toHaveFocus());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('says how long a locked account must wait (the lockout arrives as a 429)', async () => {
+    verifyTotp.mockResolvedValue({
+      data: null,
+      error: { code: 'ACCOUNT_TEMPORARILY_LOCKED', status: 429 },
+    } as never);
+    renderInSubtree(<TwoFactorForm />);
+    await enter('123456');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Too many wrong codes. Try again in 15 minutes.',
+    );
   });
 });

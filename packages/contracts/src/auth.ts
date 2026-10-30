@@ -31,6 +31,19 @@ export const PasswordConfirmSchema = z.object({
 });
 export type PasswordConfirm = z.infer<typeof PasswordConfirmSchema>;
 
+/** Wrong two-factor codes at sign-in before the account locks, and for how long. */
+export const TWO_FACTOR_LOCKOUT = { maxFailedAttempts: 10, minutes: 15 } as const;
+
+/** One of the backup codes shown at enrolment (Better Auth's look like `AbCdE-12345`). */
+export const BackupCodeInputSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(1, message('backupCodeRequired'))
+    .max(64, message('backupCodeRequired')),
+});
+export type BackupCodeInput = z.infer<typeof BackupCodeInputSchema>;
+
 export const TotpInputSchema = z.object({
   code: z.string().regex(/^\d{6}$/, message('codeInvalid')),
 });

@@ -21,7 +21,7 @@ function parts() {
       ],
       queues: [{ close: vi.fn(() => Promise.resolve(void events.push('queue closed'))) }],
       database: { close: vi.fn(() => Promise.resolve(void events.push('database closed'))) },
-      logger: { info: vi.fn() },
+      logger: { info: vi.fn(), error: vi.fn() },
       exit: vi.fn((code: number) => void events.push(`exit ${code}`)),
     },
   };
@@ -58,5 +58,18 @@ describe('createShutdown', () => {
 
     expect(shutdownParts.workers[0]?.close).toHaveBeenCalledTimes(1);
     expect(shutdownParts.exit).toHaveBeenCalledTimes(1);
+  });
+
+  it('still exits, with 1, when closing fails', async () => {
+    const { finishJob, shutdownParts } = parts();
+    shutdownParts.database.close.mockRejectedValue(new Error('connection lost'));
+    const done = createShutdown(shutdownParts)('SIGTERM');
+    finishJob();
+    await done;
+
+    const [[logged, message]] = shutdownParts.logger.error.mock.calls as [[{ err: Error }, string]];
+    expect(logged.err.message).toBe('connection lost');
+    expect(message).toBe('shutdown failed');
+    expect(shutdownParts.exit).toHaveBeenCalledWith(1);
   });
 });

@@ -44,9 +44,11 @@ Legend: `[x]` done · `[ ]` not done · `[~]` partially done (say what is missin
 
 - [x] Email + password sign-up / sign-in / sign-out; UUID ids; role not client-settable
 - [x] Two-factor verification at sign-in (TOTP)
-- [~] 2FA enrolment UI on the account page (password re-check, QR + typed key, first code,
-  backup codes once, turn off with password): unit tests + `two-factor.smoke.ts`; review
-  round pending
+- [x] 2FA enrolment UI on the account page (password re-check, QR + typed key, first code,
+      backup codes once, turn off with password); other sessions end when it changes; backup
+      codes usable at sign-in; lockout message with the wait. Unit tests, integration test
+      against real Better Auth (`two-factor.integration.test.ts`), `two-factor.smoke.ts`
+      (including "password alone is no session" and a 320 px Greek check); reviewed twice
 - [ ] Email verification + password reset (needs Resend)
 - [x] Unit tests: auth config (`packages/auth/src/index.test.ts`), forms (`sign-in-form`, `sign-up-form`, `two-factor-form` tests)
 - [x] Smoke: `auth.smoke.ts`
@@ -211,8 +213,10 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
       and a failed session lookup renders the page signed out instead of an error
 - [x] Performance: first-visit JS 212 → 169 KiB on catalogue pages, 239 → 228 KiB on sign-in
       (zod, contract schemas and React Query out of the root layout); Redis outages no longer
-      add 500 ms per request; pool connection-wait limits and a web statement timeout; API
-      latency budget for search and listing in the performance smoke
+      add 500 ms per request once connected (and, after round 3, neither does a hung
+      connection or a Redis that is down at start-up on the web); pool connection-wait limits
+      and statement timeouts; API latency budget for search and listing in the performance
+      smoke
 - [x] Accessibility: focus after a language switch, none on Back/Forward; error page focuses
       its heading and keeps focus on retry; error-summary links name their field; stay ranges
       read "to" instead of a skipped dash; stale failed-submit messages cleared
@@ -227,7 +231,29 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
       garage sends 65 KB), EVALSHA for the rate-limit scripts, opening-hours check in SQL
 - [ ] Decision needed: how a stay that crosses a DST change is priced (today: real elapsed
       time, so the spring-forward night is an hour cheaper than the wall clock suggests)
-- [ ] Re-review of this round by the five review agents (running)
+- [x] Re-review of this round by the five review agents (findings fixed in 1.13)
+
+### 1.13 Third review round (2026-10-30)
+
+- [x] Security: turning two-factor on or off ends the user's other sessions; one factor row
+      per user (migration 0006); `TRUSTED_PROXIES` entries validated and `none` documented
+      precisely; `TRUST_PROXY=true` refused in production; no session token in logs;
+      two-factor changes from another site refused (smoke)
+- [x] Backup codes accepted at sign-in (they were promised but unusable)
+- [x] i18n: the lockout message (was masked by the generic 429) says how long to wait;
+      Greek two-factor terms consistent; "Στάθμευση στην περιοχή {area}" titles; stays next
+      year show the year; the root error screen always has its strings
+- [x] Accessibility: two-factor buttons wrap at 320 px (Greek overflowed); focus returns
+      after an awaited change; backup codes never split; password managers get the username;
+      root error screen focuses its heading
+- [x] Performance: Redis socket timeout on both clients, web never queues commands;
+      two-factor steps load on intent; the account page keeps its layout while the API
+      answers; API statement timeout 3 s (below the web's 4 s); account page in the JS and
+      CLS budgets
+- [x] Tests: RFC 6238 vectors, QR orientation, unhandled rejections, shutdown failure exit
+      code, wrong password while turning off, cancel at the QR step, proxy validation
+- [ ] Deferred: zod-free subpath for the form limits (2–3 KiB on auth pages); clearing
+      leftover rate-limit counters before local smoke runs (today: wait a minute)
 
 ## Phase 2: Owner onboarding and inventory (decisions #3–#6 in memory.md still open)
 
@@ -264,6 +290,7 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
 ## Phase 5: Owner and admin dashboards
 
 - [~] 2FA enrolment UI done (1.3); admin MFA enforced end to end once admin routes exist
+  (sessions without a second factor are already ended when it is switched on)
 - [ ] Owner calendar, bookings, listings, earnings
 - [ ] Admin approvals, moderation, users, bookings, payments, audit logs
 

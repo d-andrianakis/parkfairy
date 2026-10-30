@@ -5,15 +5,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { GlobalErrorScreen } from './global-error-screen';
 
 describe('GlobalErrorScreen', () => {
-  it('speaks the page language without the layout’s message provider', async () => {
+  it('speaks the page language without the layout’s message provider, at once', async () => {
     const { container } = render(
       <main>
         <GlobalErrorScreen locale="el" retry={() => {}} />
       </main>,
     );
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Παρουσιάστηκε σφάλμα' }),
-    ).toBeInTheDocument();
+    // Rendered at once (no catalog to fetch), with focus on the heading.
+    expect(screen.getByRole('heading', { level: 1, name: 'Παρουσιάστηκε σφάλμα' })).toHaveFocus();
     expect(screen.getByRole('button', { name: 'Δοκιμάστε ξανά' })).toBeInTheDocument();
     await expectNoAxeViolations(container);
   });

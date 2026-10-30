@@ -18,13 +18,16 @@ const enable = vi.mocked(authClient.twoFactor.enable);
 const disable = vi.mocked(authClient.twoFactor.disable);
 const verifyTotp = vi.mocked(authClient.twoFactor.verifyTotp);
 
+const EMAIL = 'demo@example.com';
 const SETUP = {
   method: 'totp',
   totpURI: 'otpauth://totp/Parkfairy:demo%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=Parkfairy',
   backupCodes: ['aaaaa-11111', 'bbbbb-22222', 'ccccc-33333'],
 };
 
+// The steps load lazily, so wait for the password field first.
 async function confirmPassword(password: string, submit = 'Continue') {
+  await screen.findByLabelText('Password');
   if (password) await userEvent.type(screen.getByLabelText('Password'), password);
   await userEvent.click(screen.getByRole('button', { name: submit }));
 }
@@ -37,18 +40,19 @@ describe('TwoFactorSettings', () => {
   });
 
   it('shows the current state and asks for the password before setting up', async () => {
-    const { container } = renderInSubtree(<TwoFactorSettings enabled={false} />);
+    const { container } = renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />);
     expect(screen.getByTestId('two-factor-status')).toHaveTextContent('Off.');
 
     await userEvent.click(screen.getByRole('button', { name: 'Set up two-factor authentication' }));
 
-    expect(screen.getByRole('heading', { name: 'Confirm it’s you' })).toHaveFocus();
+    const heading = await screen.findByRole('heading', { name: 'Confirm it’s you' });
+    await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password');
     await expectNoAxeViolations(container);
   });
 
   it('requires a password before calling the server', async () => {
-    renderInSubtree(<TwoFactorSettings enabled={false} />);
+    renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />);
     await userEvent.click(screen.getByRole('button', { name: 'Set up two-factor authentication' }));
     await confirmPassword('');
 
@@ -61,7 +65,7 @@ describe('TwoFactorSettings', () => {
       data: null,
       error: { code: 'INVALID_PASSWORD', status: 400 },
     } as never);
-    renderInSubtree(<TwoFactorSettings enabled={false} />);
+    renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />);
     await userEvent.click(screen.getByRole('button', { name: 'Set up two-factor authentication' }));
     await confirmPassword('wrong-password');
 
@@ -72,7 +76,7 @@ describe('TwoFactorSettings', () => {
   it('enrols: QR code and typed key, a first code, then backup codes shown once', async () => {
     enable.mockResolvedValue({ data: SETUP, error: null } as never);
     verifyTotp.mockResolvedValue({ data: { token: 't' }, error: null } as never);
-    const { container } = renderInSubtree(<TwoFactorSettings enabled={false} />);
+    const { container } = renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />);
     await userEvent.click(screen.getByRole('button', { name: 'Set up two-factor authentication' }));
     await confirmPassword('correct-password');
 
@@ -115,7 +119,7 @@ describe('TwoFactorSettings', () => {
       data: null,
       error: { code: 'INVALID_CODE', status: 401 },
     } as never);
-    renderInSubtree(<TwoFactorSettings enabled={false} />);
+    renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />);
     await userEvent.click(screen.getByRole('button', { name: 'Set up two-factor authentication' }));
     await confirmPassword('correct-password');
 
@@ -133,9 +137,9 @@ describe('TwoFactorSettings', () => {
   });
 
   it('cancelling returns to the overview with focus on the button', async () => {
-    renderInSubtree(<TwoFactorSettings enabled={false} />);
+    renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />);
     await userEvent.click(screen.getByRole('button', { name: 'Set up two-factor authentication' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
 
     await waitFor(() =>
       expect(
@@ -147,7 +151,7 @@ describe('TwoFactorSettings', () => {
 
   it('turns two-factor off after the password is confirmed', async () => {
     disable.mockResolvedValue({ data: { status: true }, error: null } as never);
-    renderInSubtree(<TwoFactorSettings enabled />);
+    renderInSubtree(<TwoFactorSettings enabled email={EMAIL} />);
     expect(screen.getByTestId('two-factor-status')).toHaveTextContent('On.');
 
     await userEvent.click(
@@ -169,7 +173,7 @@ describe('TwoFactorSettings', () => {
       () =>
         new Promise((resolve) => (finish = () => resolve({ data: SETUP, error: null } as never))),
     );
-    renderInSubtree(<TwoFactorSettings enabled={false} />);
+    renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />);
     await userEvent.click(screen.getByRole('button', { name: 'Set up two-factor authentication' }));
     await confirmPassword('correct-password');
 
@@ -185,12 +189,54 @@ describe('TwoFactorSettings', () => {
   });
 
   it('speaks Greek', async () => {
-    renderInSubtree(<TwoFactorSettings enabled={false} />, { locale: 'el' });
+    renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />, { locale: 'el' });
     expect(screen.getByTestId('two-factor-status')).toHaveTextContent('Ανενεργός.');
     await userEvent.click(
-      screen.getByRole('button', { name: 'Ενεργοποίηση ελέγχου δύο παραγόντων' }),
+      screen.getByRole('button', { name: 'Ρύθμιση ελέγχου ταυτότητας δύο παραγόντων' }),
     );
-    expect(screen.getByRole('heading', { name: 'Επιβεβαιώστε ότι είστε εσείς' })).toHaveFocus();
+    const heading = await screen.findByRole('heading', { name: 'Επιβεβαιώστε ότι είστε εσείς' });
+    await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByLabelText('Κωδικός πρόσβασης')).toBeInTheDocument();
+  });
+
+  it('keeps two-factor on when the password is wrong while turning it off', async () => {
+    disable.mockResolvedValue({
+      data: null,
+      error: { code: 'INVALID_PASSWORD', status: 400 },
+    } as never);
+    renderInSubtree(<TwoFactorSettings enabled email={EMAIL} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Turn off two-factor authentication' }),
+    );
+    await confirmPassword('wrong-password', 'Turn off two-factor authentication');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('That password is incorrect.');
+    expect(routerMock.refresh).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByTestId('two-factor-status')).toHaveTextContent('On.');
+  });
+
+  it('cancelling at the QR step leaves two-factor off, with focus on Set up', async () => {
+    enable.mockResolvedValue({ data: SETUP, error: null } as never);
+    renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Set up two-factor authentication' }));
+    await confirmPassword('correct-password');
+    await screen.findByRole('img', { name: 'QR code for your authenticator app' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByTestId('two-factor-status')).toHaveTextContent('Off.');
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Set up two-factor authentication' }),
+      ).toHaveFocus(),
+    );
+    expect(verifyTotp).not.toHaveBeenCalled();
+  });
+
+  it('tells password managers which login the password is for', async () => {
+    const { container } = renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Set up two-factor authentication' }));
+    await screen.findByLabelText('Password');
+    expect(container.querySelector('input[autocomplete=username]')).toHaveValue(EMAIL);
   });
 });

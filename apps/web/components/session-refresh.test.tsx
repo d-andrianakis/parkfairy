@@ -18,10 +18,16 @@ describe('SessionRefresh', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('ignores a failed request (the next page load tries again)', async () => {
-    const fetchMock = vi.fn().mockRejectedValue(new TypeError('offline'));
-    vi.stubGlobal('fetch', fetchMock);
-    render(<SessionRefresh />);
-    await expect(fetchMock.mock.results[0]?.value).rejects.toThrow('offline');
+  it('leaves no unhandled rejection when offline (the next page load tries again)', async () => {
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    try {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+      render(<SessionRefresh />);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', unhandled);
+    }
   });
 });

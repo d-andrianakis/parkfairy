@@ -11,6 +11,7 @@ export const VALIDATION_MESSAGES = [
   'passwordTooLong',
   'passwordRequired',
   'codeInvalid',
+  'backupCodeRequired',
   'locationRequired',
   'dateInvalid',
   'timeNotOnStep',

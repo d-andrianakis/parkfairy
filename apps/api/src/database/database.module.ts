@@ -18,7 +18,8 @@ export const DB = Symbol('DB');
           connectionString: env.DATABASE_URL,
           applicationName: 'parkfairy-api',
           // Public search must never hold a connection for long.
-          statementTimeoutMs: 5000,
+          // Below the web app's 4 s request timeout, so work is not done for nobody.
+          statementTimeoutMs: 3000,
           // Under load, fail fast rather than queue past the web app's 4 s timeout.
           connectionTimeoutMs: 2000,
         }),

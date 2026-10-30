@@ -9,10 +9,18 @@ export function StayRange({ start, end }: { start: string; end: string }) {
   const locale = useLocale();
   const timeZone = useTimeZone();
   const t = useTranslations('Listing');
+  const from = new Date(start);
+  const until = new Date(end);
+  // Stays can start up to a year ahead: name the year when it is not this one.
+  const year = (date: Date) =>
+    new Intl.DateTimeFormat('en', { year: 'numeric', timeZone }).format(date);
+  const thisYear = year(new Date());
+  const otherYear = year(from) !== thisYear || year(until) !== thisYear;
   const parts = new Intl.DateTimeFormat(locale, {
     ...stayOptions(locale),
+    ...(otherYear ? { year: 'numeric' } : {}),
     timeZone,
-  }).formatRangeToParts(new Date(start), new Date(end));
+  }).formatRangeToParts(from, until);
   // The separator is the shared literal right before the first part of the end.
   const firstEnd = parts.findIndex((part) => part.source === 'endRange');
   const separator = firstEnd > 0 && parts[firstEnd - 1]?.type === 'literal' ? firstEnd - 1 : -1;

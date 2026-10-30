@@ -40,6 +40,8 @@ describe('loadEnv', () => {
     expect(() => loadEnv(production)).toThrow(/TRUST_PROXY/);
     expect(() => loadEnv({ ...production, TRUST_PROXY: '' })).toThrow(/TRUST_PROXY/);
     expect(loadEnv({ ...production, TRUST_PROXY: '10.0.1.0/24' }).trustProxy).toBe('10.0.1.0/24');
+    // Express would take the left-most X-Forwarded-For entry, which visitors write.
+    expect(() => loadEnv({ ...production, TRUST_PROXY: 'true' })).toThrow(/TRUST_PROXY/);
   });
 
   it('rejects a short auth secret', () => {

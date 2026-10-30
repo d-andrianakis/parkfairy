@@ -1,7 +1,7 @@
 import type { MeResponse } from '@parkfairy/api-client';
 import { DEFAULT_TIME_ZONE } from '@parkfairy/contracts';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { rendererFor } from '@/test/render';
@@ -31,13 +31,17 @@ describe('ApiIdentity', () => {
     queryFn.mockReturnValue(new Promise(() => {}));
     renderInSubtree(<ApiIdentity />);
     expect(screen.getByRole('status')).toHaveTextContent('Checking your session with the API');
+    // The final layout is already there, so nothing moves when the answer arrives.
+    expect(screen.getByText('User ID')).toBeInTheDocument();
+    expect(screen.getByText('Member since')).toBeInTheDocument();
   });
 
   it('shows the API-verified identity formatted for the reader’s locale and time zone', async () => {
     queryFn.mockResolvedValue(me);
     const { container } = renderInSubtree(<ApiIdentity />, { locale: 'el' });
 
-    expect(await screen.findByTestId('api-user-id')).toHaveTextContent(me.id);
+    await waitFor(() => expect(screen.getByTestId('api-user-id')).toHaveTextContent(me.id));
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(screen.getByText('Μέλος')).toBeInTheDocument();
     expect(screen.getByText('Ανενεργός')).toBeInTheDocument();
     // The account's language is named in that language and marked up as such.

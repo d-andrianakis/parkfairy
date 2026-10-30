@@ -35,4 +35,16 @@ describe('parseServerEnv', () => {
     expect(() => parseServerEnv({ ...production, REDIS_URL: '' })).toThrow(/REDIS_URL/);
     expect(() => parseServerEnv({ ...production, TRUSTED_PROXIES: '' })).toThrow(/TRUSTED_PROXIES/);
   });
+
+  it('refuses proxy entries that are not addresses or ranges (Better Auth would drop them)', () => {
+    for (const entry of ['lb.internal', '10.0.0.0/33', '10.0.0.1/8/1', 'fd00::/129']) {
+      expect(() => parseServerEnv({ ...base, TRUSTED_PROXIES: entry }), entry).toThrow(
+        /TRUSTED_PROXIES/,
+      );
+    }
+    expect(
+      parseServerEnv({ ...base, TRUSTED_PROXIES: '10.0.0.0/8, fd00::/8, 192.0.2.1' })
+        .trustedProxies,
+    ).toEqual(['10.0.0.0/8', 'fd00::/8', '192.0.2.1']);
+  });
 });

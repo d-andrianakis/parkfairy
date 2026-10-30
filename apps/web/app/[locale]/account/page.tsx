@@ -51,13 +51,17 @@ export default async function AccountPage({ params }: LocaleParams) {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>
+              {/* leading-snug: the Greek heading wraps on phones, and accents need the room. */}
+              <CardTitle className="leading-snug">
                 <h2>{tTwoFactor('heading')}</h2>
               </CardTitle>
               <CardDescription>{tTwoFactor('intro')}</CardDescription>
             </CardHeader>
             <CardContent>
-              <TwoFactorSettings enabled={session.user.twoFactorEnabled === true} />
+              <TwoFactorSettings
+                enabled={session.user.twoFactorEnabled === true}
+                email={session.user.email}
+              />
             </CardContent>
           </Card>
         </Providers>

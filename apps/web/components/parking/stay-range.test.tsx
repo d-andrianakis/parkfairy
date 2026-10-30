@@ -1,5 +1,5 @@
 import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render';
 import { StayRange } from './stay-range';
 
@@ -25,6 +25,14 @@ function spoken(element: HTMLElement): string {
 }
 
 describe('StayRange', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-30T10:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('reads "to" instead of the dash, in Athens time (Greek, 24-hour)', () => {
     renderRange(SAME_DAY_END, 'el');
     const range = screen.getByTestId('range');
@@ -38,5 +46,15 @@ describe('StayRange', () => {
     renderRange(NEXT_DAY_END, 'en');
     const range = screen.getByTestId('range');
     expect(spoken(range)).toBe('Mon, Nov 2, 9:00 AM to Tue, Nov 3, 10:00 AM');
+  });
+
+  it('names the year when the stay is not this year', () => {
+    renderWithProviders(
+      <p data-testid="range">
+        <StayRange start="2027-10-21T06:00:00.000Z" end="2027-10-21T08:00:00.000Z" />
+      </p>,
+      { locale: 'el' },
+    );
+    expect(spoken(screen.getByTestId('range'))).toMatch(/21 Οκτ 2027, 09:00 έως 11:00/);
   });
 });

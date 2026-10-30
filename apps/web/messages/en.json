@@ -162,7 +162,11 @@
     "description": "Enter the 6-digit code from your authenticator app.",
     "code": "Authentication code",
     "submit": "Verify",
-    "submitting": "Verifying…"
+    "submitting": "Verifying…",
+    "useBackupCode": "Use a backup code instead",
+    "useAuthenticator": "Use your authenticator app instead",
+    "backupCode": "Backup code",
+    "backupDescription": "Enter one of the backup codes you saved when you set up two-factor authentication. Each one works once."
   },
   "Account": {
     "metaTitle": "Account",
@@ -195,14 +199,14 @@
     "working": "Checking…",
     "cancel": "Cancel",
     "scanHeading": "Add Parkfairy to your authenticator app",
-    "scanText": "Scan the QR code with an authenticator app, or type in the key below. Then enter the 6-digit code it shows.",
+    "scanText": "Scan the QR code with an authenticator app, or type in the key below. Then enter the 6-digit code the app shows.",
     "qrLabel": "QR code for your authenticator app",
     "manualKey": "Key for typing in by hand",
     "code": "Authentication code",
     "verify": "Turn on",
     "verifying": "Verifying…",
     "backupHeading": "Save your backup codes",
-    "backupText": "Each code signs you in once if you lose your phone. Store them somewhere safe: they won’t be shown again.",
+    "backupText": "If you lose your phone, each code signs you in once. Store them somewhere safe: they won’t be shown again.",
     "backupListLabel": "Backup codes",
     "done": "I’ve saved them"
   },
@@ -221,7 +225,8 @@
     "startTooFar": "{max, plural, one {Choose a start within the next day} other {Choose a start within the next # days}}",
     "endBeforeStart": "The end must be after the start",
     "durationTooLong": "A stay can last at most {max, plural, one {# day} other {# days}}",
-    "invalid": "Check this field"
+    "invalid": "Check this field",
+    "backupCodeRequired": "Enter one of your backup codes"
   },
   "Forms": {
     "invalidSummary": "{count, plural, one {# field needs your attention} other {# fields need your attention}}",
@@ -237,11 +242,12 @@
     "INVALID_CODE": "That code is not valid. Try again.",
     "OTP_HAS_EXPIRED": "That code has expired. Try a new one.",
     "TOO_MANY_ATTEMPTS": "Too many attempts. Sign in again to get a new code.",
-    "ACCOUNT_TEMPORARILY_LOCKED": "Too many wrong codes. Wait a while, then try again.",
+    "ACCOUNT_TEMPORARILY_LOCKED": "Too many wrong codes. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
     "INVALID_TWO_FACTOR_COOKIE": "Your verification session expired. Sign in again.",
     "INVALID_LOCALE": "That language is not supported.",
     "TOO_MANY_REQUESTS": "Too many attempts. Wait a moment and try again.",
-    "UNKNOWN": "Something went wrong. Please try again."
+    "UNKNOWN": "Something went wrong. Please try again.",
+    "INVALID_BACKUP_CODE": "That backup code is not valid or has already been used."
   },
   "NotFound": {
     "metaTitle": "Page not found",

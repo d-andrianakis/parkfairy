@@ -6,9 +6,9 @@ import { assertLocalDatabase } from './seed.js';
 describe('assertLocalDatabase', () => {
   it('allows local databases outside production', () => {
     expect(() =>
-      assertLocalDatabase('postgres://u:p@localhost:5434/parkfairy', 'development'),
+      assertLocalDatabase('postgres://u:p@localhost:5434/parkfairy', 'development', ''),
     ).not.toThrow();
-    expect(() => assertLocalDatabase('postgres://u:p@127.0.0.1:5432/x', 'test')).not.toThrow();
+    expect(() => assertLocalDatabase('postgres://u:p@127.0.0.1:5432/x', 'test', '')).not.toThrow();
   });
 
   it('refuses URLs whose ?host= or ?hostaddr= points elsewhere (node-postgres honours them)', () => {

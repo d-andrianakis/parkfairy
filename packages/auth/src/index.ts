@@ -3,10 +3,16 @@
  * HTTP handlers) and the API (which only verifies sessions). Both must build the
  * instance from this function so cookie names, secrets and schema always match.
  */
-import { DEFAULT_LOCALE, isLocale, PASSWORD_POLICY, SUPPORTED_LOCALES } from '@parkfairy/contracts';
+import {
+  DEFAULT_LOCALE,
+  isLocale,
+  PASSWORD_POLICY,
+  SUPPORTED_LOCALES,
+  TWO_FACTOR_LOCKOUT,
+} from '@parkfairy/contracts';
 import { schema, type Database } from '@parkfairy/database';
 import { betterAuth } from 'better-auth';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { twoFactor } from 'better-auth/plugins';
 import type { RateLimitStorage } from './rate-limit-storage.js';
@@ -103,10 +109,40 @@ export function createAuth({
       useSecureCookies: baseURL.startsWith('https://'),
       database: { generateId: 'uuid' },
     },
-    plugins: [twoFactor({ issuer: 'Parkfairy' })],
+    hooks: { after: endOtherSessionsOnTwoFactorChange },
+    plugins: [
+      twoFactor({
+        issuer: 'Parkfairy',
+        // Explicit (these are Better Auth's defaults) because the UI tells people the wait.
+        accountLockout: {
+          maxFailedAttempts: TWO_FACTOR_LOCKOUT.maxFailedAttempts,
+          durationSeconds: TWO_FACTOR_LOCKOUT.minutes * 60,
+        },
+      }),
+    ],
     telemetry: { enabled: false },
   });
 }
+
+/** Requests that switch two-factor on (a code verified from a signed-in session) or off. */
+const TWO_FACTOR_CHANGES = new Set(['/two-factor/verify-totp', '/two-factor/disable']);
+
+/**
+ * Turning two-factor on or off replaces the current session; end the user's other sessions
+ * too. Admin routes check the user's flag, so a session that never passed a second factor
+ * (say, opened with a phished password before enrolment) must not ride on it. A two-factor
+ * sign-in has no prior session and leaves other devices alone.
+ */
+const endOtherSessionsOnTwoFactorChange = createAuthMiddleware(async (ctx) => {
+  if (!TWO_FACTOR_CHANGES.has(ctx.path)) return;
+  const fresh = ctx.context.newSession;
+  if (!fresh || !ctx.context.session?.session) return;
+  const sessions = await ctx.context.internalAdapter.listSessions(fresh.user.id);
+  const others = sessions
+    .map((session) => session.token)
+    .filter((token) => token !== fresh.session.token);
+  if (others.length > 0) await ctx.context.internalAdapter.deleteSessions(others);
+});
 
 export type Auth = ReturnType<typeof createAuth>;
 export type AuthSession = Auth['$Infer']['Session'];

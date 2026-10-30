@@ -22,7 +22,9 @@ export async function getLayoutSession() {
   try {
     return await getSession();
   } catch (error) {
-    console.error('Session lookup failed; rendering signed out', error);
+    // Name and code only: database errors quote their parameters, here the session token.
+    const { name, code } = error as { name?: string; code?: string };
+    console.error('Session lookup failed; rendering signed out', { name, code });
     return null;
   }
 }

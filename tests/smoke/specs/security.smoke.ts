@@ -77,6 +77,18 @@ test.describe('signed in', () => {
     expect(await response.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
   });
 
+  test('security settings cannot be changed from another site', async ({ page }) => {
+    await page.goto('/en');
+    for (const path of ['/api/auth/two-factor/enable', '/api/auth/two-factor/disable']) {
+      const response = await page.request.post(path, {
+        headers: { origin: 'https://evil.example' },
+        data: { password: 'irrelevant' },
+      });
+      expect(response.status(), path).toBe(403);
+      expect(await response.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
+    }
+  });
+
   test('sign-in ignores off-site return URLs', async ({ page }) => {
     await page.goto('/en/sign-in?next=//evil.example/phish');
     await expect(page).toHaveURL('/en/account');

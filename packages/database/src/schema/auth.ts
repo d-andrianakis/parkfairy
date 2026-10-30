@@ -17,6 +17,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -123,7 +124,8 @@ export const twoFactors = pgTable(
   },
   (t) => [
     index('two_factors_secret_idx').on(t.secret),
-    index('two_factors_user_id_idx').on(t.userId),
+    // One factor per user: concurrent enable requests must not leave two secrets behind.
+    unique('two_factors_user_id_unique').on(t.userId),
   ],
 );
 

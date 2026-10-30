@@ -56,7 +56,9 @@ test.describe('with demo listings', () => {
     await form.getByRole('button', { name: 'Αναζήτηση' }).click();
 
     await expect(page).toHaveURL(/\/el\/search\?area=syntagma/);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Στάθμευση: Σύνταγμα');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      'Στάθμευση στην περιοχή Σύνταγμα',
+    );
     // The stay in Athens time on the 24-hour clock (CI runs in UTC; this catches zone slips),
     // read as "09:00 έως 11:30": the dash is hidden from screen readers.
     await expect(page.getByText(/09:00–?\s*έως\s*11:30/)).toBeVisible();

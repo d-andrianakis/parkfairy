@@ -27,6 +27,11 @@ const EnvSchema = z
     message: 'REDIS_URL is required in production (rate limits must be shared across instances)',
     path: ['REDIS_URL'],
   })
+  .refine((env) => env.NODE_ENV !== 'production' || env.TRUST_PROXY !== 'true', {
+    // Express would take the left-most X-Forwarded-For entry, which the visitor writes.
+    message: 'TRUST_PROXY=true trusts visitors in production; list the web server addresses',
+    path: ['TRUST_PROXY'],
+  })
   .refine((env) => env.NODE_ENV !== 'production' || env.TRUST_PROXY, {
     message: 'TRUST_PROXY is required in production (the web server addresses, or "false")',
     path: ['TRUST_PROXY'],

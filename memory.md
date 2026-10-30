@@ -92,9 +92,12 @@ Still open:
   brute-force control on passwords and two-factor codes and an attacker must not be able to
   switch them off by upsetting Redis. Better Auth keys contain the raw request path (counted
   before routing, attacker-sized), so they are sha256-hashed. The API's two keys share a hash
-  tag (`throttle:{name:key}:hits|blocked`) for Redis Cluster. Clients queue commands only
-  until the first connection; after that they fail at once while Redis is away (no 500 ms
-  wait per request, no stale replays on reconnect). Failures are logged at most every 10 s.
+  tag (`throttle:{name:key}:hits|blocked`) for Redis Cluster. The web client never queues
+  commands (its fallback is the memory store, so there is no free pass); the API client
+  queues only until the first connection, then fails at once while Redis is away. Both drop
+  a hung connection after 1 s without data (`socketTimeout`): a failover without a reset
+  otherwise made every request wait the 500 ms command timeout for minutes. Failures are
+  logged at most every 10 s.
   Integration tests count in memory, except `rate-limit.integration.test.ts` (Redis
   database 15, refuses to flush a remote or default database).
 - **2026-10-29 · Worker shutdown** is checked by `pnpm --filter @parkfairy/worker
@@ -106,8 +109,12 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   never a count of the proxies in front of the web app: counting the web server as a hop
   trusts a visitor-chosen value. The first proxy must overwrite or append the header, and the
   web app's `TRUSTED_PROXIES` must list that proxy chain. Both are required in production
-  (explicit `none` / `false` allowed) so nobody ships the permissive defaults by accident.
-  Locally everything shares 127.0.0.1.
+  so nobody ships the permissive defaults by accident; `TRUST_PROXY=true` is refused there
+  (Express would take the visitor-written left-most entry), and `TRUSTED_PROXIES` entries
+  must be IPs or CIDRs (Better Auth silently drops anything else, which trusts visitors
+  again). `TRUSTED_PROXIES=none` makes Better Auth trust a single forwarded value, so it is
+  safe only behind a platform that overwrites `X-Forwarded-For` with the client address,
+  or locally. Locally everything shares 127.0.0.1.
 - **2026-10-29 · Sessions are refreshed through the auth handler, not in server
   components.** Server components cannot set cookies, so a Better Auth refresh during an RSC
   render extended the session in the database but not the cookie, and users were signed out
@@ -118,7 +125,17 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
 - **2026-10-29 · Two-factor enrolment** lives on the account page (password again → QR +
   typed key → first code → backup codes shown once; turning it off asks for the password).
   Enabling, verifying and disabling each rotate the session cookie, so the smoke test uses
-  its own account, never the shared one.
+  its own account, never the shared one. Switching two-factor on or off also ends the user's
+  other sessions (`hooks.after` in `packages/auth`): admin routes check the user's flag, so a
+  session that never passed a second factor must not inherit it. Backup codes work at
+  sign-in (`/two-factor`, "Use a backup code instead"), once each. After 10 wrong codes the
+  account locks for 15 minutes (`TWO_FACTOR_LOCKOUT` in contracts configures Better Auth and
+  the message). The steps load on intent, so the account page doesn't ship zod and the QR
+  encoder until someone starts a change.
+- **2026-10-30 · The root error screen carries its own strings.** `app/global-error.tsx`
+  shows when the root layout failed, often because a chunk could not load, so it can neither
+  use the message provider nor fetch a catalog. `messages/error-fallback.ts` holds the
+  `Error` namespace of each catalog; a test fails if it drifts from the catalogs.
 - **2026-10-29 · Search.** Location is a curated area (`AREAS` in contracts, names in the
   `Areas` catalog) or the browser position rounded to ~100 m; PostGIS `ST_DWithin` 5 km on a
   `geography` column with a GiST index, nearest first. Opening hours are weekly wall-clock
@@ -248,7 +265,8 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   first requests after start-up skipped rate limiting. Use the offline queue with a short
   `commandTimeout` instead.
 - **Zod JIT vs CSP:** Zod 4 probes `new Function`; the browser blocks it and reports a CSP
-  violation. The web client sets `z.config({ jitless: true })` in `app/providers.tsx`.
+  violation. `lib/zod-jitless.ts` sets `z.config({ jitless: true })`; see the import-order
+  note above.
 - **Next 16 dev writes `apps/web/AGENTS.md`** pointing agents at `node_modules/next/dist/docs`.
   Keep it committed (it is re-created otherwise). Those docs are the authority for Next 16
   APIs, which differ from older training data (`proxy.ts` replaces `middleware.ts`).
@@ -340,6 +358,8 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   page. Keep client components on the catalogue free of `@parkfairy/contracts` (barrel) and
   `lib/search.ts` imports. API catalogue reads: search and listing medians ~35 ms locally
   (budget 300 ms in `performance.smoke.ts`).
+- 2026-10-30: `/en/account` 196 KiB (two-factor steps load on intent; ~247 KiB if eager),
+  CLS 0 on a phone while the API identity loads (its layout renders before the data).
 
 ## Translation notes
 

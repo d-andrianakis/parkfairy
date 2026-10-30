@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { API_URL, DEMO_DATA } from '../support/env';
+import { API_URL, DEMO_DATA, SIGNED_IN_STATE } from '../support/env';
 
 // Feature: performance budgets — catch regressions in what the browser must download
 // and in API latency. Budgets are deliberately tight; raise them only with a reason
@@ -34,15 +34,41 @@ const CATALOGUE = DEMO_DATA
   ? ['/en/search?area=syntagma', '/en/parking/syntagma-square-garage']
   : [];
 
+async function expectWithinBudget(page: Page, path: string) {
+  const { javascriptBytes, requests } = await measureFirstVisit(page, path);
+  test.info().annotations.push({
+    type: 'measurement',
+    description: `${Math.round(javascriptBytes / 1024)} KiB JS, ${requests} requests`,
+  });
+  expect(javascriptBytes).toBeLessThan(BUDGETS.javascriptBytes);
+  expect(requests).toBeLessThan(BUDGETS.requests);
+}
+
+/** Cumulative Layout Shift on a phone until `ready` resolves ("good" is < 0.1). */
+async function measureLayoutShift(page: Page, path: string, ready: () => Promise<void>) {
+  await page.setViewportSize({ width: 375, height: 740 });
+  await page.addInitScript(() => {
+    const w = window as unknown as { __cls: number };
+    w.__cls = 0;
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries() as (PerformanceEntry & {
+        value: number;
+        hadRecentInput: boolean;
+      })[]) {
+        if (!entry.hadRecentInput) w.__cls += entry.value;
+      }
+    }).observe({ type: 'layout-shift', buffered: true });
+  });
+  await page.goto(path, { waitUntil: 'networkidle' });
+  await ready();
+  const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
+  test.info().annotations.push({ type: 'measurement', description: `CLS ${cls.toFixed(4)}` });
+  return cls;
+}
+
 for (const path of ['/en', '/en/sign-in', ...CATALOGUE]) {
   test(`${path} stays within the first-visit budget`, async ({ page }) => {
-    const { javascriptBytes, requests } = await measureFirstVisit(page, path);
-    test.info().annotations.push({
-      type: 'measurement',
-      description: `${Math.round(javascriptBytes / 1024)} KiB JS, ${requests} requests`,
-    });
-    expect(javascriptBytes).toBeLessThan(BUDGETS.javascriptBytes);
-    expect(requests).toBeLessThan(BUDGETS.requests);
+    await expectWithinBudget(page, path);
   });
 }
 
@@ -54,28 +80,28 @@ for (const [path, accountNav] of [
   ...CATALOGUE.map((catalogue) => [catalogue, 'Account'] as const),
 ] as const) {
   test(`${path} does not shift while loading on a phone`, async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 740 });
-    await page.addInitScript(() => {
-      const w = window as unknown as { __cls: number };
-      w.__cls = 0;
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries() as (PerformanceEntry & {
-          value: number;
-          hadRecentInput: boolean;
-        })[]) {
-          if (!entry.hadRecentInput) w.__cls += entry.value;
-        }
-      }).observe({ type: 'layout-shift', buffered: true });
-    });
-    await page.goto(path, { waitUntil: 'networkidle' });
-    await expect(page.getByRole('navigation', { name: accountNav }).getByRole('link')).toHaveCount(
-      2,
+    const cls = await measureLayoutShift(page, path, () =>
+      expect(page.getByRole('navigation', { name: accountNav }).getByRole('link')).toHaveCount(2),
     );
-    const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
-    test.info().annotations.push({ type: 'measurement', description: `CLS ${cls.toFixed(4)}` });
     expect(cls).toBeLessThan(BUDGETS.layoutShift);
   });
 }
+
+// The account page adds the API identity (fetched in the browser) and two-factor settings.
+test.describe('signed in', () => {
+  test.use({ storageState: SIGNED_IN_STATE });
+
+  test('/en/account stays within the first-visit budget', async ({ page }) => {
+    await expectWithinBudget(page, '/en/account');
+  });
+
+  test('/en/account does not shift while the API answers, on a phone', async ({ page }) => {
+    const cls = await measureLayoutShift(page, '/en/account', () =>
+      expect(page.getByTestId('api-user-id')).toHaveText(/^[0-9a-f-]{36}$/),
+    );
+    expect(cls).toBeLessThan(BUDGETS.layoutShift);
+  });
+});
 
 test.describe('API', () => {
   test.skip(!API_URL, 'API is not reachable from this runner');

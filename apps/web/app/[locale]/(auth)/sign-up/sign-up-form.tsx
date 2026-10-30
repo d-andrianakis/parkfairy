@@ -14,7 +14,7 @@ import { FormField } from '@/components/form-field';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
-import { authErrorKey, type AuthErrorKey } from '@/lib/auth-errors';
+import { authErrorKey, authErrorValues, type AuthErrorKey } from '@/lib/auth-errors';
 import { useValidationMessage } from '@/lib/use-validation-message';
 
 export function SignUpForm() {
@@ -53,7 +53,7 @@ export function SignUpForm() {
   return (
     <form method="post" onSubmit={submit} noValidate>
       <FieldGroup>
-        <FormError message={formError ? tError(formError) : null} />
+        <FormError message={formError ? tError(formError, authErrorValues(formError)) : null} />
         <FormField
           id="name"
           label={t('name')}
