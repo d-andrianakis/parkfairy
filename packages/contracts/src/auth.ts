@@ -25,6 +25,12 @@ export const SignInInputSchema = z.object({
 });
 export type SignInInput = z.infer<typeof SignInInputSchema>;
 
+/** Re-entering the password to change security settings (e.g. two-factor). */
+export const PasswordConfirmSchema = z.object({
+  password: z.string().min(1, message('passwordRequired')),
+});
+export type PasswordConfirm = z.infer<typeof PasswordConfirmSchema>;
+
 export const TotpInputSchema = z.object({
   code: z.string().regex(/^\d{6}$/, message('codeInvalid')),
 });

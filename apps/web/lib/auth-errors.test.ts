@@ -8,6 +8,11 @@ describe('authErrorKey', () => {
     );
   });
 
+  it('maps the two-factor settings codes', () => {
+    expect(authErrorKey({ code: 'INVALID_PASSWORD', status: 400 })).toBe('INVALID_PASSWORD');
+    expect(authErrorKey({ code: 'ACCOUNT_TEMPORARILY_LOCKED' })).toBe('ACCOUNT_TEMPORARILY_LOCKED');
+  });
+
   it('folds code variants into one message', () => {
     expect(authErrorKey({ code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL' })).toBe(
       'USER_ALREADY_EXISTS',

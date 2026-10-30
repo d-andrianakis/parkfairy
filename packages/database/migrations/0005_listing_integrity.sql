@@ -1,0 +1,4 @@
+ALTER TABLE "parking_locations" ADD CONSTRAINT "parking_locations_slug_check" CHECK ("parking_locations"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and char_length("parking_locations"."slug") <= 80);--> statement-breakpoint
+ALTER TABLE "parking_locations" ADD CONSTRAINT "parking_locations_time_zone_check" CHECK ("parking_locations"."time_zone" in ('Europe/Athens'));--> statement-breakpoint
+ALTER TABLE "parking_locations" ADD CONSTRAINT "parking_locations_text_length_check" CHECK (char_length("parking_locations"."name") between 1 and 120 and char_length("parking_locations"."address") between 1 and 200 and ("parking_locations"."description" is null or char_length("parking_locations"."description") <= 2000));--> statement-breakpoint
+ALTER TABLE "parking_spaces" ADD CONSTRAINT "parking_spaces_label_check" CHECK (char_length("parking_spaces"."label") between 1 and 20);

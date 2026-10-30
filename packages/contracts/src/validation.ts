@@ -11,6 +11,13 @@ export const VALIDATION_MESSAGES = [
   'passwordTooLong',
   'passwordRequired',
   'codeInvalid',
+  'locationRequired',
+  'dateInvalid',
+  'timeNotOnStep',
+  'startInPast',
+  'startTooFar',
+  'endBeforeStart',
+  'durationTooLong',
   'invalid',
 ] as const;
 export type ValidationMessage = (typeof VALIDATION_MESSAGES)[number];

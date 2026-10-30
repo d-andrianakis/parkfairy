@@ -37,11 +37,14 @@ pnpm install
 cp .env.example .env            # then set BETTER_AUTH_SECRET: openssl rand -base64 32
 pnpm db:up                      # Postgres 17 + PostGIS on :5434, Redis on :6380
 pnpm db:migrate
+pnpm db:seed                    # demo listings + demo account (local only)
 pnpm dev                        # web :3000, API :4000 (Swagger at /docs), worker health :4100
 ```
 
-Open http://localhost:3000 (redirects to `/el` or `/en` from your browser language), create an
-account, and the account page shows the identity the API derived from your session cookie.
+Open http://localhost:3000 (redirects to `/el` or `/en` from your browser language) to browse
+and search the demo parking without an account. Sign in with the demo account from
+[GETTING_STARTED.md](GETTING_STARTED.md#demo-account) to see the identity the API derived from
+your session cookie.
 
 The compose file uses ports 5434 and 6380 so it does not collide with a local Postgres or Redis.
 A `parkfairy_test` database is created on first start for the automated tests.

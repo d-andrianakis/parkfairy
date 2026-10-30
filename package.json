@@ -14,10 +14,11 @@
     "test": "turbo run test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:up": "docker compose up -d --wait",
+    "db:up": "docker compose up -d --wait && docker compose exec -T postgres psql -U parkfairy -d parkfairy -q -f /docker-entrypoint-initdb.d/02-local-marker.sql",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @parkfairy/database db:generate",
     "db:migrate": "pnpm --filter @parkfairy/database db:migrate",
+    "db:seed": "turbo run build --filter=@parkfairy/api... && pnpm --filter @parkfairy/api seed",
     "db:studio": "pnpm --filter @parkfairy/database db:studio",
     "api:generate": "turbo run build --filter=@parkfairy/api... && pnpm --filter @parkfairy/api-client openapi:generate",
     "test:smoke": "turbo run test:smoke"

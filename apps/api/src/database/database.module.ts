@@ -14,7 +14,14 @@ export const DB = Symbol('DB');
       provide: DB_CONNECTION,
       inject: [ENV],
       useFactory: (env: Env) =>
-        createDatabase({ connectionString: env.DATABASE_URL, applicationName: 'parkfairy-api' }),
+        createDatabase({
+          connectionString: env.DATABASE_URL,
+          applicationName: 'parkfairy-api',
+          // Public search must never hold a connection for long.
+          statementTimeoutMs: 5000,
+          // Under load, fail fast rather than queue past the web app's 4 s timeout.
+          connectionTimeoutMs: 2000,
+        }),
     },
     {
       provide: DB,

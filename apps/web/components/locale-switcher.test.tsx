@@ -1,28 +1,30 @@
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authClient } from '@/lib/auth-client';
 import { setPathname } from '@/test/navigation-mock';
-import { renderWithProviders } from '@/test/render';
+import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
+import { rendererFor } from '@/test/render';
 import { LocaleSwitcher } from './locale-switcher';
 
-vi.mock('@/lib/auth-client', () => ({
-  authClient: { useSession: vi.fn(), updateUser: vi.fn() },
-}));
+// Only the catalog namespaces this subtree ships to the browser.
+const renderInSubtree = rendererFor(CLIENT_NAMESPACES.root);
 
-const useSession = vi.mocked(authClient.useSession);
+vi.mock('@/lib/auth-client', () => ({ authClient: { updateUser: vi.fn() } }));
+
 const updateUser = vi.mocked(authClient.updateUser);
 
 describe('LocaleSwitcher', () => {
   beforeEach(() => {
     setPathname('/sign-in');
-    useSession.mockReturnValue({ data: null } as ReturnType<typeof authClient.useSession>);
     updateUser.mockReset();
   });
 
   it('offers each language by its own name, on the same page', async () => {
-    const { container } = renderWithProviders(<LocaleSwitcher />, { locale: 'el' });
+    const { container } = renderInSubtree(<LocaleSwitcher signedIn={false} />, {
+      locale: 'el',
+    });
 
     expect(screen.getByRole('navigation', { name: 'Γλώσσα' })).toBeInTheDocument();
     const greek = screen.getByRole('link', { name: 'Ελληνικά' });
@@ -35,21 +37,41 @@ describe('LocaleSwitcher', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('keeps the search and stay window when switching language', () => {
+    setPathname('/search', 'area=syntagma&startDate=2026-11-02&startTime=09%3A00');
+    renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });
+    expect(screen.getByRole('link', { name: 'English' })).toHaveAttribute(
+      'href',
+      '/en/search?area=syntagma&startDate=2026-11-02&startTime=09%3A00',
+    );
+  });
+
+  it('drops query parameters that are not part of a search (tokens and the like)', () => {
+    setPathname('/search', 'area=syntagma&token=secret&next=%2Faccount');
+    renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });
+    expect(screen.getByRole('link', { name: 'English' })).toHaveAttribute(
+      'href',
+      '/en/search?area=syntagma&next=%2Faccount',
+    );
+  });
+
   it('remembers the choice on the account when signed in', async () => {
-    useSession.mockReturnValue({ data: { user: {} } } as ReturnType<typeof authClient.useSession>);
-    renderWithProviders(<LocaleSwitcher />, { locale: 'el' });
+    renderInSubtree(<LocaleSwitcher signedIn />, { locale: 'el' });
 
     await userEvent.click(screen.getByRole('link', { name: 'English' }));
-    expect(updateUser).toHaveBeenCalledWith({ locale: 'en' });
+    // The auth client is loaded on demand, so the call lands a moment later.
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith({ locale: 'en' }));
   });
 
   it('does not call the API for anonymous visitors or the current language', async () => {
-    renderWithProviders(<LocaleSwitcher />, { locale: 'el' });
+    const { unmount } = renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });
     await userEvent.click(screen.getByRole('link', { name: 'English' }));
+    unmount();
 
-    useSession.mockReturnValue({ data: { user: {} } } as ReturnType<typeof authClient.useSession>);
+    renderInSubtree(<LocaleSwitcher signedIn />, { locale: 'el' });
     await userEvent.click(screen.getByRole('link', { name: 'Ελληνικά' }));
 
+    await vi.dynamicImportSettled(); // any lazy auth-client load would have finished
     expect(updateUser).not.toHaveBeenCalled();
   });
 });

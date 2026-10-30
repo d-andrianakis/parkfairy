@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@parkfairy/contracts';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@parkfairy/contracts/locales';
 import { defineRouting } from 'next-intl/routing';
 
 export const routing = defineRouting({

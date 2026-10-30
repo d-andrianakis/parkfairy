@@ -1,13 +1,20 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
-import { hasLocale, NextIntlClientProvider } from 'next-intl';
+import { hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
+import { ClientMessages } from '@/components/client-messages';
+import { RouteFocus } from '@/components/route-focus';
+import { SessionRefresh } from '@/components/session-refresh';
 import { SiteHeader } from '@/components/site-header';
+import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { routing } from '@/i18n/routing';
-import { Providers } from '../providers';
+import { getLayoutSession } from '@/lib/session';
+import { sessionRefreshDue } from '@/lib/session-refresh';
+import { themeClassName } from '@/lib/theme';
+import { getTheme } from '@/lib/theme.server';
 import '../globals.css';
 
 export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
@@ -34,9 +41,11 @@ export default async function LocaleLayout({
   // Pages carry a per-request CSP nonce, so they must render per request (see proxy.ts).
   await headers();
   const t = await getTranslations({ locale, namespace: 'Layout' });
+  const theme = await getTheme();
+  const session = await getLayoutSession();
 
   return (
-    <html lang={locale}>
+    <html lang={locale} className={themeClassName(theme)}>
       <body className="min-h-dvh antialiased">
         <a
           href="#main-content"
@@ -44,14 +53,15 @@ export default async function LocaleLayout({
         >
           {t('skipToContent')}
         </a>
-        <NextIntlClientProvider>
-          <Providers>
-            <SiteHeader />
-            <main id="main-content" tabIndex={-1} className="outline-none">
-              {children}
-            </main>
-          </Providers>
-        </NextIntlClientProvider>
+        {/* Client components in the header and the error page; pages add their own. */}
+        <ClientMessages namespaces={CLIENT_NAMESPACES.root}>
+          <RouteFocus />
+          {session && sessionRefreshDue(session.session.expiresAt) ? <SessionRefresh /> : null}
+          <SiteHeader theme={theme} signedIn={Boolean(session)} />
+          <main id="main-content" tabIndex={-1} className="outline-none">
+            {children}
+          </main>
+        </ClientMessages>
       </body>
     </html>
   );

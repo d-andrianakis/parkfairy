@@ -10,8 +10,12 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { requireSession } from '@/lib/session';
+import { ClientMessages } from '@/components/client-messages';
+import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { ApiIdentity } from './api-identity';
+import { Providers } from './providers';
 import { SignOutButton } from './sign-out-button';
+import { TwoFactorSettings } from './two-factor-settings';
 
 export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
   const t = await getTranslations({ locale: await localeFromParams(params), namespace: 'Account' });
@@ -22,23 +26,42 @@ export default async function AccountPage({ params }: LocaleParams) {
   const locale = await localeFromParams(params);
   const session = await requireSession('/account');
   const t = await getTranslations({ locale, namespace: 'Account' });
+  const tTwoFactor = await getTranslations({ locale, namespace: 'TwoFactorSettings' });
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-12">
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <h1>{t('greeting', { name: session.user.name })}</h1>
-          </CardTitle>
-          <CardDescription>{t('signedInAs', { email: session.user.email })}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ApiIdentity />
-        </CardContent>
-        <CardFooter>
-          <SignOutButton />
-        </CardFooter>
-      </Card>
+    <div className="mx-auto grid w-full max-w-2xl gap-6 px-4 py-12">
+      <ClientMessages namespaces={CLIENT_NAMESPACES.account}>
+        <Providers>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">
+                <h1>{t('greeting', { name: session.user.name })}</h1>
+              </CardTitle>
+              {/* Email addresses have no break points; let them wrap on narrow screens. */}
+              <CardDescription className="wrap-anywhere">
+                {t('signedInAs', { email: session.user.email })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ApiIdentity />
+            </CardContent>
+            <CardFooter>
+              <SignOutButton />
+            </CardFooter>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>{tTwoFactor('heading')}</h2>
+              </CardTitle>
+              <CardDescription>{tTwoFactor('intro')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TwoFactorSettings enabled={session.user.twoFactorEnabled === true} />
+            </CardContent>
+          </Card>
+        </Providers>
+      </ClientMessages>
     </div>
   );
 }

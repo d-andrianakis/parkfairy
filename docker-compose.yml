@@ -9,7 +9,8 @@ services:
       POSTGRES_PASSWORD: parkfairy
       POSTGRES_DB: parkfairy
     ports:
-      - '5434:5432'
+      # Loopback only: the dev password is public.
+      - '127.0.0.1:5434:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
@@ -23,7 +24,7 @@ services:
     image: redis:8.8-alpine
     restart: unless-stopped
     ports:
-      - '6380:6379'
+      - '127.0.0.1:6380:6379'
     volumes:
       - redis-data:/data
     healthcheck:

@@ -22,6 +22,10 @@ describe('FormField', () => {
     const input = screen.getByLabelText('Password');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAccessibleDescription('At least 10 characters. Too short');
+    // Not a live region: on submit, every invalid field would interrupt the focused one.
+    expect(screen.queryByRole('alert')).toBeNull();
+    // No unnamed wrapper group around a single control.
+    expect(screen.queryByRole('group')).toBeNull();
     await expectNoAxeViolations(container);
   });
 });

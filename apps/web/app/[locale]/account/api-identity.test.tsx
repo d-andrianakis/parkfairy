@@ -3,8 +3,12 @@ import { DEFAULT_TIME_ZONE } from '@parkfairy/contracts';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { renderWithProviders } from '@/test/render';
+import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
+import { rendererFor } from '@/test/render';
 import { ApiIdentity } from './api-identity';
+
+// Only the catalog namespaces this subtree ships to the browser.
+const renderInSubtree = rendererFor(CLIENT_NAMESPACES.account);
 
 const me: MeResponse = {
   id: '6eae16ad-2ef5-451c-a2b8-301747d83f7e',
@@ -25,13 +29,13 @@ vi.mock('@parkfairy/api-client/react-query', () => ({
 describe('ApiIdentity', () => {
   it('announces that it is checking the session', () => {
     queryFn.mockReturnValue(new Promise(() => {}));
-    renderWithProviders(<ApiIdentity />);
+    renderInSubtree(<ApiIdentity />);
     expect(screen.getByRole('status')).toHaveTextContent('Checking your session with the API');
   });
 
   it('shows the API-verified identity formatted for the reader’s locale and time zone', async () => {
     queryFn.mockResolvedValue(me);
-    const { container } = renderWithProviders(<ApiIdentity />, { locale: 'el' });
+    const { container } = renderInSubtree(<ApiIdentity />, { locale: 'el' });
 
     expect(await screen.findByTestId('api-user-id')).toHaveTextContent(me.id);
     expect(screen.getByText('Μέλος')).toBeInTheDocument();
@@ -51,9 +55,10 @@ describe('ApiIdentity', () => {
 
   it('reports when the API rejects the session', async () => {
     queryFn.mockRejectedValue({ statusCode: 401 });
-    renderWithProviders(<ApiIdentity />);
+    const { container } = renderInSubtree(<ApiIdentity />, { locale: 'el' });
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The API could not verify your session.',
+      'Το API δεν μπόρεσε να επαληθεύσει τη συνεδρία σας.',
     );
+    await expectNoAxeViolations(container);
   });
 });

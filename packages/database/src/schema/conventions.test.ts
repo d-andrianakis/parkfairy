@@ -52,6 +52,50 @@ describe('users', () => {
   });
 });
 
+describe('parking inventory', () => {
+  it('constrains enum-like listing columns and money to known values', () => {
+    const checks = getTableConfig(schema.parkingLocations).checks.map((check) => check.name);
+    expect(checks).toEqual(
+      expect.arrayContaining([
+        'parking_locations_status_check',
+        'parking_locations_area_check',
+        'parking_locations_content_locale_check',
+        'parking_locations_currency_check',
+        'parking_locations_hourly_rate_check',
+      ]),
+    );
+  });
+
+  it('stores money as integer minor units next to a currency', () => {
+    const columns = getTableConfig(schema.parkingLocations).columns;
+    const type = (name: string) => columns.find((c) => c.name === name)?.getSQLType();
+    expect(type('hourly_rate_minor')).toBe('integer');
+    expect(type('daily_max_minor')).toBe('integer');
+    expect(type('currency')).toBe('char(3)');
+  });
+
+  it('stores locations as geography points', () => {
+    const location = getTableConfig(schema.parkingLocations).columns.find(
+      (c) => c.name === 'location',
+    );
+    expect(location?.getSQLType()).toBe('geography(Point,4326)');
+  });
+});
+
+describe('parseEwkbPoint', () => {
+  it('decodes PostGIS EWKB with an SRID (Syntagma Square)', () => {
+    // SELECT ST_SetSRID(ST_MakePoint(23.7348, 37.9755), 4326)::geography
+    const hex = '0101000020E6100000CE1951DA1BBC3740BE9F1A2FDDFC4240';
+    const point = schema.parseEwkbPoint(hex);
+    expect(point.longitude).toBeCloseTo(23.7348, 6);
+    expect(point.latitude).toBeCloseTo(37.9755, 6);
+  });
+
+  it('refuses geometry that is not a point', () => {
+    expect(() => schema.parseEwkbPoint('010200000000000000')).toThrow('Not a WKB point');
+  });
+});
+
 it('maps every Better Auth model to a table', () => {
   expect(Object.keys(schema.authSchema).sort()).toEqual(
     ['account', 'session', 'twoFactor', 'user', 'verification'].sort(),

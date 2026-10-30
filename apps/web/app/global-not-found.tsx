@@ -1,6 +1,8 @@
 import { buttonVariants } from '@parkfairy/ui/components/button';
 import type { Metadata } from 'next';
 import { getLocale, getTranslations } from 'next-intl/server';
+import { themeClassName } from '@/lib/theme';
+import { getTheme } from '@/lib/theme.server';
 import './globals.css';
 
 /**
@@ -16,9 +18,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function GlobalNotFound() {
   const locale = await getLocale();
   const t = await getTranslations('NotFound');
+  const theme = await getTheme();
 
   return (
-    <html lang={locale}>
+    <html lang={locale} className={themeClassName(theme)}>
       <body className="min-h-dvh antialiased">
         <main className="mx-auto flex max-w-xl flex-col items-start gap-4 px-4 py-24">
           <h1 className="text-3xl font-semibold tracking-tight">{t('title')}</h1>

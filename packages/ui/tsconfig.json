@@ -1,4 +1,11 @@
 {
   "extends": "@parkfairy/config/tsconfig/react-library.json",
+  "compilerOptions": {
+    // shadcn's monorepo layout: components import each other by package name, and the
+    // shadcn CLI resolves the aliases in components.json through these paths.
+    "paths": {
+      "@parkfairy/ui/*": ["./src/*"]
+    }
+  },
   "include": ["src", "vitest.config.ts"]
 }

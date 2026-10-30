@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetLivenessData, GetLivenessResponses, GetMeData, GetMeErrors, GetMeResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses } from './types.gen';
+import type { GetFeaturedParkingData, GetFeaturedParkingResponses, GetLivenessData, GetLivenessResponses, GetMeData, GetMeErrors, GetMeResponses, GetParkingListingData, GetParkingListingErrors, GetParkingListingResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, SearchParkingData, SearchParkingErrors, SearchParkingResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -31,3 +31,9 @@ export const getMe = <ThrowOnError extends boolean = false>(options?: Options<Ge
     url: '/v1/me',
     ...options
 });
+
+export const getFeaturedParking = <ThrowOnError extends boolean = false>(options?: Options<GetFeaturedParkingData, ThrowOnError>): RequestResult<GetFeaturedParkingResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetFeaturedParkingResponses, unknown, ThrowOnError>({ url: '/v1/parking/featured', ...options });
+
+export const searchParking = <ThrowOnError extends boolean = false>(options: Options<SearchParkingData, ThrowOnError>): RequestResult<SearchParkingResponses, SearchParkingErrors, ThrowOnError> => (options.client ?? client).get<SearchParkingResponses, SearchParkingErrors, ThrowOnError>({ url: '/v1/parking/search', ...options });
+
+export const getParkingListing = <ThrowOnError extends boolean = false>(options: Options<GetParkingListingData, ThrowOnError>): RequestResult<GetParkingListingResponses, GetParkingListingErrors, ThrowOnError> => (options.client ?? client).get<GetParkingListingResponses, GetParkingListingErrors, ThrowOnError>({ url: '/v1/parking/{slug}', ...options });

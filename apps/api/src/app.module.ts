@@ -1,15 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AuthGuard } from './auth/auth.guard.js';
+import { redactUrl } from './common/log-redaction.js';
 import { AuthModule } from './auth/auth.module.js';
 import { OriginGuard } from './auth/origin.guard.js';
 import { ConfigModule, ENV } from './config/config.module.js';
 import type { Env } from './config/env.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { ParkingModule } from './parking/parking.module.js';
+import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { UsersModule } from './users/users.module.js';
 
 const REQUEST_ID_PATTERN = /^[\w-]{1,128}$/;
@@ -37,7 +40,7 @@ const REQUEST_ID_PATTERN = /^[\w-]{1,128}$/;
             req: (req: { id: string; method: string; url: string }) => ({
               id: req.id,
               method: req.method,
-              url: req.url,
+              url: redactUrl(req.url),
             }),
             res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
           },
@@ -48,12 +51,12 @@ const REQUEST_ID_PATTERN = /^[\w-]{1,128}$/;
         },
       }),
     }),
-    // In-memory limits per instance; move to Redis-backed storage before scaling out.
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
+    RateLimitModule,
     DatabaseModule,
     AuthModule,
     HealthModule,
     UsersModule,
+    ParkingModule,
   ],
   providers: [
     // Guards run in this order: rate limit → CSRF origin check → session/roles.

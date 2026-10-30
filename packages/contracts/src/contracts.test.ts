@@ -8,6 +8,7 @@ import {
   LocaleSchema,
   MeResponseSchema,
   PASSWORD_POLICY,
+  PasswordConfirmSchema,
   SignInInputSchema,
   SignUpInputSchema,
   SUPPORTED_LOCALES,
@@ -53,6 +54,7 @@ describe('every validation message is a catalog key', () => {
     [SignUpInputSchema, { name: 'x'.repeat(500), email: 'a@b.co', password: 'x'.repeat(500) }],
     [SignInInputSchema, { email: 'nope', password: '' }],
     [TotpInputSchema, { code: '12ab' }],
+    [PasswordConfirmSchema, { password: '' }],
   ];
 
   it.each(invalidInputs)('%#', (schema, input) => {

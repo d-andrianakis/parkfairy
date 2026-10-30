@@ -16,10 +16,16 @@ Feature status lives in [progress.md](progress.md), not here.
 
 ## Open product decisions (block Phase 2+ schema work)
 
-From plan §15, still unanswered as of 2026-10-28:
+From plan §15. Answered by the product owner on 2026-10-29:
 
-1. Pooled capacity interchangeable across spots, or separated by type/feature?
-2. Booking granularity; minimum/maximum duration.
+1. ~~Pooled capacity or separated?~~ **Named spaces**: every space is individually
+   identified (`parking_spaces.label`) and bookings will reserve one specific space.
+2. ~~Booking granularity; min/max duration?~~ **30-minute steps, 30 minutes to 30 days**
+   (`BOOKING_STEP_MINUTES`, `MAX_BOOKING_DAYS` in contracts). Opening hours apply now: a
+   listing must be open for the whole stay.
+
+Still open:
+
 3. Charge immediately or authorize/capture? Hold duration and late-payment policy.
 4. Cancellation/refund policy; when owners become eligible for payout.
 5. Owners: individuals, businesses, or both?
@@ -51,6 +57,105 @@ From plan §15, still unanswered as of 2026-10-28:
   attributes cannot carry nonces.
 - **2026-10-28 · Locale stored on the user** (`users.locale`, set at sign-up and when
   switching language) so emails/notifications can be localized later.
+- **2026-10-29 · All UI is shadcn/ui** (product owner's rule). Components are the canonical
+  registry source (`new-york-v4`) in `packages/ui/src/components/`. Usage-specific behaviour
+  goes at the usage site (e.g. `FormField` drops `FieldError`'s `role="alert"`). The only
+  edits to the copies are accessibility fixes every use needs, each marked `// Parkfairy:`
+  so a diff against the registry explains itself (focus rings that reach 3:1, focus visible
+  in forced-colors mode, readable invalid input text). shadcn monorepo layout: `components.json`
+  in `packages/ui` and `apps/web`, and ui files import each other as `@parkfairy/ui/...`
+  (package self-reference; works in tsc, Vitest and Turbopack).
+- **2026-10-29 · Theme comes from a cookie, not a script.** `theme` cookie (`light`/`dark`;
+  absent = system) → the root layout renders `<html class>`; "system" is pure CSS
+  (`prefers-color-scheme`). No flash, works without JS, and nothing new for the nonce CSP.
+  Not `next-themes`: it injects an inline script (needs the nonce plumbed through a client
+  component) and needs `suppressHydrationWarning`. Pages render per request anyway; if some
+  pages become static later, an explicit theme there needs a hashed inline script instead.
+  The cookie lives 1 year: a consent-exempt "UI customisation" cookie under ePrivacy, but
+  persistence beyond the session must be disclosed. It is listed for the cookie notice in
+  progress.md (Phase 6 privacy review).
+
+- **2026-10-29 · Public catalogue.** Published listings are `@Public()` reads
+  (`/v1/parking/featured|search|:slug`); drafts and unknown slugs share one 404
+  (`LISTING_NOT_FOUND`). Web pages are server components that call the API at `API_URL`
+  (`lib/api.server.ts`, no cookies forwarded), never the database, so search, availability
+  and pricing rules live in one place. Those calls forward the visitor's `X-Forwarded-For` (so
+  the API rate-limits per visitor, as for the `/api` rewrite), time out after 4 s, and turn API
+  failures into translated "unavailable" states. Featured listings are cached 5 min
+  (`unstable_cache`, tag `featured-parking`: revalidate it when owners edit listings).
+- **2026-10-29 · Rate limits in Redis.** The API's throttler (120/min per client) and Better
+  Auth's limits keep their counters in Redis (atomic Lua scripts mirroring the in-memory
+  stores), so they hold across instances; `REDIS_URL` is required for the API in
+  production (web and API). If Redis fails: the API's general throttler lets requests
+  through (failing closed would turn a Redis outage into an API outage), but Better Auth's
+  limits fall back to a bounded per-process memory store, because they are the only
+  brute-force control on passwords and two-factor codes and an attacker must not be able to
+  switch them off by upsetting Redis. Better Auth keys contain the raw request path (counted
+  before routing, attacker-sized), so they are sha256-hashed. The API's two keys share a hash
+  tag (`throttle:{name:key}:hits|blocked`) for Redis Cluster. Clients queue commands only
+  until the first connection; after that they fail at once while Redis is away (no 500 ms
+  wait per request, no stale replays on reconnect). Failures are logged at most every 10 s.
+  Integration tests count in memory, except `rate-limit.integration.test.ts` (Redis
+  database 15, refuses to flush a remote or default database).
+- **2026-10-29 · Worker shutdown** is checked by `pnpm --filter @parkfairy/worker
+check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips locally.
+- **2026-10-29 · Rate-limit keys need the proxy chain right.** Server-side calls and the
+  `/api` rewrite both reach the API from the web server, so per-visitor limits depend on
+  `X-Forwarded-For`. Next.js adds nothing to an existing header (it only fills a missing
+  one), so the API's `TRUST_PROXY` must be the **web servers' addresses** (or "loopback"),
+  never a count of the proxies in front of the web app: counting the web server as a hop
+  trusts a visitor-chosen value. The first proxy must overwrite or append the header, and the
+  web app's `TRUSTED_PROXIES` must list that proxy chain. Both are required in production
+  (explicit `none` / `false` allowed) so nobody ships the permissive defaults by accident.
+  Locally everything shares 127.0.0.1.
+- **2026-10-29 · Sessions are refreshed through the auth handler, not in server
+  components.** Server components cannot set cookies, so a Better Auth refresh during an RSC
+  render extended the session in the database but not the cookie, and users were signed out
+  7 days after signing in however active. `getSession` passes `disableRefresh`; when the
+  daily refresh is due (`lib/session-refresh.ts`), the layout renders `<SessionRefresh>`,
+  which fetches `/api/auth/get-session`, whose response renews the cookie. The layout uses
+  `getLayoutSession`: if the lookup fails, the page renders signed out instead of erroring.
+- **2026-10-29 · Two-factor enrolment** lives on the account page (password again → QR +
+  typed key → first code → backup codes shown once; turning it off asks for the password).
+  Enabling, verifying and disabling each rotate the session cookie, so the smoke test uses
+  its own account, never the shared one.
+- **2026-10-29 · Search.** Location is a curated area (`AREAS` in contracts, names in the
+  `Areas` catalog) or the browser position rounded to ~100 m; PostGIS `ST_DWithin` 5 km on a
+  `geography` column with a GiST index, nearest first. Opening hours are weekly wall-clock
+  periods `[opens, closes)` in minutes, in the listing's IANA zone, with an exclusion
+  constraint against overlaps; the API checks the stay day by day on the wall clock. Free
+  spaces = active spaces until bookings exist (Phase 3 subtracts overlapping ones). Search
+  reads nearest-first candidates (`<->` KNN on the GiST index) in batches of 100 and filters
+  opening hours per batch, so open listings behind closed ones are still found; at scale,
+  move the hours check into SQL (e.g. a minute-of-week multirange column).
+- **2026-10-29 · Stay rules.** Start at most 365 days ahead (`MAX_START_AHEAD_DAYS`, which
+  also keeps every date the API walks below year 10000: a year-9999 window once looped the
+  API forever). The 30-day limit is measured on the Athens wall clock (a 30-day stay across
+  the October change is 30 days + 1 h of real time); prices use elapsed time (a Sat→Sun day
+  across that change costs a capped day plus one hour).
+- **2026-10-29 · Header from the server.** The layout reads the session (`getSession`, cached
+  per request) and renders the account links, so no client session fetch, no layout shift,
+  and no Better Auth client on pages without auth forms (the language switcher imports it
+  only when a signed-in user switches). Client components get only their catalog
+  namespaces via `ClientMessages` (it replaces, not merges: list every namespace a
+  subtree's client components use).
+- **2026-10-29 · Pricing.** Hourly rate pro rata per half hour, rounded up to the cent; each
+  full 24 h and the remainder capped at the optional daily maximum (`pricing.ts`, server-side
+  only). Integer minor units throughout.
+- **2026-10-29 · Listing text is not translated.** Name, address and description are in the
+  owner's language (`content_locale`) and marked up with `lang`, so screen readers switch voice.
+- **2026-10-29 · Demo data.** `pnpm db:seed` loads 14 fictional listings and the demo account
+  (credentials in GETTING_STARTED.md). It refuses non-local databases and production because
+  the password is public: the URL must name this machine (no `?host=`/`?hostaddr=`
+  overrides, which node-postgres honours) and the database must carry the marker
+  `parkfairy.environment = local` (set by `pnpm db:up` and the init script; CI sets it too),
+  which a tunnel cannot fake. Dev Postgres/Redis listen on 127.0.0.1 only. CI seeds before
+  the smoke suite; shared environments opt in to the catalogue smoke tests with
+  `SMOKE_DEMO_DATA=true`.
+- **2026-10-29 · Listing integrity in the database.** Slug format and length, time zone
+  (Europe/Athens only until the web app formats per listing zone), and text lengths are
+  CHECK constraints (migration 0005); an invalid zone would make `Intl` throw and break
+  search for a whole area.
 
 ## Conventions
 
@@ -69,7 +174,27 @@ From plan §15, still unanswered as of 2026-10-28:
   next-intl's formatter (zone `Europe/Athens`), never `toLocaleString` without a locale.
 - **Accessibility:** labelled inputs via `FormField` (hint + error wired to
   `aria-describedby`), inline links underlined, one `h1` per page, `<main id="main-content">`
-  comes from the layout (pages render content only).
+  comes from the layout (pages render content only). Forms keep the submit button focusable
+  while submitting (`aria-disabled` + ignore repeats, never `disabled`) and announce failed
+  submits with `useInvalidSubmitStatus`. `RouteFocus` moves focus to main after client-side
+  navigation.
+- **Colour:** use the theme tokens (`bg-primary`, `text-muted-foreground`, `bg-status-limited`
+  with `text-status-limited-foreground`, …), not raw palette classes, so both themes work.
+  Status colours are fills with a paired foreground and never the only signal (add an icon
+  or text). Every token pair is contrast-tested in `packages/ui/src/styles/tokens.test.ts`;
+  add pairs there when a component combines tokens in a new way.
+- **Adding a shadcn component:** from `apps/web`, `pnpm dlx shadcn@<exact version> add <name>`
+  (it writes into `packages/ui`). Then: dark values the CLI writes into a `.dark {}` block
+  belong in `@utility theme-dark-tokens` in `globals.css` (the token test fails if a light
+  token has no dark counterpart), add contrast pairs, run Prettier/ESLint, and check the JS
+  budget for anything client-side. Built-in English text (Dialog/Sheet "Close", Pagination
+  "Previous") fails `i18next/no-literal-string`, which also covers `packages/ui`: turn it
+  into a required prop the app fills from its catalogs. Watch for `line-clamp-*` (e.g.
+  `AlertTitle`) truncating longer Greek text, and for overlays that need lazy loading (see
+  `theme-toggle.tsx`) to stay within the JS budget.
+- **Field errors:** never pass `errors` to `FieldError`. Zod messages here are
+  `VALIDATION_MESSAGES` keys, so shadcn's documented `errors={[fieldState.error]}` would show
+  raw keys. Use `FormField` (translates via `useValidationMessage()` and passes children).
 - **Tests:** unit tests sit next to the code (`*.test.ts[x]`), integration tests needing
   Postgres in `apps/api/test/*.integration.test.ts`, browser smoke tests in
   `tests/smoke/specs/<feature>.smoke.ts`.
@@ -95,12 +220,33 @@ From plan §15, still unanswered as of 2026-10-28:
 - **Better Auth does not validate enum `additionalFields`.** `locale: "xx"` reached the DB.
   Validation now happens in `databaseHooks` (`withSupportedLocale`). Do the same for any
   new enum-like user field.
-- **Better Auth rate limits** sign-in/sign-up at 3 requests / 10 s per IP and path. The
-  smoke suite shares one account (`auth.setup.ts`) to stay under it. Limits are in-memory
-  per instance until moved to Redis (see progress.md).
+- **Better Auth rate limits** sign-in/sign-up (and every `/two-factor/*` path) at 3
+  requests / 10 s per IP and path. The smoke suite shares one account (`auth.setup.ts`) to
+  stay under it; today it signs up 3 accounts (setup, auth, two-factor) and signs in 3 times
+  per run, exactly the limit, so a new smoke test must not add sign-ups or sign-ins. Counters
+  live in Redis when `REDIS_URL` is set (see the rate-limits decision).
+- **The whole smoke suite is one client** to the API (127.0.0.1), so it shares the API's
+  120/min per-route budget. A second run started within a minute of the last one gets 429s
+  on search; wait a minute between runs.
+- **Zod's JIT probe runs when a schema is built**, not when it parses: `z.config({ jitless:
+true })` (`lib/zod-jitless.ts`) must be the first import of every client component that
+  uses zod, ahead of `@parkfairy/contracts`, or the CSP reports `script-src eval`.
+- **`vi.resetModules()` does not reset `vi.mock` factories**: the mocked module keeps its
+  first instance while a direct import of the mock file gets a new one. Take helpers from the
+  mocked path (`await import('@/i18n/navigation')`), as `route-focus.test.tsx` does.
+- **Client components get only their subtree's catalog namespaces** (`ClientMessages`). The
+  lists live in `i18n/client-namespaces.ts`, and component tests render with the same list
+  (`rendererFor(CLIENT_NAMESPACES.x)`), so a missing namespace fails a test instead of
+  showing raw keys.
 - **Better Auth client IP** comes from `x-forwarded-for` and is trusted only as a single IP
-  unless `advanced.ipAddress.trustedProxies` is set. Configure it for the real proxy chain
-  before launch, otherwise rate limiting can be bypassed or disabled.
+  unless `advanced.ipAddress.trustedProxies` is set (`TRUSTED_PROXIES` env). Configure it
+  for the real proxy chain before launch, otherwise rate limiting can be bypassed or disabled.
+- **Vitest runs a function returned from `beforeEach` as a cleanup hook.** So
+  `beforeEach(() => mock.mockReset())` calls the mock after every test (and hangs if it
+  returns a pending promise). Use braces.
+- **ioredis with `enableOfflineQueue: false`** fails every command until connected, so the
+  first requests after start-up skipped rate limiting. Use the offline queue with a short
+  `commandTimeout` instead.
 - **Zod JIT vs CSP:** Zod 4 probes `new Function`; the browser blocks it and reports a CSP
   violation. The web client sets `z.config({ jitless: true })` in `app/providers.tsx`.
 - **Next 16 dev writes `apps/web/AGENTS.md`** pointing agents at `node_modules/next/dist/docs`.
@@ -128,10 +274,72 @@ From plan §15, still unanswered as of 2026-10-28:
   `.mcp.json`. It runs code in the server's Node process, past the origin and file limits.
   We chose to keep it but approve each call by hand. Never allow-list it.
 
+- **shadcn focus ring is `ring-ring/50`.** At half opacity only a very dark ring reaches 3:1
+  on white, hence the navy `--ring` in the light theme. Field borders (`--input`) are slate-500
+  for the same reason (shadcn's default is ~1.2:1). The token test guards both.
+- **Radix menus: use `modal={false}`.** A modal DropdownMenu sets `aria-hidden` on the page
+  while its links stay focusable (axe `aria-hidden-focus`). jsdom axe does not catch this;
+  only the smoke suite does. In Playwright, assert the focused item after an arrow key before
+  pressing Enter: Radix moves focus asynchronously. Menus don't wrap at the ends (`loop` off).
+- **Out-of-gamut colours.** Tailwind's saturated colours (red-600, blue-700, …) lie just
+  outside sRGB; Chrome draws the `lab()` value and the build adds its own hex fallback, so
+  contrast differs slightly from a plain conversion. red-600 at 90% (the destructive Alert)
+  computed 4.52:1 yet failed axe; light `--destructive` is red-700 now. The token test adds
+  a 0.15 margin to any pair with an out-of-gamut colour.
+- **user-event and swapped elements.** `user.click(el)` keeps dispatching to `el` even after
+  React replaces it mid-click (browsers target what is under the pointer). Test lazy-swap
+  paths with synchronous `fireEvent` for the early press.
+- **drizzle-kit quotes custom column types** with parentheses: it generated
+  `"location" "geography(Point,4326)"`, which Postgres reads as a type name. Unquote it in the
+  generated SQL before the migration is applied anywhere (done in 0003).
+- **Zod 4 object refinements run even after a field failed** its own check (e.g. a bad
+  `z.iso.datetime()`), so `superRefine` must guard against unparsable values (NaN dates).
+- **Greek times are 12-hour by default** in CLDR/Intl (`9:00 π.μ.`). Decision (2026-10-29):
+  Greek uses the 24-hour clock everywhere (`i18n/formats.ts`: `h23`, and `h24` for a
+  closing time of midnight, "24:00"), as Greek timetables and shop hours do.
+- **`role={undefined}` does not cross the server→client boundary.** Passing it from a server
+  component to a `'use client'` component (shadcn Field, FieldError) is dropped, and the
+  defaults come back (`role="group"`, `role="alert"`). jsdom tests never see this. Use the
+  client wrappers in `components/plain-field.tsx`.
+- **React `cache()` compares arguments by identity:** pass primitives (slug, start, end),
+  not objects, or `generateMetadata` and the page make two API calls.
+- **The generated API client ignores Next's `fetch` options** (`next: { revalidate }` is
+  dropped on the `Request`); cache with `unstable_cache` instead.
+- **Playwright `getByLabel` misses names built from several `aria-labelledby` ids**
+  ("From Date"); use `getByRole(..., { name })`.
+- **Next 16 error boundaries get `retry()`** (re-fetches), not just `reset()`.
+- **Docker Desktop on this machine stops now and then** (the engine pipe disappears). If
+  tests fail at start-up or `docker ps` cannot connect, start Docker Desktop and run
+  `pnpm db:up`.
+- **Search URLs carry Athens wall-clock fields** (`startDate`, `startTime`, `endDate`,
+  `endTime`), converted with `zonedTimeToUtc` (DST-safe: gap times move forward, repeated times
+  take the earlier instant). Athens offsets are whole hours, so half-hour alignment can be
+  checked on UTC instants.
+- **Stopping a backgrounded `next start` on Windows** leaves the node process listening on
+  :3000 (the smoke suite then reuses that stale build). Kill it by port before re-running.
+
 ## Performance baselines
 
 - 2026-10-28: first-visit JS (compressed) `/en` 218 KiB, `/en/sign-in` 233 KiB. Budget in
   `tests/smoke/specs/performance.smoke.ts` is 250 KiB; raise only with a reason here.
+- 2026-10-29: `/en` 219 KiB, `/en/sign-in` 236 KiB; phone CLS 0 (`performance.smoke.ts`).
+  The shadcn theme menu costs ~28 KiB gzip (Radix menu + floating-ui + focus scope +
+  dismissable layer + remove-scroll), so it is **loaded on intent**: a stand-in button is
+  rendered, hover/focus/tap imports `theme-menu.tsx`, and an early press is replayed through
+  Radix's own trigger handlers. Eagerly it measured 248 / 264 KiB. Do the same for other
+  rarely used overlays in the layout; overlays a page needs at once belong to that page's
+  chunk, not the root layout.
+- 2026-10-29 (public catalogue, after review fixes): `/en` 212 KiB, `/en/search` 212 KiB,
+  listing page 210 KiB, `/en/sign-in` 239 KiB (auth forms need Better Auth); phone CLS 0 on
+  all four.
+- 2026-10-29 (second review round): `/en` 169 KiB, `/en/search` 169 KiB, listing 167 KiB,
+  `/en/sign-in` 228 KiB. The root layout had been shipping zod + every contract schema
+  (34 KiB, via the contracts barrel in `i18n/routing.ts`) and React Query + the API client
+  (9 KiB) to every page. Now: `@parkfairy/contracts/locales` is a zod-free subpath, the
+  contracts package is `sideEffects: false`, and the query provider wraps only the account
+  page. Keep client components on the catalogue free of `@parkfairy/contracts` (barrel) and
+  `lib/search.ts` imports. API catalogue reads: search and listing medians ~35 ms locally
+  (budget 300 ms in `performance.smoke.ts`).
 
 ## Translation notes
 

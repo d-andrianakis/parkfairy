@@ -33,6 +33,92 @@ export type MeResponse = {
     createdAt: string;
 };
 
+export type AreaId = 'syntagma' | 'monastiraki' | 'kolonaki' | 'koukaki' | 'piraeusPort' | 'glyfada' | 'marousi' | 'athensAirport' | 'thessalonikiCentre' | 'ladadika' | 'thessalonikiAirport';
+
+export type Currency = 'EUR';
+
+export type Money = {
+    amountMinor: number;
+    currency: Currency;
+};
+
+export type ParkingFeature = 'covered' | 'evCharging' | 'accessible';
+
+export type ParkingListingSummary = {
+    slug: string;
+    name: string;
+    address: string;
+    area: AreaId;
+    contentLocale: Locale;
+    hourlyRate: Money;
+    dailyMax: Money | null;
+    features: Array<ParkingFeature>;
+    spaceCount: number;
+};
+
+export type FeaturedParkingResponse = {
+    listings: Array<ParkingListingSummary>;
+};
+
+export type ParkingSearchResult = {
+    slug: string;
+    name: string;
+    address: string;
+    area: AreaId;
+    contentLocale: Locale;
+    hourlyRate: Money;
+    dailyMax: Money | null;
+    features: Array<ParkingFeature>;
+    spaceCount: number;
+    distanceMeters: number;
+    freeSpaces: number;
+    total: Money;
+};
+
+export type ParkingSearchResponse = {
+    start: string;
+    end: string;
+    results: Array<ParkingSearchResult>;
+};
+
+export type OpeningPeriod = {
+    weekday: number;
+    opens: string;
+    closes: string;
+};
+
+export type ParkingSpace = {
+    label: string;
+    features: Array<ParkingFeature>;
+};
+
+export type ParkingAvailability = {
+    start: string;
+    end: string;
+    open: boolean;
+    freeSpaces: number;
+    total: Money;
+};
+
+export type ParkingListingDetail = {
+    slug: string;
+    name: string;
+    address: string;
+    area: AreaId;
+    contentLocale: Locale;
+    hourlyRate: Money;
+    dailyMax: Money | null;
+    features: Array<ParkingFeature>;
+    spaceCount: number;
+    description: string | null;
+    latitude: number;
+    longitude: number;
+    timeZone: string;
+    openingHours: Array<OpeningPeriod>;
+    spaces: Array<ParkingSpace>;
+    availability: ParkingAvailability | null;
+};
+
 export type GetLivenessData = {
     body?: never;
     path?: never;
@@ -83,3 +169,78 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type GetFeaturedParkingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/parking/featured';
+};
+
+export type GetFeaturedParkingResponses = {
+    200: FeaturedParkingResponse;
+};
+
+export type GetFeaturedParkingResponse = GetFeaturedParkingResponses[keyof GetFeaturedParkingResponses];
+
+export type SearchParkingData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Instant (UTC, ISO 8601) on a half hour.
+         */
+        end: string;
+        /**
+         * Instant (UTC, ISO 8601) on a half hour.
+         */
+        start: string;
+        longitude?: number;
+        latitude?: number;
+        area?: 'syntagma' | 'monastiraki' | 'kolonaki' | 'koukaki' | 'piraeusPort' | 'glyfada' | 'marousi' | 'athensAirport' | 'thessalonikiCentre' | 'ladadika' | 'thessalonikiAirport';
+    };
+    url: '/v1/parking/search';
+};
+
+export type SearchParkingErrors = {
+    400: ErrorResponse;
+};
+
+export type SearchParkingError = SearchParkingErrors[keyof SearchParkingErrors];
+
+export type SearchParkingResponses = {
+    200: ParkingSearchResponse;
+};
+
+export type SearchParkingResponse = SearchParkingResponses[keyof SearchParkingResponses];
+
+export type GetParkingListingData = {
+    body?: never;
+    path: {
+        slug: string;
+    };
+    query?: {
+        /**
+         * Instant (UTC, ISO 8601) on a half hour.
+         */
+        end?: string;
+        /**
+         * Instant (UTC, ISO 8601) on a half hour.
+         */
+        start?: string;
+    };
+    url: '/v1/parking/{slug}';
+};
+
+export type GetParkingListingErrors = {
+    400: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type GetParkingListingError = GetParkingListingErrors[keyof GetParkingListingErrors];
+
+export type GetParkingListingResponses = {
+    200: ParkingListingDetail;
+};
+
+export type GetParkingListingResponse = GetParkingListingResponses[keyof GetParkingListingResponses];

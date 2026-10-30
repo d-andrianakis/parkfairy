@@ -55,7 +55,18 @@ Run these once, from the repository root.
    `pnpm db:up` waits until both containers report healthy. Run `pnpm db:migrate` after
    every pull, because it applies only the migrations that are new.
 
-3. Start the web app, the API and the worker, in watch mode:
+3. Load the demo data (once, and again whenever you want it reset):
+
+   ```sh
+   pnpm db:seed
+   ```
+
+   It adds 14 fictional parking listings in Athens, Piraeus and Thessaloniki (named spaces,
+   opening hours, prices) and a demo account. It is safe to re-run: listings are reset to
+   their demo state and the account is created only once. It refuses to run against a
+   non-local database or with `NODE_ENV=production`, because the password below is public.
+
+4. Start the web app, the API and the worker, in watch mode:
 
    ```sh
    pnpm dev
@@ -73,8 +84,22 @@ Run these once, from the repository root.
 | API readiness | http://localhost:4000/health/ready | `{"status":"ok","checks":{"database":"up"}}`           |
 | Worker health | http://localhost:4100              | `{"status":"ok"}`                                      |
 
-Then create an account in the web app. The account page shows the identity the API derived
-from your session cookie, which proves the web app, auth, API and database are connected.
+The home page shows featured demo parking, and the search finds listings by area or your
+location for any half-hour window. Listings are public, so no account is needed to browse.
+
+Then sign in. The account page shows the identity the API derived from your session cookie,
+which proves the web app, auth, API and database are connected.
+
+## Demo account
+
+Created by `pnpm db:seed`, for local databases only:
+
+| Email              | Password              | Language |
+| ------------------ | --------------------- | -------- |
+| `demo@example.com` | `parkfairy-demo-2026` | Greek    |
+
+The credentials live in `apps/api/src/seed/demo-data.ts`. They are deliberately public, so
+never seed a shared or production database (the seed refuses to).
 
 ## Browser automation for Claude Code (Playwright MCP)
 

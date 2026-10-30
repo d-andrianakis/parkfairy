@@ -5,6 +5,7 @@ import { pino } from 'pino';
 import { loadEnv } from './env.js';
 import { maintenanceProcessor } from './processors/maintenance.js';
 import type { QueueProcessor } from './queues.js';
+import { createShutdown } from './shutdown.js';
 
 const processors: QueueProcessor[] = [maintenanceProcessor];
 
@@ -74,18 +75,14 @@ health.listen(env.WORKER_HEALTH_PORT, () =>
   ),
 );
 
-let shuttingDown = false;
-async function shutdown(signal: NodeJS.Signals) {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  logger.info({ signal }, 'shutting down: finishing active jobs');
-  health.close();
-  await Promise.all(workers.map((w) => w.close()));
-  await Promise.all(queues.map((q) => q.close()));
-  await database.close();
-  logger.info('worker stopped');
-  process.exit(0);
-}
+const shutdown = createShutdown({
+  health,
+  workers,
+  queues,
+  database,
+  logger,
+  exit: (code) => process.exit(code),
+});
 
 process.on('SIGTERM', (signal) => void shutdown(signal));
 process.on('SIGINT', (signal) => void shutdown(signal));

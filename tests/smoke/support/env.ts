@@ -11,6 +11,12 @@ export const API_URL =
 export const WORKER_URL =
   process.env.SMOKE_WORKER_URL ?? (external ? undefined : 'http://localhost:4100');
 
+/**
+ * Whether the demo listings from `pnpm db:seed` exist (always locally and in CI; a shared
+ * environment opts in with SMOKE_DEMO_DATA=true).
+ */
+export const DEMO_DATA = !external || process.env.SMOKE_DEMO_DATA === 'true';
+
 /** Browser state of the shared smoke account (created or signed in by auth.setup.ts). */
 export const SIGNED_IN_STATE = '.auth/user.json';
 

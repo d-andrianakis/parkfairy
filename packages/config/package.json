@@ -6,6 +6,7 @@
   "exports": {
     "./tsconfig/*.json": "./tsconfig/*.json",
     "./eslint/base": "./eslint/base.js",
+    "./eslint/i18n": "./eslint/i18n.js",
     "./eslint/next": "./eslint/next.js"
   },
   "dependencies": {

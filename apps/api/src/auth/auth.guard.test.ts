@@ -35,7 +35,9 @@ describe('AuthGuard', () => {
   const getSession = vi.fn();
   const guard = new AuthGuard(new Reflector(), { api: { getSession } } as unknown as Auth);
 
-  beforeEach(() => getSession.mockReset());
+  beforeEach(() => {
+    getSession.mockReset(); // braces: a returned function would run as a cleanup hook
+  });
 
   it('lets @Public routes through without looking up a session', async () => {
     await expect(guard.canActivate(contextFor('open', { headers: {} }))).resolves.toBe(true);

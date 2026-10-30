@@ -15,14 +15,26 @@ export interface CreateDatabaseOptions {
   /** Maximum pooled connections for this process. */
   max?: number;
   applicationName?: string;
+  /** Abort any statement running longer than this (ms). */
+  statementTimeoutMs?: number;
+  /** Give up waiting for a free pooled connection after this long (ms). */
+  connectionTimeoutMs?: number;
 }
 
 export function createDatabase({
   connectionString,
   max = 10,
   applicationName = 'parkfairy',
+  statementTimeoutMs,
+  connectionTimeoutMs,
 }: CreateDatabaseOptions): DatabaseConnection {
-  const pool = new pg.Pool({ connectionString, max, application_name: applicationName });
+  const pool = new pg.Pool({
+    connectionString,
+    max,
+    application_name: applicationName,
+    statement_timeout: statementTimeoutMs,
+    connectionTimeoutMillis: connectionTimeoutMs,
+  });
   const db = drizzle({ client: pool, schema, casing: 'snake_case' });
   return { db, pool, close: () => pool.end() };
 }

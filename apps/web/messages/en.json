@@ -17,11 +17,120 @@
   "LocaleSwitcher": {
     "label": "Language"
   },
+  "Theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
   "Home": {
     "title": "Parking, booked before you arrive.",
     "lead": "Reserve a spot at garages and private spaces near where you are going, with the full price shown up front.",
     "ctaSignUp": "Create an account",
-    "ctaSignIn": "Sign in"
+    "ctaSignIn": "Sign in",
+    "searchHeading": "Find parking",
+    "areasHeading": "Popular areas",
+    "featuredHeading": "Featured parking",
+    "featuredLead": "Garages and private spaces you can compare right now.",
+    "howHeading": "How it works",
+    "steps": {
+      "search": {
+        "title": "Search",
+        "text": "Pick an area or use your location, then choose when you arrive and when you leave."
+      },
+      "compare": {
+        "title": "Compare",
+        "text": "See opening hours, free spaces and the full price for your stay before you go."
+      },
+      "park": {
+        "title": "Park",
+        "text": "Head to your named space. Online booking is coming soon."
+      }
+    },
+    "accountHeading": "Your Parkfairy account",
+    "accountText": "Create a free account to be ready when online booking opens."
+  },
+  "SearchForm": {
+    "label": "Search for parking",
+    "where": "Where",
+    "chooseArea": "Choose an area",
+    "myLocation": "My location",
+    "nearMe": "Use my location",
+    "locating": "Finding your location…",
+    "locationDenied": "Location access is blocked. Choose an area instead.",
+    "locationUnavailable": "Your location isn’t available. Choose an area instead.",
+    "from": "From",
+    "until": "Until",
+    "date": "Date",
+    "time": "Time",
+    "submit": "Search"
+  },
+  "Search": {
+    "metaTitle": "Search for parking",
+    "title": "Search for parking",
+    "titleArea": "Parking near {area}",
+    "titleNearYou": "Parking near you",
+    "errorTitle": "Error: {title}",
+    "formHeading": "Your search",
+    "resultsHeading": "Results",
+    "resultCount": "{count, plural, =0 {No parking found} one {# place with free spaces} other {# places with free spaces}}",
+    "emptyTitle": "No parking available",
+    "emptyText": "Nothing nearby is open with a free space for your whole stay. Try another area or different times.",
+    "invalid": "There is a problem with your search",
+    "unavailable": "Search isn’t available right now. Please try again in a moment.",
+    "prompt": "Choose where and when you want to park.",
+    "resultsTitle": "{title} – {count, plural, =0 {no parking found} one {# place with free spaces} other {# places with free spaces}}"
+  },
+  "Listing": {
+    "distance": "{distance} away",
+    "freeSpaces": "{count, plural, one {# space free} other {# spaces free}}",
+    "spaceCount": "{count, plural, one {# space} other {# spaces}}",
+    "perHour": "{price} per hour",
+    "dailyMax": "Max {price} per day",
+    "totalLabel": "Total",
+    "totalPrice": "Total {price}",
+    "moreNear": "More parking near {area}",
+    "aboutHeading": "About this parking",
+    "openingHoursHeading": "Opening hours",
+    "localTime": "Times are local (Greece).",
+    "open24h": "Open 24 hours",
+    "closed": "Closed",
+    "until": "to",
+    "spacesHeading": "Spaces",
+    "moreSpaces": "{count, plural, one {and # more space} other {and # more spaces}}",
+    "priceHeading": "Price",
+    "yourStay": "Your stay",
+    "openForStay": "{count, plural, =0 {Open for your whole stay, but no space is free.} one {Open for your whole stay, # space free.} other {Open for your whole stay, # spaces free.}}",
+    "closedForStay": "Closed during part of your stay. Choose other times or another place.",
+    "noWindow": "Choose your dates to see availability and the total price.",
+    "chooseDates": "Choose dates",
+    "changeDates": "Change dates",
+    "bookingSoon": "Online booking is coming soon.",
+    "unavailableTitle": "Parking details unavailable",
+    "unavailable": "This parking can’t be shown right now. Please try again in a moment."
+  },
+  "Features": {
+    "label": "Features",
+    "covered": "Covered",
+    "evCharging": "EV charging",
+    "accessible": "Accessible space"
+  },
+  "Cities": {
+    "athens": "Athens",
+    "thessaloniki": "Thessaloniki"
+  },
+  "Areas": {
+    "syntagma": "Syntagma",
+    "monastiraki": "Monastiraki",
+    "kolonaki": "Kolonaki",
+    "koukaki": "Koukaki",
+    "piraeusPort": "Piraeus Port",
+    "glyfada": "Glyfada",
+    "marousi": "Marousi",
+    "athensAirport": "Athens Airport",
+    "thessalonikiCentre": "Central Thessaloniki",
+    "ladadika": "Ladadika",
+    "thessalonikiAirport": "Thessaloniki Airport"
   },
   "SignUp": {
     "metaTitle": "Create account",
@@ -72,6 +181,31 @@
     "signOut": "Sign out",
     "signingOut": "Signing out…"
   },
+  "TwoFactorSettings": {
+    "heading": "Two-factor authentication",
+    "intro": "Protect your account: signing in will need a code from an authenticator app as well as your password.",
+    "statusOn": "On. Signing in needs a code from your authenticator app.",
+    "statusOff": "Off. Signing in needs only your password.",
+    "setUp": "Set up two-factor authentication",
+    "turnOff": "Turn off two-factor authentication",
+    "confirmHeading": "Confirm it’s you",
+    "confirmText": "Enter your password to change your security settings.",
+    "password": "Password",
+    "continue": "Continue",
+    "working": "Checking…",
+    "cancel": "Cancel",
+    "scanHeading": "Add Parkfairy to your authenticator app",
+    "scanText": "Scan the QR code with an authenticator app, or type in the key below. Then enter the 6-digit code it shows.",
+    "qrLabel": "QR code for your authenticator app",
+    "manualKey": "Key for typing in by hand",
+    "code": "Authentication code",
+    "verify": "Turn on",
+    "verifying": "Verifying…",
+    "backupHeading": "Save your backup codes",
+    "backupText": "Each code signs you in once if you lose your phone. Store them somewhere safe: they won’t be shown again.",
+    "backupListLabel": "Backup codes",
+    "done": "I’ve saved them"
+  },
   "Validation": {
     "nameRequired": "Enter your name",
     "nameTooLong": "Use at most {max} characters",
@@ -80,17 +214,30 @@
     "passwordTooLong": "Use at most {max} characters",
     "passwordRequired": "Enter your password",
     "codeInvalid": "Enter the 6-digit code",
+    "locationRequired": "Choose an area or use your location",
+    "dateInvalid": "Enter a valid date and time",
+    "timeNotOnStep": "Choose a time on the hour or half hour (e.g. 10:00 or 10:30)",
+    "startInPast": "The start can’t be in the past",
+    "startTooFar": "{max, plural, one {Choose a start within the next day} other {Choose a start within the next # days}}",
+    "endBeforeStart": "The end must be after the start",
+    "durationTooLong": "A stay can last at most {max, plural, one {# day} other {# days}}",
     "invalid": "Check this field"
+  },
+  "Forms": {
+    "invalidSummary": "{count, plural, one {# field needs your attention} other {# fields need your attention}}",
+    "fieldError": "{field}: {message}"
   },
   "AuthErrors": {
     "USER_ALREADY_EXISTS": "An account with this email already exists.",
     "INVALID_EMAIL_OR_PASSWORD": "The email or password is incorrect.",
+    "INVALID_PASSWORD": "That password is incorrect.",
     "INVALID_EMAIL": "Enter a valid email address.",
     "PASSWORD_TOO_SHORT": "That password is too short.",
     "PASSWORD_TOO_LONG": "That password is too long.",
     "INVALID_CODE": "That code is not valid. Try again.",
     "OTP_HAS_EXPIRED": "That code has expired. Try a new one.",
     "TOO_MANY_ATTEMPTS": "Too many attempts. Sign in again to get a new code.",
+    "ACCOUNT_TEMPORARILY_LOCKED": "Too many wrong codes. Wait a while, then try again.",
     "INVALID_TWO_FACTOR_COOKIE": "Your verification session expired. Sign in again.",
     "INVALID_LOCALE": "That language is not supported.",
     "TOO_MANY_REQUESTS": "Too many attempts. Wait a moment and try again.",
@@ -101,5 +248,10 @@
     "title": "We couldn’t find that page",
     "description": "The link may be broken or the page may have moved.",
     "home": "Go to the home page"
+  },
+  "Error": {
+    "title": "Something went wrong",
+    "description": "This page couldn’t be loaded. Please try again.",
+    "retry": "Try again"
   }
 }

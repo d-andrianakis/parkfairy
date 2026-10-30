@@ -26,7 +26,7 @@ export default async function TwoFactorPage({ params }: LocaleParams) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
+        <CardTitle className="text-xl">
           <h1>{t('title')}</h1>
         </CardTitle>
         <CardDescription>{t('description')}</CardDescription>

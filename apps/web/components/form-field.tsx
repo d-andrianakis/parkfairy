@@ -1,6 +1,7 @@
+import { FieldDescription, FieldLabel } from '@parkfairy/ui/components/field';
 import { Input } from '@parkfairy/ui/components/input';
-import { Label } from '@parkfairy/ui/components/label';
 import type { ComponentProps } from 'react';
+import { PlainField, PlainFieldError } from './plain-field';
 
 interface FormFieldProps extends ComponentProps<typeof Input> {
   id: string;
@@ -16,24 +17,17 @@ export function FormField({ id, label, hint, error, ...inputProps }: FormFieldPr
   const errorId = `${id}-error`;
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ');
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
+    // One control per field: no wrapper group; the error is read with the field, not as an alert.
+    <PlainField data-invalid={error ? true : undefined}>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Input
         id={id}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
         {...inputProps}
       />
-      {hint ? (
-        <p id={hintId} className="text-sm text-muted-foreground">
-          {hint}
-        </p>
-      ) : null}
-      {error ? (
-        <p id={errorId} className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
-    </div>
+      {hint ? <FieldDescription id={hintId}>{hint}</FieldDescription> : null}
+      {error ? <PlainFieldError id={errorId}>{error}</PlainFieldError> : null}
+    </PlainField>
   );
 }

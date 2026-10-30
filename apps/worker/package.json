@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:shutdown": "node scripts/check-shutdown.mjs"
   },
   "dependencies": {
     "@parkfairy/database": "workspace:*",

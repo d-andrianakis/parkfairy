@@ -20,6 +20,9 @@ env:
   BETTER_AUTH_SECRET: ci-only-secret-never-used-outside-ci-0123456789
   BETTER_AUTH_URL: http://localhost:3000
   TRUSTED_ORIGINS: http://localhost:3000
+  # Visitors (the smoke browser) connect directly; the API sits behind the web server on loopback.
+  TRUSTED_PROXIES: none
+  TRUST_PROXY: loopback
   API_URL: http://localhost:4000
   TURBO_TELEMETRY_DISABLED: 1
 
@@ -39,6 +42,13 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U parkfairy -d parkfairy"
           --health-interval 2s --health-timeout 5s --health-retries 30
+      # Shared rate-limit counters (API + Better Auth); the integration tests use database 15.
+      redis:
+        image: redis:8.8-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s --health-timeout 5s --health-retries 30
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -48,8 +58,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      - name: Create test database
-        run: psql "$DATABASE_URL" -c 'CREATE DATABASE parkfairy_test'
+      - name: Create test database (marked local, like infra/postgres/init)
+        run: |
+          psql "$DATABASE_URL" -c 'CREATE DATABASE parkfairy_test'
+          psql "$DATABASE_URL" -c "ALTER DATABASE parkfairy_test SET parkfairy.environment = 'local'"
 
       - run: pnpm format:check
       - run: pnpm build
@@ -107,7 +119,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @parkfairy/smoke-tests exec playwright install --with-deps chromium
       - run: pnpm db:migrate
+      # Demo listings and the demo account; the smoke suite browses them. The seed only runs
+      # against databases marked local (see infra/postgres/init/02-local-marker.sql).
+      - run: psql "$DATABASE_URL" -c "ALTER DATABASE parkfairy SET parkfairy.environment = 'local'"
+      - run: pnpm db:seed
       - run: pnpm test:smoke
+      # The worker must finish jobs and exit 0 on SIGTERM (only testable on Linux).
+      - run: pnpm --filter @parkfairy/worker check:shutdown
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

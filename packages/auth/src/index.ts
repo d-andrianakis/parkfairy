@@ -9,6 +9,15 @@ import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { twoFactor } from 'better-auth/plugins';
+import type { RateLimitStorage } from './rate-limit-storage.js';
+
+export {
+  authRateLimitKey,
+  memoryRateLimitStorage,
+  redisRateLimitStorage,
+  type RateLimitStorage,
+  type RedisEval,
+} from './rate-limit-storage.js';
 
 export interface CreateAuthOptions {
   db: Database;
@@ -18,11 +27,35 @@ export interface CreateAuthOptions {
   baseURL: string;
   /** Origins allowed to call auth endpoints with credentials. */
   trustedOrigins: string[];
+  /**
+   * Shared rate-limit counters (Redis) so limits hold across web instances; omitted, Better
+   * Auth counts per process. The API builds this instance only to verify sessions.
+   */
+  rateLimitStorage?: RateLimitStorage;
+  /**
+   * Addresses/CIDRs of the proxies in front of the web app. X-Forwarded-For is read right to
+   * left past these hops to find the client IP (rate-limit key); unset, only a single-value
+   * header is trusted. List the real proxies, not a private range that also covers clients.
+   */
+  trustedProxies?: string[];
 }
 
 export const AUTH_COOKIE_PREFIX = 'parkfairy';
 
-export function createAuth({ db, secret, baseURL, trustedOrigins }: CreateAuthOptions) {
+/** Sessions last a week from their last refresh, which happens at most once a day. */
+export const SESSION_TIMING = {
+  expiresInSeconds: 60 * 60 * 24 * 7,
+  updateAgeSeconds: 60 * 60 * 24,
+};
+
+export function createAuth({
+  db,
+  secret,
+  baseURL,
+  trustedOrigins,
+  rateLimitStorage,
+  trustedProxies,
+}: CreateAuthOptions) {
   return betterAuth({
     appName: 'Parkfairy',
     baseURL,
@@ -58,11 +91,14 @@ export function createAuth({ db, secret, baseURL, trustedOrigins }: CreateAuthOp
       },
     },
     session: {
-      expiresIn: 60 * 60 * 24 * 7,
-      updateAge: 60 * 60 * 24,
+      expiresIn: SESSION_TIMING.expiresInSeconds,
+      updateAge: SESSION_TIMING.updateAgeSeconds,
       // Cookie caching stays off: the API must see revocations and role changes immediately.
     },
+    // `enabled` keeps Better Auth's default (on in production).
+    rateLimit: rateLimitStorage ? { customStorage: rateLimitStorage } : undefined,
     advanced: {
+      ...(trustedProxies && trustedProxies.length > 0 ? { ipAddress: { trustedProxies } } : {}),
       cookiePrefix: AUTH_COOKIE_PREFIX,
       useSecureCookies: baseURL.startsWith('https://'),
       database: { generateId: 'uuid' },

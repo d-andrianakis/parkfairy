@@ -1,7 +1,22 @@
 /* Theme tokens. Import after `tailwindcss` in the consuming app's stylesheet. */
 @import 'tw-animate-css';
 
-@custom-variant dark (&:is(.dark *));
+/*
+ * Light, dark, or whatever the operating system prefers. The server renders
+ * `<html class="light">` or `<html class="dark">` for an explicit choice and no class for
+ * "system", so the first paint is already right without a script (which the nonce CSP would
+ * have to allow). `dark:` utilities follow the same rule as the tokens below.
+ */
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not(.light), :root:not(.light) *) {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -22,53 +37,100 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-status-available: var(--status-available);
+  --color-status-available-foreground: var(--status-available-foreground);
+  --color-status-limited: var(--status-limited);
+  --color-status-limited-foreground: var(--status-limited-foreground);
+  --color-status-full: var(--status-full);
+  --color-status-full-foreground: var(--status-full-foreground);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/*
+ * Parkfairy palette. Every pair is held to WCAG 2.2 AA in both themes by tokens.test.ts.
+ * - primary: parking-sign blue (the EU "P"). highlight: brand violet, for brand moments
+ *   only, never for state.
+ * - status-*: availability fills, each with a -foreground for text on it. Colour is never
+ *   the only signal: pair it with an icon or a label ("3 left").
+ * - Neutrals are Tailwind slate. `muted-foreground`, `input` and `ring` are darker than
+ *   shadcn's defaults so secondary text, field borders and the 50%-opacity focus ring
+ *   still reach 4.5:1 / 3:1.
+ */
 :root {
+  color-scheme: light;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --foreground: oklch(0.129 0.042 264.695);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.488 0.217 264.376);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.129 0.042 264.695);
+  --primary: oklch(0.488 0.243 264.376);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.446 0.043 257.281);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+  --destructive: oklch(0.505 0.213 27.518);
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.554 0.046 257.417);
+  --ring: oklch(0.282 0.091 267.935);
+  --highlight: oklch(0.541 0.281 293.009);
+  --highlight-foreground: oklch(0.984 0.003 247.858);
+  --status-available: oklch(0.527 0.154 150.069);
+  --status-available-foreground: oklch(0.984 0.003 247.858);
+  --status-limited: oklch(0.828 0.189 84.429);
+  --status-limited-foreground: oklch(0.129 0.042 264.695);
+  --status-full: oklch(0.929 0.013 255.508);
+  --status-full-foreground: oklch(0.372 0.044 257.287);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.623 0.214 259.815);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+/* Written once, applied by an explicit choice or by the OS when the choice is "system". */
+@utility theme-dark-tokens {
+  color-scheme: dark;
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.707 0.165 254.624);
+  --primary-foreground: oklch(0.129 0.042 264.695);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --input: oklch(0.554 0.046 257.417);
+  --ring: oklch(0.809 0.105 251.813);
+  --highlight: oklch(0.702 0.183 293.541);
+  --highlight-foreground: oklch(0.129 0.042 264.695);
+  --status-available: oklch(0.792 0.209 151.711);
+  --status-available-foreground: oklch(0.129 0.042 264.695);
+  --status-limited: oklch(0.828 0.189 84.429);
+  --status-limited-foreground: oklch(0.129 0.042 264.695);
+  --status-full: oklch(0.372 0.044 257.287);
+  --status-full-foreground: oklch(0.929 0.013 255.508);
+}
+
+:root.dark {
+  @apply theme-dark-tokens;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    @apply theme-dark-tokens;
+  }
 }
 
 @layer base {
@@ -77,5 +139,16 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  /* shadcn's open/close animations (tw-animate-css) ignore reduced motion. Near zero, not
+     zero, so Radix still gets `animationend` and unmounts closed menus. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

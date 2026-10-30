@@ -1,4 +1,4 @@
-import { DEFAULT_TIME_ZONE } from '@parkfairy/contracts';
+import { DEFAULT_TIME_ZONE } from '@parkfairy/contracts/locales';
 import { hasLocale } from 'next-intl';
 import { getRequestConfig } from 'next-intl/server';
 import { routing } from './routing';

@@ -1,13 +1,17 @@
 'use client';
 
+// First: zod must be configured before any schema (in @parkfairy/contracts) is built.
+import '@/lib/zod-jitless';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { TotpInputSchema, type TotpInput } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
+import { FieldGroup } from '@parkfairy/ui/components/field';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
+import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
 import { authErrorKey, type AuthErrorKey } from '@/lib/auth-errors';
@@ -25,7 +29,9 @@ export function TwoFactorForm() {
     formState: { errors, isSubmitting },
   } = useForm<TotpInput>({ resolver: zodResolver(TotpInputSchema) });
 
+  const status = useInvalidSubmitStatus();
   const onSubmit = handleSubmit(async ({ code }) => {
+    status.clear();
     setFormError(null);
     const { error } = await authClient.twoFactor.verifyTotp({ code });
     if (error) {
@@ -34,23 +40,33 @@ export function TwoFactorForm() {
     }
     router.replace('/account');
     router.refresh();
-  });
+  }, status.onInvalid);
+
+  // While a request is in flight, ignore further submits; the button stays focusable.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    if (isSubmitting) event.preventDefault();
+    else void onSubmit(event);
+  };
 
   return (
-    <form onSubmit={onSubmit} noValidate className="grid gap-4">
-      <FormError message={formError ? tError(formError) : null} />
-      <FormField
-        id="code"
-        label={t('code')}
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        maxLength={6}
-        error={validationMessage(errors.code?.message)}
-        {...register('code')}
-      />
-      <Button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? t('submitting') : t('submit')}
-      </Button>
+    <form method="post" onSubmit={submit} noValidate>
+      <FieldGroup>
+        <FormError message={formError ? tError(formError) : null} />
+        <FormField
+          id="code"
+          label={t('code')}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          error={validationMessage(errors.code?.message)}
+          {...register('code')}
+        />
+        {/* aria-disabled, not disabled: a disabled button drops keyboard focus to <body>. */}
+        <Button type="submit" aria-disabled={isSubmitting || undefined}>
+          {isSubmitting ? t('submitting') : t('submit')}
+        </Button>
+      </FieldGroup>
+      {status.region}
     </form>
   );
 }

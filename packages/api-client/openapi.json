@@ -88,6 +88,182 @@
           "users"
         ]
       }
+    },
+    "/v1/parking/featured": {
+      "get": {
+        "operationId": "getFeaturedParking",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeaturedParkingResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "parking"
+        ]
+      }
+    },
+    "/v1/parking/search": {
+      "get": {
+        "operationId": "searchParking",
+        "parameters": [
+          {
+            "name": "end",
+            "required": true,
+            "in": "query",
+            "description": "Instant (UTC, ISO 8601) on a half hour.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "start",
+            "required": true,
+            "in": "query",
+            "description": "Instant (UTC, ISO 8601) on a half hour.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "longitude",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "latitude",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "area",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "syntagma",
+                "monastiraki",
+                "kolonaki",
+                "koukaki",
+                "piraeusPort",
+                "glyfada",
+                "marousi",
+                "athensAirport",
+                "thessalonikiCentre",
+                "ladadika",
+                "thessalonikiAirport"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParkingSearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "parking"
+        ]
+      }
+    },
+    "/v1/parking/{slug}": {
+      "get": {
+        "operationId": "getParkingListing",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "end",
+            "required": false,
+            "in": "query",
+            "description": "Instant (UTC, ISO 8601) on a half hour.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "start",
+            "required": false,
+            "in": "query",
+            "description": "Instant (UTC, ISO 8601) on a half hour.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParkingListingDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "parking"
+        ]
+      }
     }
   },
   "info": {
@@ -224,6 +400,391 @@
           "emailVerified",
           "twoFactorEnabled",
           "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "AreaId": {
+        "type": "string",
+        "enum": [
+          "syntagma",
+          "monastiraki",
+          "kolonaki",
+          "koukaki",
+          "piraeusPort",
+          "glyfada",
+          "marousi",
+          "athensAirport",
+          "thessalonikiCentre",
+          "ladadika",
+          "thessalonikiAirport"
+        ]
+      },
+      "Currency": {
+        "type": "string",
+        "enum": [
+          "EUR"
+        ]
+      },
+      "Money": {
+        "type": "object",
+        "properties": {
+          "amountMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "ParkingFeature": {
+        "type": "string",
+        "enum": [
+          "covered",
+          "evCharging",
+          "accessible"
+        ]
+      },
+      "ParkingListingSummary": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "area": {
+            "$ref": "#/components/schemas/AreaId"
+          },
+          "contentLocale": {
+            "$ref": "#/components/schemas/Locale"
+          },
+          "hourlyRate": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "dailyMax": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParkingFeature"
+            }
+          },
+          "spaceCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "address",
+          "area",
+          "contentLocale",
+          "hourlyRate",
+          "dailyMax",
+          "features",
+          "spaceCount"
+        ],
+        "additionalProperties": false
+      },
+      "FeaturedParkingResponse": {
+        "type": "object",
+        "properties": {
+          "listings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParkingListingSummary"
+            }
+          }
+        },
+        "required": [
+          "listings"
+        ],
+        "additionalProperties": false
+      },
+      "ParkingSearchResult": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "area": {
+            "$ref": "#/components/schemas/AreaId"
+          },
+          "contentLocale": {
+            "$ref": "#/components/schemas/Locale"
+          },
+          "hourlyRate": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "dailyMax": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParkingFeature"
+            }
+          },
+          "spaceCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "distanceMeters": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "freeSpaces": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "address",
+          "area",
+          "contentLocale",
+          "hourlyRate",
+          "dailyMax",
+          "features",
+          "spaceCount",
+          "distanceMeters",
+          "freeSpaces",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "ParkingSearchResponse": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParkingSearchResult"
+            }
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "results"
+        ],
+        "additionalProperties": false
+      },
+      "OpeningPeriod": {
+        "type": "object",
+        "properties": {
+          "weekday": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          },
+          "opens": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$|^24:00$"
+          },
+          "closes": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$|^24:00$"
+          }
+        },
+        "required": [
+          "weekday",
+          "opens",
+          "closes"
+        ],
+        "additionalProperties": false
+      },
+      "ParkingSpace": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParkingFeature"
+            }
+          }
+        },
+        "required": [
+          "label",
+          "features"
+        ],
+        "additionalProperties": false
+      },
+      "ParkingAvailability": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "open": {
+            "type": "boolean"
+          },
+          "freeSpaces": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "open",
+          "freeSpaces",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "ParkingListingDetail": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "area": {
+            "$ref": "#/components/schemas/AreaId"
+          },
+          "contentLocale": {
+            "$ref": "#/components/schemas/Locale"
+          },
+          "hourlyRate": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "dailyMax": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParkingFeature"
+            }
+          },
+          "spaceCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "openingHours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpeningPeriod"
+            }
+          },
+          "spaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParkingSpace"
+            }
+          },
+          "availability": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ParkingAvailability"
+              }
+            ]
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "address",
+          "area",
+          "contentLocale",
+          "hourlyRate",
+          "dailyMax",
+          "features",
+          "spaceCount",
+          "description",
+          "latitude",
+          "longitude",
+          "timeZone",
+          "openingHours",
+          "spaces",
+          "availability"
         ],
         "additionalProperties": false
       }

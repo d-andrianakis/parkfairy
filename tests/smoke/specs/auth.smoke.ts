@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { TEST_PASSWORD } from '../support/env';
-import { uniqueEmail } from '../support/fixtures';
+import { expectAccessible, uniqueEmail } from '../support/fixtures';
 
 // Feature: authentication — sign up, session recognised by the API, sign out, sign in.
 
@@ -64,4 +64,5 @@ test('wrong credentials get a translated, generic error', async ({ page }) => {
   await expect(
     page.getByRole('alert').filter({ hasText: 'The email or password is incorrect.' }),
   ).toBeVisible();
+  await expectAccessible(page);
 });
