@@ -10,7 +10,9 @@ export const SignUpInputSchema = z.object({
     .string()
     .trim()
     .min(1, message('nameRequired'))
-    .max(NAME_MAX_LENGTH, message('nameTooLong')),
+    .max(NAME_MAX_LENGTH, message('nameTooLong'))
+    // Nothing a person types; Postgres also refuses NUL, which only a new account would reach.
+    .refine((name) => !/\p{Cc}/u.test(name), message('invalid')),
   email: z.email(message('emailInvalid')).max(254, message('emailInvalid')),
   password: z
     .string()
@@ -24,6 +26,17 @@ export const SignInInputSchema = z.object({
   password: z.string().min(1, message('passwordRequired')),
 });
 export type SignInInput = z.infer<typeof SignInInputSchema>;
+
+/** How long the links in account emails work; Better Auth, the emails and the pages agree. */
+export const ACCOUNT_LINK_LIFETIME = { verifyEmailHours: 24, resetPasswordMinutes: 60 } as const;
+
+/** Asks for an account email by address (password reset, a new confirmation link). */
+export const EmailLinkInputSchema = z.object({ email: SignUpInputSchema.shape.email });
+export type EmailLinkInput = z.infer<typeof EmailLinkInputSchema>;
+
+/** The new password on the page a reset link opens. */
+export const ResetPasswordInputSchema = z.object({ password: SignUpInputSchema.shape.password });
+export type ResetPasswordInput = z.infer<typeof ResetPasswordInputSchema>;
 
 /** Re-entering the password to change security settings (e.g. two-factor). */
 export const PasswordConfirmSchema = z.object({

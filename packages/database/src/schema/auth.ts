@@ -54,6 +54,10 @@ export const users = pgTable(
   (t) => [
     check('users_role_check', sql`${t.role} in (${sqlList(USER_ROLES)})`),
     check('users_locale_check', sql`${t.locale} in (${sqlList(SUPPORTED_LOCALES)})`),
+    // For the worker's sweep of accounts never confirmed.
+    index('users_unconfirmed_created_at_idx')
+      .on(t.createdAt)
+      .where(sql`not ${t.emailVerified}`),
   ],
 );
 
@@ -106,7 +110,12 @@ export const verifications = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index('verifications_identifier_idx').on(t.identifier)],
+  (t) => [
+    index('verifications_identifier_idx').on(t.identifier),
+    // Better Auth purges expired rows on every lookup, and a reset removes a user's rows.
+    index('verifications_expires_at_idx').on(t.expiresAt),
+    index('verifications_value_idx').on(t.value),
+  ],
 );
 
 export const twoFactors = pgTable(

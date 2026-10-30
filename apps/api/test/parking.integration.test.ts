@@ -3,6 +3,7 @@ import {
   addDays,
   DEFAULT_TIME_ZONE,
   findArea,
+  LISTING_SPACES_LIMIT,
   ParkingListingDetailSchema,
   ParkingSearchResponseSchema,
   zonedParts,
@@ -227,6 +228,30 @@ describe('public parking catalogue', () => {
     expect(listing.latitude).toBeCloseTo(HERE.latitude + 0.001, 6);
     expect(listing.availability).toMatchObject({ open: true, freeSpaces: 3 });
     expect(response.body).not.toHaveProperty('id');
+  });
+
+  it('sends the first spaces of a big garage, counting them all', async () => {
+    const count = LISTING_SPACES_LIMIT + 2;
+    await addListing(db, 'big', {
+      offset: 0.07, // beyond the search radius: the other tests compare exact result lists
+      hours: [0, 1440],
+      spaces: Array.from({ length: count }, (_, i) => ({
+        label: `P${i + 1}`,
+        ev: i === count - 1,
+      })),
+    });
+
+    const response = await request(app.getHttpServer())
+      .get(`/v1/parking/${slug('big')}`)
+      .query({ start, end })
+      .expect(200);
+    const listing = ParkingListingDetailSchema.parse(response.body);
+
+    expect(listing.spaces).toHaveLength(LISTING_SPACES_LIMIT);
+    expect(listing.spaces.at(-1)?.label).toBe(`P${LISTING_SPACES_LIMIT}`); // label order, not text
+    expect(listing.spaceCount).toBe(count);
+    expect(listing.availability?.freeSpaces).toBe(count);
+    expect(listing.features).toEqual(['evCharging']); // from a space beyond the ones sent
   });
 
   it('says when a listing is closed during the window', async () => {

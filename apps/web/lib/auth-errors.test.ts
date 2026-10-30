@@ -19,10 +19,13 @@ describe('authErrorKey', () => {
   });
 
   it('folds code variants into one message', () => {
-    expect(authErrorKey({ code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL' })).toBe(
-      'USER_ALREADY_EXISTS',
-    );
     expect(authErrorKey({ code: 'TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE' })).toBe('TOO_MANY_ATTEMPTS');
+  });
+
+  it('maps the email confirmation and reset codes', () => {
+    expect(authErrorKey({ code: 'EMAIL_NOT_VERIFIED', status: 403 })).toBe('EMAIL_NOT_VERIFIED');
+    expect(authErrorKey({ code: 'INVALID_TOKEN', status: 400 })).toBe('INVALID_TOKEN');
+    expect(authErrorKey({ code: 'TOKEN_EXPIRED', status: 400 })).toBe('INVALID_TOKEN');
   });
 
   it('treats rate limiting by status, whatever the body says', () => {

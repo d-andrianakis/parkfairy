@@ -82,4 +82,20 @@ describe('demo seed', () => {
     });
     expect(response.status).toBe(200);
   });
+
+  it('confirms a demo account seeded before sign-in needed a confirmed address', async () => {
+    await ensureDemoAccount(db);
+    await db
+      .update(schema.users)
+      .set({ emailVerified: false })
+      .where(eq(schema.users.email, DEMO_ACCOUNT.email));
+
+    expect(await ensureDemoAccount(db)).toBe('exists');
+
+    const [demo] = await db
+      .select({ emailVerified: schema.users.emailVerified })
+      .from(schema.users)
+      .where(eq(schema.users.email, DEMO_ACCOUNT.email));
+    expect(demo?.emailVerified).toBe(true);
+  });
 });

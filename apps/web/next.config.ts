@@ -34,7 +34,15 @@ const nextConfig: NextConfig = {
     globalNotFound: true,
   },
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      // These URLs hold a live token, and even same-origin requests would repeat it in Referer,
+      // which CDN logs record. A header, as a meta tag only applies once the parser reaches it.
+      ...['/:locale/reset-password', '/:locale/verify-email'].map((source) => ({
+        source,
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+      })),
+    ];
   },
   async rewrites() {
     // Browsers call the API same-origin so the Better Auth session cookie is sent as-is.

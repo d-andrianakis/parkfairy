@@ -66,7 +66,15 @@ async function measureLayoutShift(page: Page, path: string, ready: () => Promise
   return cls;
 }
 
-for (const path of ['/en', '/en/sign-in', ...CATALOGUE]) {
+const ACCOUNT_PAGES = [
+  '/en/sign-in',
+  '/en/sign-up',
+  '/en/forgot-password',
+  '/en/reset-password?token=x',
+  '/en/verify-email?token=x',
+];
+
+for (const path of ['/en', ...ACCOUNT_PAGES, ...CATALOGUE]) {
   test(`${path} stays within the first-visit budget`, async ({ page }) => {
     await expectWithinBudget(page, path);
   });

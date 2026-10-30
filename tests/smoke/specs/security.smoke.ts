@@ -54,6 +54,30 @@ test.describe('API', () => {
   });
 });
 
+test.describe('emailed links', () => {
+  // Only here: Better Auth skips these checks under NODE_ENV=test, so the integration suite
+  // cannot see them. An off-site redirect would carry a live reset token with it.
+  for (const path of ['/api/auth/verify-email?token=x', '/api/auth/reset-password/x']) {
+    test(`${path} cannot be edited to leave the site`, async ({ request }) => {
+      const separator = path.includes('?') ? '&' : '?';
+      const response = await request.get(
+        `${path}${separator}callbackURL=${encodeURIComponent('https://evil.example/')}`,
+        { maxRedirects: 0 },
+      );
+      expect(response.status()).toBe(403);
+      expect(response.headers().location).toBeUndefined();
+    });
+  }
+
+  test('a reset request cannot name an off-site page', async ({ request }) => {
+    const response = await request.post('/api/auth/request-password-reset', {
+      headers: { origin: WEB_URL },
+      data: { email: 'nobody@example.com', redirectTo: 'https://evil.example/' },
+    });
+    expect(response.status()).toBe(403);
+  });
+});
+
 test.describe('signed in', () => {
   test.use({ storageState: SIGNED_IN_STATE });
 

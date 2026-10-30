@@ -206,13 +206,17 @@ export const ParkingAvailabilitySchema = z
   .register(contractsRegistry, { id: 'ParkingAvailability' });
 export type ParkingAvailability = z.infer<typeof ParkingAvailabilitySchema>;
 
+/** Big garages have hundreds of spaces, and drivers don't pick one until booking. */
+export const LISTING_SPACES_LIMIT = 48;
+
 export const ParkingListingDetailSchema = ParkingListingSummarySchema.extend({
   description: z.string().nullable(),
   latitude: z.number(),
   longitude: z.number(),
   timeZone: z.string(),
   openingHours: z.array(OpeningPeriodSchema),
-  spaces: z.array(ParkingSpaceSchema),
+  /** The first spaces in label order; `spaceCount` says how many there are in all. */
+  spaces: z.array(ParkingSpaceSchema).max(LISTING_SPACES_LIMIT),
   /** Present when the request named a window. */
   availability: ParkingAvailabilitySchema.nullable(),
 }).register(contractsRegistry, { id: 'ParkingListingDetail' });

@@ -99,7 +99,24 @@ Created by `pnpm db:seed`, for local databases only:
 | `demo@example.com` | `parkfairy-demo-2026` | Greek    |
 
 The credentials live in `apps/api/src/seed/demo-data.ts`. They are deliberately public, so
-never seed a shared or production database (the seed refuses to).
+never seed a shared or production database (the seed refuses to). The address needs no
+confirming.
+
+## Emails on your machine
+
+New accounts must confirm their address before the first sign-in. Locally nothing is really
+sent: each email becomes a JSON file in `.emails/` at the repository root, which git ignores.
+To finish signing up or resetting a password, open the newest file and paste the link from
+its `text` field into your browser. A confirmation link opens a page with a button; pressing
+it is what confirms the address. Running the smoke suite empties the folder.
+
+Those files hold working confirmation and password-reset links, so don't share them. Delete the folder whenever you
+like. To send real emails, set `RESEND_API_KEY` and `EMAIL_FROM` in `.env`. Anywhere other
+than this machine the web app refuses to start without them, and it checks its other settings
+at start-up too.
+
+If you were already running `pnpm dev` when this arrived, restart it: the auth instance
+survives hot reloads, so it keeps the old rules until the server restarts.
 
 ## Browser automation for Claude Code (Playwright MCP)
 
@@ -145,6 +162,13 @@ trying injection payloads against your own forms.
   Stop it, or find the process with `netstat -ano | findstr :3000`.
 - **Sign-in or sign-up is rate limited:** Better Auth allows 3 attempts per 10 seconds per
   IP. Wait a few seconds and try again.
+- **An older local account says to confirm its email:** sign in once to send a new link, then
+  find it in `.emails/`. Run `pnpm db:seed` if it's the demo account. The worker deletes
+  accounts still unconfirmed after 7 days.
+- **An email never arrived:** one recipient gets at most 5 of each kind per hour, and 1 notice
+  that an address is already registered, counting `+tag` addresses as the same inbox. Beyond
+  that they are dropped and the web app logs `recipient limit reached`. Each kind also has a
+  site-wide hourly budget (`site limit reached`).
 
 ## Before you commit
 

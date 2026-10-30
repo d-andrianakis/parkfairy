@@ -8,8 +8,18 @@ import type { Namespace } from '@/components/client-messages';
 export const CLIENT_NAMESPACES = {
   /** Root layout: header (language switcher, theme menu) and the error boundary. */
   root: ['LocaleSwitcher', 'Theme', 'Error'],
-  /** Sign-in, sign-up and two-factor forms. */
-  auth: ['SignIn', 'SignUp', 'TwoFactor', 'AuthErrors', 'Validation', 'Forms'],
+  /** Sign-in, sign-up, two-factor, forgotten password and email confirmation forms. */
+  auth: [
+    'SignIn',
+    'SignUp',
+    'TwoFactor',
+    'ForgotPassword',
+    'ResetPassword',
+    'VerifyEmail',
+    'AuthErrors',
+    'Validation',
+    'Forms',
+  ],
   /** Account page: API identity, sign-out, two-factor settings. */
   account: ['Account', 'TwoFactorSettings', 'AuthErrors', 'Validation', 'Forms'],
   /** The search form's "use my location" button. */

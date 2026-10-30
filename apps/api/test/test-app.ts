@@ -30,18 +30,28 @@ export interface TestUser {
   cookie: string;
 }
 
-/** Signs up a fresh user through Better Auth, exactly as the web app's handler would. */
+const PASSWORD = 'correct horse battery staple';
+
+/**
+ * Signs up a fresh user through Better Auth, exactly as the web app's handler would, confirms
+ * the address (as following the emailed link does) and signs in.
+ */
 export async function signUpUser(app: INestApplication): Promise<TestUser> {
   const auth = app.get<Auth>(AUTH);
   const email = `test-${randomUUID()}@example.com`;
-  const response = await auth.api.signUpEmail({
-    body: { email, password: 'correct horse battery staple', name: 'Test Driver' },
+  const signedUp = await auth.api.signUpEmail({
+    body: { email, password: PASSWORD, name: 'Test Driver' },
     asResponse: true,
   });
-  if (!response.ok) {
-    throw new Error(`Sign-up failed with ${response.status}: ${await response.text()}`);
+  if (!signedUp.ok) {
+    throw new Error(`Sign-up failed with ${signedUp.status}: ${await signedUp.text()}`);
   }
-  const { user } = (await response.json()) as { user: { id: string } };
+  const { user } = (await signedUp.json()) as { user: { id: string } };
+  await updateUser(app, user.id, { emailVerified: true });
+  const response = await auth.api.signInEmail({
+    body: { email, password: PASSWORD },
+    asResponse: true,
+  });
   const cookie = response.headers
     .getSetCookie()
     .map((c) => c.split(';')[0])

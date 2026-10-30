@@ -3,27 +3,82 @@
 // First: zod must be configured before any schema (in @parkfairy/contracts) is built.
 import '@/lib/zod-jitless';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PASSWORD_POLICY, SignUpInputSchema, type SignUpInput } from '@parkfairy/contracts';
+import {
+  ACCOUNT_LINK_LIFETIME,
+  PASSWORD_POLICY,
+  SignUpInputSchema,
+  type SignUpInput,
+} from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
 import { FieldGroup } from '@parkfairy/ui/components/field';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, type FormEvent } from 'react';
 import { useForm } from 'react-hook-form';
+import { FocusHeading } from '@/components/focus-heading';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
-import { useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
 import { authErrorKey, authErrorValues, type AuthErrorKey } from '@/lib/auth-errors';
 import { useValidationMessage } from '@/lib/use-validation-message';
+import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
+
+/**
+ * What follows a sign-up. It reads the same when the address already has an account (Better
+ * Auth answers alike, and that account's owner gets an email saying so), so it gives nothing
+ * away about who is registered.
+ */
+function CheckYourEmail({ email }: { email: string }) {
+  const t = useTranslations('SignUp');
+  const tError = useTranslations('AuthErrors');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [resendError, setResendError] = useState<AuthErrorKey | null>(null);
+
+  async function resend() {
+    if (sending) return;
+    setSending(true);
+    setSent(false);
+    setResendError(null);
+    const { error } = await authClient.sendVerificationEmail({ email });
+    setSending(false);
+    if (error) setResendError(authErrorKey(error));
+    else setSent(true);
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-2">
+        <FocusHeading retitle>{t('sentTitle')}</FocusHeading>
+        <p className="text-sm wrap-anywhere text-muted-foreground">
+          {t('sentBody', { email, hours: ACCOUNT_LINK_LIFETIME.verifyEmailHours })}
+        </p>
+        <p className="text-sm text-muted-foreground">{t('sentHint')}</p>
+      </div>
+      <FormError message={resendError ? tError(resendError, authErrorValues(resendError)) : null} />
+      <Button
+        type="button"
+        variant="outline"
+        className={WRAPPING_BUTTON}
+        aria-disabled={sending || undefined}
+        onClick={() => void resend()}
+      >
+        {sending ? t('resending') : t('resend')}
+      </Button>
+      <p role="status" className="text-sm text-muted-foreground">
+        {sent ? t('resent') : null}
+      </p>
+    </div>
+  );
+}
 
 export function SignUpForm() {
   const t = useTranslations('SignUp');
   const tError = useTranslations('AuthErrors');
   const validationMessage = useValidationMessage();
   const locale = useLocale();
-  const router = useRouter();
   const [formError, setFormError] = useState<AuthErrorKey | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -40,8 +95,7 @@ export function SignUpForm() {
       setFormError(authErrorKey(error));
       return;
     }
-    router.replace('/account');
-    router.refresh();
+    setSentTo(values.email);
   }, status.onInvalid);
 
   // While a request is in flight, ignore further submits; the button stays focusable.
@@ -49,6 +103,8 @@ export function SignUpForm() {
     if (isSubmitting) event.preventDefault();
     else void onSubmit(event);
   };
+
+  if (sentTo) return <CheckYourEmail email={sentTo} />;
 
   return (
     <form method="post" onSubmit={submit} noValidate>
@@ -80,7 +136,7 @@ export function SignUpForm() {
           {...register('password')}
         />
         {/* aria-disabled, not disabled: a disabled button drops keyboard focus to <body>. */}
-        <Button type="submit" aria-disabled={isSubmitting || undefined}>
+        <Button type="submit" className={WRAPPING_BUTTON} aria-disabled={isSubmitting || undefined}>
           {isSubmitting ? t('submitting') : t('submit')}
         </Button>
       </FieldGroup>

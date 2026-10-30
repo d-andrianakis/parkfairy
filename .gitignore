@@ -19,6 +19,9 @@ blob-report/
 Thumbs.db
 *.log
 
+# Emails written instead of sent on this machine; they hold live sign-in links
+.emails/
+
 # Playwright auth state for the smoke suite
 tests/smoke/.auth/
 

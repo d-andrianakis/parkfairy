@@ -10,6 +10,12 @@ const publicPages = [
   '/sign-in',
   '/sign-up',
   '/two-factor',
+  '/forgot-password',
+  '/reset-password?token=not-a-real-token',
+  '/reset-password?error=INVALID_TOKEN',
+  '/reset-password?done=1',
+  '/verify-email',
+  '/verify-email?token=not-a-real-token',
   '/no-such-page',
   // Public catalogue (demo listings from pnpm db:seed).
   ...(DEMO_DATA ? ['/search?area=syntagma', '/parking/syntagma-square-garage'] : []),

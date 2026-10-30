@@ -55,6 +55,40 @@ describe('LocaleSwitcher', () => {
     );
   });
 
+  it('keeps a reset link working in the other language', () => {
+    // Without its token the page could only say the link is dead, which would be untrue.
+    setPathname('/reset-password', 'token=abc&utm=x');
+    renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });
+    expect(screen.getByRole('link', { name: 'English' })).toHaveAttribute(
+      'href',
+      '/en/reset-password?token=abc',
+    );
+  });
+
+  it('keeps the outcome of a reset in the other language', () => {
+    setPathname('/reset-password', 'done=1');
+    renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });
+    expect(screen.getByRole('link', { name: 'English' })).toHaveAttribute(
+      'href',
+      '/en/reset-password?done=1',
+    );
+  });
+
+  it('keeps a confirmation link working in the other language', () => {
+    setPathname('/verify-email', 'token=abc&utm=x');
+    renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });
+    expect(screen.getByRole('link', { name: 'English' })).toHaveAttribute(
+      'href',
+      '/en/verify-email?token=abc',
+    );
+  });
+
+  it('carries a token only on the page that uses it', () => {
+    setPathname('/sign-in', 'token=abc');
+    renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });
+    expect(screen.getByRole('link', { name: 'English' })).toHaveAttribute('href', '/en/sign-in');
+  });
+
   it('remembers the choice on the account when signed in', async () => {
     renderInSubtree(<LocaleSwitcher signedIn />, { locale: 'el' });
 

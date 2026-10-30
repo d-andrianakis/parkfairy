@@ -5,9 +5,33 @@ export type RateLimitStorage = NonNullable<
   NonNullable<BetterAuthOptions['rateLimit']>['customStorage']
 >;
 
-/** The one Redis call this needs; ioredis satisfies it, so this package has no Redis dependency. */
+/** The Redis calls this needs; ioredis satisfies them, so this package has no Redis dependency. */
 export interface RedisEval {
   eval(script: string, numKeys: number, ...args: (string | number)[]): Promise<unknown>;
+  evalsha(sha1: string, numKeys: number, ...args: (string | number)[]): Promise<unknown>;
+}
+
+/** A Lua script and its hash, computed once. */
+export function redisScript(source: string) {
+  return { source, sha1: createHash('sha1').update(source).digest('hex') };
+}
+
+/**
+ * Runs a script by its hash, so its text isn't sent on every request. Redis forgets scripts on
+ * a restart or failover and answers NOSCRIPT; the full text then loads it again.
+ */
+export async function runScript(
+  redis: RedisEval,
+  { source, sha1 }: ReturnType<typeof redisScript>,
+  numKeys: number,
+  ...args: (string | number)[]
+): Promise<unknown> {
+  try {
+    return await redis.evalsha(sha1, numKeys, ...args);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.startsWith('NOSCRIPT')) throw error;
+    return redis.eval(source, numKeys, ...args);
+  }
 }
 
 /*
@@ -16,7 +40,7 @@ export interface RedisEval {
  * or expired window starts at 1; at `max` the request is refused until the window has passed.
  * Uses Redis's clock, so web instances with skewed clocks agree.
  */
-const CONSUME = `
+const CONSUME = redisScript(`
 local t = redis.call('TIME')
 local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
 local window = tonumber(ARGV[1])
@@ -35,7 +59,7 @@ end
 redis.call('HSET', KEYS[1], 'count', count + 1, 'last', now)
 redis.call('PEXPIRE', KEYS[1], window)
 return {1, 0}
-`;
+`);
 
 /**
  * Better Auth's key is the client address plus the raw request path, and it is counted before
@@ -116,7 +140,8 @@ export function redisRateLimitStorage(
     async consume(key, rule) {
       const hashed = authRateLimitKey(key);
       try {
-        const [allowed, retryAfter] = (await redis.eval(
+        const [allowed, retryAfter] = (await runScript(
+          redis,
           CONSUME,
           1,
           hashed,

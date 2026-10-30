@@ -64,7 +64,8 @@ A `parkfairy_test` database is created on first start for the automated tests.
 
 Run the smoke suite against a deployed environment with `SMOKE_WEB_URL` (plus `SMOKE_API_URL`,
 `SMOKE_WORKER_URL` if reachable, and `SMOKE_USER_EMAIL`/`SMOKE_USER_PASSWORD` for a
-pre-provisioned Greek-locale account so runs don't create users).
+pre-provisioned Greek-locale account, which those runs need: new accounts must confirm an
+emailed link, and the suite can't read a real inbox, so specs that create accounts skip).
 
 CI fails if the schema has unmigrated changes or the generated client is out of date, so
 run `pnpm db:generate` / `pnpm api:generate` and commit the output alongside your change.

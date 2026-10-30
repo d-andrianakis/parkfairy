@@ -1,5 +1,5 @@
 import type { ThrottlerStorage } from '@nestjs/throttler';
-import type { Redis } from 'ioredis';
+import { redisScript, runScript, type RedisEval } from '@parkfairy/auth';
 
 type ThrottlerStorageRecord = Awaited<ReturnType<ThrottlerStorage['increment']>>;
 
@@ -9,7 +9,7 @@ type ThrottlerStorageRecord = Awaited<ReturnType<ThrottlerStorage['increment']>>
  * limit block the key for `blockDuration`; when the block ends counting starts afresh.
  * Returns [hits, ms until the window resets, blocked (1/0), ms until the block ends].
  */
-const INCREMENT = `
+const INCREMENT = redisScript(`
 local blockTtl = redis.call('PTTL', KEYS[2])
 if blockTtl > 0 then
   return {tonumber(redis.call('GET', KEYS[1]) or '0'), redis.call('PTTL', KEYS[1]), 1, blockTtl}
@@ -27,7 +27,7 @@ if hits > tonumber(ARGV[2]) and block > 0 then
   return {hits, ttl, 1, block}
 end
 return {hits, ttl, 0, 0}
-`;
+`);
 
 const seconds = (ms: number) => Math.max(0, Math.ceil(ms / 1000));
 
@@ -45,7 +45,7 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
   private suppressed = 0;
 
   constructor(
-    private readonly redis: Pick<Redis, 'eval'>,
+    private readonly redis: RedisEval,
     private readonly onError: (error: unknown, suppressed: number) => void,
   ) {}
 
@@ -60,7 +60,8 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     // touches both atomically).
     const base = `throttle:{${throttlerName}:${key}}`;
     try {
-      const [hits, ttlMs, blocked, blockMs] = (await this.redis.eval(
+      const [hits, ttlMs, blocked, blockMs] = (await runScript(
+        this.redis,
         INCREMENT,
         2,
         `${base}:hits`,

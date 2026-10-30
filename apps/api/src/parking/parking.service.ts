@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   findArea,
+  LISTING_SPACES_LIMIT,
   ParkingListingDetailSchema,
   ParkingListingSummarySchema,
   ParkingSearchResultSchema,
@@ -222,7 +223,9 @@ export class ParkingService {
         opens: wallTime(period.opensMinute),
         closes: wallTime(period.closesMinute),
       })),
-      spaces: spaces.map((s) => ({ label: s.label, features: features(s) })),
+      spaces: spaces
+        .slice(0, LISTING_SPACES_LIMIT)
+        .map((s) => ({ label: s.label, features: features(s) })),
       availability: window
         ? {
             start: window.start.toISOString(),

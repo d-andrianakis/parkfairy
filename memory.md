@@ -132,6 +132,40 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   account locks for 15 minutes (`TWO_FACTOR_LOCKOUT` in contracts configures Better Auth and
   the message). The steps load on intent, so the account page doesn't ship zod and the QR
   encoder until someone starts a change.
+- **2026-10-30 · Account emails.** Sign-in needs a confirmed address, and the emailed link
+  confirms without opening a session (`autoSignInAfterVerification` stays off): a stranger can
+  sign up with someone's address, and clicking must not put its owner inside an account whose
+  password the stranger knows. The link opens our page and a person presses a button, because
+  mail scanners fetch links: pointed at Better Auth's GET, a scanner would confirm the stranger's
+  account. Sending happens in the web process inside `after()`, not through
+  BullMQ, because these jobs would hold live reset links in Redis, and the person who asked can
+  simply ask again. Booking emails (Phase 3) need the outbox and worker instead, since nobody
+  is there to ask again. `sendEmail` must return at once: Better Auth awaits its callbacks, so
+  a slow send would reveal whether an address has an account. Links are rebuilt in
+  `packages/auth` so a request's `callbackURL` never reaches an email. Emails leave out the
+  account name, which is free text a stranger would get to put in front of the address's owner.
+  Each recipient has a cap per kind of email (`RECIPIENT_LIMITS`, counted on the inbox, so
+  `+tags` and Gmail dots don't multiply it), because Better Auth's limits are per client and
+  every sign-up with a taken address mails its owner. Each kind also has a site budget per clock
+  hour (`SITE_LIMITS`), separate so sign-up floods can't stop resets. Reset tokens are hashed at
+  rest (`verification.storeIdentifier`), and a reset deletes the user's other verification rows:
+  Better Auth consumes only the token used, so a thief's saved link would undo the recovery. The
+  password-changed email links to the reset page. Resend is one `fetch` with an idempotency key
+  and paced calls, no SDK. Unconfirmed accounts go after 7 days (longer than the link because
+  signing in sends a new one). `users.locale` of an unconfirmed account is whatever the first
+  sign-up chose, possibly a stranger; nothing better is known then.
+- **2026-10-30 · Accepted: sign up then sign in tells a taken address from a free one** (401 vs
+  403 `EMAIL_NOT_VERIFIED`). Inherent in requiring confirmation; rewriting the 403 would leave
+  real people with no idea why they can't sign in. It is noisy: a miss creates an account and
+  emails the target.
+- **2026-10-30 · Sign-up is validated before the address is looked up** (`validateSignUp`,
+  `hooks.before`). Only a new account reaches the insert, so anything that fails there is an
+  oracle: `locale: "xx"` and a NUL in the name both did. Any new sign-up field goes through it.
+- **2026-10-30 · Emails become files only on this machine.** Without `RESEND_API_KEY` they go
+  to `.emails/`, and `parseServerEnv` allows that only when `BETTER_AUTH_URL` is loopback. The
+  check is on the origin, not `NODE_ENV`, because smoke runs production builds locally while
+  staging must never write live reset links to disk. The transport has only run against a mock
+  so far: try one real send when a Resend key and verified domain exist.
 - **2026-10-30 · The root error screen carries its own strings.** `app/global-error.tsx`
   shows when the root layout failed, often because a chunk could not load, so it can neither
   use the message provider nor fetch a catalog. `messages/error-fallback.ts` holds the
@@ -238,13 +272,40 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   Validation now happens in `databaseHooks` (`withSupportedLocale`). Do the same for any
   new enum-like user field.
 - **Better Auth rate limits** sign-in/sign-up (and every `/two-factor/*` path) at 3
-  requests / 10 s per IP and path. The smoke suite shares one account (`auth.setup.ts`) to
-  stay under it; today it signs up 3 accounts (setup, auth, two-factor) and signs in 3 times
-  per run, exactly the limit, so a new smoke test must not add sign-ups or sign-ins. Counters
-  live in Redis when `REDIS_URL` is set (see the rate-limits decision).
-- **The whole smoke suite is one client** to the API (127.0.0.1), so it shares the API's
-  120/min per-route budget. A second run started within a minute of the last one gets 429s
-  on search; wait a minute between runs.
+  requests / 10 s per IP and path, and reset and confirmation requests at 3 / 60 s. Smoke specs
+  that sign in use `test.use(ownVisitor)`: each test sends its own `X-Forwarded-For`, which the
+  local web app trusts as a single value (`TRUSTED_PROXIES=none`). That models separate
+  visitors and leaves the limits untouched. One test still has only 3 sign-ins in 10 s.
+  Counters live in Redis when `REDIS_URL` is set (see the rate-limits decision).
+- **Better Auth enumeration protection needs `customSyntheticUser`.** With verification on,
+  sign-up with a taken address answers with a fake user, but it lacks additional and plugin
+  fields (`role`, `locale`, `twoFactorEnabled`) unless told, and the shape then gives the
+  account away. A new user field must be added there too; the integration test compares keys.
+- **A two-factor sign-in clears the session cookie with an empty `session_token=`.** Checking
+  that a response "set no session" must look for a value, not the cookie name.
+- **`next dev` keeps the Better Auth instance across hot reloads** (`globalForAuth`), so changes
+  to its options need a server restart.
+- **Running the smoke suite beside `pnpm dev`:** `pnpm test:smoke` reuses servers on 3000/4000/
+  4100, which would test dev builds. Build web with `API_URL=http://localhost:4200` (Next bakes
+  rewrites into the build), start the built apps on other ports with `BETTER_AUTH_URL`,
+  `TRUSTED_ORIGINS`, `API_PORT` and `WORKER_HEALTH_PORT` set, then point the suite at them with
+  `SMOKE_WEB_URL`, `SMOKE_API_URL`, `SMOKE_WORKER_URL`, `SMOKE_DEMO_DATA=true` and
+  `EMAIL_OUTBOX_DIR`. Rebuild web afterwards.
+- **Everything local arrives from 127.0.0.1,** so the smoke suite would share one client's
+  limits (120/min per route on the API) and a re-run would meet the last run's counters. Each
+  worker therefore sends its own `X-Forwarded-For` (`VISITOR_HEADERS`).
+- **The rate-limit stores use a rolling window that only ends after a quiet `window`:** every
+  allowed hit moves it forward. Right for "5 an hour for one address". Wrong for a site-wide
+  budget, which fills under steady traffic and stays shut: put the clock hour in the key.
+- **API integration tests run with `NODE_ENV=test`, where Better Auth skips origin checks and
+  rate limits.** Off-site redirects, CSRF and limits on auth routes can only be tested in the
+  smoke suite (`security.smoke.ts`).
+- **A failed `register()` in `instrumentation.ts` does not stop Next:** it logs and serves on.
+  `requireServerEnv` exits the process itself. `process.env` already holds the root `.env` by
+  then, because `next.config.ts` loads it. Don't import `server-only` from what `register()`
+  loads.
+- **`router.refresh()` puts the server's `<title>` back,** overwriting `document.title`. A state
+  that outlives a refresh needs its own URL (`/reset-password?done=1`).
 - **Zod's JIT probe runs when a schema is built**, not when it parses: `z.config({ jitless:
 true })` (`lib/zod-jitless.ts`) must be the first import of every client component that
   uses zod, ahead of `@parkfairy/contracts`, or the CSP reports `script-src eval`.
@@ -360,6 +421,10 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   (budget 300 ms in `performance.smoke.ts`).
 - 2026-10-30: `/en/account` 196 KiB (two-factor steps load on intent; ~247 KiB if eager),
   CLS 0 on a phone while the API identity loads (its layout renders before the data).
+- 2026-10-30 (account emails): every auth page ~228 KiB (measured before the last edits; the
+  smoke budget of 250 KiB passes on the final build). `lib/auth.ts` is in every page's server
+  bundle, so the email code and both catalogs added 4–5% eager server JS (no cold-start change
+  measured).
 
 ## Translation notes
 

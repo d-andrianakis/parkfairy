@@ -11,21 +11,41 @@ import {
 const rule = { window: 10, max: 3 };
 
 function redisAnswering(result: unknown): RedisEval {
-  return { eval: vi.fn().mockResolvedValue(result) };
+  return { eval: vi.fn(), evalsha: vi.fn().mockResolvedValue(result) };
 }
 
 describe('redisRateLimitStorage', () => {
   it('runs one atomic script per request, hashed key, window in milliseconds', async () => {
-    const evalScript = vi.fn().mockResolvedValue([1, 0]);
-    const redis: RedisEval = { eval: evalScript };
+    const evalsha = vi.fn().mockResolvedValue([1, 0]);
+    const evalScript = vi.fn();
+    const redis: RedisEval = { eval: evalScript, evalsha };
     await expect(redisRateLimitStorage(redis).consume('1.2.3.4/sign-in', rule)).resolves.toEqual({
       allowed: true,
       retryAfter: null,
     });
+    expect(evalsha).toHaveBeenCalledWith(
+      expect.stringMatching(/^[0-9a-f]{40}$/),
+      1,
+      authRateLimitKey('1.2.3.4/sign-in'),
+      10_000,
+      3,
+    );
+    expect(evalScript).not.toHaveBeenCalled(); // the text isn't sent on every request
+  });
+
+  it('sends the script again when Redis has forgotten it', async () => {
+    const evalScript = vi.fn().mockResolvedValue([1, 0]);
+    const redis: RedisEval = {
+      eval: evalScript,
+      evalsha: vi.fn().mockRejectedValue(new Error('NOSCRIPT No matching script')),
+    };
+    await expect(redisRateLimitStorage(redis).consume('k', rule)).resolves.toMatchObject({
+      allowed: true,
+    });
     expect(evalScript).toHaveBeenCalledWith(
       expect.stringContaining("redis.call('TIME')"),
       1,
-      authRateLimitKey('1.2.3.4/sign-in'),
+      authRateLimitKey('k'),
       10_000,
       3,
     );
@@ -45,7 +65,10 @@ describe('redisRateLimitStorage', () => {
 
   it('keeps limiting in memory when Redis fails, and reports at most every 10 s', async () => {
     const onError = vi.fn();
-    const redis: RedisEval = { eval: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')) };
+    const redis: RedisEval = {
+      eval: vi.fn(),
+      evalsha: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),
+    };
     const storage = redisRateLimitStorage(redis, onError);
 
     for (let i = 0; i < 3; i++) {

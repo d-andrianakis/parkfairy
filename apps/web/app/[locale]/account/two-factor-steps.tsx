@@ -12,8 +12,9 @@ import {
 import { Button } from '@parkfairy/ui/components/button';
 import { FieldGroup } from '@parkfairy/ui/components/field';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
+import { FocusHeading } from '@/components/focus-heading';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
 import { QrCode } from '@/components/qr-code';
@@ -21,14 +22,12 @@ import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { authClient } from '@/lib/auth-client';
 import { authErrorKey, authErrorValues, type AuthErrorKey } from '@/lib/auth-errors';
 import { useValidationMessage } from '@/lib/use-validation-message';
+import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 
 // The steps of two-factor-settings.tsx, loaded only once someone starts a change: they bring
 // zod, react-hook-form and the QR encoder, which the overview does not need.
 
 export type AuthResult = Promise<{ error: { code?: string; status?: number } | null }>;
-
-/** Long Greek labels wrap instead of pushing a 320 px screen sideways. */
-const WRAPPING = 'h-auto min-h-9 max-w-full whitespace-normal';
 
 /** The base32 secret inside an otpauth:// URI, grouped for typing by hand. */
 function manualKey(totpURI: string): string {
@@ -38,13 +37,7 @@ function manualKey(totpURI: string): string {
 
 /** Heading of the current step; receives focus when the step appears. */
 function StepHeading({ children }: { children: ReactNode }) {
-  const ref = useRef<HTMLHeadingElement>(null);
-  useEffect(() => ref.current?.focus(), []);
-  return (
-    <h3 ref={ref} tabIndex={-1} className="text-base font-semibold outline-none">
-      {children}
-    </h3>
-  );
+  return <FocusHeading level="h3">{children}</FocusHeading>;
 }
 
 /** Asks for the password again before a security change; `onConfirm` calls Better Auth. */
@@ -100,10 +93,14 @@ export function PasswordStep({
           {...register('password')}
         />
         <div className="flex flex-wrap gap-2">
-          <Button type="submit" className={WRAPPING} aria-disabled={isSubmitting || undefined}>
+          <Button
+            type="submit"
+            className={WRAPPING_BUTTON}
+            aria-disabled={isSubmitting || undefined}
+          >
             {isSubmitting ? t('working') : submitLabel}
           </Button>
-          <Button type="button" variant="outline" className={WRAPPING} onClick={onCancel}>
+          <Button type="button" variant="outline" className={WRAPPING_BUTTON} onClick={onCancel}>
             {t('cancel')}
           </Button>
         </div>
@@ -173,10 +170,14 @@ export function ScanStep({
           {...register('code')}
         />
         <div className="flex flex-wrap gap-2">
-          <Button type="submit" className={WRAPPING} aria-disabled={isSubmitting || undefined}>
+          <Button
+            type="submit"
+            className={WRAPPING_BUTTON}
+            aria-disabled={isSubmitting || undefined}
+          >
             {isSubmitting ? t('verifying') : t('verify')}
           </Button>
-          <Button type="button" variant="outline" className={WRAPPING} onClick={onCancel}>
+          <Button type="button" variant="outline" className={WRAPPING_BUTTON} onClick={onCancel}>
             {t('cancel')}
           </Button>
         </div>
@@ -204,7 +205,7 @@ export function BackupCodesStep({ codes, onDone }: { codes: string[]; onDone: ()
           </li>
         ))}
       </ul>
-      <Button className={`w-fit ${WRAPPING}`} onClick={onDone}>
+      <Button className={`w-fit ${WRAPPING_BUTTON}`} onClick={onDone}>
         {t('done')}
       </Button>
     </div>

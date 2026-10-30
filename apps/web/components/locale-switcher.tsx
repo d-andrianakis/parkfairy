@@ -12,6 +12,12 @@ import { SEARCH_PARAM_KEYS } from '@/lib/search-params';
 /** Query parameters worth keeping in the other language; anything else (tokens…) is dropped. */
 const CARRIED_PARAMS: readonly string[] = [...SEARCH_PARAM_KEYS, 'next'];
 
+/** Pages opened from an emailed link, which mean nothing without that link's parameters. */
+const LINK_PARAMS: Readonly<Record<string, readonly string[]>> = {
+  '/reset-password': ['token', 'error', 'done'],
+  '/verify-email': ['token'],
+};
+
 /**
  * Plain links rather than a <select>: switching language is navigation, and links keep it
  * keyboard/screen-reader friendly without a change-of-context on input (WCAG 3.2.2).
@@ -21,8 +27,9 @@ export function LocaleSwitcher({ signedIn }: { signedIn: boolean }) {
   const current = useLocale();
   const pathname = usePathname();
   // Same page in the other language, search and stay window included.
+  const carried = [...CARRIED_PARAMS, ...(LINK_PARAMS[pathname] ?? [])];
   const query = Object.fromEntries(
-    [...(useSearchParams() ?? [])].filter(([key]) => CARRIED_PARAMS.includes(key)),
+    [...(useSearchParams() ?? [])].filter(([key]) => carried.includes(key)),
   );
 
   function rememberPreference(locale: Locale) {

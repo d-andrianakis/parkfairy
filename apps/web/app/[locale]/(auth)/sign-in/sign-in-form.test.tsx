@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authClient } from '@/lib/auth-client';
+import { takeRememberedEmail } from '@/lib/remembered-email';
 import { routerMock } from '@/test/navigation-mock';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { rendererFor } from '@/test/render';
@@ -55,6 +56,27 @@ describe('SignInForm', () => {
       'Το email ή ο κωδικός πρόσβασης δεν είναι σωστά.',
     );
     expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it('says to confirm the address first, and opens no session', async () => {
+    signIn.mockResolvedValue({
+      data: null,
+      error: { code: 'EMAIL_NOT_VERIFIED', status: 403 },
+    } as never);
+    renderInSubtree(<SignInForm returnTo="/account" />, { locale: 'el' });
+    await submit();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Επιβεβαιώστε πρώτα τη διεύθυνση email σας.',
+    );
+    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it('takes the typed address along to the forgotten-password form', async () => {
+    renderInSubtree(<SignInForm returnTo="/account" />);
+    await userEvent.type(screen.getByLabelText('Email'), 'maria@example.gr');
+    await userEvent.click(screen.getByRole('link', { name: 'Forgot your password?' }));
+    expect(takeRememberedEmail()).toBe('maria@example.gr');
   });
 
   it('explains rate limiting', async () => {

@@ -49,7 +49,8 @@ Legend: `[x]` done · `[ ]` not done · `[~]` partially done (say what is missin
       codes usable at sign-in; lockout message with the wait. Unit tests, integration test
       against real Better Auth (`two-factor.integration.test.ts`), `two-factor.smoke.ts`
       (including "password alone is no session" and a 320 px Greek check); reviewed twice
-- [ ] Email verification + password reset (needs Resend)
+- [~] Email verification + password reset: done and tested end to end against the local
+  outbox (1.14). Missing: one real send, which needs a Resend key and a verified domain
 - [x] Unit tests: auth config (`packages/auth/src/index.test.ts`), forms (`sign-in-form`, `sign-up-form`, `two-factor-form` tests)
 - [x] Smoke: `auth.smoke.ts`
 - [x] Security: shared password policy, locale validation hook, open-redirect guard, CSRF origin check (Better Auth + API)
@@ -100,8 +101,14 @@ Legend: `[x]` done · `[ ]` not done · `[~]` partially done (say what is missin
       `ACCOUNT_TEMPORARILY_LOCKED`, `Validation.startTooFar` / `durationTooLong` /
       `timeNotOnStep`, `Search.resultsTitle`, the colon pattern in `Search.titleArea` and
       `Listing.moreNear`, `Listing.localTime`, and the plain hyphen CLDR puts in multi-day
-      Greek ranges
-- [ ] Localized emails (when email lands)
+      Greek ranges. Added 2026-10-30: `SignUp.sent*`/`resend*`, `SignIn.forgotPassword`,
+      `AuthErrors.EMAIL_NOT_VERIFIED`/`INVALID_TOKEN`, `ForgotPassword.*`, `ResetPassword.*`,
+      `VerifyEmail.*`, `Email.*`. Questions: Επιβεβαίωση vs Επαλήθευση for the address (two-factor
+      uses Επαλήθευση); Επαναφορά vs Ορισμός vs Αλλαγή κωδικού; "στη διεύθυνση {email}" vs "στο
+      {email}"; "σας στείλαμε" after "Αν υπάρχει λογαριασμός"; Ακολουθήστε vs Πατήστε τον σύνδεσμο;
+      Αποστολή ξανά vs Επαναποστολή; Στάλθηκε vs Εστάλη; πια vs πλέον; περιηγητή vs πρόγραμμα
+      περιήγησης; "Κάποιος" vs impersonal "Ζητήθηκε…"; Πίσω vs Επιστροφή στη σύνδεση
+- [x] Localized emails: rendered in the language stored on the account (1.14)
 
 ### 1.7 Security baseline
 
@@ -196,7 +203,11 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
 - [ ] Production config before launch: `TRUST_PROXY` = the web servers' addresses (never a
       hop count), `TRUSTED_PROXIES` = the proxy chain, the first proxy overwriting/appending
       `X-Forwarded-For` (memory.md, rate-limit keys). The apps now refuse to start in
-      production without them
+      production without them. Also for email (1.14): `RESEND_API_KEY` and `EMAIL_FROM` on a
+      verified domain, Resend click tracking off (it would rewrite one-time links), access logs
+      without query strings (confirmation tokens hold the address), a stop grace of at least
+      20 s (`after()` work), and check the real limit (`ratelimit-limit`) against the 2 sends
+      a second assumed in `transport.ts`
 - [ ] At scale: opening-hours filter in SQL (minute-of-week multirange) and short-TTL search
       caching (perf review findings 2/6, deferred until real inventory)
 - [x] Contracts & docs: OpenAPI + client regenerated, migrations 0003/0004 reviewed, memory.md
@@ -227,8 +238,12 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
       outage and expiry, env parsing, worker shutdown order, sign-in/sign-up repeat submits,
       route focus, error screens, stay range; smoke covers 2FA end to end and keeps the stay
       window across a language switch
-- [ ] Deferred: cap the spaces a listing returns in the API (page shows 48; a 2,000-space
-      garage sends 65 KB), EVALSHA for the rate-limit scripts, opening-hours check in SQL
+- [x] Listing spaces capped in the API at 48 (`LISTING_SPACES_LIMIT`, in the contract);
+      `spaceCount` carries the total. The query still reads every row, fine to about 2,000 spaces
+- [x] Rate-limit scripts run by EVALSHA, falling back to the full text on NOSCRIPT (tested
+      against real Redis after `SCRIPT FLUSH`)
+- [ ] Deferred: opening-hours check in SQL; top-48 spaces in SQL (needs an ICU numeric
+      collation; worth it above about 10,000 spaces in one listing)
 - [ ] Decision needed: how a stay that crosses a DST change is priced (today: real elapsed
       time, so the spring-forward night is an hour cheaper than the wall clock suggests)
 - [x] Re-review of this round by the five review agents (findings fixed in 1.13)
@@ -252,8 +267,48 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
       CLS budgets
 - [x] Tests: RFC 6238 vectors, QR orientation, unhandled rejections, shutdown failure exit
       code, wrong password while turning off, cancel at the QR step, proxy validation
-- [ ] Deferred: zod-free subpath for the form limits (2–3 KiB on auth pages); clearing
-      leftover rate-limit counters before local smoke runs (today: wait a minute)
+- [x] No more waiting between local smoke runs: each worker is a visitor of its own
+      (`VISITOR_HEADERS`); two runs in a row pass
+- [ ] Deferred: zod-free subpath for the form limits (2–3 KiB on auth pages; low value)
+
+### 1.14 Account emails (2026-10-30)
+
+- [x] **Implemented:** sign-in needs a confirmed address; forgotten-password flow; four
+      localized emails (`apps/web/lib/email`); Resend transport with idempotency, pacing and
+      `Retry-After`; file outbox on this machine only; start-up check (`instrumentation.ts`);
+      unconfirmed accounts deleted after 7 days (worker); migration 0007 (three indexes)
+- [x] **Unit tests:** contracts, auth options, email render, delivery, transport, env, forms,
+      focus heading, language switcher, space list, worker job
+- [x] **Integration:** `account-email.integration.test.ts` (real Better Auth and Postgres, but
+      origin checks and rate limits are off under `NODE_ENV=test`, see memory.md)
+- [x] **Smoke:** `account-email.smoke.ts` (147 tests in the suite on the final build, run twice;
+      beside `pnpm dev` on other ports, so `pnpm test:smoke` itself runs first in CI),
+      off-site link checks in `security.smoke.ts`, new pages in the accessibility and JS budgets
+- [x] **Security review:** fixed sign-up oracles (locale, NUL in the name, image), saved reset
+      links surviving a reset, alias bypass of the recipient cap, site-wide budgets, confirmation
+      by button (scanners), unconfirmed-account retention, `no-referrer` header. Open items below
+- [x] **Performance review:** site budget now per clock hour (the rolling window never reset
+      under steady traffic), pacing, indexes, JS budget extended; first-visit JS 228 KiB
+- [x] **Accessibility review:** titles per state, heading focus ring, wrapping buttons, typed
+      address carried to the reset form (3.3.7), instructions leave with the form, email colours
+- [x] **i18n review:** ICU plurals, Greek wording, `κωδικός πρόσβασης` everywhere (bare κωδικός
+      means the two-factor code), `lang` on email content; strings listed in 1.6
+- [x] **Test review:** gaps closed (start-up guard against a real `next start`, off-site
+      redirects, expiry, three-way enumeration comparison, Redis down, HTML body)
+- [x] **Contracts & docs:** no API contract change for email; migration 0007 reviewed;
+      GETTING_STARTED, README, memory.md
+- [ ] A real send through Resend, and the emails in Gmail, Outlook and Apple Mail, dark mode
+      included (colours are fixed, but some clients recolour anyway)
+- [ ] Manual NVDA and VoiceOver pass on the panels (heading focus, `FormError` insertion, busy
+      button, Greek voice on a Latin address)
+- [ ] Support process for a planted second factor: someone who signs up with a stranger's
+      address, has it confirmed and enrols TOTP leaves the owner locked out after a reset
+      (needs the owner to press the button now, so unlikely; no self-service recovery exists)
+- [ ] Accepted for now, revisit before launch: sign up then sign in tells a taken address from a
+      free one (401 vs 403), reset request timing differs by ~3 ms, reset tokens in URLs reach
+      proxy logs, a language switch on the "check your inbox" panel returns to the empty form,
+      one IP can spend a recipient's hourly reset allowance (that recipient still has working
+      links), and a show-password toggle for the reset form
 
 ## Phase 2: Owner onboarding and inventory (decisions #3–#6 in memory.md still open)
 
@@ -296,7 +351,8 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
 
 ## Phase 6: Production readiness
 
-- [ ] Security + privacy review, GDPR retention and data-subject workflows
+- [ ] Security + privacy review, GDPR retention and data-subject workflows (unconfirmed
+      accounts are handled, 1.14)
 - [ ] Cookie notice/inventory: Better Auth session cookies, `NEXT_LOCALE` (session),
       `theme` (display preference, first-party, 1 year, `light`/`dark`)
 - [ ] Backups, restore drill, monitoring, alerts, runbooks

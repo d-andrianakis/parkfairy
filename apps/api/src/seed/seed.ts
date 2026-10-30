@@ -72,7 +72,10 @@ export async function ensureDemoAccount(db: Database): Promise<'created' | 'exis
     .select({ id: schema.users.id })
     .from(schema.users)
     .where(eq(schema.users.email, DEMO_ACCOUNT.email));
-  if (existing) return 'exists';
+  if (existing) {
+    await confirmDemoEmail(db); // seeded before sign-in required a confirmed address
+    return 'exists';
+  }
   const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000';
   const auth = createAuth({
     db,
@@ -82,5 +85,14 @@ export async function ensureDemoAccount(db: Database): Promise<'created' | 'exis
   });
   // Through Better Auth, so the password is hashed exactly as at sign-up.
   await auth.api.signUpEmail({ body: { ...DEMO_ACCOUNT } });
+  await confirmDemoEmail(db);
   return 'created';
+}
+
+/** The demo address receives no mail, and the account has to work straight away. */
+async function confirmDemoEmail(db: Database): Promise<void> {
+  await db
+    .update(schema.users)
+    .set({ emailVerified: true })
+    .where(eq(schema.users.email, DEMO_ACCOUNT.email));
 }

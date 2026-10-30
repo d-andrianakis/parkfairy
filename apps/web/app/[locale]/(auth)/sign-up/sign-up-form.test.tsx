@@ -3,7 +3,6 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authClient } from '@/lib/auth-client';
-import { routerMock } from '@/test/navigation-mock';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { rendererFor } from '@/test/render';
 import { SignUpForm } from './sign-up-form';
@@ -11,8 +10,11 @@ import { SignUpForm } from './sign-up-form';
 // Only the catalog namespaces this subtree ships to the browser.
 const renderInSubtree = rendererFor(CLIENT_NAMESPACES.auth);
 
-vi.mock('@/lib/auth-client', () => ({ authClient: { signUp: { email: vi.fn() } } }));
+vi.mock('@/lib/auth-client', () => ({
+  authClient: { signUp: { email: vi.fn() }, sendVerificationEmail: vi.fn() },
+}));
 const signUp = vi.mocked(authClient.signUp.email);
+const resend = vi.mocked(authClient.sendVerificationEmail);
 
 async function fill({
   name = 'Maria',
@@ -28,6 +30,7 @@ async function fill({
 describe('SignUpForm', () => {
   beforeEach(() => {
     signUp.mockReset(); // braces: a returned function would run as a cleanup hook
+    resend.mockReset();
   });
 
   it('explains the password rule up front and when it is broken', async () => {
@@ -56,20 +59,73 @@ describe('SignUpForm', () => {
       password: 'correct horse battery',
       locale,
     });
-    expect(routerMock.replace).toHaveBeenCalledWith('/account');
   });
 
-  it('tells people when the email is already registered', async () => {
-    signUp.mockResolvedValue({
-      data: null,
-      error: { code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', status: 422 },
-    } as never);
-    renderInSubtree(<SignUpForm />, { locale: 'el' });
-    await fill({});
+  describe('after signing up', () => {
+    beforeEach(() => {
+      signUp.mockResolvedValue({ data: {}, error: null } as never);
+    });
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Υπάρχει ήδη λογαριασμός με αυτό το email.',
-    );
+    beforeEach(() => {
+      document.title = 'Create account · Parkfairy';
+    });
+
+    it.each([
+      ['el', 'Ελέγξτε τα εισερχόμενά σας', 'Στείλαμε μήνυμα στη διεύθυνση maria@example.gr'],
+      ['en', 'Check your inbox', 'We’ve sent an email to maria@example.gr'],
+    ] as const)('asks to check the inbox, moving focus there (%s)', async (locale, title, body) => {
+      const { container } = renderInSubtree(<SignUpForm />, { locale });
+      await fill({});
+
+      const heading = await screen.findByRole('heading', { name: title });
+      expect(heading).toHaveFocus(); // the button that had it is gone
+      expect(document.title).toBe(`${title} · Parkfairy`); // it no longer names the form
+      expect(screen.getByText(new RegExp(body))).toBeInTheDocument();
+      expect(container.querySelector('input')).toBeNull();
+      await expectNoAxeViolations(container);
+    });
+
+    it('sends the link again on request and says so', async () => {
+      resend.mockResolvedValue({ data: { status: true }, error: null } as never);
+      renderInSubtree(<SignUpForm />);
+      await fill({});
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Send it again' }));
+
+      expect(resend).toHaveBeenCalledWith({ email: 'maria@example.gr' });
+      expect(await screen.findByRole('status')).toHaveTextContent('Sent. Check your inbox.');
+    });
+
+    it('explains when too many links were asked for', async () => {
+      resend.mockResolvedValue({ data: null, error: { status: 429 } } as never);
+      renderInSubtree(<SignUpForm />);
+      await fill({});
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Send it again' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Too many attempts');
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    });
+
+    it('ignores a repeat press while sending, keeping the button focusable', async () => {
+      let finish = () => {};
+      resend.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finish = () => resolve({ data: { status: true }, error: null } as never);
+          }),
+      );
+      renderInSubtree(<SignUpForm />);
+      await fill({});
+      await userEvent.click(await screen.findByRole('button', { name: 'Send it again' }));
+
+      const button = screen.getByRole('button', { name: 'Sending…' });
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(button);
+      expect(resend).toHaveBeenCalledOnce();
+      finish();
+      expect(await screen.findByRole('button', { name: 'Send it again' })).toHaveFocus();
+    });
   });
 
   it('announces how many fields need attention, in the page language', async () => {
@@ -99,6 +155,6 @@ describe('SignUpForm', () => {
     await userEvent.click(button);
     expect(signUp).toHaveBeenCalledTimes(1);
     finish();
-    await waitFor(() => expect(routerMock.replace).toHaveBeenCalled());
+    expect(await screen.findByRole('heading', { name: 'Check your inbox' })).toBeInTheDocument();
   });
 });

@@ -16,15 +16,13 @@ import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { FeatureBadges } from '@/components/parking/feature-badges';
 import { OpeningHours } from '@/components/parking/opening-hours';
+import { SpaceList } from '@/components/parking/space-list';
 import { StayRange } from '@/components/parking/stay-range';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { loadListing } from '@/lib/api.server';
 import { parseListingWindow, windowQuery, type SearchParams } from '@/lib/search';
 import { validationArgs } from '@/lib/validation-args';
-
-/** Big garages list hundreds of spaces; drivers don't pick one until booking. */
-const SPACES_SHOWN = 48;
 
 interface ListingPageProps {
   params: Promise<{ locale: string; slug: string }>;
@@ -143,25 +141,7 @@ export default async function ListingPage(props: ListingPageProps) {
           <p className="mt-1 text-sm text-muted-foreground">
             {t('spaceCount', { count: listing.spaceCount })}
           </p>
-          <ul aria-labelledby="spaces-heading" className="mt-3 grid gap-2 sm:grid-cols-2">
-            {listing.spaces.slice(0, SPACES_SHOWN).map((space) => (
-              <li
-                key={space.label}
-                className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
-              >
-                {/* Owner content: Greek "Α1" looks like Latin "A1" but is read differently. */}
-                <span lang={listing.contentLocale} className="font-mono font-medium">
-                  {space.label}
-                </span>
-                <FeatureBadges features={space.features} />
-              </li>
-            ))}
-          </ul>
-          {listing.spaces.length > SPACES_SHOWN ? (
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t('moreSpaces', { count: listing.spaces.length - SPACES_SHOWN })}
-            </p>
-          ) : null}
+          <SpaceList listing={listing} labelledBy="spaces-heading" />
         </section>
       </div>
 

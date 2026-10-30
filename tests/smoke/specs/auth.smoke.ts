@@ -1,21 +1,19 @@
 import { expect, test } from '@playwright/test';
-import { TEST_PASSWORD } from '../support/env';
-import { expectAccessible, uniqueEmail } from '../support/fixtures';
+import { EMAIL_OUTBOX, TEST_PASSWORD } from '../support/env';
+import { expectAccessible, ownVisitor, registerAndSignIn, uniqueEmail } from '../support/fixtures';
 
 // Feature: authentication — sign up, session recognised by the API, sign out, sign in.
+
+test.use(ownVisitor);
 
 test('a driver signs up, is recognised by the API, signs out and signs back in', async ({
   page,
 }) => {
+  test.skip(!EMAIL_OUTBOX, 'A new account needs its confirmation email');
   const email = uniqueEmail();
 
-  await page.goto('/en/sign-up');
-  await page.getByLabel('Name').fill('Smoke Driver');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(TEST_PASSWORD);
-  await page.getByRole('button', { name: 'Create account' }).click();
+  await registerAndSignIn(page, email);
 
-  await expect(page).toHaveURL('/en/account');
   await expect(page.getByRole('heading', { name: 'Verified by the API' })).toBeVisible();
   const apiUserId = page.getByTestId('api-user-id');
   await expect(apiUserId).toHaveText(

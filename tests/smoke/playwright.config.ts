@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { WEB_URL } from './support/env';
+import { VISITOR_HEADERS, WEB_URL } from './support/env';
 
 const isCI = Boolean(process.env.CI);
 const external = Boolean(process.env.SMOKE_WEB_URL);
@@ -16,6 +16,7 @@ export default defineConfig({
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: WEB_URL,
+    extraHTTPHeaders: VISITOR_HEADERS,
     locale: 'en-US',
     trace: 'retain-on-failure',
   },
@@ -46,6 +47,8 @@ export default defineConfig({
         {
           command: 'pnpm --filter @parkfairy/web start',
           url: 'http://localhost:3000/en',
+          // A key in a developer's .env must not send real mail to the suite's addresses.
+          env: { RESEND_API_KEY: '' },
           reuseExistingServer: !isCI,
           timeout: 60_000,
         },

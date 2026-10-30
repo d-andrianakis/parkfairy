@@ -754,6 +754,7 @@
             }
           },
           "spaces": {
+            "maxItems": 48,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ParkingSpace"

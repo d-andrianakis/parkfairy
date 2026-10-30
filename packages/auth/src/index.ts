@@ -4,13 +4,16 @@
  * instance from this function so cookie names, secrets and schema always match.
  */
 import {
+  ACCOUNT_LINK_LIFETIME,
   DEFAULT_LOCALE,
   isLocale,
   PASSWORD_POLICY,
+  SignUpInputSchema,
   SUPPORTED_LOCALES,
   TWO_FACTOR_LOCKOUT,
+  type Locale,
 } from '@parkfairy/contracts';
-import { schema, type Database } from '@parkfairy/database';
+import { deleteUserVerifications, schema, type Database } from '@parkfairy/database';
 import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
@@ -21,9 +24,20 @@ export {
   authRateLimitKey,
   memoryRateLimitStorage,
   redisRateLimitStorage,
+  redisScript,
+  runScript,
   type RateLimitStorage,
   type RedisEval,
 } from './rate-limit-storage.js';
+
+/** An email Better Auth wants sent, in the language stored on the account. */
+export interface AuthEmail {
+  kind: 'verify-email' | 'reset-password' | 'password-changed' | 'existing-account';
+  to: string;
+  locale: Locale;
+  /** Where the email's button goes. Built here, so a caller cannot choose the destination. */
+  url: string;
+}
 
 export interface CreateAuthOptions {
   db: Database;
@@ -44,6 +58,12 @@ export interface CreateAuthOptions {
    * header is trusted. List the real proxies, not a private range that also covers clients.
    */
   trustedProxies?: string[];
+  /**
+   * Hands an email over for delivery and returns at once: Better Auth awaits its callbacks,
+   * so a slow send would tell a visitor whether an address has an account. Only the web app
+   * passes this; the API never serves these flows.
+   */
+  sendEmail?: (email: AuthEmail) => void;
 }
 
 export const AUTH_COOKIE_PREFIX = 'parkfairy';
@@ -61,7 +81,15 @@ export function createAuth({
   trustedOrigins,
   rateLimitStorage,
   trustedProxies,
+  sendEmail,
 }: CreateAuthOptions) {
+  const send = (kind: AuthEmail['kind'], user: AccountRef, url: string) => {
+    sendEmail?.({ kind, to: user.email, locale: accountLocale(user), url });
+    return Promise.resolve();
+  };
+  const pageUrl = (user: AccountRef, path: string) =>
+    new URL(`/${accountLocale(user)}${path}`, baseURL).href;
+
   return betterAuth({
     appName: 'Parkfairy',
     baseURL,
@@ -73,8 +101,54 @@ export function createAuth({
       enabled: true,
       minPasswordLength: PASSWORD_POLICY.minLength,
       maxPasswordLength: PASSWORD_POLICY.maxLength,
-      // TODO(phase 2): require verification once transactional email (Resend) is wired up.
-      requireEmailVerification: false,
+      // Sign-up then opens no session and answers the same whether the address is taken.
+      requireEmailVerification: true,
+      resetPasswordTokenExpiresIn: ACCOUNT_LINK_LIFETIME.resetPasswordMinutes * 60,
+      // A reset is how people recover a stolen account, so it must end the thief's sessions.
+      revokeSessionsOnPasswordReset: true,
+      // Without this the duplicate-address answer lacks our fields and gives the account away.
+      customSyntheticUser: ({ coreFields, additionalFields, id }) => ({
+        ...coreFields,
+        role: 'user',
+        locale: DEFAULT_LOCALE,
+        twoFactorEnabled: false,
+        ...additionalFields,
+        id,
+      }),
+      // A reset consumes only its own token. A thief's saved link must not undo a recovery, so
+      // this also removes the other links, pending two-factor sign-ins and trusted devices.
+      onPasswordReset: async ({ user }) => {
+        await deleteUserVerifications(db, user.id);
+        await send('password-changed', user, pageUrl(user, '/forgot-password'));
+      },
+      ...(sendEmail && {
+        sendResetPassword: ({ user, url }) =>
+          send('reset-password', user, withCallback(url, `/${accountLocale(user)}/reset-password`)),
+        onExistingUserSignUp: ({ user }) =>
+          send('existing-account', user, pageUrl(user, '/forgot-password')),
+      }),
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendOnSignIn: true,
+      expiresIn: ACCOUNT_LINK_LIFETIME.verifyEmailHours * 60 * 60,
+      // No session from the link. A stranger may have signed up with this address: clicking
+      // must not put its owner inside an account whose password the stranger knows.
+      autoSignInAfterVerification: false,
+      // The link opens our page, where a person presses a button to confirm. Pointed straight
+      // at Better Auth's GET, a mail scanner fetching it would confirm the stranger's account.
+      ...(sendEmail && {
+        sendVerificationEmail: ({ user, token }) =>
+          send(
+            'verify-email',
+            user,
+            pageUrl(user, `/verify-email?token=${encodeURIComponent(token)}`),
+          ),
+      }),
+    },
+    // A copy of the verifications table must not hand over live password resets.
+    verification: {
+      storeIdentifier: { default: 'plain', overrides: { 'reset-password': 'hashed' } },
     },
     user: {
       additionalFields: {
@@ -109,7 +183,7 @@ export function createAuth({
       useSecureCookies: baseURL.startsWith('https://'),
       database: { generateId: 'uuid' },
     },
-    hooks: { after: endOtherSessionsOnTwoFactorChange },
+    hooks: { before: validateSignUp, after: endOtherSessionsOnTwoFactorChange },
     plugins: [
       twoFactor({
         issuer: 'Parkfairy',
@@ -123,6 +197,23 @@ export function createAuth({
     telemetry: { enabled: false },
   });
 }
+
+/**
+ * Refuses a bad sign-up before anything looks the address up. Only a new account reaches the
+ * insert, so anything that fails there (an unsupported locale, a NUL in the name) would tell a
+ * free address from a taken one, which gets the generic answer first.
+ */
+const validateSignUp = createAuthMiddleware((ctx) => {
+  if (ctx.path !== '/sign-up/email') return Promise.resolve();
+  const { name, locale, image } = (ctx.body ?? {}) as Record<string, unknown>;
+  if (locale !== undefined && !isLocale(locale)) return Promise.reject(unsupportedLocale());
+  const valid = image === undefined && SignUpInputSchema.shape.name.safeParse(name).success;
+  return valid
+    ? Promise.resolve()
+    : Promise.reject(
+        new APIError('BAD_REQUEST', { message: 'Invalid sign-up', code: INVALID_SIGN_UP }),
+      );
+});
 
 /** Requests that switch two-factor on (a code verified from a signed-in session) or off. */
 const TWO_FACTOR_CHANGES = new Set(['/two-factor/verify-totp', '/two-factor/disable']);
@@ -149,15 +240,32 @@ export type AuthSession = Auth['$Infer']['Session'];
 export type AuthUser = AuthSession['user'];
 
 export const INVALID_LOCALE = 'INVALID_LOCALE';
+export const INVALID_SIGN_UP = 'INVALID_SIGN_UP';
+
+/** The account fields an email needs; Better Auth types `user` without our additional fields. */
+type AccountRef = { email: string; locale?: unknown };
+
+function accountLocale(user: AccountRef): Locale {
+  return isLocale(user.locale) ? user.locale : DEFAULT_LOCALE;
+}
+
+/** Better Auth's link with our landing page, whatever `callbackURL` the request carried. */
+function withCallback(url: string, callbackURL: string): string {
+  const link = new URL(url);
+  link.searchParams.set('callbackURL', callbackURL);
+  return link.href;
+}
 
 /** Database hook: passes the write through, or rejects it if it sets an unsupported locale. */
 function withSupportedLocale<T extends Record<string, unknown>>(data: T): Promise<{ data: T }> {
   if (data.locale !== undefined && !isLocale(data.locale)) {
-    return Promise.reject(
-      new APIError('BAD_REQUEST', { message: 'Unsupported locale', code: INVALID_LOCALE }),
-    );
+    return Promise.reject(unsupportedLocale());
   }
   return Promise.resolve({ data });
+}
+
+function unsupportedLocale() {
+  return new APIError('BAD_REQUEST', { message: 'Unsupported locale', code: INVALID_LOCALE });
 }
 
 /** Parses a comma-separated origin list (e.g. TRUSTED_ORIGINS) into normalized origins. */

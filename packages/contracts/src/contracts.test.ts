@@ -3,12 +3,14 @@ import { z } from 'zod';
 import {
   contractsRegistry,
   DEFAULT_LOCALE,
+  EmailLinkInputSchema,
   isLocale,
   isValidationMessage,
   LocaleSchema,
   MeResponseSchema,
   PASSWORD_POLICY,
   PasswordConfirmSchema,
+  ResetPasswordInputSchema,
   SignInInputSchema,
   SignUpInputSchema,
   SUPPORTED_LOCALES,
@@ -38,6 +40,15 @@ describe('sign-up input', () => {
     ]);
   });
 
+  it('refuses control characters in a name', () => {
+    const result = SignUpInputSchema.safeParse({
+      name: 'Ma\u0000ria',
+      email: 'maria@example.gr',
+      password: 'x'.repeat(PASSWORD_POLICY.minLength),
+    });
+    expect(issueMessages(result)).toEqual(['invalid']);
+  });
+
   it('enforces the upper password bound', () => {
     const result = SignUpInputSchema.safeParse({
       name: 'Maria',
@@ -48,6 +59,28 @@ describe('sign-up input', () => {
   });
 });
 
+describe('account email input', () => {
+  it('holds a reset password to the sign-up rules', () => {
+    const atMin = 'x'.repeat(PASSWORD_POLICY.minLength);
+    expect(ResetPasswordInputSchema.safeParse({ password: atMin }).success).toBe(true);
+    expect(issueMessages(ResetPasswordInputSchema.safeParse({ password: atMin.slice(1) }))).toEqual(
+      ['passwordTooShort'],
+    );
+    expect(
+      issueMessages(
+        ResetPasswordInputSchema.safeParse({ password: 'x'.repeat(PASSWORD_POLICY.maxLength + 1) }),
+      ),
+    ).toEqual(['passwordTooLong']);
+  });
+
+  it('accepts the addresses sign-up accepts, and no longer ones', () => {
+    expect(EmailLinkInputSchema.safeParse({ email: 'maria@example.gr' }).success).toBe(true);
+    expect(
+      issueMessages(EmailLinkInputSchema.safeParse({ email: `${'x'.repeat(250)}@b.co` })),
+    ).toEqual(['emailInvalid']);
+  });
+});
+
 describe('every validation message is a catalog key', () => {
   const invalidInputs: [z.ZodType, unknown][] = [
     [SignUpInputSchema, { name: '', email: '', password: '' }],
@@ -55,6 +88,8 @@ describe('every validation message is a catalog key', () => {
     [SignInInputSchema, { email: 'nope', password: '' }],
     [TotpInputSchema, { code: '12ab' }],
     [PasswordConfirmSchema, { password: '' }],
+    [EmailLinkInputSchema, { email: 'nope' }],
+    [ResetPasswordInputSchema, { password: 'short' }],
   ];
 
   it.each(invalidInputs)('%#', (schema, input) => {

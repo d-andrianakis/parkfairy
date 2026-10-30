@@ -143,7 +143,13 @@
     "submit": "Create account",
     "submitting": "Creating account…",
     "haveAccount": "Already have an account?",
-    "signInLink": "Sign in"
+    "signInLink": "Sign in",
+    "sentTitle": "Check your inbox",
+    "sentBody": "We’ve sent an email to {email}. Follow the link in it to continue. The link works for {hours, plural, one {# hour} other {# hours}}.",
+    "sentHint": "Nothing there? Check your spam folder, or send it again.",
+    "resend": "Send it again",
+    "resending": "Sending…",
+    "resent": "Sent. Check your inbox."
   },
   "SignIn": {
     "metaTitle": "Sign in",
@@ -154,7 +160,8 @@
     "submit": "Sign in",
     "submitting": "Signing in…",
     "noAccount": "First time here?",
-    "signUpLink": "Create an account"
+    "signUpLink": "Create an account",
+    "forgotPassword": "Forgot your password?"
   },
   "TwoFactor": {
     "metaTitle": "Two-factor verification",
@@ -233,7 +240,6 @@
     "fieldError": "{field}: {message}"
   },
   "AuthErrors": {
-    "USER_ALREADY_EXISTS": "An account with this email already exists.",
     "INVALID_EMAIL_OR_PASSWORD": "The email or password is incorrect.",
     "INVALID_PASSWORD": "That password is incorrect.",
     "INVALID_EMAIL": "Enter a valid email address.",
@@ -247,7 +253,9 @@
     "INVALID_LOCALE": "That language is not supported.",
     "TOO_MANY_REQUESTS": "Too many attempts. Wait a moment and try again.",
     "UNKNOWN": "Something went wrong. Please try again.",
-    "INVALID_BACKUP_CODE": "That backup code is not valid or has already been used."
+    "INVALID_BACKUP_CODE": "That backup code is not valid or has already been used.",
+    "EMAIL_NOT_VERIFIED": "Confirm your email address first. We’ve sent you a new link.",
+    "INVALID_TOKEN": "This link has expired or has already been used. Request a new one."
   },
   "NotFound": {
     "metaTitle": "Page not found",
@@ -259,5 +267,80 @@
     "title": "Something went wrong",
     "description": "This page couldn’t be loaded. Please try again.",
     "retry": "Try again"
+  },
+  "ForgotPassword": {
+    "metaTitle": "Forgot your password",
+    "title": "Forgot your password?",
+    "description": "Enter your email and we’ll send you a link to choose a new password.",
+    "email": "Email",
+    "submit": "Send link",
+    "submitting": "Sending…",
+    "sentTitle": "Check your inbox",
+    "sentBody": "If there’s an account for {email}, we’ve sent it a link to choose a new password. The link works for {minutes, plural, one {# minute} other {# minutes}}.",
+    "backToSignIn": "Back to sign in"
+  },
+  "ResetPassword": {
+    "metaTitle": "Choose a new password",
+    "title": "Choose a new password",
+    "description": "You’ll be signed out everywhere, and can then sign in with the new password.",
+    "password": "New password",
+    "passwordHint": "At least {min} characters.",
+    "submit": "Save new password",
+    "submitting": "Saving…",
+    "doneTitle": "Password changed",
+    "doneBody": "Your new password is ready to use.",
+    "signIn": "Sign in",
+    "invalidTitle": "This link no longer works",
+    "invalidBody": "It has expired or has already been used. Request a new one.",
+    "requestNew": "Request a new link"
+  },
+  "VerifyEmail": {
+    "confirmedTitle": "Email confirmed",
+    "confirmedBody": "Your account is ready. Sign in to continue.",
+    "signIn": "Sign in",
+    "failedTitle": "This link no longer works",
+    "failedBody": "Enter your email and we’ll send you a new link.",
+    "requestTitle": "Confirm your email",
+    "requestBody": "Enter your email and we’ll send you a confirmation link.",
+    "email": "Email",
+    "submit": "Send link",
+    "submitting": "Sending…",
+    "sentTitle": "Check your inbox",
+    "sentBody": "If {email} still needs confirming, we’ve sent it a new link. The link works for {hours, plural, one {# hour} other {# hours}}.",
+    "confirmBody": "Press the button to finish creating your account. If you didn’t sign up for Parkfairy, just close this page.",
+    "confirm": "Confirm email",
+    "confirming": "Confirming…"
+  },
+  "Email": {
+    "footer": "Parkfairy. You’re receiving this because this address was used on our site.",
+    "linkFallback": "If the button doesn’t work, copy this link into your browser:",
+    "verifyEmail": {
+      "subject": "Confirm your email address",
+      "heading": "Confirm your email address",
+      "body": "Confirm this address to finish creating your Parkfairy account. The link works for {hours, plural, one {# hour} other {# hours}}.",
+      "action": "Confirm email",
+      "note": "If you didn’t create an account, ignore this email and nothing will happen."
+    },
+    "resetPassword": {
+      "subject": "Choose a new password",
+      "heading": "Choose a new password",
+      "body": "Someone asked to reset the password of your Parkfairy account. The link works for {minutes, plural, one {# minute} other {# minutes}} and only once.",
+      "action": "Choose a new password",
+      "note": "If this wasn’t you, ignore this email. Your password stays as it is."
+    },
+    "passwordChanged": {
+      "subject": "Your password was changed",
+      "heading": "Your password was changed",
+      "body": "The password of your Parkfairy account was just changed, and every device was signed out.",
+      "action": "Choose a new password",
+      "note": "If this was you, there’s nothing more to do. If not, choose a new password now."
+    },
+    "existingAccount": {
+      "subject": "You already have a Parkfairy account",
+      "heading": "You already have an account",
+      "body": "Someone tried to create a Parkfairy account with this address, but it already has one.",
+      "action": "Reset your password",
+      "note": "If that was you and you’ve forgotten your password, use the link in this email. If not, ignore this email: nothing has changed."
+    }
   }
 }

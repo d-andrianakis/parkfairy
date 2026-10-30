@@ -62,6 +62,18 @@ describe('rate limits shared through Redis', () => {
     expect(await hit()).toMatchObject({ totalHits: 1, isBlocked: false });
   });
 
+  it('keeps counting when Redis forgets its scripts, as after a restart or failover', async () => {
+    const onError = vi.fn();
+    const storage = new RedisThrottlerStorage(redis, onError);
+    const hit = () => storage.increment(`flushed-${run}`, 60_000, 5, 30_000, 'default');
+
+    expect(await hit()).toMatchObject({ totalHits: 1 });
+    await redis.script('FLUSH');
+
+    expect(await hit()).toMatchObject({ totalHits: 2 });
+    expect(onError).not.toHaveBeenCalled(); // it failed open neither silently nor noisily
+  });
+
   it('API: counts the very first request after start-up (no free pass while connecting)', async () => {
     const fresh = createRateLimitRedis(redisUrl);
     try {

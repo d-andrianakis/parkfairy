@@ -50,6 +50,13 @@
       "when": 1793352403870,
       "tag": "0006_two_factor_one_per_user",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793371025908,
+      "tag": "0007_account_cleanup_indexes",
+      "breakpoints": true
     }
   ]
 }

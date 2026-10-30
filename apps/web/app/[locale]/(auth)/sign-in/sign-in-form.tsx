@@ -12,9 +12,10 @@ import { useForm } from 'react-hook-form';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
 import { authErrorKey, authErrorValues, type AuthErrorKey } from '@/lib/auth-errors';
+import { rememberEmail } from '@/lib/remembered-email';
 import { useValidationMessage } from '@/lib/use-validation-message';
 
 export function SignInForm({ returnTo }: { returnTo: string }) {
@@ -26,6 +27,7 @@ export function SignInForm({ returnTo }: { returnTo: string }) {
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<SignInInput>({ resolver: zodResolver(SignInInputSchema) });
 
@@ -54,31 +56,42 @@ export function SignInForm({ returnTo }: { returnTo: string }) {
   };
 
   return (
-    <form method="post" onSubmit={submit} noValidate>
-      <FieldGroup>
-        <FormError message={formError ? tError(formError, authErrorValues(formError)) : null} />
-        <FormField
-          id="email"
-          label={t('email')}
-          type="email"
-          autoComplete="email"
-          error={validationMessage(errors.email?.message)}
-          {...register('email')}
-        />
-        <FormField
-          id="password"
-          label={t('password')}
-          type="password"
-          autoComplete="current-password"
-          error={validationMessage(errors.password?.message)}
-          {...register('password')}
-        />
-        {/* aria-disabled, not disabled: a disabled button drops keyboard focus to <body>. */}
-        <Button type="submit" aria-disabled={isSubmitting || undefined}>
-          {isSubmitting ? t('submitting') : t('submit')}
-        </Button>
-      </FieldGroup>
-      {status.region}
-    </form>
+    <>
+      <form method="post" onSubmit={submit} noValidate>
+        <FieldGroup>
+          <FormError message={formError ? tError(formError, authErrorValues(formError)) : null} />
+          <FormField
+            id="email"
+            label={t('email')}
+            type="email"
+            autoComplete="email"
+            error={validationMessage(errors.email?.message)}
+            {...register('email')}
+          />
+          <FormField
+            id="password"
+            label={t('password')}
+            type="password"
+            autoComplete="current-password"
+            error={validationMessage(errors.password?.message)}
+            {...register('password')}
+          />
+          {/* aria-disabled, not disabled: a disabled button drops keyboard focus to <body>. */}
+          <Button type="submit" aria-disabled={isSubmitting || undefined}>
+            {isSubmitting ? t('submitting') : t('submit')}
+          </Button>
+        </FieldGroup>
+        {status.region}
+      </form>
+      <p className="text-sm">
+        <Link
+          href="/forgot-password"
+          className="text-primary underline underline-offset-4 hover:decoration-2"
+          onClick={() => rememberEmail(getValues('email'))}
+        >
+          {t('forgotPassword')}
+        </Link>
+      </p>
+    </>
   );
 }

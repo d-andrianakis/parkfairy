@@ -1,0 +1,121 @@
+import 'server-only';
+import { randomUUID } from 'node:crypto';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+export interface OutgoingEmail {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}
+
+export interface EmailTransport {
+  /** Resolves once the email is accepted; rejects with a reason that holds no address or link. */
+  send(email: OutgoingEmail): Promise<void>;
+}
+
+const RESEND_ENDPOINT = 'https://api.resend.com/emails';
+const REQUEST_TIMEOUT_MS = 5_000;
+const RETRY_DELAYS_MS = [500, 2_000];
+/** Resend's default limit is 2 requests a second; check `ratelimit-limit` on a real send. */
+const SEND_INTERVAL_MS = 500;
+/** Longest `Retry-After` honoured: a quota hours away would only hold the process open. */
+const MAX_RETRY_AFTER_MS = 30_000;
+
+/** Worth another try: rate limits, Resend's own failures and "same key still in progress". */
+const isRetryable = (status: number) => status === 409 || status === 429 || status >= 500;
+
+function retryAfterMs(response: Response): number {
+  const seconds = Number(response.headers.get('retry-after'));
+  return Number.isFinite(seconds) ? Math.min(seconds * 1000, MAX_RETRY_AFTER_MS) : 0;
+}
+
+/**
+ * Resend's error name, for telling an unverified domain from a bad key in the logs. Only that:
+ * its `message` can echo the address.
+ */
+async function errorName(response: Response): Promise<string> {
+  const body = (await response.json().catch(() => null)) as { name?: unknown } | null;
+  return typeof body?.name === 'string' && /^[a-z_]+$/.test(body.name) ? ` ${body.name}` : '';
+}
+
+/**
+ * Resend's REST API (a single call, so no SDK). Sends run after the response, so a few retries
+ * cost nobody any waiting; the idempotency key stops a retry after a lost answer from
+ * delivering the email twice. Calls are spaced out, because a burst over Resend's limit would
+ * lose emails, and the password-changed notice has nobody to ask for it again.
+ */
+export function resendTransport({
+  apiKey,
+  from,
+  fetchFn = fetch,
+  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  timeoutMs = REQUEST_TIMEOUT_MS,
+}: {
+  apiKey: string;
+  from: string;
+  fetchFn?: typeof fetch;
+  wait?: (ms: number) => Promise<void>;
+  timeoutMs?: number;
+}): EmailTransport {
+  let nextSlot = 0;
+  /** Waits for this call's turn; each call books the next free slot. */
+  async function turn() {
+    const now = Date.now();
+    const slot = Math.max(now, nextSlot);
+    nextSlot = slot + SEND_INTERVAL_MS;
+    if (slot > now) await wait(slot - now);
+  }
+
+  return {
+    async send({ to, subject, text, html }) {
+      const idempotencyKey = randomUUID();
+      let failure = '';
+      let retryAfter = 0;
+      for (const delay of [0, ...RETRY_DELAYS_MS]) {
+        if (delay) await wait(Math.max(delay, retryAfter));
+        await turn();
+        try {
+          const response = await fetchFn(RESEND_ENDPOINT, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${apiKey}`,
+              'content-type': 'application/json',
+              'idempotency-key': idempotencyKey,
+            },
+            body: JSON.stringify({ from, to: [to], subject, text, html }),
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+          if (response.ok) {
+            await response.body?.cancel(); // an unread body would hold the connection
+            return;
+          }
+          failure = `Resend answered ${response.status}${await errorName(response)}`;
+          if (!isRetryable(response.status)) break;
+          retryAfter = retryAfterMs(response);
+        } catch (error) {
+          failure = error instanceof Error ? error.name : 'Network error';
+        }
+      }
+      throw new Error(failure);
+    },
+  };
+}
+
+/**
+ * Writes each email to a file instead of sending it, for local work and the smoke suite
+ * (`parseServerEnv` allows this only on a loopback origin). The rename makes a file appear
+ * complete, so a reader never sees half of one.
+ */
+export function outboxTransport(directory: string): EmailTransport {
+  return {
+    async send(email) {
+      await mkdir(directory, { recursive: true });
+      const name = `${Date.now()}-${randomUUID()}.json`;
+      const partial = join(directory, `${name}.partial`);
+      await writeFile(partial, JSON.stringify(email, null, 2));
+      await rename(partial, join(directory, name));
+    },
+  };
+}
