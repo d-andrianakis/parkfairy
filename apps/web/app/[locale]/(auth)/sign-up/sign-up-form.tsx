@@ -17,9 +17,12 @@ import { useForm } from 'react-hook-form';
 import { FocusHeading } from '@/components/focus-heading';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
+import { PasswordField, usePasswordReveal } from '@/components/password-field';
+import { SentPlaceholder } from '@/components/sent-placeholder';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { authClient } from '@/lib/auth-client';
 import { authErrorKey, authErrorValues, type AuthErrorKey } from '@/lib/auth-errors';
+import { useSentPanel } from '@/lib/sent-panel';
 import { useValidationMessage } from '@/lib/use-validation-message';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 
@@ -78,7 +81,7 @@ export function SignUpForm() {
   const validationMessage = useValidationMessage();
   const locale = useLocale();
   const [formError, setFormError] = useState<AuthErrorKey | null>(null);
-  const [sentTo, setSentTo] = useState<string | null>(null);
+  const sent = useSentPanel();
   const {
     register,
     handleSubmit,
@@ -86,8 +89,10 @@ export function SignUpForm() {
   } = useForm<SignUpInput>({ resolver: zodResolver(SignUpInputSchema) });
 
   const status = useInvalidSubmitStatus();
+  const reveal = usePasswordReveal();
   const onSubmit = handleSubmit(async (values) => {
     status.clear();
+    reveal.hide();
     setFormError(null);
     // The account remembers the language it was created in (emails, notifications).
     const { error } = await authClient.signUp.email({ ...values, locale });
@@ -95,7 +100,7 @@ export function SignUpForm() {
       setFormError(authErrorKey(error));
       return;
     }
-    setSentTo(values.email);
+    sent.show(values.email);
   }, status.onInvalid);
 
   // While a request is in flight, ignore further submits; the button stays focusable.
@@ -104,7 +109,10 @@ export function SignUpForm() {
     else void onSubmit(event);
   };
 
-  if (sentTo) return <CheckYourEmail email={sentTo} />;
+  if (sent.waiting) {
+    return <SentPlaceholder className="min-h-56">{t('sentTitle')}</SentPlaceholder>;
+  }
+  if (sent.sentTo) return <CheckYourEmail email={sent.sentTo} />;
 
   return (
     <form method="post" onSubmit={submit} noValidate>
@@ -125,11 +133,11 @@ export function SignUpForm() {
           error={validationMessage(errors.email?.message)}
           {...register('email')}
         />
-        <FormField
+        <PasswordField
           id="password"
           label={t('password')}
-          type="password"
           autoComplete="new-password"
+          reveal={reveal}
           minLength={PASSWORD_POLICY.minLength}
           hint={t('passwordHint', { min: PASSWORD_POLICY.minLength })}
           error={validationMessage(errors.password?.message)}

@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
+import { forgetEverySentTo } from '@/lib/remembered-email';
 
 export function SignOutButton() {
   const t = useTranslations('Account');
@@ -18,6 +19,7 @@ export function SignOutButton() {
     await authClient.signOut();
     // Drop every cached response that belonged to the signed-out user.
     queryClient.clear();
+    forgetEverySentTo();
     router.replace('/');
     router.refresh();
   }

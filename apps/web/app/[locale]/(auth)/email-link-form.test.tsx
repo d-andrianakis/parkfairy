@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { authClient } from '@/lib/auth-client';
 import { rememberEmail, takeRememberedEmail } from '@/lib/remembered-email';
+import { routerMock, setPathname } from '@/test/navigation-mock';
 import { rendererFor } from '@/test/render';
 import { EmailLinkForm } from './email-link-form';
 
@@ -24,6 +25,9 @@ async function submit(email = 'maria@example.gr') {
 
 describe('EmailLinkForm', () => {
   beforeEach(() => {
+    sessionStorage.clear();
+    setPathname('/');
+    routerMock.replace.mockReset();
     requestReset.mockReset();
     requestConfirmation.mockReset();
     requestReset.mockResolvedValue({ data: { status: true }, error: null } as never);
@@ -68,6 +72,33 @@ describe('EmailLinkForm', () => {
     renderInSubtree(<EmailLinkForm purpose={purpose} intro="Enter your email." />, { locale });
     await submit();
     expect(await screen.findByText(text)).toBeInTheDocument();
+  });
+
+  it('comes back in the other language, with the address and without the form', async () => {
+    setPathname('/forgot-password', 'sent=1');
+    sessionStorage.setItem('parkfairy.sent-to:/forgot-password', 'maria@example.gr');
+    const { container } = renderInSubtree(
+      <EmailLinkForm purpose="reset-password" intro="Enter your email." />,
+      { locale: 'el' },
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Ελέγξτε τα εισερχόμενά σας' }),
+    ).toHaveFocus();
+    expect(screen.getByText(/θα λάβετε σύνδεσμο/)).toBeInTheDocument();
+    expect(container.querySelector('input')).toBeNull();
+    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it('shows the heading, unfocused, until it knows the address', () => {
+    setPathname('/forgot-password', 'sent=1');
+    const { container } = renderInSubtree(
+      <EmailLinkForm purpose="reset-password" intro="Enter your email." />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Check your inbox' })).not.toHaveFocus();
+    expect(container.querySelector('input')).toBeNull();
+    expect(routerMock.replace).toHaveBeenCalledExactlyOnceWith('/forgot-password');
   });
 
   it('drops the instruction once the form is gone', async () => {

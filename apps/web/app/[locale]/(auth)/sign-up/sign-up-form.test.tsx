@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authClient } from '@/lib/auth-client';
+import { routerMock, setPathname } from '@/test/navigation-mock';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { rendererFor } from '@/test/render';
 import { SignUpForm } from './sign-up-form';
@@ -23,14 +24,38 @@ async function fill({
 }) {
   if (name) await userEvent.type(screen.getByLabelText(/^(name|όνομα)$/i), name);
   if (email) await userEvent.type(screen.getByLabelText('Email'), email);
-  if (password) await userEvent.type(screen.getByLabelText(/password|κωδικός/i), password);
-  await userEvent.click(screen.getByRole('button'));
+  if (password)
+    await userEvent.type(screen.getByLabelText(/^(password|κωδικός πρόσβασης)$/i), password);
+  await userEvent.click(
+    screen.getByRole('button', { name: /^(create account|δημιουργία λογαριασμού)$/i }),
+  );
 }
 
 describe('SignUpForm', () => {
   beforeEach(() => {
     signUp.mockReset(); // braces: a returned function would run as a cleanup hook
     resend.mockReset();
+    routerMock.replace.mockReset();
+    sessionStorage.clear();
+    setPathname('/');
+  });
+
+  it('can show the password, hiding it only once the form goes out', async () => {
+    signUp.mockResolvedValue({ data: null, error: { status: 500 } } as never);
+    renderInSubtree(<SignUpForm />);
+    const password = screen.getByLabelText('Password');
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }));
+
+    await fill({ password: 'short' });
+    await waitFor(() => expect(password).toHaveAttribute('aria-invalid', 'true'));
+    expect(password).toHaveAttribute('type', 'text');
+    expect(signUp).not.toHaveBeenCalled();
+
+    await userEvent.clear(password);
+    await userEvent.type(password, 'correct horse battery');
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('alert');
+    expect(password).toHaveAttribute('type', 'password');
   });
 
   it('explains the password rule up front and when it is broken', async () => {
@@ -82,6 +107,29 @@ describe('SignUpForm', () => {
       expect(document.title).toBe(`${title} · Parkfairy`); // it no longer names the form
       expect(screen.getByText(new RegExp(body))).toBeInTheDocument();
       expect(container.querySelector('input')).toBeNull();
+      await expectNoAxeViolations(container);
+    });
+
+    it('comes back in the other language, with the address and no form', async () => {
+      setPathname('/sign-up', 'sent=1');
+      sessionStorage.setItem('parkfairy.sent-to:/sign-up', 'maria@example.gr');
+      const { container } = renderInSubtree(<SignUpForm />, { locale: 'el' });
+
+      const heading = await screen.findByRole('heading', { name: 'Ελέγξτε τα εισερχόμενά σας' });
+      expect(heading).toHaveFocus();
+      expect(screen.getByText(/στη διεύθυνση maria@example.gr/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Αποστολή ξανά' })).toBeInTheDocument();
+      expect(container.querySelector('input')).toBeNull();
+    });
+
+    it('shows the heading, unfocused, until it knows the address', async () => {
+      setPathname('/sign-up', 'sent=1');
+      const { container } = renderInSubtree(<SignUpForm />, { locale: 'el' });
+
+      const heading = screen.getByRole('heading', { name: 'Ελέγξτε τα εισερχόμενά σας' });
+      expect(heading).not.toHaveFocus();
+      expect(container.querySelector('input')).toBeNull();
+      expect(routerMock.replace).toHaveBeenCalledExactlyOnceWith('/sign-up');
       await expectNoAxeViolations(container);
     });
 

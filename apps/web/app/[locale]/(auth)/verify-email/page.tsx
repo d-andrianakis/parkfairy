@@ -3,17 +3,23 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { redirect } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
-import { usableToken } from '@/lib/email-link-params';
+import { showsSentPanel, usableToken, type SentPanelSearch } from '@/lib/email-link-params';
 import { getSession } from '@/lib/session';
 import { EmailLinkForm } from '../email-link-form';
 import { ConfirmEmail } from './confirm-email';
 
-export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: LocaleParams & SentPanelSearch): Promise<Metadata> {
   const t = await getTranslations({
     locale: await localeFromParams(params),
     namespace: 'VerifyEmail',
   });
-  return { title: t('requestTitle'), robots: { index: false, follow: false } };
+  return {
+    title: t(showsSentPanel(await searchParams) ? 'sentTitle' : 'requestTitle'),
+    robots: { index: false, follow: false },
+  };
 }
 
 /** Where the emailed link lands; without one it is a page to ask for a new link. */

@@ -133,3 +133,17 @@ describe.each([
     expect(contrast(foreground, background, opacity)).toBeGreaterThanOrEqual(minimum + margin);
   });
 });
+
+// Inputs have a fill of their own in the dark theme (`dark:bg-input/30`), which PasswordField's
+// toggle sits on: this is where the usual 50% ring once fell below 3:1, so its ring is solid.
+describe('on the dark input fill', () => {
+  it.each([
+    ['ring', NON_TEXT],
+    ['muted-foreground', TEXT],
+  ] as const)('%s reaches %s:1', (fg, minimum) => {
+    const { [fg]: foreground, input, background } = dark;
+    expect(foreground && input && background).toBeDefined();
+    if (!foreground || !input || !background) return;
+    expect(contrast(foreground, over(input, background, 0.3))).toBeGreaterThanOrEqual(minimum);
+  });
+});

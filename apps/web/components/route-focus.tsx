@@ -8,11 +8,17 @@ import { usePathname, useSearchParams } from '@/i18n/navigation';
 // count as a navigation. StrictMode's second effect run sees the same key and does nothing.
 let lastKey: string | undefined;
 let traversedTo: string | undefined;
+let keepFocus = false;
 if (typeof window !== 'undefined') {
   // Back/Forward restore the scroll position; leave focus alone there too.
   window.addEventListener('popstate', () => {
     traversedTo = window.location.href;
   });
+}
+
+/** For a page rewriting its own URL (`useSentPanel`), which is no navigation. */
+export function keepFocusThroughUrlChange() {
+  keepFocus = true;
 }
 
 /**
@@ -29,7 +35,9 @@ export function RouteFocus() {
     if (!navigated) return;
     const traversal = traversedTo === window.location.href;
     traversedTo = undefined;
-    if (!traversal) document.getElementById('main-content')?.focus();
+    const keep = keepFocus;
+    keepFocus = false;
+    if (!traversal && !keep) document.getElementById('main-content')?.focus();
   }, [key]);
 
   return null;

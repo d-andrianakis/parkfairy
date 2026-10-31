@@ -17,8 +17,9 @@ const signIn = vi.mocked(authClient.signIn.email);
 
 async function submit(email = 'maria@example.gr', password = 'correct horse battery') {
   if (email) await userEvent.type(screen.getByLabelText('Email'), email);
-  if (password) await userEvent.type(screen.getByLabelText(/password|κωδικός/i), password);
-  await userEvent.click(screen.getByRole('button'));
+  if (password)
+    await userEvent.type(screen.getByLabelText(/^(password|κωδικός πρόσβασης)$/i), password);
+  await userEvent.click(screen.getByRole('button', { name: /^(sign in|σύνδεση)$/i }));
 }
 
 describe('SignInForm', () => {
@@ -58,18 +59,76 @@ describe('SignInForm', () => {
     expect(routerMock.replace).not.toHaveBeenCalled();
   });
 
-  it('says to confirm the address first, and opens no session', async () => {
+  it('tells someone who just signed up what to do: unconfirmed gets the same answer', async () => {
     signIn.mockResolvedValue({
       data: null,
-      error: { code: 'EMAIL_NOT_VERIFIED', status: 403 },
+      error: { code: 'INVALID_EMAIL_OR_PASSWORD', status: 401 },
     } as never);
     renderInSubtree(<SignInForm returnTo="/account" />, { locale: 'el' });
     await submit();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Επιβεβαιώστε πρώτα τη διεύθυνση email σας.',
+      'Αν μόλις εγγραφήκατε, ακολουθήστε πρώτα τον σύνδεσμο που λάβατε.',
     );
-    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it('offers to show the password', async () => {
+    const { container } = renderInSubtree(<SignInForm returnTo="/account" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'text');
+    expect(signIn).not.toHaveBeenCalled();
+    await expectNoAxeViolations(container);
+  });
+
+  it('keeps a shown password readable when nothing was sent', async () => {
+    renderInSubtree(<SignInForm returnTo="/account" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }));
+
+    await submit('not-an-address', 'correct horse battery');
+
+    await waitFor(() => expect(screen.getByRole('status')).not.toBeEmptyDOMElement());
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'text');
+    expect(signIn).not.toHaveBeenCalled();
+  });
+
+  it('hides a shown password once the form goes out', async () => {
+    signIn.mockResolvedValue({
+      data: null,
+      error: { code: 'INVALID_EMAIL_OR_PASSWORD', status: 401 },
+    } as never);
+    renderInSubtree(<SignInForm returnTo="/account" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }));
+
+    await submit();
+
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
+  });
+
+  it('leaves no address behind once signed in', async () => {
+    sessionStorage.setItem('parkfairy.sent-to:/sign-up', 'maria@example.gr');
+    signIn.mockResolvedValue({ data: { redirect: false }, error: null } as never);
+    renderInSubtree(<SignInForm returnTo="/account" />);
+
+    await submit();
+
+    await waitFor(() => expect(routerMock.replace).toHaveBeenCalled());
+    expect(sessionStorage.getItem('parkfairy.sent-to:/sign-up')).toBeNull();
+  });
+
+  it('keeps it when sign-in fails: the panel may still be needed', async () => {
+    sessionStorage.setItem('parkfairy.sent-to:/sign-up', 'maria@example.gr');
+    signIn.mockResolvedValue({
+      data: null,
+      error: { code: 'INVALID_EMAIL_OR_PASSWORD', status: 401 },
+    } as never);
+    renderInSubtree(<SignInForm returnTo="/account" />);
+
+    await submit();
+
+    await screen.findByRole('alert');
+    expect(sessionStorage.getItem('parkfairy.sent-to:/sign-up')).toBe('maria@example.gr');
+    sessionStorage.clear();
   });
 
   it('takes the typed address along to the forgotten-password form', async () => {
@@ -99,12 +158,14 @@ describe('SignInForm', () => {
   });
 
   it('continues to two-factor verification when the account requires it', async () => {
+    sessionStorage.setItem('parkfairy.sent-to:/sign-up', 'maria@example.gr');
     signIn.mockResolvedValue({ data: { twoFactorRedirect: true }, error: null } as never);
     renderInSubtree(<SignInForm returnTo="/account" />);
     await submit();
 
     expect(routerMock.push).toHaveBeenCalledWith('/two-factor');
     expect(routerMock.replace).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('parkfairy.sent-to:/sign-up')).toBeNull();
   });
 
   it('keeps the button focusable while signing in, and ignores repeat submits', async () => {

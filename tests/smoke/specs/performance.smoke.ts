@@ -72,6 +72,8 @@ const ACCOUNT_PAGES = [
   '/en/forgot-password',
   '/en/reset-password?token=x',
   '/en/verify-email?token=x',
+  '/en/verify-email',
+  '/en/two-factor',
 ];
 
 for (const path of ['/en', ...ACCOUNT_PAGES, ...CATALOGUE]) {
@@ -90,6 +92,30 @@ for (const [path, accountNav] of [
   test(`${path} does not shift while loading on a phone`, async ({ page }) => {
     const cls = await measureLayoutShift(page, path, () =>
       expect(page.getByRole('navigation', { name: accountNav }).getByRole('link')).toHaveCount(2),
+    );
+    expect(cls).toBeLessThan(BUDGETS.layoutShift);
+  });
+}
+
+// A reloaded "check your inbox" panel: the server can't read the address, so `SentPlaceholder`
+// holds the place until the page hydrates. In both languages, because the Greek text is longer.
+for (const path of [
+  '/en/sign-up',
+  '/el/sign-up',
+  '/en/forgot-password',
+  '/el/forgot-password',
+  '/en/verify-email',
+  '/el/verify-email',
+]) {
+  test(`${path}?sent=1 does not shift while its panel comes back`, async ({ page }) => {
+    const address = 'maria@example.gr';
+    const pathname = path.slice('/en'.length);
+    await page.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [
+      `parkfairy.sent-to:${pathname}`,
+      address,
+    ] as const);
+    const cls = await measureLayoutShift(page, `${path}?sent=1`, () =>
+      expect(page.getByText(address)).toBeVisible(),
     );
     expect(cls).toBeLessThan(BUDGETS.layoutShift);
   });

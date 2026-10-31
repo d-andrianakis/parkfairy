@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { usableToken } from './email-link-params';
+import { showsSentPanel, usableToken } from './email-link-params';
+
+describe('showsSentPanel', () => {
+  it.each([
+    [{ sent: '1' }, true],
+    [{ sent: '' }, true],
+    [{ sent: ['1', '1'] }, true],
+    [{}, false],
+  ])('reads %j as %s', (search, expected) => {
+    expect(showsSentPanel(search)).toBe(expected);
+  });
+});
 
 describe('usableToken', () => {
   it('returns the token of a working link', () => {

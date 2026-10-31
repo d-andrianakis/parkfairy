@@ -7,15 +7,18 @@ import { useLocale, useTranslations } from 'next-intl';
 import { LOCALE_ENDONYMS } from '@/i18n/locales';
 import { Link, usePathname, useSearchParams } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';
+import { SENT_PARAM } from '@/lib/email-link-params';
 import { SEARCH_PARAM_KEYS } from '@/lib/search-params';
 
 /** Query parameters worth keeping in the other language; anything else (tokens…) is dropped. */
 const CARRIED_PARAMS: readonly string[] = [...SEARCH_PARAM_KEYS, 'next'];
 
-/** Pages opened from an emailed link, which mean nothing without that link's parameters. */
+/** Pages whose state is in the URL: an emailed link's parameters, or a form that was sent. */
 const LINK_PARAMS: Readonly<Record<string, readonly string[]>> = {
   '/reset-password': ['token', 'error', 'done'],
-  '/verify-email': ['token'],
+  '/verify-email': ['token', SENT_PARAM],
+  '/sign-up': [SENT_PARAM],
+  '/forgot-password': [SENT_PARAM],
 };
 
 /**

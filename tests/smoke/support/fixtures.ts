@@ -23,7 +23,7 @@ export async function signUp(page: Page, email: string, name = 'Smoke Driver') {
   await page.goto('/en/sign-up');
   await page.getByLabel('Name').fill(name);
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(TEST_PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(TEST_PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeFocused();
 }
@@ -31,7 +31,7 @@ export async function signUp(page: Page, email: string, name = 'Smoke Driver') {
 /** Fills in the sign-in form on the current page (English). */
 export async function signIn(page: Page, email: string, password = TEST_PASSWORD) {
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
 

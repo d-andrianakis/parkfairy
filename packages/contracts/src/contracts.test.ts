@@ -49,6 +49,13 @@ describe('sign-up input', () => {
     expect(issueMessages(result)).toEqual(['invalid']);
   });
 
+  it('refuses a lone surrogate in a name, and keeps real emoji', () => {
+    const rest = { email: 'maria@example.gr', password: 'x'.repeat(PASSWORD_POLICY.minLength) };
+    const lone = SignUpInputSchema.safeParse({ ...rest, name: 'Ma\ud800ria' });
+    expect(issueMessages(lone)).toEqual(['invalid']);
+    expect(SignUpInputSchema.safeParse({ ...rest, name: 'Maria 😀' }).success).toBe(true);
+  });
+
   it('enforces the upper password bound', () => {
     const result = SignUpInputSchema.safeParse({
       name: 'Maria',

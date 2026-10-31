@@ -8,10 +8,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // navigation module instance that RouteFocus reads.
 type NavigationMock = typeof import('@/test/navigation-mock');
 let RouteFocus: typeof import('./route-focus').RouteFocus;
+let keepFocusThroughUrlChange: typeof import('./route-focus').keepFocusThroughUrlChange;
 let setPathname: NavigationMock['setPathname'];
 beforeEach(async () => {
   vi.resetModules();
-  ({ RouteFocus } = await import('./route-focus'));
+  ({ RouteFocus, keepFocusThroughUrlChange } = await import('./route-focus'));
   ({ setPathname } = (await import('@/i18n/navigation')) as unknown as NavigationMock);
 });
 
@@ -62,6 +63,22 @@ describe('RouteFocus', () => {
 
     rerender(<Page />);
     expect(getByRole('button')).toHaveFocus();
+  });
+
+  it('leaves focus alone when a page rewrites its own URL, once', () => {
+    setPathname('/verify-email', 'token=abc');
+    const { rerender, getByRole } = render(<Page />);
+    getByRole('button').focus();
+
+    keepFocusThroughUrlChange();
+    setPathname('/verify-email', 'sent=1');
+    rerender(<Page />);
+    expect(getByRole('button')).toHaveFocus();
+
+    // A link to the plain page is a real navigation, even from there.
+    setPathname('/verify-email');
+    rerender(<Page />);
+    expect(main()).toHaveFocus();
   });
 
   it('counts a language switch as a navigation, although the layout remounts', () => {

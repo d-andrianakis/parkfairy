@@ -21,12 +21,12 @@ test('a driver enrols in two-factor, signs in with a code, then turns it off', a
   // Set up: password again (a wrong one is refused), then the QR code and the same key as text.
   await page.getByRole('button', { name: 'Set up two-factor authentication' }).click();
   await expect(page.getByRole('heading', { name: 'Confirm it’s you' })).toBeFocused();
-  await page.getByLabel('Password').fill('not the password');
+  await page.getByLabel('Password', { exact: true }).fill('not the password');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(
     page.getByRole('alert').filter({ hasText: 'That password is incorrect.' }),
   ).toBeVisible();
-  await page.getByLabel('Password').fill(TEST_PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(TEST_PASSWORD);
   await page.getByRole('button', { name: 'Continue' }).click();
 
   await expect(
@@ -58,7 +58,7 @@ test('a driver enrols in two-factor, signs in with a code, then turns it off', a
   await expect(page).toHaveURL('/en');
   await page.goto('/en/sign-in');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(TEST_PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(TEST_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL('/en/two-factor');
   // The password alone is not a session: the API still refuses.

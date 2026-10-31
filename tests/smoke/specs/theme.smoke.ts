@@ -96,8 +96,8 @@ test.describe('with a dark OS setting', () => {
 
 test('keyboard users can change the theme and keep their place', async ({ page }) => {
   await page.goto('/el');
-  const trigger = page.getByRole('button', { name: 'Θέμα' });
-  const menu = page.getByRole('menu', { name: 'Θέμα' });
+  const trigger = page.getByRole('button', { name: 'Εμφάνιση' });
+  const menu = page.getByRole('menu', { name: 'Εμφάνιση' });
   await trigger.focus();
   await page.keyboard.press('Enter');
 
@@ -117,7 +117,7 @@ test('keyboard users can change the theme and keep their place', async ({ page }
   await page.keyboard.press('ArrowDown');
   await expect(menu.getByRole('menuitemradio', { name: 'Σκουρόχρωμο' })).toBeFocused();
   await page.keyboard.press('ArrowDown');
-  await expect(menu.getByRole('menuitemradio', { name: 'Προεπιλογή συστήματος' })).toBeFocused();
+  await expect(menu.getByRole('menuitemradio', { name: 'Προεπιλογή' })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('html')).not.toHaveAttribute('class', /(light|dark)/);
   expect(await themeCookie(page)).toBeUndefined();

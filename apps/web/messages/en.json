@@ -228,19 +228,20 @@
     "locationRequired": "Choose an area or use your location",
     "dateInvalid": "Enter a valid date and time",
     "timeNotOnStep": "Choose a time on the hour or half hour (e.g. 10:00 or 10:30)",
-    "startInPast": "The start can’t be in the past",
-    "startTooFar": "{max, plural, one {Choose a start within the next day} other {Choose a start within the next # days}}",
-    "endBeforeStart": "The end must be after the start",
+    "startInPast": "Arrival can’t be in the past",
+    "startTooFar": "{max, plural, one {Choose an arrival date within the next day} other {Choose an arrival date within the next # days}}",
+    "endBeforeStart": "Departure must be after arrival",
     "durationTooLong": "A stay can last at most {max, plural, one {# day} other {# days}}",
     "invalid": "Check this field",
     "backupCodeRequired": "Enter one of your backup codes"
   },
   "Forms": {
     "invalidSummary": "{count, plural, one {# field needs your attention} other {# fields need your attention}}",
-    "fieldError": "{field}: {message}"
+    "fieldError": "{field}: {message}",
+    "showPassword": "Show password"
   },
   "AuthErrors": {
-    "INVALID_EMAIL_OR_PASSWORD": "The email or password is incorrect.",
+    "INVALID_EMAIL_OR_PASSWORD": "The email or password is incorrect. If you’ve just signed up, first follow the link we emailed you.",
     "INVALID_PASSWORD": "That password is incorrect.",
     "INVALID_EMAIL": "Enter a valid email address.",
     "PASSWORD_TOO_SHORT": "That password is too short.",
@@ -254,7 +255,6 @@
     "TOO_MANY_REQUESTS": "Too many attempts. Wait a moment and try again.",
     "UNKNOWN": "Something went wrong. Please try again.",
     "INVALID_BACKUP_CODE": "That backup code is not valid or has already been used.",
-    "EMAIL_NOT_VERIFIED": "Confirm your email address first. We’ve sent you a new link.",
     "INVALID_TOKEN": "This link has expired or has already been used. Request a new one."
   },
   "NotFound": {
@@ -324,7 +324,7 @@
     "resetPassword": {
       "subject": "Choose a new password",
       "heading": "Choose a new password",
-      "body": "Someone asked to reset the password of your Parkfairy account. The link works for {minutes, plural, one {# minute} other {# minutes}} and only once.",
+      "body": "A password reset was requested for your Parkfairy account. The link works for {minutes, plural, one {# minute} other {# minutes}} and only once.",
       "action": "Choose a new password",
       "note": "If this wasn’t you, ignore this email. Your password stays as it is."
     },

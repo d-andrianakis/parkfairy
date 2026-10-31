@@ -188,13 +188,13 @@ test('an invalid search explains what to fix, in the page language', async ({ pa
   await expect(page).toHaveTitle(/^Σφάλμα: /);
   const endTime = page.getByRole('combobox', { name: 'Έως Ώρα' });
   await expect(endTime).toHaveAttribute('aria-invalid', 'true');
-  await expect(endTime).toHaveAccessibleDescription('Η λήξη πρέπει να είναι μετά την έναρξη');
+  await expect(endTime).toHaveAccessibleDescription('Η αναχώρηση πρέπει να είναι μετά την άφιξη');
 
   // The summary sits before the form and links to the field, naming it.
   const summary = page.getByRole('alert').filter({ hasText: 'Υπάρχει πρόβλημα' });
   await expect(
     summary.getByRole('link', {
-      name: 'Έως: Η λήξη πρέπει να είναι μετά την έναρξη',
+      name: 'Έως: Η αναχώρηση πρέπει να είναι μετά την άφιξη',
       exact: true,
     }),
   ).toHaveAttribute('href', '#search-end-date');

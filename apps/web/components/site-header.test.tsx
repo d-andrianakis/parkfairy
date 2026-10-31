@@ -19,7 +19,7 @@ describe('SiteHeader', () => {
       within(account).getByRole('link', { name: 'Δημιουργία λογαριασμού' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Γλώσσα' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Θέμα' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Εμφάνιση' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Αρχική σελίδα Parkfairy' })).toBeInTheDocument();
     await expectNoAxeViolations(container);
   });

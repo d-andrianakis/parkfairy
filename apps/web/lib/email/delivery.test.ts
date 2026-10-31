@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EmailTransport } from './transport';
 
 vi.mock('server-only', () => ({}));
-const { createEmailDelivery, recipientKey, RECIPIENT_LIMITS, SITE_LIMITS } =
+const { createEmailDelivery, recipientKey, RECIPIENT_LIMITS, SITE_LIMITS, VISITOR_SHARE } =
   await import('./delivery');
 
 const email: AuthEmail = {
@@ -66,6 +66,55 @@ describe('createEmailDelivery', () => {
 
     expect(transport.send).toHaveBeenCalledTimes(max);
     expect(onFailure).toHaveBeenCalledExactlyOnceWith('reset-password', 'recipient limit reached');
+  });
+
+  it('lets one visitor spend only a share of an address’s reset emails', async () => {
+    const { deliver, flush, transport, onFailure } = setup();
+    const { max } = RECIPIENT_LIMITS['reset-password'];
+    expect(VISITOR_SHARE).toEqual({ window: 3600, max: 3 });
+    expect(RECIPIENT_LIMITS['reset-password']).toEqual({ window: 3600, max: 6 });
+
+    for (let i = 0; i < max * 2; i++) deliver({ ...email, visitor: '203.0.113.7' });
+    await flush();
+
+    expect(transport.send).toHaveBeenCalledTimes(VISITOR_SHARE.max);
+    expect(onFailure).toHaveBeenCalledWith('reset-password', 'visitor share reached');
+  });
+
+  it('leaves the rest of the allowance for the owner, whatever one visitor tried', async () => {
+    const { deliver, flush, transport } = setup();
+    const { max } = RECIPIENT_LIMITS['reset-password'];
+
+    for (let i = 0; i < max * 2; i++) deliver({ ...email, visitor: '203.0.113.7' });
+    await flush();
+    for (let i = 0; i < max; i++) {
+      deliver({ ...email, visitor: `198.51.100.${i}` });
+    }
+    await flush();
+
+    expect(transport.send).toHaveBeenCalledTimes(max);
+  });
+
+  it('counts a visitor’s share per address, however the address is written', async () => {
+    const { deliver, flush, transport } = setup();
+
+    for (let i = 0; i <= VISITOR_SHARE.max; i++) {
+      deliver({ ...email, to: `maria+${i}@example.gr`, visitor: '203.0.113.7' });
+    }
+    deliver({ ...email, to: 'someone@else.gr', visitor: '203.0.113.7' });
+    await flush();
+
+    expect(transport.send).toHaveBeenCalledTimes(VISITOR_SHARE.max + 1);
+  });
+
+  it('keeps the recipient cap across visitors', async () => {
+    const { deliver, flush, transport } = setup();
+    const { max } = RECIPIENT_LIMITS['reset-password'];
+
+    for (let i = 0; i < max + 2; i++) deliver({ ...email, visitor: `198.51.100.${i}` });
+    await flush();
+
+    expect(transport.send).toHaveBeenCalledTimes(max);
   });
 
   it('counts other recipients and other kinds separately', async () => {

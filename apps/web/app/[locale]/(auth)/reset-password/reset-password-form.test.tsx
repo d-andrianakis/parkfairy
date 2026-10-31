@@ -15,8 +15,16 @@ vi.mock('@/lib/auth-client', () => ({ authClient: { resetPassword: vi.fn() } }))
 const resetPassword = vi.mocked(authClient.resetPassword);
 
 async function submit(password = 'correct horse battery') {
-  if (password) await userEvent.type(screen.getByLabelText(/password|κωδικός/i), password);
-  await userEvent.click(screen.getByRole('button'));
+  if (password)
+    await userEvent.type(
+      screen.getByLabelText(/^(new password|νέος κωδικός πρόσβασης)$/i),
+      password,
+    );
+  await userEvent.click(
+    screen.getByRole('button', {
+      name: /^(save new password|αποθήκευση νέου κωδικού πρόσβασης)$/i,
+    }),
+  );
 }
 
 describe('ResetPasswordForm', () => {
@@ -81,6 +89,23 @@ describe('ResetPasswordForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.getByLabelText('New password')).toBeInTheDocument();
+  });
+
+  it('can show the password, hiding it only once the form goes out', async () => {
+    resetPassword.mockResolvedValue({ data: null, error: { status: 500 } } as never);
+    const { container } = renderInSubtree(<ResetPasswordForm token="abc" />);
+    const password = screen.getByLabelText('New password');
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }));
+
+    await submit('short');
+    await waitFor(() => expect(password).toHaveAttribute('aria-invalid', 'true'));
+    expect(password).toHaveAttribute('type', 'text'); // they need to see what was refused
+    await expectNoAxeViolations(container);
+
+    await userEvent.clear(password);
+    await submit();
+    await screen.findByRole('alert');
+    expect(password).toHaveAttribute('type', 'password');
   });
 
   it('keeps the button focusable while saving, and ignores repeat submits', async () => {

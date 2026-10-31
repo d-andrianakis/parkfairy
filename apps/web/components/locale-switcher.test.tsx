@@ -74,6 +74,24 @@ describe('LocaleSwitcher', () => {
     );
   });
 
+  it.each(['/sign-up', '/forgot-password', '/verify-email'])(
+    'keeps the check-your-inbox panel of %s in the other language',
+    (page) => {
+      setPathname(page, 'sent=1');
+      renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });
+      expect(screen.getByRole('link', { name: 'English' })).toHaveAttribute(
+        'href',
+        `/en${page}?sent=1`,
+      );
+    },
+  );
+
+  it('carries the panel mark only on the pages that have the panel', () => {
+    setPathname('/sign-in', 'sent=1');
+    renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });
+    expect(screen.getByRole('link', { name: 'English' })).toHaveAttribute('href', '/en/sign-in');
+  });
+
   it('keeps a confirmation link working in the other language', () => {
     setPathname('/verify-email', 'token=abc&utm=x');
     renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });

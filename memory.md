@@ -16,20 +16,61 @@ Feature status lives in [progress.md](progress.md), not here.
 
 ## Open product decisions (block Phase 2+ schema work)
 
-From plan §15. Answered by the product owner on 2026-10-29:
+From plan §15 and the decisions form. Answered by the product owner on 2026-10-29 (#1–#2) and
+2026-10-31 (#3–#17):
 
 1. ~~Pooled capacity or separated?~~ **Named spaces**: every space is individually
    identified (`parking_spaces.label`) and bookings will reserve one specific space.
 2. ~~Booking granularity; min/max duration?~~ **30-minute steps, 30 minutes to 30 days**
    (`BOOKING_STEP_MINUTES`, `MAX_BOOKING_DAYS` in contracts). Opening hours apply now: a
    listing must be open for the whole stay.
+3. ~~Charge immediately or authorize/capture? Hold duration and late-payment policy.~~ **Charge
+   in full at booking; a space is held for 10 minutes while the driver pays.** If a payment
+   succeeds after the hold ran out (how we read "late payment"), the booking stands if the
+   space is still free, otherwise the driver gets a full refund.
+4. ~~Cancellation/refund policy; when owners become eligible for payout.~~ **Each owner picks
+   from two or three set policies (#16); an owner can be paid 24 hours after the stay ends.**
+5. ~~Owners: individuals, businesses, or both?~~ **Both from day one.** A listing goes live
+   after a Stripe check, admin approval and proof of the right to rent.
+6. ~~Exact Stripe Connect funds flow and Greek/EU compliance obligations.~~ **Separate charges
+   and transfers**, so Parkfairy is ultimately liable for chargebacks. Parkfairy earns a
+   commission from the owner's share (#15). An accountant and a lawyer confirm the legal and
+   tax rules before Phase 4 starts (#18).
+7. Stay across a clock change: **real elapsed time**, as pricing works today.
+8. Booking without an account: **no, an account is required.**
+9. Who picks the exact space: **the driver, from a list.** Two drivers can go for the same
+   space, so the booking flow needs a "just taken" state.
+10. Gap between bookings on one space: **the owner chooses none, 30 or 60 minutes.**
+11. Overstays: **the owner reports it and support handles it.** No automatic charge at launch;
+    the terms say what the driver owes and the next driver is refunded.
+12. Price rules at launch, on top of the hourly rate and daily cap: **weekend rates, day and
+    night rates, long-stay discounts, per-space prices and dated prices** (#17).
+13. Two-factor recovery: **support removes it after an identity check**, as an audited admin
+    action with an email to the address and a written procedure.
+14. Personal data retention: **the adviser sets the periods** (#18).
+15. ~~Commission rate.~~ **10% for now, and easy to change later.** So a stored setting rather
+    than a constant in code, and each booking keeps the rate it was sold at, so a change never
+    rewrites past bookings or payouts.
+16. ~~Which cancellation policies owners choose from.~~ **All three:** full refund until 1 hour
+    before the start; full refund until 24 hours before; full refund until 24 hours before and
+    50% until the start. Whether the 14-day withdrawal right changes these is in #18.
+17. ~~How price rules combine.~~ **For each half hour the most specific price wins: dated, then
+    weekend, then day or night.** A long-stay discount and the daily caps never stack: the driver
+    pays whichever total is lower. Where spaces in one listing cost different amounts, search
+    shows "from" the cheapest free space, and the listing page shows each space's price.
 
-Still open:
+Still open, both waiting on people outside the project:
 
-3. Charge immediately or authorize/capture? Hold duration and late-payment policy.
-4. Cancellation/refund policy; when owners become eligible for payout.
-5. Owners: individuals, businesses, or both?
-6. Exact Stripe Connect funds flow and Greek/EU compliance obligations.
+18. For the accountant and lawyer, before Phase 4: VAT on parking and on commission; who issues
+    the driver's receipt (myDATA); DAC7 seller reporting (the directive names parking spaces);
+    whether the 14-day withdrawal right covers dated parking bookings (the Art. 16(l) exception
+    covers leisure services, and we found no ruling on parking); retention periods; terms of
+    service; whether Parkfairy may hold drivers' money until payout.
+19. For Stripe, with the eligibility check in Phase 4: how long a platform may hold funds.
+    Charging at booking, stays up to 365 days ahead (`MAX_START_AHEAD_DAYS`) and paying owners
+    after the stay mean holding a driver's money for over a year. Stripe's docs give no limit
+    for separate charges and transfers but advise against holding funds arbitrarily (checked
+    2026-10-31). If this is a problem, the simple fix is a shorter booking horizon.
 
 ## Architecture decisions
 
@@ -154,10 +195,61 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   and paced calls, no SDK. Unconfirmed accounts go after 7 days (longer than the link because
   signing in sends a new one). `users.locale` of an unconfirmed account is whatever the first
   sign-up chose, possibly a stranger; nothing better is known then.
-- **2026-10-30 · Accepted: sign up then sign in tells a taken address from a free one** (401 vs
-  403 `EMAIL_NOT_VERIFIED`). Inherent in requiring confirmation; rewriting the 403 would leave
-  real people with no idea why they can't sign in. It is noisy: a miss creates an account and
-  emails the target.
+- **2026-10-30, reversed 2026-10-31 · Sign up then sign in tells a taken address from a free
+  one** (401 vs 403 `EMAIL_NOT_VERIFIED`). First accepted: it comes with requiring confirmation,
+  rewriting the 403 leaves real people with no idea why they can't sign in, and it is noisy (a
+  miss creates an account and emails the target). The product owner then wanted it fixed. Done:
+  both cases get one answer (`AuthErrors.INVALID_EMAIL_OR_PASSWORD`), whose message also tells
+  someone who just signed up to follow the emailed link; the right password still sends a new
+  one.
+- **2026-10-31 · Primary is darker in both themes** (product owner, on the design-system page,
+  https://claude.ai/artifact/DStnsAF85ew2BoBz5PJ7mD): light `oklch(0.36 0.18 264.376)`, dark
+  `oklch(0.62 0.17 257)`. `globals.css` stays the source of truth: an edit on that page does not
+  reach the repo by itself. The dark value has less headroom: `primary-foreground` on it is 5.47:1
+  (4.60:1 on hover), and primary text is 4.84:1 on `card` but only 3.97:1 on `muted` and
+  `secondary`. No screen does that today, so keep primary text off those fills in dark mode, or
+  add the pair to `tokens.test.ts` and lighten the token. Email buttons keep their own fixed
+  `#1d4ed8` in `lib/email/render.ts`, which was never the same value as `--primary`.
+- **2026-10-31 · Whatever Postgres changes on the way in is an enumeration leak.** A lone surrogate
+  in a name passed `\p{Cc}`, and `pg` rewrites it to U+FFFD, so a free address echoed a changed name
+  while a taken one echoed the raw text: one request told them apart, with no timing involved.
+  `SignUpInputSchema` now refuses `\p{Cs}` too (with the `u` flag that means unpaired surrogates
+  only, so emoji stay). `validateSignUp` also requires the parsed name to equal the raw one: only
+  the parsed copy is trimmed and the raw one is stored, so padding got past the length limit.
+- **2026-10-31 · Leave `transaction` unset on the Drizzle adapter.** Better Auth runs sign-up inside
+  `runWithTransaction`, a no-op only while that option is off. On, it would hold one of the web
+  app's few connections through scrypt and the Redis address claim, per sign-up.
+- **2026-10-31 · A free address and a taken one must look alike everywhere.** The review of that
+  fix found the same leak three more ways, so all are closed in `packages/auth`: two sign-ups at
+  once (the loser hit the unique index: 422 for a free address only, every time, no timing
+  needed), so `create.before` claims the address in the rate-limit store and a lost claim
+  throws 403, which Better Auth answers as a duplicate; sign-up and sign-in timing, covered with
+  reset by `ANSWER_FLOOR_MS` (a floor hides nothing below it, so measure real work again on
+  production hardware); and `createdAt`/`updatedAt` differing in about 1% of real answers. With
+  Redis down the claim holds per instance. Any new user field or failure after the lookup must
+  keep this true.
+- **2026-10-31 · A visitor gets a share of an address's reset emails** (`VISITOR_SHARE`, 3 of 6
+  an hour), or one person spends the allowance in two minutes and the owner's request sends
+  nothing. Checked before the recipient cap, so what it drops spends nothing. The IP comes from
+  Better Auth's `getIP`, so forged headers get as far as they do with the rate limits; when it
+  can't be told, visitors share `unknown`. Accepted: two real IPs can still spend the allowance,
+  but the emails they trigger reach the owner, whose links work. Data: a hash of address and IP
+  in Redis for an hour, for abuse control only.
+- **2026-10-31 · "Check your inbox" survives a language switch and a reload** (`useSentPanel`).
+  `?sent=1` marks the state, because the title comes from the server and the switcher carries
+  URL state. The address is in `sessionStorage`, per page, never the URL; it goes on the plain
+  form, on sign-in and on sign-out. The URL changes through `history.replaceState`: a navigation
+  would refetch and move focus, so `keepFocusThroughUrlChange` tells `RouteFocus` this one isn't.
+  A link back to the plain page doesn't remount either: the hook resets itself and calls
+  `router.refresh()` to get the title back. `?sent=1` with no stored address goes to the form.
+  Accepted: that redirect needs JavaScript, so a copied link without it stays on the heading.
+- **2026-10-31 · Password fields are `PasswordField`, with `usePasswordReveal` in the form.** The
+  form calls `reveal.hide()` once validation has passed, not on the `submit` event: someone told
+  their password is too short needs to go on seeing it. Hiding matters because browsers keep text
+  fields in autofill history and password managers only save password fields. The button
+  renders after hydration; until then `endControl` is `null`, not `undefined`, because a
+  different tree around the input makes React replace it, losing focus and keystrokes on a real
+  page while no test render notices. Hence the `hydrateRoot` test.
 - **2026-10-30 · Sign-up is validated before the address is looked up** (`validateSignUp`,
   `hooks.before`). Only a new account reaches the insert, so anything that fails there is an
   oracle: `locale: "xx"` and a NUL in the name both did. Any new sign-up field goes through it.
@@ -353,6 +445,14 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   `.mcp.json`. It runs code in the server's Node process, past the origin and file limits.
   We chose to keep it but approve each call by hand. Never allow-list it.
 
+- **A Better Auth after hook can't change a status by throwing.** The error replaces the body,
+  but `dispatch` passes the original `status` on, so a rewritten 403 stays a 403 with the new
+  body. Return a `Response` instead, only when `ctx.request` exists: a server-side `auth.api`
+  call would otherwise resolve with that Response where it expects the error.
+- **`getByLabel('Password')` also matches the "Show password" button** in Playwright (it matches
+  substrings and `aria-label`). Use `{ exact: true }`. Testing Library's string match is exact.
+- **Reset requests can't reach `VISITOR_SHARE` in the smoke suite:** Better Auth refuses the
+  fourth request a minute first. The share is covered by unit tests only.
 - **shadcn focus ring is `ring-ring/50`.** At half opacity only a very dark ring reaches 3:1
   on white, hence the navy `--ring` in the light theme. Field borders (`--input`) are slate-500
   for the same reason (shadcn's default is ~1.2:1). The token test guards both.
@@ -425,9 +525,32 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   smoke budget of 250 KiB passes on the final build). `lib/auth.ts` is in every page's server
   bundle, so the email code and both catalogs added 4–5% eager server JS (no cold-start change
   measured).
+- 2026-10-31 (decisions follow-ups, measured before the review fixes; the budget passes on the
+  final build): `/en` 169 KiB, auth pages 228–229 KiB (`/en/sign-up` largest), `/en/account` 195
+  KiB, 248.5 KiB once the two-factor steps load on intent, so they must stay lazy. The answer
+  floors pin no database connection: reset held 200 requests a second without errors. Each
+  held request is a socket and a timer, which only costs money on per-invocation hosting.
+  CLS on a direct `?sent=1` load was 0.014–0.023 before `SentPlaceholder` reserved the height
+  (budget 0.01). Since 2026-10-31 `performance.smoke.ts` holds all three pages to that budget, in
+  both languages.
 
 ## Translation notes
 
 - Greek copy was written by the developer tooling, not a native translator. Have a native
   speaker review `apps/web/messages/el.json` before launch (tracked in progress.md).
+- **2026-10-31 · Wording settled by the product owner.** New copy follows these: `Παροχές` for
+  listing features; `άφιξη`/`αναχώρηση` for the start and end of a stay; `Εμφάνιση` for the theme
+  menu and `Προεπιλογή` for its system option; `Επιβεβαίωση` for an address (two-factor keeps
+  `Επαλήθευση`); `Επαναφορά κωδικού πρόσβασης` for titles and buttons alike; "Αν υπάρχει
+  λογαριασμός…, θα λάβετε σύνδεσμο"; `Ζητήθηκε επαναφορά…` in the reset email. Kept as they were:
+  `Ανοιχτά`, `online κράτηση`, the area names, `στη διεύθυνση {email}`, "Ακολουθήστε τον
+  σύνδεσμο", `Αποστολή ξανά`, `στάλθηκε`, `πια`, `περιηγητή`, `Πίσω στη σύνδεση`.
+- **2026-10-31 · Second round of wording.** The sign-in error ends `που λάβατε`; the
+  existing-account email opens `Έγινε προσπάθεια…`; the page where a new password is typed has
+  the tab title `Νέος κωδικός πρόσβασης`, while its heading stays Επαναφορά. Deliberately kept,
+  so don't "fix" them: `σας στείλαμε` in `VerifyEmail.sentBody`, neuter `Ανοιχτόχρωμο` and
+  `Σκουρόχρωμο`, `Εμφάνιση κωδικού πρόσβασης`, the verb "να ορίσετε" inside sentences, `πλέον` in
+  `ResetPassword.doneBody`, and the `Από`/`Έως` labels. English errors say arrival and departure
+  and the reset email is impersonal, but "Choose a new password", "we’ve sent it a link" and the
+  existing-account "Someone tried…" stay.
 - Language names are always shown in their own language (`LOCALE_ENDONYMS`).

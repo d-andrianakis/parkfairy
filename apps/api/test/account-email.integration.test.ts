@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { createAuth, type AuthEmail } from '@parkfairy/auth';
+import { ANSWER_FLOOR_MS, createAuth, type AuthEmail } from '@parkfairy/auth';
 import { deleteUnconfirmedAccounts, schema, type Database } from '@parkfairy/database';
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,19 +22,21 @@ const sessionCookie = (response: Response) =>
 describe('account emails (Better Auth and Postgres, end to end)', () => {
   let app: TestApp;
   let db: Database;
+  let auth: ReturnType<typeof createAuth>;
   let handler: (request: Request) => Promise<Response>;
   let sent: AuthEmail[];
 
   beforeAll(async () => {
     app = await createTestApp();
     db = app.get<Database>(DB);
-    handler = createAuth({
+    auth = createAuth({
       db,
       secret: 'x'.repeat(32),
       baseURL: ORIGIN,
       trustedOrigins: [ORIGIN],
       sendEmail: (email) => sent.push(email),
-    }).handler;
+    });
+    handler = auth.handler;
   });
   afterAll(async () => {
     await app.close();
@@ -79,6 +81,14 @@ describe('account emails (Better Auth and Postgres, end to end)', () => {
     return email;
   }
 
+  async function isConfirmed(email: string) {
+    const [user] = await db
+      .select({ emailVerified: schema.users.emailVerified })
+      .from(schema.users)
+      .where(eq(schema.users.email, email));
+    return user?.emailVerified;
+  }
+
   async function userId(email: string) {
     const [user] = await db
       .select({ id: schema.users.id })
@@ -102,19 +112,44 @@ describe('account emails (Better Auth and Postgres, end to end)', () => {
       expect(url).toMatch(/\?token=[\w.-]+$/);
     });
 
-    it('refuses sign-in until confirmed, and only after the right password', async () => {
+    it('refuses sign-in until confirmed, and sends a link only for the right password', async () => {
       const email = newAddress();
       await signUp(email, 'en'); // not the default language: a lost locale would show
       sent = [];
 
       expect((await signIn(email, 'not the password')).status).toBe(401);
-      expect(sent).toEqual([]); // a stranger cannot trigger mail, nor learn the account exists
+      expect(sent).toEqual([]); // a stranger cannot trigger mail
 
       const refused = await signIn(email);
-      expect(refused.status).toBe(403);
-      expect(await refused.json()).toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
+      expect(refused.status).toBe(401);
       expect(sessionCookie(refused)).toBe('');
       expect(lastEmail()).toMatchObject({ kind: 'verify-email', to: email, locale: 'en' });
+    });
+
+    it('answers an unconfirmed address exactly like a wrong password', async () => {
+      // Sign up with an address, sign in with the password just chosen: if the answers
+      // differed, a stranger could tell a free address from a taken one.
+      const free = newAddress();
+      await signUp(free);
+      const taken = await confirmedAccount();
+      await signUp(taken);
+
+      const fresh = await signIn(free);
+      const wrong = await signIn(taken, 'not the password');
+
+      expect(fresh.status).toBe(401);
+      expect(fresh.status).toBe(wrong.status);
+      expect(fresh.statusText).toBe(wrong.statusText);
+      expect(Object.fromEntries(fresh.headers)).toEqual(Object.fromEntries(wrong.headers));
+      expect(await fresh.text()).toBe(await wrong.text()); // to the byte, key order included
+    });
+
+    it('keeps the plain error for server-side callers, who are not visitors', async () => {
+      const email = newAddress();
+      await signUp(email);
+      await expect(
+        auth.api.signInEmail({ body: { email, password: PASSWORD } }),
+      ).rejects.toMatchObject({ body: { code: 'EMAIL_NOT_VERIFIED' } });
     });
 
     it('confirms with the token from the link, opening no session, then allows sign-in', async () => {
@@ -126,11 +161,7 @@ describe('account emails (Better Auth and Postgres, end to end)', () => {
       // Someone else may have signed up with this address and know the password.
       expect(sessionCookie(confirmed)).toBe('');
 
-      const [user] = await db
-        .select({ emailVerified: schema.users.emailVerified })
-        .from(schema.users)
-        .where(eq(schema.users.email, email));
-      expect(user?.emailVerified).toBe(true);
+      expect(await isConfirmed(email)).toBe(true);
       const signedIn = await signIn(email);
       expect(signedIn.status).toBe(200);
       expect(sessionCookie(signedIn)).not.toBe('');
@@ -153,7 +184,7 @@ describe('account emails (Better Auth and Postgres, end to end)', () => {
 
       expect(answer.status).toBe(401);
       expect(await answer.json()).toMatchObject({ code: 'INVALID_TOKEN' });
-      expect((await signIn(email)).status).toBe(403);
+      expect(await isConfirmed(email)).toBe(false);
     });
 
     describe('after a while', () => {
@@ -215,15 +246,16 @@ describe('account emails (Better Auth and Postgres, end to end)', () => {
     it('answers exactly like a new sign-up and tells the owner instead', async () => {
       const taken = await confirmedAccount('en');
 
-      const fresh = (await (await signUp(newAddress())).json()) as { user: object };
+      const fresh = (await (await signUp(newAddress())).json()) as { user: { name: string } };
       sent = [];
       const duplicate = await signUp(taken, 'el');
-      const body = (await duplicate.json()) as { token: null; user: object };
+      const body = (await duplicate.json()) as { token: null; user: { name: string } };
 
       expect(duplicate.status).toBe(200);
       expect(sessionCookie(duplicate)).toBe('');
       expect(body.token).toBeNull();
       expect(Object.keys(body.user).sort()).toEqual(Object.keys(fresh.user).sort());
+      expect(body.user.name).toBe(fresh.user.name);
       // The owner's language, not the one the stranger asked for.
       expect(sent).toEqual([
         {
@@ -235,11 +267,57 @@ describe('account emails (Better Auth and Postgres, end to end)', () => {
       ]);
     });
 
+    it('answers two sign-ups at once alike, free or taken', async () => {
+      // A free address passes the lookup twice; the loser must not fail at the unique index.
+      const twice = (email: string) => Promise.all([signUp(email), signUp(email)]);
+      const taken = await confirmedAccount();
+
+      const address = newAddress();
+      const free = await twice(address);
+      const duplicate = await twice(taken);
+
+      expect(free.map((answer) => answer.status)).toEqual([200, 200]);
+      expect(duplicate.map((answer) => answer.status)).toEqual([200, 200]);
+      const shape = async (answer: Response) => {
+        const { token, user } = (await answer.json()) as { token: null; user: object };
+        return { token, keys: Object.keys(user) };
+      };
+      const reference = await shape(duplicate[0]);
+      for (const answer of [...free, duplicate[1]]) {
+        expect(await shape(answer)).toEqual(reference);
+      }
+      // One link for the one account, and each sign-up with the taken address told its owner.
+      expect(sent.map(({ kind, to }) => [kind, to]).sort()).toEqual([
+        ['existing-account', taken],
+        ['existing-account', taken],
+        ['verify-email', address],
+      ]);
+    });
+
+    it('creates one account from two sign-ups at once', async () => {
+      const email = newAddress();
+      await Promise.all([signUp(email), signUp(email)]);
+      const users = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.email, email));
+      expect(users).toHaveLength(1);
+    });
+
+    it('gives a new account one timestamp, as the answer for a taken address has', async () => {
+      const { user } = (await (await signUp(newAddress())).json()) as {
+        user: { createdAt: string; updatedAt: string };
+      };
+      expect(user.updatedAt).toBe(user.createdAt);
+    });
+
     it.each([
       ['an unsupported language', { locale: 'xx' }, 'INVALID_LOCALE'],
       ['a short password', { password: 'short' }, 'PASSWORD_TOO_SHORT'],
       ['a NUL in the name', { name: 'Ma\u0000ria' }, 'INVALID_SIGN_UP'],
+      ['a lone surrogate in the name', { name: 'Ma\ud800ria' }, 'INVALID_SIGN_UP'],
       ['a name over the limit', { name: 'x'.repeat(101) }, 'INVALID_SIGN_UP'],
+      ['a name padded past the limit', { name: `Maria${' '.repeat(200)}` }, 'INVALID_SIGN_UP'],
       ['an image, which the form never sends', { image: 'x' }, 'INVALID_SIGN_UP'],
     ])('refuses %s alike for taken and free addresses', async (_, input, code) => {
       const taken = await confirmedAccount();
@@ -290,6 +368,50 @@ describe('account emails (Better Auth and Postgres, end to end)', () => {
       expect(unknown.status).toBe(known.status);
       expect(await unknown.json()).toEqual(await known.json());
       expect(sent).toEqual([expect.objectContaining({ kind: 'reset-password', to: email })]);
+    });
+
+    it.each([
+      ['/request-password-reset', requestReset],
+      ['/sign-in/email', (email: string) => signIn(email, 'not the password')],
+      ['/sign-up/email', (email: string) => signUp(email)],
+    ])('takes the same minimum time on %s, known address or not', async (path, ask) => {
+      const known = await confirmedAccount();
+      const timed = async (email: string) => {
+        const started = performance.now();
+        await ask(email);
+        return performance.now() - started;
+      };
+      const floor = Number(ANSWER_FLOOR_MS[path]) - 5; // timers can fire early
+
+      expect(await timed(known)).toBeGreaterThanOrEqual(floor);
+      expect(await timed(newAddress())).toBeGreaterThanOrEqual(floor);
+    });
+
+    it('holds a sign-in for an unconfirmed address just as long', async () => {
+      const email = newAddress();
+      await signUp(email);
+
+      const started = performance.now();
+      await signIn(email);
+
+      const floor = Number(ANSWER_FLOOR_MS['/sign-in/email']) - 5;
+      expect(performance.now() - started).toBeGreaterThanOrEqual(floor);
+    });
+
+    it('says who asked, for the visitor’s share of an address’s emails', async () => {
+      const email = await confirmedAccount();
+      await handler(
+        new Request(`${ORIGIN}/api/auth/request-password-reset`, {
+          method: 'POST',
+          headers: {
+            origin: ORIGIN,
+            'content-type': 'application/json',
+            'x-forwarded-for': '203.0.113.7',
+          },
+          body: JSON.stringify({ email }),
+        }),
+      );
+      expect(lastEmail().visitor).toBe('203.0.113.7');
     });
 
     it('never stores the token in a usable form', async () => {
@@ -376,7 +498,12 @@ describe('account emails (Better Auth and Postgres, end to end)', () => {
 
       await post('/reset-password', { token, newPassword: NEW_PASSWORD });
 
-      expect((await signIn(email, NEW_PASSWORD)).status).toBe(403);
+      expect(await isConfirmed(email)).toBe(false);
+      sent = [];
+      expect((await signIn(email)).status).toBe(401);
+      expect(sent).toEqual([]); // the old password is no good
+      expect((await signIn(email, NEW_PASSWORD)).status).toBe(401);
+      expect(lastEmail()).toMatchObject({ kind: 'verify-email', to: email }); // the new one is
     });
 
     it('accepts a token only once', async () => {

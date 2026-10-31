@@ -17,6 +17,7 @@ import { useForm } from 'react-hook-form';
 import { FocusHeading } from '@/components/focus-heading';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
+import { PasswordField, usePasswordReveal } from '@/components/password-field';
 import { QrCode } from '@/components/qr-code';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { authClient } from '@/lib/auth-client';
@@ -65,8 +66,10 @@ export function PasswordStep({
     formState: { errors, isSubmitting },
   } = useForm<PasswordConfirm>({ resolver: zodResolver(PasswordConfirmSchema) });
 
+  const reveal = usePasswordReveal();
   const onSubmit = handleSubmit(async ({ password }) => {
     status.clear();
+    reveal.hide();
     setFormError(null);
     const { error } = await onConfirm(password);
     if (error) setFormError(authErrorKey(error));
@@ -84,11 +87,11 @@ export function PasswordStep({
       <input type="email" name="username" autoComplete="username" value={email} readOnly hidden />
       <FieldGroup className="gap-4">
         <FormError message={formError ? tError(formError, authErrorValues(formError)) : null} />
-        <FormField
+        <PasswordField
           id="two-factor-password"
           label={t('password')}
-          type="password"
           autoComplete="current-password"
+          reveal={reveal}
           error={validationMessage(errors.password?.message)}
           {...register('password')}
         />

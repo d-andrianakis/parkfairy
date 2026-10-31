@@ -91,23 +91,20 @@ Legend: `[x]` done · `[ ]` not done · `[~]` partially done (say what is missin
 - [x] Language switcher (links, endonyms, `aria-current`), preference saved on the account
 - [x] Lint rule forbids literal UI text
 - [x] Smoke: `i18n.smoke.ts`
-- [ ] Native-speaker review of Greek copy. Added 2026-10-29: the catalogue (`Home`, `SearchForm`,
-      `Search`, `Listing`, `Features`, `Cities`, `Areas`, `Error`, new `Validation` keys; open
-      questions in the i18n review: Ανοιχτά vs Ανοιχτό, online vs ηλεκτρονική κράτηση,
-      Χαρακτηριστικά vs Παροχές, έναρξη/λήξη vs άφιξη/αναχώρηση, area names) and `Theme.*` (Θέμα / Ανοιχτόχρωμο /
-      Σκουρόχρωμο / Προεπιλογή συστήματος); decide Θέμα vs Εμφάνιση (Θέμα also means "subject")
-      and Προεπιλογή συστήματος vs Όπως η συσκευή. Tests hard-code these strings. Also:
-      `Forms.*`, `TwoFactorSettings.*`, `AuthErrors.INVALID_PASSWORD` /
+- [ ] Native-speaker review of Greek copy. The wording questions raised so far were settled by
+      the product owner on 2026-10-31 (memory.md, Translation notes; the edits are in 1.15).
+      Still to read through: the catalogue (`Home`, `SearchForm`, `Search`, `Listing`,
+      `Features`, `Cities`, `Error`, new `Validation` keys) and `Theme.*`. Tests hard-code these
+      strings. Also: `Forms.*`, `TwoFactorSettings.*`, `AuthErrors.INVALID_PASSWORD` /
       `ACCOUNT_TEMPORARILY_LOCKED`, `Validation.startTooFar` / `durationTooLong` /
       `timeNotOnStep`, `Search.resultsTitle`, the colon pattern in `Search.titleArea` and
       `Listing.moreNear`, `Listing.localTime`, and the plain hyphen CLDR puts in multi-day
       Greek ranges. Added 2026-10-30: `SignUp.sent*`/`resend*`, `SignIn.forgotPassword`,
-      `AuthErrors.EMAIL_NOT_VERIFIED`/`INVALID_TOKEN`, `ForgotPassword.*`, `ResetPassword.*`,
-      `VerifyEmail.*`, `Email.*`. Questions: Επιβεβαίωση vs Επαλήθευση for the address (two-factor
-      uses Επαλήθευση); Επαναφορά vs Ορισμός vs Αλλαγή κωδικού; "στη διεύθυνση {email}" vs "στο
-      {email}"; "σας στείλαμε" after "Αν υπάρχει λογαριασμός"; Ακολουθήστε vs Πατήστε τον σύνδεσμο;
-      Αποστολή ξανά vs Επαναποστολή; Στάλθηκε vs Εστάλη; πια vs πλέον; περιηγητή vs πρόγραμμα
-      περιήγησης; "Κάποιος" vs impersonal "Ζητήθηκε…"; Πίσω vs Επιστροφή στη σύνδεση
+      `AuthErrors.INVALID_TOKEN`, `ForgotPassword.*`, `ResetPassword.*`, `VerifyEmail.*`,
+      `Email.*`. Added 2026-10-31: `Forms.showPassword`, the longer
+      `AuthErrors.INVALID_EMAIL_OR_PASSWORD`, "ημερομηνία άφιξης" in `Validation.startTooFar`,
+      "κωδικού πρόσβασης" in `ResetPassword.submit`, `ResetPassword.metaTitle`,
+      `Email.existingAccount.body`
 - [x] Localized emails: rendered in the language stored on the account (1.14)
 
 ### 1.7 Security baseline
@@ -244,8 +241,8 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
       against real Redis after `SCRIPT FLUSH`)
 - [ ] Deferred: opening-hours check in SQL; top-48 spaces in SQL (needs an ICU numeric
       collation; worth it above about 10,000 spaces in one listing)
-- [ ] Decision needed: how a stay that crosses a DST change is priced (today: real elapsed
-      time, so the spring-forward night is an hour cheaper than the wall clock suggests)
+- [x] Decided 2026-10-31: a stay that crosses a DST change is priced on real elapsed time, as it
+      is today, so the spring-forward night stays an hour cheaper than the wall clock suggests
 - [x] Re-review of this round by the five review agents (findings fixed in 1.13)
 
 ### 1.13 Third review round (2026-10-30)
@@ -303,16 +300,63 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
       button, Greek voice on a Latin address)
 - [ ] Support process for a planted second factor: someone who signs up with a stranger's
       address, has it confirmed and enrols TOTP leaves the owner locked out after a reset
-      (needs the owner to press the button now, so unlikely; no self-service recovery exists)
-- [ ] Accepted for now, revisit before launch: sign up then sign in tells a taken address from a
-      free one (401 vs 403), reset request timing differs by ~3 ms, reset tokens in URLs reach
-      proxy logs, a language switch on the "check your inbox" panel returns to the empty form,
-      one IP can spend a recipient's hourly reset allowance (that recipient still has working
-      links), and a show-password toggle for the reset form
+      (needs the owner to press the button now, so unlikely; no self-service recovery exists).
+      Decided 2026-10-31: support removes it after an identity check (#13, built in Phase 5)
+- [ ] Accepted for now, revisit before launch: reset tokens in URLs reach proxy logs (the
+      production config in 1.11 keeps query strings out of access logs). The other items once
+      listed here are to be fixed before launch: see 1.15
 
-## Phase 2: Owner onboarding and inventory (decisions #3–#6 in memory.md still open)
+### 1.15 Follow-ups from the decisions form (2026-10-31)
 
-- [ ] Owner profiles + verification states
+The answers are in memory.md (Open product decisions, Translation notes).
+
+- [x] **Greek edits:** every decision is in `el.json`, and `catalogs.test.ts` pins the settled
+      terms. `ResetPassword.title` also became Επαναφορά κωδικού πρόσβασης; its `metaTitle` is
+      Νέος κωδικός πρόσβασης (second wording round)
+- [x] **Sign up then sign in** gets one answer, identical to the byte
+      (`account-email.integration.test.ts`, `account-email.smoke.ts`), and so do two sign-ups
+      at once, which the security review found also told a free address from a taken one
+- [x] **Reset timing:** reset, sign-in and sign-up answers are held to `ANSWER_FLOOR_MS`
+- [x] **One visitor can't spend an address's reset emails:** 3 of 6 an hour (`delivery.test.ts`;
+      unit-tested only, see memory.md). Accepted: two real IPs still can
+- [x] **Language switch keeps the panel**, on all three pages, with reloads and titles
+- [x] **Show-password button** on all four password fields; hides after validation passes
+- [x] **Unit tests**, **integration** and **smoke** on the final tree, plus 28 deliberate breaks of
+      the new behaviour, each caught by a test
+- [x] **Security review:** F1 (parallel sign-ups) and the sign-up and sign-in timing fixed;
+      timestamps, unidentified visitors, the lingering address and the `auth.api` trap fixed
+- [x] **Performance review:** no connection pinned, budgets hold, CLS placeholder added
+- [x] **Accessibility review:** input replaced at hydration (serious), toggle focus ring in dark
+      mode, silent waiting state, stuck panel and missed route focus fixed
+- [x] **i18n review:** bare `κωδικού` on the reset button, `startTooFar`, ambiguous English fixed
+- [x] **Test review:** gaps closed (floors, the two untested password fields, sign-out, waiting)
+- [x] **Second form (2026-10-31):** pricing, commission and cancellation answered (memory.md #15–#17);
+      wording answered and applied (memory.md, Translation notes)
+- [x] **Review round before commit (2026-10-31):** a lone surrogate in a name told a free address
+      from a taken one, fixed with padded names; `show` leaves the URL alone once the visitor has
+      left; `?sent=1` layout shift is now in `performance.smoke.ts` on all three pages, both
+      languages; reloads on all three panels; shared claim store, sign-out states and the dark
+      input fill covered. Primary darkened in both themes from the design-system page
+- [ ] Decide: `ResetPassword.submit` reads `Αποθήκευση νέου κωδικού πρόσβασης`, but the wording
+      note says titles and buttons use `Επαναφορά κωδικού πρόσβασης`. Change it, or add it to the
+      kept list in memory.md
+- [ ] Borderline (WCAG 2.4.3): a restored panel's `FocusHeading` takes focus after hydration, even
+      if someone moved on during a slow load. Fix: only when focus is on `body` or `#main-content`
+- [ ] Manual: NVDA and VoiceOver on the toggle and on a language switch at the panel; a saved
+      password filling in during slow hydration (Chrome, Edge, Firefox, Safari); whether 1Password
+      or Bitwarden icons cover the toggle
+- [ ] Before launch: measure sign-up, sign-in and reset work on production hardware against
+      `ANSWER_FLOOR_MS`
+- [ ] Watch: one `ECONNRESET` on `/api/v1/me` in `account-email.smoke.ts` (once in four runs on
+      2026-10-31, not reproduced, cause unknown), and one failure of
+      `parking.integration.test.ts` under heavy machine load (error not captured, three clean
+      runs after)
+
+## Phase 2: Owner onboarding and inventory (decisions answered in memory.md)
+
+- [ ] Owner profiles + verification states: individuals and businesses from day one, with the
+      tax details DAC7 reporting needs (exact fields after #18)
+- [ ] Proof of the right to rent: private document upload, kept apart from public listing photos
 - [~] Facilities (`parking_locations`, PostGIS point, IANA time zone) and spaces: tables and
   demo data exist (1.11); owner link and management UI missing
 - [~] Named units (decision: named spaces, no pooled inventory): `parking_spaces` exists
@@ -320,7 +364,9 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
 - [~] Schedules and availability exceptions (DST-safe in Europe/Athens): weekly hours done
   (1.11); exceptions (holidays, closures) missing
 - [~] Pricing rules + server-side quotes (integer minor units): hourly + daily cap quote done;
-  richer rules missing
+  weekend, day and night, long-stay, per-space and dated prices missing (rules: memory.md #17),
+  and search showing "from" the cheapest free space
+- [ ] Owner setting: gap between bookings on a space (none, 30 or 60 minutes)
 - [ ] Exit criteria: an owner manages their facility without reaching another owner's data (smoke + integration test)
 
 ## Phase 3: Search and booking engine
@@ -329,30 +375,42 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
   map (Mapbox, CSP updated deliberately) and address search missing
 - [~] Availability + quote endpoints: opening hours + quote done; free spaces ignore bookings
   until booking exists
-- [ ] Transactional allocation + holds (exclusion constraints, `[start, end)`)
+- [ ] Transactional allocation + holds (exclusion constraints, `[start, end)`): the driver picks
+      the space from a list, 10-minute hold, the owner's gap counts as overlap, a "just taken"
+      state, and the listing's 48-space cap (1.12) must not hide free spaces
+- [ ] Booking requires a signed-in account (no guest checkout)
 - [ ] Hold expiry worker, cancellations, booking history
 - [ ] Concurrency tests (named spot race, last pooled unit) and DST edge cases
 - [ ] Transactional outbox
 
 ## Phase 4: Payments and payouts
 
-- [ ] Confirm Stripe Connect eligibility + funds flow
+- [ ] Accountant and lawyer confirm the Greek/EU rules before this phase starts (#18)
+- [ ] Confirm Stripe Connect eligibility and how long funds may be held (#19); funds flow decided:
+      separate charges and transfers
 - [ ] Connected-account onboarding
-- [ ] Checkout, signed webhooks, idempotency, payment state machine
-- [ ] Refunds, fees, transfers, ledger, reconciliation
-- [ ] Late-payment and dispute workflows
+- [ ] Checkout (charge in full at booking), signed webhooks, idempotency, payment state machine
+- [ ] Refunds, fees, transfers, ledger, reconciliation: commission from the owner's share (10%,
+      a stored setting that is easy to change, kept on each booking), each owner's choice of the
+      three cancellation policies (memory.md #16), payout 24 hours after the stay ends
+- [ ] Late-payment and dispute workflows: a payment after the hold keeps the booking if the
+      space is still free, otherwise a full refund
 
 ## Phase 5: Owner and admin dashboards
 
 - [~] 2FA enrolment UI done (1.3); admin MFA enforced end to end once admin routes exist
   (sessions without a second factor are already ended when it is switched on)
 - [ ] Owner calendar, bookings, listings, earnings
-- [ ] Admin approvals, moderation, users, bookings, payments, audit logs
+- [ ] Admin approvals (listings, proof of the right to rent), moderation, users, bookings,
+      payments, audit logs
+- [ ] Overstay reports: the owner reports, support handles it (#11)
+- [ ] Support removes two-factor after an identity check: audited action, email to the address,
+      written procedure (#13)
 
 ## Phase 6: Production readiness
 
 - [ ] Security + privacy review, GDPR retention and data-subject workflows (unconfirmed
-      accounts are handled, 1.14)
+      accounts are handled, 1.14; the adviser sets the periods, #18)
 - [ ] Cookie notice/inventory: Better Auth session cookies, `NEXT_LOCALE` (session),
       `theme` (display preference, first-party, 1 year, `light`/`dark`)
 - [ ] Backups, restore drill, monitoring, alerts, runbooks

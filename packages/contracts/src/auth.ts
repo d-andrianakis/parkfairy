@@ -11,8 +11,9 @@ export const SignUpInputSchema = z.object({
     .trim()
     .min(1, message('nameRequired'))
     .max(NAME_MAX_LENGTH, message('nameTooLong'))
-    // Nothing a person types; Postgres also refuses NUL, which only a new account would reach.
-    .refine((name) => !/\p{Cc}/u.test(name), message('invalid')),
+    // Nothing a person types. Only a new account reaches Postgres, which refuses NUL and rewrites
+    // a lone surrogate, so either would tell a free address from a taken one.
+    .refine((name) => !/[\p{Cc}\p{Cs}]/u.test(name), message('invalid')),
   email: z.email(message('emailInvalid')).max(254, message('emailInvalid')),
   password: z
     .string()

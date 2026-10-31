@@ -23,7 +23,6 @@ describe('authErrorKey', () => {
   });
 
   it('maps the email confirmation and reset codes', () => {
-    expect(authErrorKey({ code: 'EMAIL_NOT_VERIFIED', status: 403 })).toBe('EMAIL_NOT_VERIFIED');
     expect(authErrorKey({ code: 'INVALID_TOKEN', status: 400 })).toBe('INVALID_TOKEN');
     expect(authErrorKey({ code: 'TOKEN_EXPIRED', status: 400 })).toBe('INVALID_TOKEN');
   });

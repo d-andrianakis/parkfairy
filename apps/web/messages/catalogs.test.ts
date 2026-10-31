@@ -74,6 +74,25 @@ describe('message catalogs', () => {
     });
   });
 
+  it('keeps the Greek wording the product owner settled (memory.md, Translation notes)', () => {
+    expect(flatten(el)).toMatchObject({
+      'Features.label': 'Παροχές',
+      'Theme.label': 'Εμφάνιση',
+      'Theme.system': 'Προεπιλογή',
+      'Validation.startInPast': 'Η άφιξη δεν μπορεί να είναι στο παρελθόν',
+      'Validation.endBeforeStart': 'Η αναχώρηση πρέπει να είναι μετά την άφιξη',
+      'ResetPassword.metaTitle': 'Νέος κωδικός πρόσβασης',
+      'ResetPassword.title': 'Επαναφορά κωδικού πρόσβασης',
+      'Email.resetPassword.action': 'Επαναφορά κωδικού πρόσβασης',
+      'Email.passwordChanged.action': 'Επαναφορά κωδικού πρόσβασης',
+    });
+    expect(flatten(el)['ForgotPassword.sentBody']).toContain('θα λάβετε σύνδεσμο');
+    expect(flatten(el)['Email.resetPassword.body']).toMatch(/^Ζητήθηκε επαναφορά/);
+    expect(flatten(el)['Validation.startTooFar']).toContain('ημερομηνία άφιξης');
+    expect(flatten(el)['Email.existingAccount.body']).toMatch(/^Έγινε προσπάθεια/);
+    expect(flatten(el)['AuthErrors.INVALID_EMAIL_OR_PASSWORD']).toContain('που λάβατε');
+  });
+
   it('translates every validation key used by the contracts', () => {
     for (const key of VALIDATION_MESSAGES) expect(reference).toHaveProperty([`Validation.${key}`]);
   });

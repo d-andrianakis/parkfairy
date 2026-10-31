@@ -3,14 +3,18 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
+import { showsSentPanel, type SentPanelSearch } from '@/lib/email-link-params';
 import { EmailLinkForm } from '../email-link-form';
 
-export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: LocaleParams & SentPanelSearch): Promise<Metadata> {
   const t = await getTranslations({
     locale: await localeFromParams(params),
     namespace: 'ForgotPassword',
   });
-  return { title: t('metaTitle') };
+  return { title: t(showsSentPanel(await searchParams) ? 'sentTitle' : 'metaTitle') };
 }
 
 export default async function ForgotPasswordPage({ params }: LocaleParams) {

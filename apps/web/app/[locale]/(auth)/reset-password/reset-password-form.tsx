@@ -14,7 +14,7 @@ import { useTranslations } from 'next-intl';
 import { useState, type FormEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { FormError } from '@/components/form-error';
-import { FormField } from '@/components/form-field';
+import { PasswordField, usePasswordReveal } from '@/components/password-field';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { Link, useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
@@ -35,8 +35,10 @@ export function ResetPasswordForm({ token }: { token: string }) {
   } = useForm<ResetPasswordInput>({ resolver: zodResolver(ResetPasswordInputSchema) });
 
   const status = useInvalidSubmitStatus();
+  const reveal = usePasswordReveal();
   const onSubmit = handleSubmit(async ({ password }) => {
     status.clear();
+    reveal.hide();
     setFormError(null);
     const { error } = await authClient.resetPassword({ newPassword: password, token });
     if (error) {
@@ -60,11 +62,11 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <form method="post" onSubmit={submit} noValidate>
         <FieldGroup>
           <FormError message={formError ? tError(formError, authErrorValues(formError)) : null} />
-          <FormField
+          <PasswordField
             id="password"
             label={t('password')}
-            type="password"
             autoComplete="new-password"
+            reveal={reveal}
             minLength={PASSWORD_POLICY.minLength}
             hint={t('passwordHint', { min: PASSWORD_POLICY.minLength })}
             error={validationMessage(errors.password?.message)}

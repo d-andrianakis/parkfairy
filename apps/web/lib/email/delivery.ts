@@ -12,10 +12,17 @@ const HOUR_SECONDS = 60 * 60;
  */
 export const RECIPIENT_LIMITS: Record<AuthEmail['kind'], { window: number; max: number }> = {
   'verify-email': { window: HOUR_SECONDS, max: 5 },
-  'reset-password': { window: HOUR_SECONDS, max: 5 },
+  'reset-password': { window: HOUR_SECONDS, max: 6 },
   'password-changed': { window: HOUR_SECONDS, max: 5 },
   'existing-account': { window: HOUR_SECONDS, max: 1 },
 };
+
+/**
+ * One visitor's share of an address's reset emails. Better Auth lets a visitor ask three times
+ * a minute, so without this one person could spend the whole allowance in two minutes and the
+ * address's owner would then ask for a link and get nothing.
+ */
+export const VISITOR_SHARE = { window: HOUR_SECONDS, max: 3 };
 
 /**
  * Per kind and clock hour, across everyone: what a flood to many addresses may spend of the
@@ -69,6 +76,14 @@ export function createEmailDelivery({
     schedule(async () => {
       try {
         const recipient = `email:${email.kind}:${recipientKey(email.to)}`;
+        // First, so what it drops doesn't spend the recipient's allowance.
+        if (
+          email.visitor &&
+          !(await limits.consume(`${recipient}:from:${email.visitor}`, VISITOR_SHARE)).allowed
+        ) {
+          onFailure(email.kind, 'visitor share reached');
+          return;
+        }
         if (!(await limits.consume(recipient, RECIPIENT_LIMITS[email.kind])).allowed) {
           onFailure(email.kind, 'recipient limit reached');
           return;

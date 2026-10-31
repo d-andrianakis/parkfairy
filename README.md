@@ -105,5 +105,5 @@ enforced by a test over every table. Migrations are plain SQL in
 ## Status
 
 See [progress.md](progress.md). Phase 1 (foundation, authentication, i18n, security and
-accessibility baselines) is in place; Phase 2 waits on the product decisions listed in
-[memory.md](memory.md).
+accessibility baselines) is in place. Phase 2 can start: its product decisions are answered
+in [memory.md](memory.md).

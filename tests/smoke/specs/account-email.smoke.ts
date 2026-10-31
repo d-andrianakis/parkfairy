@@ -38,9 +38,7 @@ test('an address must be confirmed before the first sign-in', async ({ page }) =
 
   await page.goto('/en/sign-in');
   await signIn(page, email);
-  const refused = page.getByRole('alert').filter({
-    hasText: 'Confirm your email address first.',
-  });
+  const refused = page.getByRole('alert').filter({ hasText: 'If you’ve just signed up' });
   await expect(refused).toBeVisible();
   await expect(page).toHaveURL('/en/sign-in');
   await expectAccessible(page);
@@ -75,6 +73,156 @@ test('signing up with a taken address gives nothing away and tells the owner', a
   expect((await page.request.get('/api/v1/me')).status()).toBe(401);
   const notice = await waitForEmail(email, 'You already have a Parkfairy account');
   expect(emailLink(notice)).toMatch(/\/en\/forgot-password$/);
+});
+
+test('signing in says nothing about whether an address is free', async ({ page }) => {
+  readsOutbox();
+  // The attack: sign up, then sign in with the password just chosen.
+  const signUpWith = (email: string, password: string) =>
+    page.request.post('/api/auth/sign-up/email', {
+      headers: { origin: WEB_URL },
+      data: { name: 'Stranger', email, password },
+    });
+  const signInWith = (email: string, password: string) =>
+    page.request.post('/api/auth/sign-in/email', {
+      headers: { origin: WEB_URL },
+      data: { email, password },
+    });
+  const free = uniqueEmail('free');
+  const taken = uniqueEmail('taken');
+  expect((await signUpWith(taken, TEST_PASSWORD)).status()).toBe(200);
+
+  expect((await signUpWith(free, NEW_PASSWORD)).status()).toBe(200);
+  expect((await signUpWith(taken, NEW_PASSWORD)).status()).toBe(200);
+  const fresh = await signInWith(free, NEW_PASSWORD);
+  const refused = await signInWith(taken, NEW_PASSWORD);
+
+  expect(fresh.status()).toBe(401);
+  expect(refused.status()).toBe(401);
+  expect(await fresh.json()).toMatchObject({ code: 'INVALID_EMAIL_OR_PASSWORD' });
+  expect(await fresh.text()).toBe(await refused.text());
+});
+
+test('reset requests are held to a floor through the real route', async ({ page }) => {
+  const started = Date.now();
+  const response = await page.request.post('/api/auth/request-password-reset', {
+    headers: { origin: WEB_URL },
+    data: { email: uniqueEmail('floor') },
+  });
+  expect(response.status()).toBe(200);
+  expect(Date.now() - started).toBeGreaterThanOrEqual(240); // the network only adds to it
+});
+
+test('the check-your-inbox panel stays through a language switch and a reload', async ({
+  page,
+}) => {
+  readsOutbox();
+  const email = uniqueEmail('panel');
+  await signUp(page, email);
+  await expect(page).toHaveURL('/en/sign-up?sent=1'); // the address stays out of it
+
+  await page
+    .getByRole('navigation', { name: 'Language' })
+    .getByRole('link', { name: 'Ελληνικά' })
+    .click();
+
+  await expect(page).toHaveURL('/el/sign-up?sent=1');
+  await expect(page.getByRole('heading', { name: 'Ελέγξτε τα εισερχόμενά σας' })).toBeFocused();
+  await expect(page).toHaveTitle(/^Ελέγξτε τα εισερχόμενά σας/);
+  await expect(page.getByText(email)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Αποστολή ξανά' })).toBeVisible();
+  await expect(page.getByLabel('Email')).toBeHidden();
+  await expectAccessible(page);
+
+  await page.reload();
+  await expect(page.getByText(email)).toBeVisible();
+  await expect(page).toHaveTitle(/^Ελέγξτε τα εισερχόμενά σας/);
+
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expectAccessible(page);
+  await page.emulateMedia({ colorScheme: 'light' });
+
+  // The header's link is the way back, say after a mistyped address.
+  await page.getByRole('banner').getByRole('link', { name: 'Δημιουργία λογαριασμού' }).click();
+  await expect(page).toHaveURL('/el/sign-up');
+  await expect(page.getByLabel('Email')).toBeVisible();
+  await expect(page).not.toHaveTitle(/^Ελέγξτε τα εισερχόμενά σας/);
+  await expect(page.locator('#main-content')).toBeFocused();
+});
+
+test('going back to the form right after sending works, without a reload', async ({ page }) => {
+  readsOutbox();
+  await signUp(page, uniqueEmail('mistyped'));
+
+  await page.getByRole('banner').getByRole('link', { name: 'Create account' }).click();
+
+  await expect(page).toHaveURL('/en/sign-up');
+  await expect(page.getByLabel('Email')).toBeVisible();
+  await expect(page).not.toHaveTitle(/^Check your inbox/);
+  await expect(page.locator('#main-content')).toBeFocused();
+});
+
+test('someone typing before the page hydrates keeps the field', async ({ page }) => {
+  // The page's scripts wait until the field is in use; replacing the input would then drop it.
+  let release = () => {};
+  const typed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/_next/static/**/*.js', async (route) => {
+    await typed;
+    await route.continue();
+  });
+  await page.goto('/en/sign-in', { waitUntil: 'commit' });
+  const password = page.getByLabel('Password', { exact: true });
+  await password.focus();
+  await password.pressSequentially('horse');
+  await expect(page.getByRole('button', { name: 'Show password' })).toBeHidden();
+
+  release();
+  await expect(page.getByRole('button', { name: 'Show password' })).toBeVisible();
+
+  await expect(password).toBeFocused();
+  await password.pressSequentially('staple');
+  await expect(password).toHaveValue('horsestaple');
+});
+
+test('a dead confirmation link’s panel stays through a language switch and a reload', async ({
+  page,
+}) => {
+  const email = uniqueEmail('dead-link');
+  await page.goto('/en/verify-email?token=not-a-token');
+  await page.getByRole('button', { name: 'Confirm email' }).click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByRole('button', { name: 'Send link' }).click();
+  // The URL first: the focus has to survive that change, not just arrive before it.
+  await expect(page).toHaveURL('/en/verify-email?sent=1');
+  await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeFocused();
+
+  await page
+    .getByRole('navigation', { name: 'Language' })
+    .getByRole('link', { name: 'Ελληνικά' })
+    .click();
+
+  await expect(page).toHaveURL('/el/verify-email?sent=1');
+  await expect(page.getByRole('heading', { name: 'Ελέγξτε τα εισερχόμενά σας' })).toBeFocused();
+  await expect(page).toHaveTitle(/^Ελέγξτε τα εισερχόμενά σας/);
+  await expect(page.getByText(email)).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText(email)).toBeVisible();
+  await expect(page).toHaveTitle(/^Ελέγξτε τα εισερχόμενά σας/);
+});
+
+test('a copied check-your-inbox link opens the form', async ({ page }) => {
+  await page.goto('/en/forgot-password?sent=1');
+  await expect(page.getByLabel('Email')).toBeVisible();
+  await expect(page).toHaveURL('/en/forgot-password');
+  await expect(page).toHaveTitle(/^Forgot your password/);
+});
+
+test('the confirmation panel stays out of search indexes too', async ({ page }) => {
+  await page.goto('/en/verify-email?sent=1');
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
 });
 
 test('a forgotten password is replaced through the emailed link', async ({ page }) => {
@@ -159,6 +307,18 @@ test('asking for a reset carries the typed address over and reveals nothing', as
   await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeFocused();
   await expect(page.getByText(`If there’s an account for ${nobody}`)).toBeVisible();
   await expect(page.getByText('Enter your email')).toBeHidden(); // the instruction went too
+
+  await page
+    .getByRole('navigation', { name: 'Language' })
+    .getByRole('link', { name: 'Ελληνικά' })
+    .click();
+  await expect(page).toHaveURL('/el/forgot-password?sent=1');
+  await expect(page.getByText(`Αν υπάρχει λογαριασμός με τη διεύθυνση ${nobody}`)).toBeVisible();
+  await expect(page).toHaveTitle(/^Ελέγξτε τα εισερχόμενά σας/);
+
+  await page.reload();
+  await expect(page.getByText(`Αν υπάρχει λογαριασμός με τη διεύθυνση ${nobody}`)).toBeVisible();
+  await expect(page).toHaveTitle(/^Ελέγξτε τα εισερχόμενά σας/);
 });
 
 test('reset requests are limited per visitor', async ({ page }) => {

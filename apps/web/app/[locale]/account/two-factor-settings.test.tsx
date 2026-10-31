@@ -73,6 +73,33 @@ describe('TwoFactorSettings', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
+  it('can show the password, named in the page language', async () => {
+    renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />, { locale: 'el' });
+    await userEvent.click(screen.getByRole('button'));
+    expect(
+      await screen.findByRole('button', { name: 'Εμφάνιση κωδικού πρόσβασης' }),
+    ).toBeInTheDocument();
+  });
+
+  it('hides a shown password only once the form goes out', async () => {
+    enable.mockResolvedValue({
+      data: null,
+      error: { code: 'INVALID_PASSWORD', status: 400 },
+    } as never);
+    renderInSubtree(<TwoFactorSettings enabled={false} email={EMAIL} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Set up two-factor authentication' }));
+    const password = await screen.findByLabelText('Password');
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(password).toHaveAttribute('aria-invalid', 'true'));
+    expect(password).toHaveAttribute('type', 'text');
+
+    await confirmPassword('wrong-password');
+    await screen.findByRole('alert');
+    expect(password).toHaveAttribute('type', 'password');
+  });
+
   it('enrols: QR code and typed key, a first code, then backup codes shown once', async () => {
     enable.mockResolvedValue({ data: SETUP, error: null } as never);
     verifyTotp.mockResolvedValue({ data: { token: 't' }, error: null } as never);

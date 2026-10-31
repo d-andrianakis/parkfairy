@@ -16,10 +16,12 @@ import { useForm } from 'react-hook-form';
 import { FocusHeading } from '@/components/focus-heading';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
+import { SentPlaceholder } from '@/components/sent-placeholder';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { authClient } from '@/lib/auth-client';
 import { authErrorKey, authErrorValues, type AuthErrorKey } from '@/lib/auth-errors';
 import { takeRememberedEmail } from '@/lib/remembered-email';
+import { useSentPanel } from '@/lib/sent-panel';
 import { useValidationMessage } from '@/lib/use-validation-message';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 
@@ -44,7 +46,7 @@ export function EmailLinkForm({
   const tError = useTranslations('AuthErrors');
   const validationMessage = useValidationMessage();
   const [formError, setFormError] = useState<AuthErrorKey | null>(null);
-  const [sentTo, setSentTo] = useState<string | null>(null);
+  const sent = useSentPanel();
   const {
     register,
     handleSubmit,
@@ -66,7 +68,7 @@ export function EmailLinkForm({
       ? authClient.requestPasswordReset({ email })
       : authClient.sendVerificationEmail({ email }));
     if (error) setFormError(authErrorKey(error));
-    else setSentTo(email);
+    else sent.show(email);
   }, status.onInvalid);
 
   // While a request is in flight, ignore further submits; the button stays focusable.
@@ -75,12 +77,13 @@ export function EmailLinkForm({
     else void onSubmit(event);
   };
 
-  if (sentTo) {
+  if (sent.waiting) return <SentPlaceholder className="min-h-32">{t('sentTitle')}</SentPlaceholder>;
+  if (sent.sentTo) {
     return (
       <div className="grid gap-2">
         <FocusHeading retitle>{t('sentTitle')}</FocusHeading>
         <p className="text-sm wrap-anywhere text-muted-foreground">
-          {t('sentBody', { email: sentTo, ...LIFETIME })}
+          {t('sentBody', { email: sent.sentTo, ...LIFETIME })}
         </p>
       </div>
     );

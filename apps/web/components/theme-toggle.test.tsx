@@ -28,7 +28,7 @@ describe('ThemeToggle', () => {
     const { container } = renderInSubtree(<ThemeToggle initialTheme="system" />, {
       locale: 'el',
     });
-    const trigger = screen.getByRole('button', { name: 'Θέμα' });
+    const trigger = screen.getByRole('button', { name: 'Εμφάνιση' });
     expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await expectNoAxeViolations(container);
@@ -36,11 +36,11 @@ describe('ThemeToggle', () => {
 
   it('opens on a key press made before the menu loaded, on the first option', async () => {
     renderInSubtree(<ThemeToggle initialTheme="dark" />, { locale: 'el' });
-    const trigger = screen.getByRole('button', { name: 'Θέμα' });
+    const trigger = screen.getByRole('button', { name: 'Εμφάνιση' });
     trigger.focus();
     fireEvent.keyDown(trigger, { key: 'Enter' }); // synchronously, before the chunk resolves
 
-    const menu = await screen.findByRole('menu', { name: 'Θέμα' });
+    const menu = await screen.findByRole('menu', { name: 'Εμφάνιση' });
     expect(menu).toBeVisible();
     await waitFor(() =>
       expect(screen.getByRole('menuitemradio', { name: 'Ανοιχτόχρωμο' })).toHaveFocus(),
@@ -48,7 +48,7 @@ describe('ThemeToggle', () => {
     expect(screen.getAllByRole('menuitemradio').map((item) => item.textContent)).toEqual([
       'Ανοιχτόχρωμο',
       'Σκουρόχρωμο',
-      'Προεπιλογή συστήματος',
+      'Προεπιλογή',
     ]);
     expect(screen.getByRole('menuitemradio', { name: 'Σκουρόχρωμο' })).toHaveAttribute(
       'aria-checked',

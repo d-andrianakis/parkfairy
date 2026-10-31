@@ -11,11 +11,12 @@ import { useState, type FormEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
+import { PasswordField, usePasswordReveal } from '@/components/password-field';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { Link, useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
 import { authErrorKey, authErrorValues, type AuthErrorKey } from '@/lib/auth-errors';
-import { rememberEmail } from '@/lib/remembered-email';
+import { forgetEverySentTo, rememberEmail } from '@/lib/remembered-email';
 import { useValidationMessage } from '@/lib/use-validation-message';
 
 export function SignInForm({ returnTo }: { returnTo: string }) {
@@ -32,14 +33,17 @@ export function SignInForm({ returnTo }: { returnTo: string }) {
   } = useForm<SignInInput>({ resolver: zodResolver(SignInInputSchema) });
 
   const status = useInvalidSubmitStatus();
+  const reveal = usePasswordReveal();
   const onSubmit = handleSubmit(async (values) => {
     status.clear();
+    reveal.hide();
     setFormError(null);
     const { data, error } = await authClient.signIn.email(values);
     if (error) {
       setFormError(authErrorKey(error));
       return;
     }
+    forgetEverySentTo();
     // Accounts with two-factor enabled get no session until the TOTP code is verified.
     if (data && 'twoFactorRedirect' in data && data.twoFactorRedirect) {
       router.push('/two-factor');
@@ -68,11 +72,11 @@ export function SignInForm({ returnTo }: { returnTo: string }) {
             error={validationMessage(errors.email?.message)}
             {...register('email')}
           />
-          <FormField
+          <PasswordField
             id="password"
             label={t('password')}
-            type="password"
             autoComplete="current-password"
+            reveal={reveal}
             error={validationMessage(errors.password?.message)}
             {...register('password')}
           />

@@ -14,11 +14,11 @@ import {
   type Locale,
 } from '@parkfairy/contracts';
 import { deleteUserVerifications, schema, type Database } from '@parkfairy/database';
-import { betterAuth } from 'better-auth';
-import { APIError, createAuthMiddleware } from 'better-auth/api';
+import { BASE_ERROR_CODES, betterAuth } from 'better-auth';
+import { APIError, createAuthMiddleware, getIP, isAPIError } from 'better-auth/api';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { twoFactor } from 'better-auth/plugins';
-import type { RateLimitStorage } from './rate-limit-storage.js';
+import { memoryRateLimitStorage, type RateLimitStorage } from './rate-limit-storage.js';
 
 export {
   authRateLimitKey,
@@ -37,6 +37,11 @@ export interface AuthEmail {
   locale: Locale;
   /** Where the email's button goes. Built here, so a caller cannot choose the destination. */
   url: string;
+  /**
+   * Client address of whoever asked for a reset, who may not be the inbox's owner. `unknown`
+   * when it can't be told: those visitors then share one bucket, as in Better Auth's limits.
+   */
+  visitor?: string;
 }
 
 export interface CreateAuthOptions {
@@ -74,6 +79,22 @@ export const SESSION_TIMING = {
   updateAgeSeconds: 60 * 60 * 24,
 };
 
+/**
+ * The least these answers take. A new account writes two rows, a reset token one, and sign-in
+ * reads more for a known address: a few milliseconds that tell a free address from a taken one
+ * over enough tries. Every answer waits for this floor instead, which is far above that work
+ * here and too short to notice. Measure the real work again once production hardware exists:
+ * a floor hides nothing below it.
+ */
+export const ANSWER_FLOOR_MS: Readonly<Record<string, number>> = {
+  '/request-password-reset': 250,
+  '/sign-in/email': 300,
+  '/sign-up/email': 500,
+};
+
+/** How long one sign-up holds an address; only needs to outlast the password hash. */
+const SIGN_UP_CLAIM = { window: 10, max: 1 };
+
 export function createAuth({
   db,
   secret,
@@ -83,12 +104,20 @@ export function createAuth({
   trustedProxies,
   sendEmail,
 }: CreateAuthOptions) {
-  const send = (kind: AuthEmail['kind'], user: AccountRef, url: string) => {
-    sendEmail?.({ kind, to: user.email, locale: accountLocale(user), url });
+  const send = (kind: AuthEmail['kind'], user: AccountRef, url: string, visitor?: string) => {
+    sendEmail?.({
+      kind,
+      to: user.email,
+      locale: accountLocale(user),
+      url,
+      ...(visitor && { visitor }),
+    });
     return Promise.resolve();
   };
   const pageUrl = (user: AccountRef, path: string) =>
     new URL(`/${accountLocale(user)}${path}`, baseURL).href;
+  const ipAddress = trustedProxies && trustedProxies.length > 0 ? { trustedProxies } : undefined;
+  const claims = rateLimitStorage ?? memoryRateLimitStorage();
 
   return betterAuth({
     appName: 'Parkfairy',
@@ -96,6 +125,8 @@ export function createAuth({
     basePath: '/api/auth',
     secret,
     trustedOrigins,
+    // No `transaction` option: Better Auth would then run each sign-up in one, holding one of the
+    // few connections through password hashing and the address claim below.
     database: drizzleAdapter(db, { provider: 'pg', schema: schema.authSchema }),
     emailAndPassword: {
       enabled: true,
@@ -122,8 +153,14 @@ export function createAuth({
         await send('password-changed', user, pageUrl(user, '/forgot-password'));
       },
       ...(sendEmail && {
-        sendResetPassword: ({ user, url }) =>
-          send('reset-password', user, withCallback(url, `/${accountLocale(user)}/reset-password`)),
+        sendResetPassword: ({ user, url }, request) =>
+          send(
+            'reset-password',
+            user,
+            withCallback(url, `/${accountLocale(user)}/reset-password`),
+            // Read as the rate limits read it, so a forged header gets no further here.
+            (request && getIP(request, { advanced: { ipAddress } })) ?? 'unknown',
+          ),
         onExistingUserSignUp: ({ user }) =>
           send('existing-account', user, pageUrl(user, '/forgot-password')),
       }),
@@ -166,7 +203,19 @@ export function createAuth({
     // Better Auth does not enforce enum values on additional fields, so validate before any write.
     databaseHooks: {
       user: {
-        create: { before: (user) => withSupportedLocale(user) },
+        create: {
+          // Two sign-ups at once both find the address free, and the loser would hit the unique
+          // index: a failure only a free address can produce. The claim turns it into Better
+          // Auth's duplicate answer (a 403 here), the one a taken address gets. With Redis down
+          // this holds per instance, like the limits it shares a store with.
+          before: async (user) => {
+            // One clock reading, as in the answer a taken address gets.
+            const checked = await withSupportedLocale({ ...user, updatedAt: user.createdAt });
+            const { allowed } = await claims.consume(`sign-up:${user.email}`, SIGN_UP_CLAIM);
+            if (!allowed) throw new APIError('FORBIDDEN');
+            return checked;
+          },
+        },
         update: { before: (user) => withSupportedLocale(user) },
       },
     },
@@ -178,12 +227,12 @@ export function createAuth({
     // `enabled` keeps Better Auth's default (on in production).
     rateLimit: rateLimitStorage ? { customStorage: rateLimitStorage } : undefined,
     advanced: {
-      ...(trustedProxies && trustedProxies.length > 0 ? { ipAddress: { trustedProxies } } : {}),
+      ...(ipAddress && { ipAddress }),
       cookiePrefix: AUTH_COOKIE_PREFIX,
       useSecureCookies: baseURL.startsWith('https://'),
       database: { generateId: 'uuid' },
     },
-    hooks: { before: validateSignUp, after: endOtherSessionsOnTwoFactorChange },
+    hooks: { before: beforeRequest, after: afterRequest },
     plugins: [
       twoFactor({
         issuer: 'Parkfairy',
@@ -198,41 +247,79 @@ export function createAuth({
   });
 }
 
+const answerStartedAt = new WeakMap<Request, number>();
+
+const beforeRequest = createAuthMiddleware((ctx) => {
+  if (ANSWER_FLOOR_MS[ctx.path] && ctx.request) answerStartedAt.set(ctx.request, performance.now());
+  return ctx.path === '/sign-up/email' ? validateSignUp(ctx.body) : Promise.resolve();
+});
+
 /**
  * Refuses a bad sign-up before anything looks the address up. Only a new account reaches the
  * insert, so anything that fails there (an unsupported locale, a NUL in the name) would tell a
  * free address from a taken one, which gets the generic answer first.
  */
-const validateSignUp = createAuthMiddleware((ctx) => {
-  if (ctx.path !== '/sign-up/email') return Promise.resolve();
-  const { name, locale, image } = (ctx.body ?? {}) as Record<string, unknown>;
+function validateSignUp(body: unknown) {
+  const { name, locale, image } = (body ?? {}) as Record<string, unknown>;
   if (locale !== undefined && !isLocale(locale)) return Promise.reject(unsupportedLocale());
-  const valid = image === undefined && SignUpInputSchema.shape.name.safeParse(name).success;
+  const parsed = SignUpInputSchema.shape.name.safeParse(name);
+  // Only the parsed copy is trimmed, and the raw name is what gets stored: the form sends it
+  // trimmed, so a padded one is a way around the length limit.
+  const valid = image === undefined && parsed.success && parsed.data === name;
   return valid
     ? Promise.resolve()
     : Promise.reject(
         new APIError('BAD_REQUEST', { message: 'Invalid sign-up', code: INVALID_SIGN_UP }),
       );
-});
+}
+
+/** Holds an answer until its `ANSWER_FLOOR_MS` after the request began. */
+async function holdAnswer(path: string, request: Request | undefined) {
+  const startedAt = request && answerStartedAt.get(request);
+  const floor = ANSWER_FLOOR_MS[path];
+  if (startedAt === undefined || floor === undefined) return;
+  const left = startedAt + floor - performance.now();
+  if (left > 0) await new Promise((resolve) => setTimeout(resolve, left));
+}
+
+/**
+ * An unconfirmed address gets the wrong-password answer. Anyone can sign up with an address and
+ * sign in with the password they chose: a different answer means the address was free, and the
+ * wrong password means it was taken. The message speaks to both cases, and the right password
+ * still sends a new link (`sendOnSignIn`). A Response, because Better Auth keeps the original
+ * status for a replaced error: throwing here would answer 403 with the wrong-password body.
+ */
+function hideUnconfirmedAddress(returned: unknown): Response | undefined {
+  if (!isAPIError(returned) || returned.body?.code !== 'EMAIL_NOT_VERIFIED') return undefined;
+  const { body, statusCode, status } = APIError.from(
+    'UNAUTHORIZED',
+    BASE_ERROR_CODES.INVALID_EMAIL_OR_PASSWORD,
+  );
+  return Response.json(body, { status: statusCode, statusText: status.toString() });
+}
 
 /** Requests that switch two-factor on (a code verified from a signed-in session) or off. */
 const TWO_FACTOR_CHANGES = new Set(['/two-factor/verify-totp', '/two-factor/disable']);
 
-/**
- * Turning two-factor on or off replaces the current session; end the user's other sessions
- * too. Admin routes check the user's flag, so a session that never passed a second factor
- * (say, opened with a phished password before enrolment) must not ride on it. A two-factor
- * sign-in has no prior session and leaves other devices alone.
- */
-const endOtherSessionsOnTwoFactorChange = createAuthMiddleware(async (ctx) => {
-  if (!TWO_FACTOR_CHANGES.has(ctx.path)) return;
+const afterRequest = createAuthMiddleware(async (ctx) => {
+  await holdAnswer(ctx.path, ctx.request);
+  // Only over HTTP: a server-side `auth.api` caller must keep seeing the error thrown.
+  if (ctx.path === '/sign-in/email' && ctx.request) {
+    return hideUnconfirmedAddress(ctx.context.returned);
+  }
+  if (!TWO_FACTOR_CHANGES.has(ctx.path)) return undefined;
+  // Turning two-factor on or off replaces the current session; end the user's other sessions
+  // too. Admin routes check the user's flag, so a session that never passed a second factor
+  // (say, opened with a phished password before enrolment) must not ride on it. A two-factor
+  // sign-in has no prior session and leaves other devices alone.
   const fresh = ctx.context.newSession;
-  if (!fresh || !ctx.context.session?.session) return;
+  if (!fresh || !ctx.context.session?.session) return undefined;
   const sessions = await ctx.context.internalAdapter.listSessions(fresh.user.id);
   const others = sessions
     .map((session) => session.token)
     .filter((token) => token !== fresh.session.token);
   if (others.length > 0) await ctx.context.internalAdapter.deleteSessions(others);
+  return undefined;
 });
 
 export type Auth = ReturnType<typeof createAuth>;
