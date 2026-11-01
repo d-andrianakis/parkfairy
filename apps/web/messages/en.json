@@ -63,6 +63,15 @@
     "until": "Until",
     "date": "Date",
     "time": "Time",
+    "chooseDateTime": "Choose a date and time",
+    "hour": "Hour",
+    "minutes": "Minutes",
+    "monthNavigation": "Change month",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "today": "Today, {date}",
+    "selectedDay": "{date}, selected",
+    "untilMoved": "Departure moved to {date}",
     "submit": "Search"
   },
   "Search": {

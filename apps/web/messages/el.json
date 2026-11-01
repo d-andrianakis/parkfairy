@@ -63,6 +63,15 @@
     "until": "Έως",
     "date": "Ημερομηνία",
     "time": "Ώρα",
+    "chooseDateTime": "Επιλέξτε ημερομηνία και ώρα",
+    "hour": "Ώρα",
+    "minutes": "Λεπτά",
+    "monthNavigation": "Αλλαγή μήνα",
+    "previousMonth": "Προηγούμενος μήνας",
+    "nextMonth": "Επόμενος μήνας",
+    "today": "Σήμερα, {date}",
+    "selectedDay": "{date}, επιλεγμένη",
+    "untilMoved": "Η αναχώρηση άλλαξε: {date}",
     "submit": "Αναζήτηση"
   },
   "Search": {

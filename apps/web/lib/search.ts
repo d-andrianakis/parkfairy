@@ -10,7 +10,7 @@ import {
   type ParkingSearchQuery,
   type ValidationMessage,
 } from '@parkfairy/contracts';
-import { WINDOW_PARAM_KEYS } from './search-params';
+import { DEFAULT_DURATION_MS, WINDOW_PARAM_KEYS } from './search-params';
 
 /**
  * Search forms submit Athens wall-clock dates and half-hour times (GET, so results are
@@ -20,7 +20,6 @@ import { WINDOW_PARAM_KEYS } from './search-params';
 export type SearchParams = Record<string, string | string[] | undefined>;
 
 const STEP_MS = BOOKING_STEP_MINUTES * 60_000;
-const DEFAULT_DURATION_MS = 2 * 60 * 60_000;
 
 /** `00:00`, `00:30`, … `23:30`. */
 export const TIME_OPTIONS = Array.from({ length: (24 * 60) / BOOKING_STEP_MINUTES }, (_, i) => {

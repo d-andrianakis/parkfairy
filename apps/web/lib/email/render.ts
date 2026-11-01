@@ -8,6 +8,9 @@ import type { OutgoingEmail } from './transport';
 
 const CATALOGS = { el, en };
 
+/** The light theme's `--primary`, held to it by tokens.test.ts: mail clients can't read our CSS. */
+const PRIMARY = '#092c99';
+
 /** The catalog section of each kind of email; every section has the same keys. */
 const SECTIONS = {
   'verify-email': 'verifyEmail',
@@ -58,7 +61,7 @@ export function renderAuthEmail({ kind, to, locale, url }: AuthEmail): OutgoingE
     )
     .join('');
   // Inline styles and a presentation table: what mail clients render consistently. Every text
-  // has its own colour (slate-900 on white, white on blue-700), because clients drop the styles
+  // has its own colour (slate-900 on white, white on the primary), because clients drop the styles
   // on <body>. The colour-scheme tags ask for no automatic dark mode, but some clients recolour
   // anyway, so check real ones. `lang` repeats on the content because webmail drops the <html>
   // element, and a screen reader needs it for the Greek.
@@ -77,9 +80,9 @@ export function renderAuthEmail({ kind, to, locale, url }: AuthEmail): OutgoingE
 <tr><td bgcolor="#ffffff" style="padding:32px 24px">
 <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#0f172a">${escapeHtml(heading)}</h1>
 ${body}
-<p style="margin:24px 0"><a href="${link}" style="display:inline-block;padding:12px 20px;background:#1d4ed8;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:underline;border-radius:6px">${escapeHtml(action)}</a></p>
+<p style="margin:24px 0"><a href="${link}" style="display:inline-block;padding:12px 20px;background:${PRIMARY};color:#ffffff;font-size:16px;font-weight:bold;text-decoration:underline;border-radius:6px">${escapeHtml(action)}</a></p>
 <p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:#475569">${escapeHtml(shared('linkFallback'))}</p>
-<p style="margin:0;font-size:14px;line-height:1.5;color:#1d4ed8;word-break:break-all"><a href="${link}" style="color:#1d4ed8">${link}</a></p>
+<p style="margin:0;font-size:14px;line-height:1.5;color:${PRIMARY};word-break:break-all"><a href="${link}" style="color:${PRIMARY}">${link}</a></p>
 </td></tr>
 </table>
 <p lang="${locale}" style="max-width:520px;margin:16px auto 0;font-size:13px;line-height:1.5;color:#475569">${escapeHtml(footer)}</p>

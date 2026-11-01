@@ -2,27 +2,28 @@ import {
   addDays,
   AREAS,
   CITIES,
+  MAX_BOOKING_DAYS,
   MAX_START_AHEAD_DAYS,
   type ValidationMessage,
 } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
 import { FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@parkfairy/ui/components/field';
-import { Input } from '@parkfairy/ui/components/input';
 import {
   NativeSelect,
   NativeSelectOptGroup,
   NativeSelectOption,
 } from '@parkfairy/ui/components/native-select';
 import { Search } from 'lucide-react';
-import { useFormatter, useLocale, useTranslations } from 'next-intl';
-import { timeOptions } from '@/i18n/formats';
+import { useLocale, useTranslations } from 'next-intl';
 import { getPathname } from '@/i18n/navigation';
 import { TIME_OPTIONS, type SearchErrors, type SearchValues } from '@/lib/search';
 import { validationArgs } from '@/lib/validation-args';
 import { ClientMessages } from '../client-messages';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { PlainField, PlainFieldError } from '../plain-field';
+import { DateTimeField } from './date-time-field';
 import { NearMeButton } from './near-me-button';
+import { StayFields } from './stay-fields';
 
 interface SearchFormProps {
   values: SearchValues;
@@ -45,7 +46,7 @@ function useValidationText() {
     key ? tValidation(key, validationArgs(key)) : undefined;
 }
 
-/** Date + half-hour time for one end of the stay, grouped under its legend. */
+/** A date and half-hour time for one end of the stay, under its legend. */
 function WindowFields({
   part,
   date,
@@ -60,71 +61,36 @@ function WindowFields({
   minDate: string;
 }) {
   const t = useTranslations('SearchForm');
-  const format = useFormatter();
-  const locale = useLocale();
   const errorText = useValidationText();
-  const invalid = error ? true : undefined;
   const errorId = error ? `search-${part}-error` : undefined;
   const legendId = `search-${part}-legend`;
-  const timeLabel = (option: string) => {
-    const [hours = 0, minutes = 0] = option.split(':').map(Number);
-    return format.dateTime(new Date(Date.UTC(2000, 0, 1, hours, minutes)), {
-      ...timeOptions(locale),
-      timeZone: 'UTC',
-    });
-  };
 
   return (
     <FieldSet>
       <FieldLegend id={legendId} variant="label">
         {t(part === 'start' ? 'from' : 'until')}
       </FieldLegend>
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,8rem)] gap-2">
-        <PlainField data-invalid={invalid}>
-          <FieldLabel
-            id={`search-${part}-date-label`}
-            htmlFor={SEARCH_FIELD_IDS[part]}
-            className="text-xs text-muted-foreground"
-          >
-            {t('date')}
-          </FieldLabel>
-          <Input
-            id={SEARCH_FIELD_IDS[part]}
-            name={`${part}Date`}
-            type="date"
-            min={minDate}
-            max={addDays(minDate, MAX_START_AHEAD_DAYS)}
-            defaultValue={date}
-            // "From Date" / "Until Date" also in forms lists and rotors, not just on Tab.
-            aria-labelledby={`${legendId} search-${part}-date-label`}
-            aria-invalid={invalid}
-            aria-describedby={errorId}
-          />
-        </PlainField>
-        <PlainField data-invalid={invalid}>
-          <FieldLabel
-            id={`search-${part}-time-label`}
-            htmlFor={`search-${part}-time`}
-            className="text-xs text-muted-foreground"
-          >
-            {t('time')}
-          </FieldLabel>
-          <NativeSelect
-            id={`search-${part}-time`}
-            name={`${part}Time`}
-            defaultValue={time}
-            aria-labelledby={`${legendId} search-${part}-time-label`}
-            aria-invalid={invalid}
-            aria-describedby={errorId}
-          >
-            {TIME_OPTIONS.map((option) => (
-              <NativeSelectOption key={option} value={option}>
-                {timeLabel(option)}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </PlainField>
-      </div>
+      <ClientMessages namespaces={CLIENT_NAMESPACES.searchForm}>
+        <DateTimeField
+          part={part}
+          id={SEARCH_FIELD_IDS[part]}
+          timeId={`search-${part}-time`}
+          dateName={`${part}Date`}
+          timeName={`${part}Time`}
+          date={date}
+          time={time}
+          minDate={minDate}
+          // A stay can end past the last day it can start on, and From can take Until there.
+          maxDate={addDays(
+            minDate,
+            part === 'start' ? MAX_START_AHEAD_DAYS : MAX_START_AHEAD_DAYS + MAX_BOOKING_DAYS,
+          )}
+          times={TIME_OPTIONS}
+          labelledBy={legendId}
+          invalid={error ? true : undefined}
+          errorId={errorId}
+        />
+      </ClientMessages>
       {error ? <PlainFieldError id={errorId}>{errorText(error)}</PlainFieldError> : null}
     </FieldSet>
   );
@@ -132,9 +98,9 @@ function WindowFields({
 
 /**
  * Where + from/until search. A plain GET form: results are shareable URLs and the search
- * works without JavaScript ("use my location" is the only scripted part). The server
- * validates and explains problems in the page language, so the browser's own validation
- * bubbles (untranslated) are switched off.
+ * works without JavaScript ("use my location" and the date picker are enhancements). The
+ * server validates and explains problems in the page language, so the browser's own
+ * validation bubbles (untranslated) are switched off.
  */
 export function SearchForm({ values, errors = {}, minDate, className }: SearchFormProps) {
   const t = useTranslations('SearchForm');
@@ -187,22 +153,24 @@ export function SearchForm({ values, errors = {}, minDate, className }: SearchFo
             <PlainFieldError id="search-area-error">{errorText(errors.area)}</PlainFieldError>
           ) : null}
         </PlainField>
-        <div className="grid gap-5">
-          <WindowFields
-            part="start"
-            date={values.startDate}
-            time={values.startTime}
-            error={errors.start}
-            minDate={minDate}
-          />
-          <WindowFields
-            part="end"
-            date={values.endDate}
-            time={values.endTime}
-            error={errors.end}
-            minDate={minDate}
-          />
-        </div>
+        <StayFields>
+          <div className="grid gap-5">
+            <WindowFields
+              part="start"
+              date={values.startDate}
+              time={values.startTime}
+              error={errors.start}
+              minDate={minDate}
+            />
+            <WindowFields
+              part="end"
+              date={values.endDate}
+              time={values.endTime}
+              error={errors.end}
+              minDate={minDate}
+            />
+          </div>
+        </StayFields>
         <Button type="submit" size="lg" className="sm:w-fit">
           <Search aria-hidden />
           {t('submit')}

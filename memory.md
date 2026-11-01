@@ -202,14 +202,39 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   both cases get one answer (`AuthErrors.INVALID_EMAIL_OR_PASSWORD`), whose message also tells
   someone who just signed up to follow the emailed link; the right password still sends a new
   one.
+- **2026-10-31 · A date and time are picked in one field, `DateTimeField`** (product owner's
+  request). The server renders a native date input and time list, because search must work without
+  JavaScript and before hydration. They then give way to one `role="combobox"` button in the same
+  space, with hidden inputs carrying the same four fields, so URLs and validation don't change.
+  Someone using a native field keeps it until focus leaves (not on a window switch), and whatever
+  was entered is read from the DOM. Their Date and Time labels are `sr-only`: visible, the row
+  would be taller than the button and the page would jump. The picker (54 KiB gzip) loads on hover,
+  focus or press, and a press that can't load it brings the native fields back. Combobox, because
+  a button can't carry `aria-invalid`. Days reach the calendar as noon UTC with `timeZone` set, so
+  a visitor anywhere picks the Athens day; "today" is Athens' too.
+- **2026-11-01 · A From picked at or past Until takes Until along** (product owner), keeping the
+  length of the stay; only From does this, and without JavaScript the server's error still
+  explains it. `StayFields` measures from the stay as it was when the picker first changed it, not
+  from the previous step: a day, an hour and every arrow key each change From, so stepping would
+  shorten the stay, and picking a later day then an earlier hour would lengthen it. That snapshot
+  goes when the picker closes, so a moved Until doesn't jump back on the next visit. The screen
+  reader hears about it once, from `onCloseAutoFocus`: sooner, the focus landing on the field cuts
+  the message off. A stay with no length of its own (a refused URL) gets the default two hours.
+  The message is screen-reader only on purpose. The accessibility review suggested a visible line
+  (advisory, not an AA failure), but it would appear just after the press that closes the picker,
+  moving Search or Until out from under the pointer mid-click. Sighted people see the field change,
+  and the results page states the stay under its heading. Known limit: the length is on the wall
+  clock, but `zonedTimeToUtc` moves a time in the spring gap forward, so on that one night a From
+  of 03:00 or 03:30 with a stay of an hour or less is still refused, with the usual error.
 - **2026-10-31 · Primary is darker in both themes** (product owner, on the design-system page,
   https://claude.ai/artifact/DStnsAF85ew2BoBz5PJ7mD): light `oklch(0.36 0.18 264.376)`, dark
   `oklch(0.62 0.17 257)`. `globals.css` stays the source of truth: an edit on that page does not
   reach the repo by itself. The dark value has less headroom: `primary-foreground` on it is 5.47:1
   (4.60:1 on hover), and primary text is 4.84:1 on `card` but only 3.97:1 on `muted` and
   `secondary`. No screen does that today, so keep primary text off those fills in dark mode, or
-  add the pair to `tokens.test.ts` and lighten the token. Email buttons keep their own fixed
-  `#1d4ed8` in `lib/email/render.ts`, which was never the same value as `--primary`.
+  add the pair to `tokens.test.ts` and lighten the token. Emails use the light primary too, as
+  the fixed `#092c99` in `lib/email/render.ts` (product owner, 2026-11-01): mail clients can't read
+  the CSS, so `tokens.test.ts` fails when `--primary` moves away from that value.
 - **2026-10-31 · Whatever Postgres changes on the way in is an enumeration leak.** A lone surrogate
   in a name passed `\p{Cc}`, and `pg` rewrites it to U+FFFD, so a free address echoed a changed name
   while a taken one echoed the raw text: one request told them apart, with no timing involved.
@@ -453,6 +478,22 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   substrings and `aria-label`). Use `{ exact: true }`. Testing Library's string match is exact.
 - **Reset requests can't reach `VISITOR_SHARE` in the smoke suite:** Better Auth refuses the
   fourth request a minute first. The share is covered by unit tests only.
+- **`shadcn add` (4.23.0) needs care here.** It stops to ask about overwriting `button.tsx` (never
+  yes: our fixes are in it), so whatever comes after is not written; it adds shadcn's `cn` package
+  to `apps/web`, and files import `cn` from it instead of `@parkfairy/ui/lib/utils`. Calendar and
+  toggle-group were taken from `shadcn view <name>` instead, imports rewritten, with dependencies
+  pinned in `packages/ui`.
+- **`outline-none` also sets Tailwind's outline-style variable,** so `outline-2` on top of it draws
+  nothing. Add `outline-solid`; shadcn's base classes all have `outline-none`.
+- **react-day-picker:** it sets `lang="en-US"` and English labels unless given `lang` and `labels`,
+  and dropping `labelDayButton` loses ", selected", which only the cell's `aria-selected` then
+  carries. Its `TZDate` reads the real clock whatever `vi.useFakeTimers` says, and a date that is
+  today gets another name, so tests use far-future dates. The registry's inline `components`
+  remount the whole calendar on every parent render; they are module constants here. Its month
+  caption is a `role="status"` of its own, so tests look for ours inside the form.
+- **`document.hasFocus()` is false in jsdom.** Mock it where code depends on it.
+- **Axe right after `emulateMedia` can catch a colour mid-transition:** a toggle fades its text
+  while its fill changes at once. Await `document.getAnimations()` first.
 - **shadcn focus ring is `ring-ring/50`.** At half opacity only a very dark ring reaches 3:1
   on white, hence the navy `--ring` in the light theme. Field borders (`--input`) are slate-500
   for the same reason (shadcn's default is ~1.2:1). The token test guards both.
@@ -533,6 +574,8 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   CLS on a direct `?sent=1` load was 0.014–0.023 before `SentPlaceholder` reserved the height
   (budget 0.01). Since 2026-10-31 `performance.smoke.ts` holds all three pages to that budget, in
   both languages.
+- 2026-10-31 (date and time picker, from the build manifests before the review fixes; the budget
+  passes on the final build): `/en` and `/en/search` 170.4 KiB, 224 KiB once the picker loads.
 
 ## Translation notes
 
@@ -550,7 +593,9 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   the tab title `Νέος κωδικός πρόσβασης`, while its heading stays Επαναφορά. Deliberately kept,
   so don't "fix" them: `σας στείλαμε` in `VerifyEmail.sentBody`, neuter `Ανοιχτόχρωμο` and
   `Σκουρόχρωμο`, `Εμφάνιση κωδικού πρόσβασης`, the verb "να ορίσετε" inside sentences, `πλέον` in
-  `ResetPassword.doneBody`, and the `Από`/`Έως` labels. English errors say arrival and departure
+  `ResetPassword.doneBody`, `Αποθήκευση νέου κωδικού πρόσβασης` in `ResetPassword.submit` (decided
+  2026-11-01: it says what the press does and leads into `Αποθήκευση…`), and the `Από`/`Έως`
+  labels. English errors say arrival and departure
   and the reset email is impersonal, but "Choose a new password", "we’ve sent it a link" and the
   existing-account "Someone tried…" stay.
 - Language names are always shown in their own language (`LOCALE_ENDONYMS`).

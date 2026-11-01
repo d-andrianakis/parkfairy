@@ -337,9 +337,9 @@ The answers are in memory.md (Open product decisions, Translation notes).
       left; `?sent=1` layout shift is now in `performance.smoke.ts` on all three pages, both
       languages; reloads on all three panels; shared claim store, sign-out states and the dark
       input fill covered. Primary darkened in both themes from the design-system page
-- [ ] Decide: `ResetPassword.submit` reads `Αποθήκευση νέου κωδικού πρόσβασης`, but the wording
-      note says titles and buttons use `Επαναφορά κωδικού πρόσβασης`. Change it, or add it to the
-      kept list in memory.md
+- [x] Decided (2026-11-01, product owner): `ResetPassword.submit` keeps its wording,
+      `Αποθήκευση νέου κωδικού πρόσβασης`, which matches the English button and `Αποθήκευση…`
+      while it saves. Added to the kept list in memory.md
 - [ ] Borderline (WCAG 2.4.3): a restored panel's `FocusHeading` takes focus after hydration, even
       if someone moved on during a slow load. Fix: only when focus is on `body` or `#main-content`
 - [ ] Manual: NVDA and VoiceOver on the toggle and on a language switch at the panel; a saved
@@ -351,6 +351,45 @@ The answers are in memory.md (Open product decisions, Translation notes).
       2026-10-31, not reproduced, cause unknown), and one failure of
       `parking.integration.test.ts` under heavy machine load (error not captured, three clean
       runs after)
+
+### 1.16 Date and time picker (2026-10-31)
+
+One field for each end of a stay: day on the left, hour and half hour on the right. See memory.md.
+
+- [x] **Until follows From (2026-11-01):** a From picked at or past Until moves Until and keeps
+      the length of the stay (`StayFields`). Unit and smoke tests cover the order of picks, arrow
+      keys, midnight, a refused URL and the announcement in both languages
+- [x] **Emails use the primary (2026-11-01):** `#092c99`, held to `--primary` by `tokens.test.ts`
+- [x] **Implemented:** `DateTimeField` and the lazy `DateTimePicker`, shadcn calendar, popover,
+      scroll area and toggle group added. The search form still submits the same four fields
+      and works without JavaScript
+- [x] **Unit tests:** `date-time-field.test.tsx`, `date-time-field.load.test.tsx`, the ui package
+- [x] **Smoke test:** `parking.smoke.ts` (mouse, keyboard, Greek, axe in both themes, forced
+      colours, 320 px, far time zones, nonsense in the URL, lazy load, no JavaScript)
+- [x] **Security review:** nothing found in the picker, new dependencies included. Round two: a
+      crafted date past year 9999 could break the moved Until; guarded
+- [x] **Performance review:** the picker stays out of first-visit JS; 2 px of shift and the wait
+      on a first press fixed. Round two: the calendar no longer re-renders when only the time
+      changes, a test counts its renders, and the CLS check waits for the picker field
+- [x] **Accessibility review:** calendar language, "selected" in the day's name, today without
+      colour, native fields back if the picker can't load, Down Arrow, arrows choose, visible
+      column labels, a window switch no longer swaps the field, the calendar no longer remounts.
+      Round two: quiet on repeat visits, and Until's calendar reaches a moved date. Its suggested
+      visible note was declined: see memory.md
+- [x] **i18n review:** calendar language, "selected" and the month navigation's name fixed. Round
+      two: the announcement says departure, with the date spelled out for listeners
+- [x] **Test review:** gaps closed; removing either time-zone handling now fails a test (tried).
+      Round two: click-away, zero-length stays, a mangled From, half hours, both clock changes,
+      far time zones, the form's wiring and `PRIMARY` against the token
+- [x] **Contracts & docs:** no contract or schema change; memory.md updated
+- [ ] Spring-forward night: a From of 03:00 or 03:30 with a stay of an hour or less is refused
+      with the usual error (memory.md). Decide whether those times should be offered at all
+- [ ] Manual: NVDA and VoiceOver on the field (how the combobox reads, short Greek dates included)
+      and in the calendar, and how `SearchForm.untilMoved` sounds, including that the focus doesn't
+      cut it off; closing the picker with TalkBack, which has no Escape and no close button; 400%
+      zoom; the picker in Safari and Firefox (the smoke suite runs Chrome only)
+- [ ] Native speaker: the new `SearchForm` strings in `el.json`, with the rest (see Translation
+      notes in memory.md)
 
 ## Phase 2: Owner onboarding and inventory (decisions answered in memory.md)
 

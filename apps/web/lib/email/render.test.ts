@@ -79,6 +79,13 @@ describe('renderAuthEmail', () => {
     });
   });
 
+  it('colours the button and the link with the site primary', () => {
+    const { html } = render('verify-email', 'en');
+    expect(html).toContain('background:#092c99;color:#ffffff');
+    expect(html).toContain(`style="color:#092c99"`);
+    expect(html).not.toContain('#1d4ed8');
+  });
+
   it('states how long each link works', () => {
     expect(render('verify-email', 'en').text).toContain('24 hours');
     expect(render('verify-email', 'el').text).toContain('24 ώρες');

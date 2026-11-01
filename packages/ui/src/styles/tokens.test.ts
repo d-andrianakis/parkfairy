@@ -93,6 +93,7 @@ const PAIRS: [string, string, number, number?][] = [
   ['muted-foreground', 'background', TEXT],
   ['muted-foreground', 'card', TEXT],
   ['muted-foreground', 'muted', TEXT],
+  ['muted-foreground', 'popover', TEXT], // weekday names and outside days in the calendar
   ['primary', 'background', TEXT], // links, `link` buttons
   ['primary', 'card', TEXT],
   ['destructive', 'background', TEXT], // field errors
@@ -117,6 +118,20 @@ const dark = tokens('@utility theme-dark-tokens');
 
 it('the dark theme defines every colour the light theme defines', () => {
   expect(Object.keys(dark).sort()).toEqual(Object.keys(light).sort());
+});
+
+// Mail clients can't read this file, so the emails have the same colour written out as hex.
+it('the emails still use the light primary', () => {
+  const email = readFileSync(
+    new URL('../../../../apps/web/lib/email/render.ts', import.meta.url),
+    'utf8',
+  );
+  const channels = light.primary?.rgb.map((v) =>
+    Math.round(v * 255)
+      .toString(16)
+      .padStart(2, '0'),
+  );
+  expect(/const PRIMARY = '(#[0-9a-f]{6})'/.exec(email)?.[1]).toBe(`#${channels?.join('')}`);
 });
 
 describe.each([

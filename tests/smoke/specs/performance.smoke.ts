@@ -90,9 +90,16 @@ for (const [path, accountNav] of [
   ...CATALOGUE.map((catalogue) => [catalogue, 'Account'] as const),
 ] as const) {
   test(`${path} does not shift while loading on a phone`, async ({ page }) => {
-    const cls = await measureLayoutShift(page, path, () =>
-      expect(page.getByRole('navigation', { name: accountNav }).getByRole('link')).toHaveCount(2),
-    );
+    const cls = await measureLayoutShift(page, path, async () => {
+      await expect(
+        page.getByRole('navigation', { name: accountNav }).getByRole('link'),
+      ).toHaveCount(2);
+      // Those links are server-rendered. The search form's swap to the picker field comes later.
+      if (path !== '/el' && !path.includes('/search')) return;
+      await expect(
+        page.getByRole('combobox', { name: path.startsWith('/el') ? 'Από' : 'From', exact: true }),
+      ).toBeVisible();
+    });
     expect(cls).toBeLessThan(BUDGETS.layoutShift);
   });
 }
