@@ -11,6 +11,7 @@ import { MapPin } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { FeatureBadges } from './feature-badges';
+import { ListingPhotoImage } from './listing-photo';
 
 export function useMoney() {
   const format = useFormatter();
@@ -23,10 +24,17 @@ interface ListingCardProps {
   /** Query (e.g. the search window) carried to the listing page. */
   query?: Record<string, string>;
   headingLevel?: 'h2' | 'h3';
+  /** The first result on a page: its photo is likely the largest thing in view. */
+  priority?: boolean;
 }
 
 /** A listing in a grid or result list; the whole card links to the listing page. */
-export function ListingCard({ listing, query, headingLevel: Heading = 'h3' }: ListingCardProps) {
+export function ListingCard({
+  listing,
+  query,
+  headingLevel: Heading = 'h3',
+  priority = false,
+}: ListingCardProps) {
   const t = useTranslations('Listing');
   const tAreas = useTranslations('Areas');
   const format = useFormatter();
@@ -46,8 +54,18 @@ export function ListingCard({ listing, query, headingLevel: Heading = 'h3' }: Li
 
   // Ring on keyboard focus only; the transparent outline is what forced-colors mode draws.
   return (
-    <Card className="relative h-full gap-4 py-5 transition-shadow hover:shadow-md has-[a:focus-visible]:ring-[3px] has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:outline-hidden">
-      <CardHeader className="px-5">
+    <Card className="relative h-full gap-4 overflow-hidden pt-0 pb-5 transition-shadow hover:shadow-md has-[a:focus-visible]:ring-[3px] has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:outline-hidden">
+      {/* Decoration here: the name beside it is the link, and the listing page has the words. */}
+      {listing.coverPhoto ? (
+        <ListingPhotoImage
+          photo={listing.coverPhoto}
+          alt=""
+          sizes="(min-width: 1024px) 20rem, (min-width: 640px) 50vw, 100vw"
+          className="aspect-[3/2] w-full object-cover"
+          priority={priority}
+        />
+      ) : null}
+      <CardHeader className={listing.coverPhoto ? 'px-5' : 'px-5 pt-5'}>
         <CardTitle className="text-base">
           <Heading lang={listing.contentLocale}>
             <Link
@@ -79,11 +97,15 @@ export function ListingCard({ listing, query, headingLevel: Heading = 'h3' }: Li
               ? t('freeSpaces', { count: result.freeSpaces })
               : t('spaceCount', { count: listing.spaceCount })}
             <br />
-            {t('perHour', { price: money(listing.hourlyRate) })}
+            {t(listing.spacePricesVary ? 'perHourFrom' : 'perHour', {
+              price: money(listing.hourlyRate),
+            })}
           </p>
           {result ? (
             <p className="text-right">
-              <span className="block text-xs text-muted-foreground">{t('totalLabel')}</span>
+              <span className="block text-xs text-muted-foreground">
+                {t(listing.spacePricesVary ? 'totalLabelFrom' : 'totalLabel')}
+              </span>
               <span className="text-lg font-semibold">{money(result.total)}</span>
             </p>
           ) : null}

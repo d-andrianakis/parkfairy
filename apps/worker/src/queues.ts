@@ -1,4 +1,5 @@
 import type { Database } from '@parkfairy/database';
+import type { EmailTransport } from '@parkfairy/email';
 import type { Job } from 'bullmq';
 import type { Logger } from 'pino';
 
@@ -6,12 +7,15 @@ import type { Logger } from 'pino';
 export const QUEUES = {
   /** Periodic housekeeping: hold expiry sweeps, outbox dispatch, reconciliation (from phase 3). */
   maintenance: 'maintenance',
+  /** Emails owed to people: outbox sweeps and the sender. */
+  email: 'email',
 } as const;
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 
 export interface ProcessorContext {
   db: Database;
   logger: Logger;
+  email: { transport: EmailTransport; webUrl: string };
 }
 
 export interface ScheduledJob {

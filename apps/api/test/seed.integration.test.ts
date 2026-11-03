@@ -25,6 +25,7 @@ const listing: DemoListing = {
     closesMinute: 1440,
   })),
   spaces: [{ label: 'A1' }, { label: 'A2', hasEvCharging: true }],
+  cancellationPolicy: 'oneDay',
 };
 
 describe('demo seed', () => {

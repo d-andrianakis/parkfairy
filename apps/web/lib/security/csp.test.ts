@@ -15,6 +15,29 @@ describe('buildContentSecurityPolicy', () => {
     buildContentSecurityPolicy({ nonce: 'abc', isDev: false, upgradeInsecureRequests: true }),
   );
 
+  it('reaches Mapbox only where a page asks for it', () => {
+    expect(production.get('connect-src')).toEqual(["'self'"]);
+    expect(production.has('worker-src')).toBe(false);
+
+    const maps = directives(
+      buildContentSecurityPolicy({
+        nonce: 'abc',
+        isDev: false,
+        upgradeInsecureRequests: true,
+        maps: true,
+      }),
+    );
+    expect(maps.get('connect-src')).toEqual([
+      "'self'",
+      'https://api.mapbox.com',
+      'https://events.mapbox.com',
+    ]);
+    expect(maps.get('worker-src')).toEqual(["'self'"]);
+    // The map gains origins to talk to, never a looser way to run code.
+    expect(maps.get('script-src')).toEqual(production.get('script-src'));
+    expect(maps.get('img-src')).toEqual(production.get('img-src'));
+  });
+
   it('only runs scripts carrying this response nonce', () => {
     expect(production.get('script-src')).toEqual(["'self'", "'nonce-abc'", "'strict-dynamic'"]);
   });

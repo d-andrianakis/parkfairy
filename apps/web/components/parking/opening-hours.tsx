@@ -9,6 +9,17 @@ function minutes(wallTime: string): number {
   return hours * 60 + mins;
 }
 
+/** A wall time (`HH:MM`) as this language writes the time of day. */
+export function useWallTime() {
+  const format = useFormatter();
+  const locale = useLocale();
+  return (time: string) =>
+    format.dateTime(new Date(Date.UTC(2000, 0, 1, 0, minutes(time) % 1440)), {
+      ...timeOptions(locale),
+      timeZone: 'UTC',
+    });
+}
+
 /** Weekly hours, Monday first, in the listing's local time. */
 export function OpeningHours({ periods }: { periods: OpeningPeriod[] }) {
   const t = useTranslations('Listing');

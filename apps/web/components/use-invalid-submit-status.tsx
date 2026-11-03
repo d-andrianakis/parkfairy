@@ -15,11 +15,16 @@ export function useInvalidSubmitStatus() {
   const t = useTranslations('Forms');
   const [message, setMessage] = useState('');
 
-  function onInvalid<T extends FieldValues>(errors: FieldErrors<T>) {
-    const text = t('invalidSummary', { count: Object.keys(errors).length });
+  /** For forms that keep their own errors. */
+  function report(count: number) {
+    const text = t('invalidSummary', { count });
     // Clear first, so the same message is announced again on the next failed attempt.
     setMessage('');
     requestAnimationFrame(() => setMessage(text));
+  }
+
+  function onInvalid<T extends FieldValues>(errors: FieldErrors<T>) {
+    report(Object.keys(errors).length);
   }
 
   const clear = () => setMessage('');
@@ -29,5 +34,5 @@ export function useInvalidSubmitStatus() {
       {message}
     </p>
   );
-  return { onInvalid, clear, region };
+  return { onInvalid, report, clear, region };
 }

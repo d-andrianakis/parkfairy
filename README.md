@@ -14,6 +14,7 @@ one set of domain packages.
 | `apps/worker`         | BullMQ workers for scheduled and asynchronous jobs.                                                       |
 | `packages/database`   | Drizzle schema, versioned SQL migrations, connection factory.                                             |
 | `packages/auth`       | The single Better Auth configuration used by both web and API.                                            |
+| `packages/email`      | Email layout and transport for web and worker, and the owner emails the worker sends.                     |
 | `packages/contracts`  | Zod schemas and shared constants (locales, validation keys) for the API, web and worker.                  |
 | `packages/api-client` | TypeScript client + TanStack Query helpers generated from the API's OpenAPI document.                     |
 | `packages/ui`         | shadcn/ui-style components, Tailwind theme tokens, and test helpers (axe).                                |

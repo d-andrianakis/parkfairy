@@ -22,6 +22,12 @@ Thumbs.db
 # Emails written instead of sent on this machine; they hold live sign-in links
 .emails/
 
+# Copied from mapbox-gl at build time
+apps/web/public/vendor/
+
+# Uploads kept on this machine: photos and owners' proof documents
+.uploads/
+
 # Playwright auth state for the smoke suite
 tests/smoke/.auth/
 

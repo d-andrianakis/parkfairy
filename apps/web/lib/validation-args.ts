@@ -4,7 +4,7 @@ import {
   NAME_MAX_LENGTH,
   PASSWORD_POLICY,
   type ValidationMessage,
-} from '@parkfairy/contracts';
+} from '@parkfairy/contracts/validation';
 
 /** ICU arguments for `Validation.*` messages (server and client components alike). */
 export function validationArgs(key: ValidationMessage) {

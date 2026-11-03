@@ -118,6 +118,42 @@ at start-up too.
 If you were already running `pnpm dev` when this arrived, restart it: the auth instance
 survives hot reloads, so it keeps the old rules until the server restarts.
 
+## Listing parking on your machine
+
+"List parking" in the header opens the owner area. Uploads become files in `.uploads/` at the
+repository root, which git ignores. Anywhere other than this machine the API refuses to start
+without `S3_BUCKET` and `OWNER_DATA_KEY` (`openssl rand -base64 32`). Losing that key loses every
+saved tax number, so keep it in the secret store and back it up.
+
+**The map.** Set `MAPBOX_PUBLIC_TOKEN` in `.env` to a public token (`pk...`) from a Mapbox account,
+restricted to your site's URLs, and restart the web app. Without one, the location step offers
+"Use my location" and typed coordinates instead. Address search stores what it finds, so it uses
+Mapbox's permanent geocoding, which needs a card on the Mapbox account.
+
+**Reviewing a listing by hand.** There is no admin screen until Phase 5, so staff change a
+listing's status in the database. Open a database shell, see what's waiting, then either publish
+it or send it back. The worker notices the change and emails the owner within about two minutes.
+
+```sh
+docker exec -it parkfairy-postgres-1 psql -U parkfairy -d parkfairy
+```
+
+```sql
+select slug, name, submitted_at from parking_locations
+where status = 'in_review' order by submitted_at;
+
+-- Goes live.
+update parking_locations set status = 'published', review_note = null where slug = '...';
+
+-- Goes back to the owner, who sees the note and can fix and resend it.
+update parking_locations
+set status = 'changes_requested', review_note = 'What needs to change'
+where slug = '...';
+```
+
+Proof documents are in `.uploads/proofs/<listing id>/`. They have no file extension; the type is in
+`parking_proof_documents`.
+
 ## Browser automation for Claude Code (Playwright MCP)
 
 `.mcp.json` registers a Playwright MCP server, so Claude Code can drive a real Chrome window

@@ -186,6 +186,58 @@ test('someone typing before the page hydrates keeps the field', async ({ page })
   await expect(password).toHaveValue('horsestaple');
 });
 
+test('a panel restored during a slow load leaves the focus where someone moved it', async ({
+  page,
+}) => {
+  const address = 'maria@example.gr';
+  await page.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [
+    'parkfairy.sent-to:/forgot-password',
+    address,
+  ] as const);
+  let release = () => {};
+  const movedOn = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/_next/static/**/*.js', async (route) => {
+    await movedOn;
+    await route.continue();
+  });
+  await page.goto('/en/forgot-password?sent=1', { waitUntil: 'commit' });
+  const signIn = page.getByRole('banner').getByRole('link', { name: 'Sign in' });
+  await signIn.focus();
+  await expect(page.getByText(address)).toBeHidden(); // the panel has to come after the move
+
+  release();
+  await expect(page.getByText(address)).toBeVisible();
+
+  await expect(signIn).toBeFocused();
+});
+
+test('a panel after a slow request leaves the focus where someone moved it', async ({ page }) => {
+  let release = () => {};
+  const movedOn = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/auth/request-password-reset', async (route) => {
+    await movedOn;
+    await route.continue();
+  });
+  await page.goto('/en/forgot-password');
+  await page.getByLabel('Email').fill(uniqueEmail('slow-request'));
+  await page.getByRole('button', { name: 'Send link' }).click();
+  const signIn = page.getByRole('banner').getByRole('link', { name: 'Sign in' });
+  await signIn.focus();
+  const heading = page.getByRole('heading', { name: 'Check your inbox' });
+  await expect(heading).toBeHidden();
+
+  release();
+  await expect(heading).toBeVisible();
+
+  await expect(signIn).toBeFocused();
+  await expect(page.getByRole('status').filter({ hasText: 'Check your inbox' })).toBeAttached();
+  await expect(page).toHaveTitle(/^Check your inbox/); // here only the panel can rename the tab
+});
+
 test('a dead confirmation link’s panel stays through a language switch and a reload', async ({
   page,
 }) => {

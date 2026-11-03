@@ -8,6 +8,7 @@ import { maintenanceProcessor, UNCONFIRMED_ACCOUNT_DAYS } from './maintenance.js
 vi.mock('@parkfairy/database', () => ({ deleteUnconfirmedAccounts: vi.fn() }));
 
 const logger = pino({ level: 'silent' });
+const email = { transport: { send: () => Promise.resolve() }, webUrl: 'http://localhost:3000' };
 const jobNamed = (name: string) => ({ id: '1', name }) as Job;
 
 describe('maintenance processor', () => {
@@ -21,7 +22,7 @@ describe('maintenance processor', () => {
     const db = { execute } as unknown as Database;
 
     await expect(
-      maintenanceProcessor.process(jobNamed('heartbeat'), { db, logger }),
+      maintenanceProcessor.process(jobNamed('heartbeat'), { db, logger, email }),
     ).resolves.toEqual({
       ok: true,
     });
@@ -47,7 +48,11 @@ describe('maintenance processor', () => {
       const db = {} as Database;
 
       await expect(
-        maintenanceProcessor.process(jobNamed('delete-unconfirmed-accounts'), { db, logger }),
+        maintenanceProcessor.process(jobNamed('delete-unconfirmed-accounts'), {
+          db,
+          logger,
+          email,
+        }),
       ).resolves.toEqual({ deleted: 3 });
 
       expect(UNCONFIRMED_ACCOUNT_DAYS).toBeGreaterThan(1); // the emailed link lasts a day
@@ -57,8 +62,8 @@ describe('maintenance processor', () => {
 
   it('fails loudly on unknown job names instead of silently dropping work', async () => {
     const db = { execute: vi.fn() } as unknown as Database;
-    await expect(maintenanceProcessor.process(jobNamed('mystery'), { db, logger })).rejects.toThrow(
-      /Unknown maintenance job/,
-    );
+    await expect(
+      maintenanceProcessor.process(jobNamed('mystery'), { db, logger, email }),
+    ).rejects.toThrow(/Unknown maintenance job/);
   });
 });

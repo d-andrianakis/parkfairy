@@ -1,4 +1,6 @@
 import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 // Local runs read the shared root .env; CI provides the variables directly.
@@ -32,6 +34,8 @@ export default defineConfig({
       // Apps under test count rate limits in memory, so suites and repeated runs never share
       // counters. rate-limit.integration.test.ts uses Redis, on its own logical database.
       REDIS_URL: '',
+      // Uploads from tests stay out of the demo data's folder.
+      OBJECT_STORE_DIR: join(tmpdir(), 'parkfairy-test-uploads'),
       TEST_REDIS_URL: process.env.TEST_REDIS_URL ?? redisDatabase(process.env.REDIS_URL, 15),
     },
     // Integration suites share one database.

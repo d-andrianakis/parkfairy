@@ -123,7 +123,7 @@ it('the dark theme defines every colour the light theme defines', () => {
 // Mail clients can't read this file, so the emails have the same colour written out as hex.
 it('the emails still use the light primary', () => {
   const email = readFileSync(
-    new URL('../../../../apps/web/lib/email/render.ts', import.meta.url),
+    new URL('../../../../packages/email/src/layout.ts', import.meta.url),
     'utf8',
   );
   const channels = light.primary?.rgb.map((v) =>

@@ -140,9 +140,10 @@ export default async function SearchPage(props: SearchPageProps) {
               </Empty>
             ) : (
               <ul className="grid gap-4 sm:grid-cols-2">
-                {response.results.map((result) => (
+                {response.results.map((result, index) => (
                   <li key={result.slug}>
                     <ListingCard
+                      priority={index === 0}
                       listing={result}
                       query={windowQuery(search.values)}
                       headingLevel="h3"

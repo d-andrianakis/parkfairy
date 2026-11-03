@@ -35,6 +35,8 @@ export type MeResponse = {
 
 export type AreaId = 'syntagma' | 'monastiraki' | 'kolonaki' | 'koukaki' | 'piraeusPort' | 'glyfada' | 'marousi' | 'athensAirport' | 'thessalonikiCentre' | 'ladadika' | 'thessalonikiAirport';
 
+export type ListingStatus = 'draft' | 'in_review' | 'changes_requested' | 'published' | 'suspended';
+
 export type Currency = 'EUR';
 
 export type Money = {
@@ -44,6 +46,14 @@ export type Money = {
 
 export type ParkingFeature = 'covered' | 'evCharging' | 'accessible';
 
+export type ListingPhoto = {
+    key: string;
+    width: number;
+    height: number;
+    alt: string | null;
+    color: string;
+};
+
 export type ParkingListingSummary = {
     slug: string;
     name: string;
@@ -52,8 +62,10 @@ export type ParkingListingSummary = {
     contentLocale: Locale;
     hourlyRate: Money;
     dailyMax: Money | null;
+    spacePricesVary: boolean;
     features: Array<ParkingFeature>;
     spaceCount: number;
+    coverPhoto: ListingPhoto | null;
 };
 
 export type FeaturedParkingResponse = {
@@ -68,8 +80,10 @@ export type ParkingSearchResult = {
     contentLocale: Locale;
     hourlyRate: Money;
     dailyMax: Money | null;
+    spacePricesVary: boolean;
     features: Array<ParkingFeature>;
     spaceCount: number;
+    coverPhoto: ListingPhoto | null;
     distanceMeters: number;
     freeSpaces: number;
     total: Money;
@@ -90,6 +104,8 @@ export type OpeningPeriod = {
 export type ParkingSpace = {
     label: string;
     features: Array<ParkingFeature>;
+    hourlyRate: Money;
+    total: Money | null;
 };
 
 export type ParkingAvailability = {
@@ -100,6 +116,26 @@ export type ParkingAvailability = {
     total: Money;
 };
 
+export type CancellationPolicy = 'oneHour' | 'oneDay' | 'oneDayThenHalf';
+
+export type ListingPriceRules = {
+    weekendRate: Money | null;
+    night: {
+        rate: Money;
+        from: string;
+        to: string;
+    } | null;
+    dated: Array<{
+        startsOn: string;
+        endsOn: string;
+        rate: Money;
+    }>;
+    longStay: Array<{
+        minDays: number;
+        percent: number;
+    }>;
+};
+
 export type ParkingListingDetail = {
     slug: string;
     name: string;
@@ -108,15 +144,254 @@ export type ParkingListingDetail = {
     contentLocale: Locale;
     hourlyRate: Money;
     dailyMax: Money | null;
+    spacePricesVary: boolean;
     features: Array<ParkingFeature>;
     spaceCount: number;
+    coverPhoto: ListingPhoto | null;
     description: string | null;
     latitude: number;
     longitude: number;
     timeZone: string;
     openingHours: Array<OpeningPeriod>;
     spaces: Array<ParkingSpace>;
+    photos: Array<ListingPhoto>;
+    priceRules: ListingPriceRules;
+    cancellationPolicy: CancellationPolicy | null;
     availability: ParkingAvailability | null;
+};
+
+export type OwnerKind = 'individual' | 'business';
+
+export type OwnerVerification = 'unverified' | 'pending' | 'verified' | 'rejected';
+
+export type OwnerCountry = 'AT' | 'BE' | 'BG' | 'CY' | 'CZ' | 'DE' | 'DK' | 'EE' | 'ES' | 'FI' | 'FR' | 'GR' | 'HR' | 'HU' | 'IE' | 'IT' | 'LT' | 'LU' | 'LV' | 'MT' | 'NL' | 'PL' | 'PT' | 'RO' | 'SE' | 'SI' | 'SK';
+
+export type OwnerProfileInput = {
+    kind: 'individual' | 'business';
+    firstName?: string | null;
+    lastName?: string | null;
+    legalName?: string | null;
+    phone: string & string;
+    addressLine: string;
+    city: string;
+    postalCode: string & string;
+    country: 'AT' | 'BE' | 'BG' | 'CY' | 'CZ' | 'DE' | 'DK' | 'EE' | 'ES' | 'FI' | 'FR' | 'GR' | 'HR' | 'HU' | 'IE' | 'IT' | 'LT' | 'LU' | 'LV' | 'MT' | 'NL' | 'PL' | 'PT' | 'RO' | 'SE' | 'SI' | 'SK';
+};
+
+export type OwnerProfilePatch = {
+    kind?: 'individual' | 'business';
+    firstName?: string | null;
+    lastName?: string | null;
+    legalName?: string | null;
+    phone?: (string & string) | null;
+    addressLine?: string | null;
+    city?: string | null;
+    postalCode?: (string & string) | null;
+    country?: 'AT' | 'BE' | 'BG' | 'CY' | 'CZ' | 'DE' | 'DK' | 'EE' | 'ES' | 'FI' | 'FR' | 'GR' | 'HR' | 'HU' | 'IE' | 'IT' | 'LT' | 'LU' | 'LV' | 'MT' | 'NL' | 'PL' | 'PT' | 'RO' | 'SE' | 'SI' | 'SK';
+};
+
+export type OwnerTaxInput = {
+    taxCountry: 'AT' | 'BE' | 'BG' | 'CY' | 'CZ' | 'DE' | 'DK' | 'EE' | 'ES' | 'FI' | 'FR' | 'GR' | 'HR' | 'HU' | 'IE' | 'IT' | 'LT' | 'LU' | 'LV' | 'MT' | 'NL' | 'PL' | 'PT' | 'RO' | 'SE' | 'SI' | 'SK';
+    taxId?: string & string;
+    vatId?: string & string;
+    registrationNumber?: string & string;
+    birthDate?: string;
+};
+
+export type OwnerTaxSummary = {
+    taxCountry: OwnerCountry;
+    taxIdEnding: string | null;
+    vatIdEnding: string | null;
+    registrationEnding: string | null;
+    birthDateSaved: boolean;
+};
+
+export type OwnerProfile = {
+    kind: OwnerKind | null;
+    firstName: string | null;
+    lastName: string | null;
+    legalName: string | null;
+    phone: string | null;
+    addressLine: string | null;
+    city: string | null;
+    postalCode: string | null;
+    country: OwnerCountry;
+    verification: OwnerVerification;
+    tax: OwnerTaxSummary;
+};
+
+export type ListingLocationInput = {
+    name: string;
+    address: string;
+    areaId: 'syntagma' | 'monastiraki' | 'kolonaki' | 'koukaki' | 'piraeusPort' | 'glyfada' | 'marousi' | 'athensAirport' | 'thessalonikiCentre' | 'ladadika' | 'thessalonikiAirport';
+    latitude: number;
+    longitude: number;
+    description?: string | null;
+    contentLocale: Locale;
+};
+
+export type ListingLocationPatch = {
+    name?: string | null;
+    address?: string | null;
+    areaId?: 'syntagma' | 'monastiraki' | 'kolonaki' | 'koukaki' | 'piraeusPort' | 'glyfada' | 'marousi' | 'athensAirport' | 'thessalonikiCentre' | 'ladadika' | 'thessalonikiAirport';
+    latitude?: number | null;
+    longitude?: number | null;
+    description?: string | null;
+    contentLocale?: Locale;
+};
+
+export type ListingSpaceInput = {
+    label: string;
+    features: Array<ParkingFeature>;
+    hourlyRateMinor: number | null;
+};
+
+export type ListingSpacesInput = {
+    spaces: Array<ListingSpaceInput>;
+};
+
+export type ListingHoursInput = {
+    periods: Array<OpeningPeriod>;
+};
+
+export type ListingPricesInput = {
+    hourlyRateMinor: number;
+    dailyMaxMinor: number | null;
+    bookingGapMinutes: 0 | 30 | 60;
+    cancellationPolicy: 'oneHour' | 'oneDay' | 'oneDayThenHalf';
+    weekendRateMinor: number | null;
+    night: {
+        rateMinor: number;
+        from: string;
+        to: string;
+    } | null;
+    datedPrices: Array<{
+        label: string | null;
+        startsOn: string;
+        endsOn: string;
+        rateMinor: number;
+    }>;
+    longStayDiscounts: Array<{
+        minDays: number;
+        percent: number;
+    }>;
+};
+
+export type ListingPhotoUpdate = {
+    alt: string | null;
+};
+
+export type ListingPhotoOrder = {
+    ids: Array<string>;
+};
+
+export type OwnerPhoto = {
+    key: string;
+    width: number;
+    height: number;
+    alt: string | null;
+    color: string;
+    id: string;
+};
+
+export type ProofKind = 'titleDeed' | 'lease' | 'operatingLicence' | 'other';
+
+export type OwnerProof = {
+    id: string;
+    kind: ProofKind;
+    fileName: string;
+    contentType: 'application/pdf' | 'image/jpeg' | 'image/png';
+    sizeBytes: number;
+    createdAt: string;
+};
+
+export type ListingProofPatch = {
+    landRegistrationNumber: (string & string) | null;
+};
+
+export type ListingSubmitInput = {
+    confirmed: true;
+};
+
+export type AccountStep = 'profile' | 'tax';
+
+export type ListingStep = 'location' | 'spaces' | 'hours' | 'prices' | 'photos' | 'proof' | 'review';
+
+export type OwnerListingProgress = {
+    id: string;
+    name: string | null;
+    contentLocale: Locale;
+    status: ListingStatus;
+    slug: string | null;
+    coverPhoto: ListingPhoto | null;
+    doneSteps: Array<ListingStep>;
+    nextStep: ListingStep | null;
+    reviewNote: string | null;
+    submittedAt: string | null;
+    updatedAt: string;
+};
+
+export type OwnerOnboarding = {
+    started: boolean;
+    doneAccountSteps: Array<AccountStep>;
+    listings: Array<OwnerListingProgress>;
+};
+
+export type OwnerSpace = {
+    id: string;
+    label: string;
+    features: Array<ParkingFeature>;
+    hourlyRateMinor: number | null;
+};
+
+export type OwnerPrices = {
+    hourlyRateMinor: number | null;
+    dailyMaxMinor: number | null;
+    bookingGapMinutes: number;
+    cancellationPolicy: CancellationPolicy | null;
+    weekendRateMinor: number | null;
+    night: {
+        rateMinor: number;
+        from: string;
+        to: string;
+    } | null;
+    datedPrices: Array<{
+        label: string | null;
+        startsOn: string;
+        endsOn: string;
+        rateMinor: number;
+    }>;
+    longStayDiscounts: Array<{
+        minDays: number;
+        percent: number;
+    }>;
+};
+
+export type OwnerListing = {
+    id: string;
+    status: ListingStatus;
+    locked: boolean;
+    progress: OwnerListingProgress;
+    doneAccountSteps: Array<AccountStep>;
+    location: {
+        name: string | null;
+        address: string | null;
+        areaId: AreaId | null;
+        latitude: number | null;
+        longitude: number | null;
+        description: string | null;
+        contentLocale: Locale;
+    };
+    spaces: Array<OwnerSpace>;
+    openingHours: Array<OpeningPeriod>;
+    prices: OwnerPrices;
+    photos: Array<OwnerPhoto>;
+    proofs: Array<OwnerProof>;
+    landRegistrationNumber: string | null;
+};
+
+export type OwnerListingCreated = {
+    id: string;
 };
 
 export type GetLivenessData = {
@@ -169,6 +444,28 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type GetListingPhotoData = {
+    body?: never;
+    path: {
+        key: string;
+        width: '480' | '960' | '1600';
+    };
+    query?: never;
+    url: '/v1/media/photos/{key}/{width}.webp';
+};
+
+export type GetListingPhotoErrors = {
+    404: ErrorResponse;
+};
+
+export type GetListingPhotoError = GetListingPhotoErrors[keyof GetListingPhotoErrors];
+
+export type GetListingPhotoResponses = {
+    200: Blob | File;
+};
+
+export type GetListingPhotoResponse = GetListingPhotoResponses[keyof GetListingPhotoResponses];
 
 export type GetFeaturedParkingData = {
     body?: never;
@@ -244,3 +541,465 @@ export type GetParkingListingResponses = {
 };
 
 export type GetParkingListingResponse = GetParkingListingResponses[keyof GetParkingListingResponses];
+
+export type GetOwnerOnboardingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/onboarding';
+};
+
+export type GetOwnerOnboardingErrors = {
+    401: ErrorResponse;
+};
+
+export type GetOwnerOnboardingError = GetOwnerOnboardingErrors[keyof GetOwnerOnboardingErrors];
+
+export type GetOwnerOnboardingResponses = {
+    200: OwnerOnboarding;
+};
+
+export type GetOwnerOnboardingResponse = GetOwnerOnboardingResponses[keyof GetOwnerOnboardingResponses];
+
+export type GetOwnerProfileData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/profile';
+};
+
+export type GetOwnerProfileErrors = {
+    401: ErrorResponse;
+};
+
+export type GetOwnerProfileError = GetOwnerProfileErrors[keyof GetOwnerProfileErrors];
+
+export type GetOwnerProfileResponses = {
+    200: OwnerProfile;
+};
+
+export type GetOwnerProfileResponse = GetOwnerProfileResponses[keyof GetOwnerProfileResponses];
+
+export type UpdateOwnerProfileData = {
+    body: OwnerProfilePatch;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/profile';
+};
+
+export type UpdateOwnerProfileErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+};
+
+export type UpdateOwnerProfileError = UpdateOwnerProfileErrors[keyof UpdateOwnerProfileErrors];
+
+export type UpdateOwnerProfileResponses = {
+    200: OwnerProfile;
+};
+
+export type UpdateOwnerProfileResponse = UpdateOwnerProfileResponses[keyof UpdateOwnerProfileResponses];
+
+export type SaveOwnerTaxDetailsData = {
+    body: OwnerTaxInput;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/profile/tax';
+};
+
+export type SaveOwnerTaxDetailsErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SaveOwnerTaxDetailsError = SaveOwnerTaxDetailsErrors[keyof SaveOwnerTaxDetailsErrors];
+
+export type SaveOwnerTaxDetailsResponses = {
+    200: OwnerProfile;
+};
+
+export type SaveOwnerTaxDetailsResponse = SaveOwnerTaxDetailsResponses[keyof SaveOwnerTaxDetailsResponses];
+
+export type CreateOwnerListingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/listings';
+};
+
+export type CreateOwnerListingErrors = {
+    401: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type CreateOwnerListingError = CreateOwnerListingErrors[keyof CreateOwnerListingErrors];
+
+export type CreateOwnerListingResponses = {
+    201: OwnerListingCreated;
+};
+
+export type CreateOwnerListingResponse = CreateOwnerListingResponses[keyof CreateOwnerListingResponses];
+
+export type DeleteOwnerListingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}';
+};
+
+export type DeleteOwnerListingErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type DeleteOwnerListingError = DeleteOwnerListingErrors[keyof DeleteOwnerListingErrors];
+
+export type DeleteOwnerListingResponses = {
+    204: void;
+};
+
+export type DeleteOwnerListingResponse = DeleteOwnerListingResponses[keyof DeleteOwnerListingResponses];
+
+export type GetOwnerListingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}';
+};
+
+export type GetOwnerListingErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type GetOwnerListingError = GetOwnerListingErrors[keyof GetOwnerListingErrors];
+
+export type GetOwnerListingResponses = {
+    200: OwnerListing;
+};
+
+export type GetOwnerListingResponse = GetOwnerListingResponses[keyof GetOwnerListingResponses];
+
+export type SaveListingLocationData = {
+    body: ListingLocationPatch;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/location';
+};
+
+export type SaveListingLocationErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SaveListingLocationError = SaveListingLocationErrors[keyof SaveListingLocationErrors];
+
+export type SaveListingLocationResponses = {
+    200: OwnerListingProgress;
+};
+
+export type SaveListingLocationResponse = SaveListingLocationResponses[keyof SaveListingLocationResponses];
+
+export type SaveListingSpacesData = {
+    body: ListingSpacesInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/spaces';
+};
+
+export type SaveListingSpacesErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SaveListingSpacesError = SaveListingSpacesErrors[keyof SaveListingSpacesErrors];
+
+export type SaveListingSpacesResponses = {
+    200: OwnerListingProgress;
+};
+
+export type SaveListingSpacesResponse = SaveListingSpacesResponses[keyof SaveListingSpacesResponses];
+
+export type SaveListingHoursData = {
+    body: ListingHoursInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/hours';
+};
+
+export type SaveListingHoursErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SaveListingHoursError = SaveListingHoursErrors[keyof SaveListingHoursErrors];
+
+export type SaveListingHoursResponses = {
+    200: OwnerListingProgress;
+};
+
+export type SaveListingHoursResponse = SaveListingHoursResponses[keyof SaveListingHoursResponses];
+
+export type SaveListingPricesData = {
+    body: ListingPricesInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/prices';
+};
+
+export type SaveListingPricesErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SaveListingPricesError = SaveListingPricesErrors[keyof SaveListingPricesErrors];
+
+export type SaveListingPricesResponses = {
+    200: OwnerListingProgress;
+};
+
+export type SaveListingPricesResponse = SaveListingPricesResponses[keyof SaveListingPricesResponses];
+
+export type UploadListingPhotoData = {
+    body: Blob | File;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/photos';
+};
+
+export type UploadListingPhotoErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type UploadListingPhotoError = UploadListingPhotoErrors[keyof UploadListingPhotoErrors];
+
+export type UploadListingPhotoResponses = {
+    201: OwnerPhoto;
+};
+
+export type UploadListingPhotoResponse = UploadListingPhotoResponses[keyof UploadListingPhotoResponses];
+
+export type ReorderListingPhotosData = {
+    body: ListingPhotoOrder;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/photos/order';
+};
+
+export type ReorderListingPhotosErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type ReorderListingPhotosError = ReorderListingPhotosErrors[keyof ReorderListingPhotosErrors];
+
+export type ReorderListingPhotosResponses = {
+    204: void;
+};
+
+export type ReorderListingPhotosResponse = ReorderListingPhotosResponses[keyof ReorderListingPhotosResponses];
+
+export type DeleteListingPhotoData = {
+    body?: never;
+    path: {
+        id: string;
+        photoId: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/photos/{photoId}';
+};
+
+export type DeleteListingPhotoErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type DeleteListingPhotoError = DeleteListingPhotoErrors[keyof DeleteListingPhotoErrors];
+
+export type DeleteListingPhotoResponses = {
+    204: void;
+};
+
+export type DeleteListingPhotoResponse = DeleteListingPhotoResponses[keyof DeleteListingPhotoResponses];
+
+export type UpdateListingPhotoData = {
+    body: ListingPhotoUpdate;
+    path: {
+        id: string;
+        photoId: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/photos/{photoId}';
+};
+
+export type UpdateListingPhotoErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type UpdateListingPhotoError = UpdateListingPhotoErrors[keyof UpdateListingPhotoErrors];
+
+export type UpdateListingPhotoResponses = {
+    204: void;
+};
+
+export type UpdateListingPhotoResponse = UpdateListingPhotoResponses[keyof UpdateListingPhotoResponses];
+
+export type UploadListingProofData = {
+    body: Blob | File;
+    headers?: {
+        /**
+         * URI-encoded: names stay out of request logs.
+         */
+        'x-file-name'?: string;
+    };
+    path: {
+        id: string;
+    };
+    query: {
+        kind: 'titleDeed' | 'lease' | 'operatingLicence' | 'other';
+    };
+    url: '/v1/owner/listings/{id}/proofs';
+};
+
+export type UploadListingProofErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type UploadListingProofError = UploadListingProofErrors[keyof UploadListingProofErrors];
+
+export type UploadListingProofResponses = {
+    201: OwnerProof;
+};
+
+export type UploadListingProofResponse = UploadListingProofResponses[keyof UploadListingProofResponses];
+
+export type DeleteListingProofData = {
+    body?: never;
+    path: {
+        id: string;
+        proofId: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/proofs/{proofId}';
+};
+
+export type DeleteListingProofErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type DeleteListingProofError = DeleteListingProofErrors[keyof DeleteListingProofErrors];
+
+export type DeleteListingProofResponses = {
+    204: void;
+};
+
+export type DeleteListingProofResponse = DeleteListingProofResponses[keyof DeleteListingProofResponses];
+
+export type DownloadListingProofData = {
+    body?: never;
+    path: {
+        id: string;
+        proofId: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/proofs/{proofId}';
+};
+
+export type DownloadListingProofErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type DownloadListingProofError = DownloadListingProofErrors[keyof DownloadListingProofErrors];
+
+export type DownloadListingProofResponses = {
+    200: Blob | File;
+};
+
+export type DownloadListingProofResponse = DownloadListingProofResponses[keyof DownloadListingProofResponses];
+
+export type SaveListingProofDetailsData = {
+    body: ListingProofPatch;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/proof-details';
+};
+
+export type SaveListingProofDetailsErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SaveListingProofDetailsError = SaveListingProofDetailsErrors[keyof SaveListingProofDetailsErrors];
+
+export type SaveListingProofDetailsResponses = {
+    200: OwnerListingProgress;
+};
+
+export type SaveListingProofDetailsResponse = SaveListingProofDetailsResponses[keyof SaveListingProofDetailsResponses];
+
+export type SubmitOwnerListingData = {
+    body: ListingSubmitInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/submit';
+};
+
+export type SubmitOwnerListingErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SubmitOwnerListingError = SubmitOwnerListingErrors[keyof SubmitOwnerListingErrors];
+
+export type SubmitOwnerListingResponses = {
+    200: OwnerListingProgress;
+};
+
+export type SubmitOwnerListingResponse = SubmitOwnerListingResponses[keyof SubmitOwnerListingResponses];

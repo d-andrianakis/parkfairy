@@ -66,12 +66,20 @@ export async function expectAccessible(page: Page) {
 
 /** Collects Content-Security-Policy violations reported by the browser for this page. */
 export async function trackCspViolations(page: Page): Promise<() => Promise<string[]>> {
+  // Kept out here: every navigation is a new window, which would forget the pages before it.
+  const seen: string[] = [];
+  await page.exposeFunction('__reportCsp', (violation: string) => {
+    seen.push(violation);
+  });
   await page.addInitScript(() => {
-    const store: string[] = [];
-    (window as unknown as { __csp: string[] }).__csp = store;
     document.addEventListener('securitypolicyviolation', (event) => {
-      store.push(`${event.violatedDirective} ${event.blockedURI}`);
+      void (window as unknown as { __reportCsp(violation: string): Promise<void> }).__reportCsp(
+        `${event.violatedDirective} ${event.blockedURI} from ${event.sourceFile}:${event.lineNumber}:${event.columnNumber} on ${location.pathname}`,
+      );
     });
   });
-  return () => page.evaluate(() => (window as unknown as { __csp: string[] }).__csp);
+  return async () => {
+    await page.evaluate(() => undefined); // a round trip, for anything still on its way
+    return seen;
+  };
 }

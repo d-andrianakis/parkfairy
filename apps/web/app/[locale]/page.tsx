@@ -102,6 +102,22 @@ export default async function HomePage({ params }: LocaleParams) {
         </ol>
       </section>
 
+      <section aria-labelledby="owner-heading" className="mx-auto w-full max-w-5xl px-4">
+        <Card>
+          <CardContent className="flex flex-col gap-3">
+            <h2 id="owner-heading" className="text-2xl font-semibold tracking-tight">
+              {t('ownerHeading')}
+            </h2>
+            <p className="max-w-2xl text-muted-foreground">{t('ownerText')}</p>
+            <div>
+              <Button asChild variant="outline">
+                <Link href="/owner">{t('ownerAction')}</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
       <section aria-labelledby="account-heading" className="mx-auto w-full max-w-5xl px-4">
         <Card>
           <CardContent className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">

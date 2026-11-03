@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { API_URL, DEMO_DATA, SIGNED_IN_STATE } from '../support/env';
+import { API_URL, DEMO_DATA, SIGNED_IN_STATE, WEB_URL } from '../support/env';
 
 // Feature: performance budgets — catch regressions in what the browser must download
 // and in API latency. Budgets are deliberately tight; raise them only with a reason
@@ -93,7 +93,7 @@ for (const [path, accountNav] of [
     const cls = await measureLayoutShift(page, path, async () => {
       await expect(
         page.getByRole('navigation', { name: accountNav }).getByRole('link'),
-      ).toHaveCount(2);
+      ).toHaveCount(3);
       // Those links are server-rendered. The search form's swap to the picker field comes later.
       if (path !== '/el' && !path.includes('/search')) return;
       await expect(
@@ -134,6 +134,36 @@ test.describe('signed in', () => {
 
   test('/en/account stays within the first-visit budget', async ({ page }) => {
     await expectWithinBudget(page, '/en/account');
+  });
+
+  for (const path of ['/en/owner', '/en/owner/profile', '/en/owner/tax']) {
+    test(`${path} stays within the first-visit budget`, async ({ page }) => {
+      await expectWithinBudget(page, path);
+    });
+  }
+
+  test('/en/owner does not shift while loading, on a phone', async ({ page }) => {
+    const cls = await measureLayoutShift(page, '/en/owner', () =>
+      expect(page.getByRole('progressbar')).toBeVisible(),
+    );
+    expect(cls).toBeLessThan(BUDGETS.layoutShift);
+  });
+
+  test('the location step keeps the map out of a first visit', async ({ page }) => {
+    const headers = { origin: WEB_URL };
+    const created = await page.request.post('/api/v1/owner/listings', { headers });
+    expect(created.status()).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    try {
+      const mapbox: string[] = [];
+      page.on('request', (request) => {
+        if (request.url().includes('mapbox')) mapbox.push(request.url());
+      });
+      await expectWithinBudget(page, `/en/owner/listings/${id}/location`);
+      expect(mapbox).toEqual([]);
+    } finally {
+      await page.request.delete(`/api/v1/owner/listings/${id}`, { headers });
+    }
   });
 
   test('/en/account does not shift while the API answers, on a phone', async ({ page }) => {

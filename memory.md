@@ -59,6 +59,17 @@ From plan §15 and the decisions form. Answered by the product owner on 2026-10-
     pays whichever total is lower. Where spaces in one listing cost different amounts, search
     shows "from" the cheapest free space, and the listing page shows each space's price.
 
+Answered by the product owner on 2026-11-02, for owner onboarding:
+
+20. Where the owner journey ends for now: **at submitted.** No admin screen until Phase 5; staff change
+    a listing's status by hand in the database. The owner side still handles `changes_requested`
+    (note shown, fix, resubmit), because status emails were asked for too.
+21. How an owner places a facility: **Mapbox now**: address search and a draggable pin, with typed
+    coordinates and "use my location" alongside (WCAG 2.5.7 rules out drag-only input).
+22. Tax details: **collected now**, encrypted, on the fields DAC7 names, and adjusted when the adviser
+    answers #18. Payout account details wait for Stripe in Phase 4.
+23. Also in this round: **the full price rules (#17), status emails and one reminder email.**
+
 Still open, both waiting on people outside the project:
 
 18. For the accountant and lawyer, before Phase 4: VAT on parking and on commission; who issues
@@ -212,6 +223,13 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   focus or press, and a press that can't load it brings the native fields back. Combobox, because
   a button can't carry `aria-invalid`. Days reach the calendar as noon UTC with `timeZone` set, so
   a visitor anywhere picks the Athens day; "today" is Athens' too.
+- **2026-11-01 · `FocusHeading` takes the focus only from nothing in particular:** `body`, where it
+  falls when a form goes, or `#main-content`, where `RouteFocus` puts it. Anywhere else means
+  someone moved on during a slow request or hydration, so they keep their place (WCAG 2.4.3). The
+  heading then goes into a `role="status"` beside it, because a screen reader says nothing else
+  for "Save your backup codes" or "Email confirmed" (4.1.3), and a tab title isn't spoken by
+  itself. Every use today removes whatever held the focus first. A new use that leaves its trigger
+  on the page won't get the focus, so remove the trigger or move the focus there.
 - **2026-11-01 · A From picked at or past Until takes Until along** (product owner), keeping the
   length of the stay; only From does this, and without JavaScript the server's error still
   explains it. `StayFields` measures from the stay as it was when the picker first changed it, not
@@ -324,6 +342,84 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   (Europe/Athens only until the web app formats per listing zone), and text lengths are
   CHECK constraints (migration 0005); an invalid zone would make `Intl` throw and break
   search for a whole area.
+- **2026-11-02 · Owner progress is worked out, never stored.** `onboarding-progress.ts` reads what
+  is saved each time, so it can't drift: a step is done when its data would pass its schema, and
+  clearing a field reopens the step. Continue is simply the first step not done. Steps stay open in
+  any order. The one thing kept is `updated_at`, which every step's save must touch, because the
+  reminder reads it.
+- **2026-11-02 · A draft is a row in `parking_locations`, not a separate table.** Name, address,
+  area, point and rate are nullable, and `parking_locations_complete_check` requires them past
+  `draft`/`changes_requested`, so the database still refuses an incomplete listing going live
+  however it is asked. Public queries cast their rows to the complete shape on that guarantee: only
+  `published` rows reach them. Status is one column; the `in_review` row keeps a real slug from the
+  name (Greek transliterated), and drafts hold `draft-<id>`.
+- **2026-11-02 · Fields save as they are left, except tax.** `useAutosave` sends only valid values
+  that changed, one at a time and in order. Half a step therefore survives, which is the point of
+  "pick up where you left off". Tax details are the exception: nothing is stored until the button,
+  and saved values never come back to the browser, only their last three characters, so an empty
+  field means "keep what's stored". A change of tax country needs a new number with it.
+- **2026-11-02 · Tax values are encrypted in the API** (AES-256-GCM, `OWNER_DATA_KEY`) with the
+  owner and field as additional data, so a value copied to another row won't decrypt. On this
+  machine the key derives from the session secret, so changing that secret makes local tax values
+  unreadable. Fields are those DAC7 names (checked against Revenue Ireland's guidance on 2026-11-02;
+  EUR-Lex could not be fetched); the adviser confirms them under #18. Not collected: permanent
+  establishments ("where available") and the payout account, which Stripe holds in Phase 4.
+- **2026-11-02 · Uploads are read inside the route, not by a body parser.** Parsers run before the
+  guards, so anyone could make the API buffer megabytes without an account (`read-body.ts`). Bytes
+  decide the type, never the header. Every photo is re-encoded by sharp to three WebP widths, which
+  drops location and camera metadata; scans uploaded as proof are re-encoded for the same reason,
+  PDFs are stored as they came and only ever served as attachments. A file slightly over the limit
+  is read to the end and thrown away: answering while the browser is still sending resets the
+  connection, and the owner would see a network error instead of "too large". `UploadGate` limits
+  what runs at once (16 uploads in all, 2 per user, 2 decoding images), because the rate limit counts
+  requests per minute and one image takes 3 of libuv's 4 threads. sharp opens everything with a
+  64 MP limit, proofs included: a 1.4 MB PNG decoded to 2.28 GB without one. A file's name goes in
+  the URI-encoded `X-File-Name` header, never the query string, which reaches logs.
+- **2026-11-03 · Every edit to a draft takes the row lock** (`edit()` in
+  `owner-listings.service.ts`): it locks the row, checks the listing is still editable and touches
+  `updated_at`. Submit does the same and rechecks completeness inside, so staff can't receive a
+  listing whose only photo was deleted a moment earlier, and a check made before the lock proves
+  nothing.
+- **2026-11-02 · Photos are served by the API at content-hash URLs,** same origin, so the CSP stays
+  as it was, and cacheable for ever. The route has its own limit, 1,200 a minute, because one
+  results page is dozens of images and the default throttle is per route; it also stops random keys
+  costing an S3 read each, which a CDN can't absorb. A 404 caches for a minute, and the year-long
+  header goes on successes only. Put a CDN in front at launch. Two listings with the same
+  picture share files, so deleting removes a file only when no row still uses its key. Not
+  next/image: the sizes already exist, and its optimiser would do the work twice.
+- **2026-11-02 · Local uploads and S3 share one interface** (`ObjectStore`), chosen by `S3_BUCKET`.
+  Files on disk are allowed only on a loopback origin, as with emails. No MinIO: a new container
+  for every developer and CI run, to test a thin adapter. The cost is that the S3 path has only run
+  against a mocked client, so try it for real with the first deployment.
+- **2026-11-02 · Status emails hang off the column, not on who changed it.** The worker compares
+  `status` with `notified_status`, so a status changed by hand in the database emails the owner
+  just as Phase 5's admin screen will, with nothing to add there. Each sweep is one statement that
+  queues the email and marks it, so a crash can't lose or double one; the dedupe key includes the
+  submission time, so a second round of review emails again. This is the transactional outbox
+  Phase 3 needs: `email_outbox` holds no addresses (they are looked up when sending), and its id is
+  Resend's idempotency key. Booking emails should reuse it.
+- **2026-11-02 · Owner emails live in `packages/email`, not the web catalogs,** because the worker
+  sends them. Plain functions rather than ICU: no plurals are needed, and it spares the worker
+  next-intl. Auth emails keep their catalog text and share the layout and transport.
+- **2026-11-02 · Mapbox is allowed across all of `/owner`,** not just the location step: moving
+  between steps doesn't load a new document, so the policy in force is that of the page the owner
+  arrived on. That still leaves someone arriving from the home page with its policy, so every link
+  to the location step is a real page load (`StepLink`, `useStepNavigation`). The map itself loads
+  on intent ("Show the map"): it is heavy, and each one shown is a billed map load. The strict
+  `mapbox-gl-csp` build is used so no `blob:` worker is needed; its worker is
+  copied to `public/vendor` at build time and served from our origin. Classic `streets-v12`, because
+  the Standard style needs `wasm-unsafe-eval`. Typed coordinates and "use my location" always stay
+  (WCAG 2.5.7, and the page must work with no token). Mapbox is a new processor of owners' IP
+  addresses and belongs in the Phase 6 privacy review. **The map has never run:** no token existed
+  when it was built.
+- **2026-11-02 · How prices combine.** The most specific price wins each half hour: dated, weekend,
+  night, hourly (#17), on the listing's wall clock. Length stays real elapsed time (#7), but the
+  long-stay threshold reads the wall clock, like the 30-day limit, so a week across the spring change
+  still earns its discount. Our reading, as #17 didn't say: a space's own rate scales everything else
+  in proportion, cap included, so a space 20% dearer stays 20% dearer at night. All of that is
+  `quoteStayMinor`, so a different answer changes one function. Rounding happens once per 24 hours.
+  Clock changes are found by halving rather than asking `Intl` per half hour: a 30-day stay across
+  50 results would be 72,000 lookups.
 
 ## Conventions
 
@@ -369,6 +465,17 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
 
 ## Gotchas and environment quirks
 
+- **Returning a `Buffer` from a Nest route sends JSON** (`{"type":"Buffer","data":[…]}`), with a 200
+  and no error. Use `StreamableFile`. Only comparing the bytes in a test caught it.
+- **`sharp()` throws at construction on an empty buffer,** before any `await`. Build it inside the
+  `try`.
+- **API tests need an `Origin` on writes** (`OriginGuard`), and a `X-Forwarded-For` per user: every
+  test client is otherwise one visitor and meets the rate limits.
+- **Photo tests need different pictures.** Files are named by content, so a repeated colour in a
+  test image shares a file between listings, and "the file is gone" fails now and then.
+- **Radix checkboxes and radios need `ResizeObserver`,** which jsdom lacks; `testing/setup.ts` stubs it.
+- **`public/vendor/` is generated** and ignored by git and ESLint. A fresh clone gets it from the
+  `dev` and `build` scripts.
 - **Ports:** compose maps Postgres → 5434 and Redis → 6380 because this dev machine already
   runs another project's Postgres on 5432 and a Redis service on 6379. Don't stop those.
 - **Docker restarts:** containers use `restart: unless-stopped`; if tests fail with
@@ -444,7 +551,17 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   `commandTimeout` instead.
 - **Zod JIT vs CSP:** Zod 4 probes `new Function`; the browser blocks it and reports a CSP
   violation. `lib/zod-jitless.ts` sets `z.config({ jitless: true })`; see the import-order
-  note above.
+  note above. A page with no forms has nothing to import it first, so it must load no zod at all,
+  and that takes checking the whole graph: on 2026-11-03 the owner dashboard reached the contracts
+  through `use-validation-message` → `validation-args`, for four numbers. Those limits now live in
+  the zod-free `validation.ts`; `dashboard-bundle.test.ts` makes importing zod there fail.
+- **`trackCspViolations` follows the whole test** since 2026-11-03. It kept its list in the window,
+  so each navigation threw earlier violations away and it only ever checked the last page. That is
+  how the dashboard's violation stayed hidden. To find what called `eval`, wrap `window.Function`
+  in a `Proxy` from an init script, report `new Error().stack` with `Error.stackTraceLimit` raised,
+  and read those positions in `.next/static/chunks`.
+- **`testing-library` joins inline text with no space,** so a step link reads "LocationDone" in
+  tests and "Location Done" in a browser. Match `/^Location\s*Done$/`.
 - **Next 16 dev writes `apps/web/AGENTS.md`** pointing agents at `node_modules/next/dist/docs`.
   Keep it committed (it is re-created otherwise). Those docs are the authority for Next 16
   APIs, which differ from older training data (`proxy.ts` replaces `middleware.ts`).
@@ -576,6 +693,9 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   both languages.
 - 2026-10-31 (date and time picker, from the build manifests before the review fixes; the budget
   passes on the final build): `/en` and `/en/search` 170.4 KiB, 224 KiB once the picker loads.
+- 2026-11-03 (owner onboarding): `/en/owner`, its profile and tax pages and the location step are
+  held to the 250 KiB budget in `performance.smoke.ts`. The location step must request nothing from
+  Mapbox on a first visit, because the map loads on intent.
 
 ## Translation notes
 

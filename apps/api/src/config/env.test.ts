@@ -5,6 +5,8 @@ const base = {
   DATABASE_URL: 'postgres://u:p@localhost:5432/db',
   BETTER_AUTH_SECRET: 'x'.repeat(32),
   BETTER_AUTH_URL: 'https://app.example.gr',
+  S3_BUCKET: 'parkfairy-uploads',
+  OWNER_DATA_KEY: Buffer.alloc(32, 7).toString('base64'),
 };
 
 describe('loadEnv', () => {
@@ -42,6 +44,23 @@ describe('loadEnv', () => {
     expect(loadEnv({ ...production, TRUST_PROXY: '10.0.1.0/24' }).trustProxy).toBe('10.0.1.0/24');
     // Express would take the left-most X-Forwarded-For entry, which visitors write.
     expect(() => loadEnv({ ...production, TRUST_PROXY: 'true' })).toThrow(/TRUST_PROXY/);
+  });
+
+  it('keeps uploads on disk on this machine only', () => {
+    const local = { ...base, BETTER_AUTH_URL: 'http://localhost:3000' };
+    const { S3_BUCKET: _bucket, ...noBucket } = local;
+    expect(loadEnv(noBucket).objectStoreDir).toMatch(/\.uploads$/);
+    const { S3_BUCKET: _other, ...elsewhere } = base;
+    expect(() => loadEnv(elsewhere)).toThrow(/S3_BUCKET/);
+  });
+
+  it('needs a real key for tax details anywhere but this machine', () => {
+    const { OWNER_DATA_KEY: _key, ...noKey } = base;
+    expect(() => loadEnv(noKey)).toThrow(/OWNER_DATA_KEY/);
+    expect(() => loadEnv({ ...base, OWNER_DATA_KEY: 'c2hvcnQ=' })).toThrow(/32 bytes/);
+    expect(loadEnv({ ...noKey, BETTER_AUTH_URL: 'http://127.0.0.1:3000' }).OWNER_DATA_KEY).toBe(
+      undefined,
+    );
   });
 
   it('rejects a short auth secret', () => {

@@ -340,8 +340,16 @@ The answers are in memory.md (Open product decisions, Translation notes).
 - [x] Decided (2026-11-01, product owner): `ResetPassword.submit` keeps its wording,
       `Αποθήκευση νέου κωδικού πρόσβασης`, which matches the English button and `Αποθήκευση…`
       while it saves. Added to the kept list in memory.md
-- [ ] Borderline (WCAG 2.4.3): a restored panel's `FocusHeading` takes focus after hydration, even
-      if someone moved on during a slow load. Fix: only when focus is on `body` or `#main-content`
+- [x] WCAG 2.4.3 (2026-11-01): `FocusHeading` takes the focus only from `body` or `#main-content`,
+      so someone who moved on during a slow request or load keeps their place, and a status
+      message tells them instead. Unit tests, and smoke tests of a slow load and a slow request.
+      All five reviews run: security and performance found nothing
+- [ ] Minor: while a two-factor step's code loads, `fallback={null}` shows nothing and the button
+      is already gone (`two-factor-settings.tsx`). Only reachable on a slow network, because it
+      preloads on hover and focus. Fix: keep the button until the step is ready
+- [ ] Manual: `FocusHeading`'s status with NVDA and VoiceOver: tab off during a slow sign-up, an
+      email confirmation and a two-factor step, and check whether it doubles up with the page
+      title Next.js announces
 - [ ] Manual: NVDA and VoiceOver on the toggle and on a language switch at the panel; a saved
       password filling in during slow hydration (Chrome, Edge, Firefox, Safari); whether 1Password
       or Bitwarden icons cover the toggle
@@ -393,20 +401,81 @@ One field for each end of a stay: day on the left, hour and half hour on the rig
 
 ## Phase 2: Owner onboarding and inventory (decisions answered in memory.md)
 
-- [ ] Owner profiles + verification states: individuals and businesses from day one, with the
-      tax details DAC7 reporting needs (exact fields after #18)
-- [ ] Proof of the right to rent: private document upload, kept apart from public listing photos
-- [~] Facilities (`parking_locations`, PostGIS point, IANA time zone) and spaces: tables and
-  demo data exist (1.11); owner link and management UI missing
-- [~] Named units (decision: named spaces, no pooled inventory): `parking_spaces` exists
-- [ ] Photos (S3), listing status, amenities
-- [~] Schedules and availability exceptions (DST-safe in Europe/Athens): weekly hours done
-  (1.11); exceptions (holidays, closures) missing
-- [~] Pricing rules + server-side quotes (integer minor units): hourly + daily cap quote done;
-  weekend, day and night, long-stay, per-space and dated prices missing (rules: memory.md #17),
-  and search showing "from" the cheapest free space
-- [ ] Owner setting: gap between bookings on a space (none, 30 or 60 minutes)
-- [ ] Exit criteria: an owner manages their facility without reaching another owner's data (smoke + integration test)
+### 2.1 Owner onboarding (2026-11-02)
+
+One dashboard with milestones, worked out from what is saved, so progress can't drift and Continue
+always opens the first unfinished step. Decisions #20-#23 in memory.md.
+
+- [~] **Implemented** behind the API's authorization rules (no client-trusted roles/IDs): done and
+  tested, except that the map has never run with a real token
+- [x] **Unit tests** next to the code (`*.test.ts[x]`) for logic, guards, components
+- [x] **Smoke test** `tests/smoke/specs/owner-onboarding.smoke.ts` covering the critical path,
+      including a listing sent back and sent again
+- [x] **Security** review (`security-reviewer` agent): authz, input validation, CSRF, secrets, logging of PII
+- [~] **Performance** review (`performance-reviewer` agent): both High findings fixed and owner pages
+  in the budget. Left open: owner messages sent again on every step, versioning the Mapbox worker
+  file, a `Buffer.from` copy in the media route, and the query count of an autosave
+- [~] **Accessibility** (`accessibility-reviewer` agent): axe clean in both languages, keyboard path
+  and focus tested. Left open: the manual screen reader checks below
+- [~] **i18n** (`i18n-reviewer` agent): catalogs complete in both languages. Left open: the
+  native-speaker list below
+- [x] **Contracts & docs**: OpenAPI/client regenerated, migrations reviewed, memory.md updated if something non-obvious was learned
+
+- [~] Owner profiles + verification states: individuals and businesses from day one, with the
+  tax details DAC7 reporting needs (exact fields after #18). `verified` and `rejected` are set by
+  hand until Phase 5
+- [~] Proof of the right to rent: private upload, kept apart from public photos, EXIF removed from
+  scans. Tested on local files; S3 only against a mocked client
+- [~] Facilities (`parking_locations`, PostGIS point, IANA time zone) and spaces: owners create and
+  edit them. The location step's map is unverified
+- [x] Named units (decision: named spaces, no pooled inventory)
+- [~] Photos (S3), listing status, amenities: all work on local files; S3 only against a mocked client
+- [~] Schedules and availability exceptions (DST-safe in Europe/Athens): weekly hours done, owners
+  set them; exceptions (holidays, closures) missing
+- [x] Pricing rules + server-side quotes (integer minor units): weekend, day and night, long-stay,
+      per-space and dated prices (memory.md #17), and search showing "from" the cheapest free space
+- [x] Owner setting: gap between bookings on a space (none, 30 or 60 minutes). Saved here; Phase 3
+      applies it
+- [x] Exit criteria: an owner manages their facility without reaching another owner's data (smoke + integration test)
+
+**Try with the real thing** (none of these has run yet):
+
+- [ ] The map, with a Mapbox token: the pin, dragging it, address search, and no CSP violations
+- [ ] Uploads against a real S3 bucket
+- [ ] A status email and a reminder through Resend
+
+**Manual NVDA and VoiceOver checks** (from the accessibility review):
+
+- [ ] Is an error read on arrival when `setErrors` and `.focus()` run in the same tick?
+      (`location-form.tsx`, `spaces-form.tsx`, `prices-form.tsx`, `submit-listing.tsx`) If not, focus in an effect
+- [ ] Does focus moving to the file input cut off "Photo removed"? (`photos-step.tsx`, `proof-step.tsx`)
+- [ ] Does the delete question read well?
+- [ ] How do both screen readers read the radio group's error?
+- [ ] How does `role="application"` behave, and do the Mapbox strings work with a Greek voice?
+- [ ] Is the pace of `SaveStatus` tolerable?
+- [ ] In a real Windows contrast theme, is the selected radio's dot visible? (`radio-group.tsx`)
+
+**Native-speaker pass** (from the i18n review; the Greek so far is a non-native judgement):
+
+- [ ] `Home.ownerHeading`, `ownerText`, `ownerAction`, `Header.listParking`
+- [ ] New `Listing` keys: `perHourFrom`, `totalPriceFrom`, `totalLabelFrom`, `photosHeading`,
+      `photoAlt`, `spacePrice`, `spaceTotal`, `weekendRate`, `nightRate`, `datedRate`, `longStay`,
+      `cancellationHeading`, `cancellation.*`
+- [ ] `Validation.textTooLong` through `landRegistrationInvalid` (39 keys), and one verb throughout:
+      Εισαγάγετε or Συμπληρώστε
+- [ ] `Owner.metaTitle`, `Owner.optional`, `Owner.landing.*`, `Owner.state.*`, `Owner.save.*`,
+      `Owner.step.*`, `Owner.stepNames.*`, `Owner.stepLeads.*`, `Owner.errors.*`
+- [ ] `Owner.dashboard.*`, including `checks.payouts`: "Πληρωμές" is also the word for drivers' payments
+- [ ] `Owner.profile.*`, `Owner.location.*`, `Owner.spaces.*`, `Owner.photos.*`
+- [ ] `Owner.hours.*`, especially `overnightHint`
+- [ ] `Owner.prices.*`: "Μέτρια" can read as "mediocre"; "Ενδιάμεση" is a candidate
+- [ ] `Owner.tax.*`, with the accountant for "Αριθμός ΦΠΑ", ΑΦΜ and ΓΕΜΗ
+- [ ] `Owner.proof.*`, with the lawyer for Συμβόλαιο ιδιοκτησίας, υπεκμίσθωση, ΚΑΕΚ, and the
+      wording for renting out (ενοικιάζω)
+- [ ] `Owner.review.*`, especially the legal `confirm` sentence
+- [ ] The `el` block of `packages/email/src/owner-emails.ts`: footer, `linkFallback` and all four
+      email kinds
+- [ ] The Mapbox strings
 
 ## Phase 3: Search and booking engine
 
@@ -449,7 +518,14 @@ One field for each end of a stay: day on the left, hour and half hour on the rig
 ## Phase 6: Production readiness
 
 - [ ] Security + privacy review, GDPR retention and data-subject workflows (unconfirmed
-      accounts are handled, 1.14; the adviser sets the periods, #18)
+      accounts are handled, 1.14; the adviser sets the periods, #18). Owner onboarding adds:
+      Mapbox as a processor of owners' IP addresses, how long `email_outbox` keeps sent rows
+      (90 days today), and deleting an owner's account along with their tax values and proofs
+- [ ] Owner onboarding in production: `OWNER_DATA_KEY`, `S3_BUCKET` and a role with
+      `s3:ListBucket` (without it a missing photo is a 500 rather than a 404), `MAPBOX_PUBLIC_TOKEN`
+      and a card on the account for permanent geocoding, `UV_THREADPOOL_SIZE=16`, a CDN in front of
+      media, and a repeat of the upload burst in the production image with a memory limit and
+      `MALLOC_ARENA_MAX` set
 - [ ] Cookie notice/inventory: Better Auth session cookies, `NEXT_LOCALE` (session),
       `theme` (display preference, first-party, 1 year, `light`/`dark`)
 - [ ] Backups, restore drill, monitoring, alerts, runbooks

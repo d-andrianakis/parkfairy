@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetFeaturedParkingData, GetFeaturedParkingResponses, GetLivenessData, GetLivenessResponses, GetMeData, GetMeErrors, GetMeResponses, GetParkingListingData, GetParkingListingErrors, GetParkingListingResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, SearchParkingData, SearchParkingErrors, SearchParkingResponses } from './types.gen';
+import type { CreateOwnerListingData, CreateOwnerListingErrors, CreateOwnerListingResponses, DeleteListingPhotoData, DeleteListingPhotoErrors, DeleteListingPhotoResponses, DeleteListingProofData, DeleteListingProofErrors, DeleteListingProofResponses, DeleteOwnerListingData, DeleteOwnerListingErrors, DeleteOwnerListingResponses, DownloadListingProofData, DownloadListingProofErrors, DownloadListingProofResponses, GetFeaturedParkingData, GetFeaturedParkingResponses, GetListingPhotoData, GetListingPhotoErrors, GetListingPhotoResponses, GetLivenessData, GetLivenessResponses, GetMeData, GetMeErrors, GetMeResponses, GetOwnerListingData, GetOwnerListingErrors, GetOwnerListingResponses, GetOwnerOnboardingData, GetOwnerOnboardingErrors, GetOwnerOnboardingResponses, GetOwnerProfileData, GetOwnerProfileErrors, GetOwnerProfileResponses, GetParkingListingData, GetParkingListingErrors, GetParkingListingResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, ReorderListingPhotosData, ReorderListingPhotosErrors, ReorderListingPhotosResponses, SaveListingHoursData, SaveListingHoursErrors, SaveListingHoursResponses, SaveListingLocationData, SaveListingLocationErrors, SaveListingLocationResponses, SaveListingPricesData, SaveListingPricesErrors, SaveListingPricesResponses, SaveListingProofDetailsData, SaveListingProofDetailsErrors, SaveListingProofDetailsResponses, SaveListingSpacesData, SaveListingSpacesErrors, SaveListingSpacesResponses, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsErrors, SaveOwnerTaxDetailsResponses, SearchParkingData, SearchParkingErrors, SearchParkingResponses, SubmitOwnerListingData, SubmitOwnerListingErrors, SubmitOwnerListingResponses, UpdateListingPhotoData, UpdateListingPhotoErrors, UpdateListingPhotoResponses, UpdateOwnerProfileData, UpdateOwnerProfileErrors, UpdateOwnerProfileResponses, UploadListingPhotoData, UploadListingPhotoErrors, UploadListingPhotoResponses, UploadListingProofData, UploadListingProofErrors, UploadListingProofResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -32,8 +32,260 @@ export const getMe = <ThrowOnError extends boolean = false>(options?: Options<Ge
     ...options
 });
 
+export const getListingPhoto = <ThrowOnError extends boolean = false>(options: Options<GetListingPhotoData, ThrowOnError>): RequestResult<GetListingPhotoResponses, GetListingPhotoErrors, ThrowOnError> => (options.client ?? client).get<GetListingPhotoResponses, GetListingPhotoErrors, ThrowOnError>({ url: '/v1/media/photos/{key}/{width}.webp', ...options });
+
 export const getFeaturedParking = <ThrowOnError extends boolean = false>(options?: Options<GetFeaturedParkingData, ThrowOnError>): RequestResult<GetFeaturedParkingResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetFeaturedParkingResponses, unknown, ThrowOnError>({ url: '/v1/parking/featured', ...options });
 
 export const searchParking = <ThrowOnError extends boolean = false>(options: Options<SearchParkingData, ThrowOnError>): RequestResult<SearchParkingResponses, SearchParkingErrors, ThrowOnError> => (options.client ?? client).get<SearchParkingResponses, SearchParkingErrors, ThrowOnError>({ url: '/v1/parking/search', ...options });
 
 export const getParkingListing = <ThrowOnError extends boolean = false>(options: Options<GetParkingListingData, ThrowOnError>): RequestResult<GetParkingListingResponses, GetParkingListingErrors, ThrowOnError> => (options.client ?? client).get<GetParkingListingResponses, GetParkingListingErrors, ThrowOnError>({ url: '/v1/parking/{slug}', ...options });
+
+export const getOwnerOnboarding = <ThrowOnError extends boolean = false>(options?: Options<GetOwnerOnboardingData, ThrowOnError>): RequestResult<GetOwnerOnboardingResponses, GetOwnerOnboardingErrors, ThrowOnError> => (options?.client ?? client).get<GetOwnerOnboardingResponses, GetOwnerOnboardingErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/onboarding',
+    ...options
+});
+
+export const getOwnerProfile = <ThrowOnError extends boolean = false>(options?: Options<GetOwnerProfileData, ThrowOnError>): RequestResult<GetOwnerProfileResponses, GetOwnerProfileErrors, ThrowOnError> => (options?.client ?? client).get<GetOwnerProfileResponses, GetOwnerProfileErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/profile',
+    ...options
+});
+
+export const updateOwnerProfile = <ThrowOnError extends boolean = false>(options: Options<UpdateOwnerProfileData, ThrowOnError>): RequestResult<UpdateOwnerProfileResponses, UpdateOwnerProfileErrors, ThrowOnError> => (options.client ?? client).patch<UpdateOwnerProfileResponses, UpdateOwnerProfileErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/profile',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const saveOwnerTaxDetails = <ThrowOnError extends boolean = false>(options: Options<SaveOwnerTaxDetailsData, ThrowOnError>): RequestResult<SaveOwnerTaxDetailsResponses, SaveOwnerTaxDetailsErrors, ThrowOnError> => (options.client ?? client).put<SaveOwnerTaxDetailsResponses, SaveOwnerTaxDetailsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/profile/tax',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const createOwnerListing = <ThrowOnError extends boolean = false>(options?: Options<CreateOwnerListingData, ThrowOnError>): RequestResult<CreateOwnerListingResponses, CreateOwnerListingErrors, ThrowOnError> => (options?.client ?? client).post<CreateOwnerListingResponses, CreateOwnerListingErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings',
+    ...options
+});
+
+export const deleteOwnerListing = <ThrowOnError extends boolean = false>(options: Options<DeleteOwnerListingData, ThrowOnError>): RequestResult<DeleteOwnerListingResponses, DeleteOwnerListingErrors, ThrowOnError> => (options.client ?? client).delete<DeleteOwnerListingResponses, DeleteOwnerListingErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}',
+    ...options
+});
+
+export const getOwnerListing = <ThrowOnError extends boolean = false>(options: Options<GetOwnerListingData, ThrowOnError>): RequestResult<GetOwnerListingResponses, GetOwnerListingErrors, ThrowOnError> => (options.client ?? client).get<GetOwnerListingResponses, GetOwnerListingErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}',
+    ...options
+});
+
+export const saveListingLocation = <ThrowOnError extends boolean = false>(options: Options<SaveListingLocationData, ThrowOnError>): RequestResult<SaveListingLocationResponses, SaveListingLocationErrors, ThrowOnError> => (options.client ?? client).patch<SaveListingLocationResponses, SaveListingLocationErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/location',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const saveListingSpaces = <ThrowOnError extends boolean = false>(options: Options<SaveListingSpacesData, ThrowOnError>): RequestResult<SaveListingSpacesResponses, SaveListingSpacesErrors, ThrowOnError> => (options.client ?? client).put<SaveListingSpacesResponses, SaveListingSpacesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/spaces',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const saveListingHours = <ThrowOnError extends boolean = false>(options: Options<SaveListingHoursData, ThrowOnError>): RequestResult<SaveListingHoursResponses, SaveListingHoursErrors, ThrowOnError> => (options.client ?? client).put<SaveListingHoursResponses, SaveListingHoursErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/hours',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const saveListingPrices = <ThrowOnError extends boolean = false>(options: Options<SaveListingPricesData, ThrowOnError>): RequestResult<SaveListingPricesResponses, SaveListingPricesErrors, ThrowOnError> => (options.client ?? client).put<SaveListingPricesResponses, SaveListingPricesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/prices',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const uploadListingPhoto = <ThrowOnError extends boolean = false>(options: Options<UploadListingPhotoData, ThrowOnError>): RequestResult<UploadListingPhotoResponses, UploadListingPhotoErrors, ThrowOnError> => (options.client ?? client).post<UploadListingPhotoResponses, UploadListingPhotoErrors, ThrowOnError>({
+    bodySerializer: null,
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/photos',
+    ...options,
+    headers: {
+        'Content-Type': 'image/jpeg',
+        ...options.headers
+    }
+});
+
+export const reorderListingPhotos = <ThrowOnError extends boolean = false>(options: Options<ReorderListingPhotosData, ThrowOnError>): RequestResult<ReorderListingPhotosResponses, ReorderListingPhotosErrors, ThrowOnError> => (options.client ?? client).put<ReorderListingPhotosResponses, ReorderListingPhotosErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/photos/order',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const deleteListingPhoto = <ThrowOnError extends boolean = false>(options: Options<DeleteListingPhotoData, ThrowOnError>): RequestResult<DeleteListingPhotoResponses, DeleteListingPhotoErrors, ThrowOnError> => (options.client ?? client).delete<DeleteListingPhotoResponses, DeleteListingPhotoErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/photos/{photoId}',
+    ...options
+});
+
+export const updateListingPhoto = <ThrowOnError extends boolean = false>(options: Options<UpdateListingPhotoData, ThrowOnError>): RequestResult<UpdateListingPhotoResponses, UpdateListingPhotoErrors, ThrowOnError> => (options.client ?? client).patch<UpdateListingPhotoResponses, UpdateListingPhotoErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/photos/{photoId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const uploadListingProof = <ThrowOnError extends boolean = false>(options: Options<UploadListingProofData, ThrowOnError>): RequestResult<UploadListingProofResponses, UploadListingProofErrors, ThrowOnError> => (options.client ?? client).post<UploadListingProofResponses, UploadListingProofErrors, ThrowOnError>({
+    bodySerializer: null,
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/proofs',
+    ...options,
+    headers: {
+        'Content-Type': 'application/pdf',
+        ...options.headers
+    }
+});
+
+export const deleteListingProof = <ThrowOnError extends boolean = false>(options: Options<DeleteListingProofData, ThrowOnError>): RequestResult<DeleteListingProofResponses, DeleteListingProofErrors, ThrowOnError> => (options.client ?? client).delete<DeleteListingProofResponses, DeleteListingProofErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/proofs/{proofId}',
+    ...options
+});
+
+export const downloadListingProof = <ThrowOnError extends boolean = false>(options: Options<DownloadListingProofData, ThrowOnError>): RequestResult<DownloadListingProofResponses, DownloadListingProofErrors, ThrowOnError> => (options.client ?? client).get<DownloadListingProofResponses, DownloadListingProofErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/proofs/{proofId}',
+    ...options
+});
+
+export const saveListingProofDetails = <ThrowOnError extends boolean = false>(options: Options<SaveListingProofDetailsData, ThrowOnError>): RequestResult<SaveListingProofDetailsResponses, SaveListingProofDetailsErrors, ThrowOnError> => (options.client ?? client).patch<SaveListingProofDetailsResponses, SaveListingProofDetailsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/proof-details',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const submitOwnerListing = <ThrowOnError extends boolean = false>(options: Options<SubmitOwnerListingData, ThrowOnError>): RequestResult<SubmitOwnerListingResponses, SubmitOwnerListingErrors, ThrowOnError> => (options.client ?? client).post<SubmitOwnerListingResponses, SubmitOwnerListingErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/submit',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});

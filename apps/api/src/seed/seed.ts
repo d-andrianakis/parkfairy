@@ -2,10 +2,18 @@
  * Demo marketplace and demo account for LOCAL databases (`pnpm db:seed`, see main.ts).
  * Idempotent: listings are upserted by slug, and the account is created once.
  */
+import { readFile } from 'node:fs/promises';
 import { createAuth, parseOrigins } from '@parkfairy/auth';
 import { schema, type Database } from '@parkfairy/database';
 import { eq, sql } from 'drizzle-orm';
+import { NO_PRICE_RULES } from '../parking/pricing.js';
+import type { ObjectStore } from '../storage/object-store.js';
+import { storePhoto } from '../storage/photo-pipeline.js';
 import { DEMO_ACCOUNT, type DemoListing } from './demo-data.js';
+import type { DemoPhoto } from './demo-photos.js';
+
+/** From `src/seed` and `dist/seed` alike. */
+const PHOTOS_DIRECTORY = new URL('../../seed-assets/photos/', import.meta.url);
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
@@ -45,8 +53,9 @@ export async function assertMarkedLocal(db: Database): Promise<void> {
 }
 
 export async function upsertListing(db: Database, listing: DemoListing): Promise<void> {
-  const { openingHours, spaces, latitude, longitude, ...columns } = listing;
+  const { openingHours, spaces, priceRules, latitude, longitude, ...columns } = listing;
   const values = { ...columns, location: { latitude, longitude }, status: 'published' as const };
+  const rules = { ...NO_PRICE_RULES, ...priceRules };
   await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(schema.parkingLocations)
@@ -59,11 +68,68 @@ export async function upsertListing(db: Database, listing: DemoListing): Promise
       .delete(schema.parkingOpeningHours)
       .where(eq(schema.parkingOpeningHours.locationId, row.id));
     await tx
+      .delete(schema.parkingPriceRules)
+      .where(eq(schema.parkingPriceRules.locationId, row.id));
+    await tx
+      .delete(schema.parkingStayDiscounts)
+      .where(eq(schema.parkingStayDiscounts.locationId, row.id));
+    await tx
       .insert(schema.parkingSpaces)
       .values(spaces.map((space) => ({ ...space, locationId: row.id })));
     await tx
       .insert(schema.parkingOpeningHours)
       .values(openingHours.map((period) => ({ ...period, locationId: row.id })));
+    if (rules.weekendRateMinor !== null) {
+      await tx.insert(schema.parkingPriceRules).values({
+        locationId: row.id,
+        kind: 'weekend',
+        hourlyRateMinor: rules.weekendRateMinor,
+      });
+    }
+    if (rules.night) {
+      await tx.insert(schema.parkingPriceRules).values({
+        locationId: row.id,
+        kind: 'night',
+        hourlyRateMinor: rules.night.rateMinor,
+        fromMinute: rules.night.fromMinute,
+        toMinute: rules.night.toMinute,
+      });
+    }
+    if (rules.discounts.length > 0) {
+      await tx
+        .insert(schema.parkingStayDiscounts)
+        .values(rules.discounts.map((discount) => ({ ...discount, locationId: row.id })));
+    }
+  });
+}
+
+/**
+ * Puts a listing's photos through the same pipeline as an owner's upload, so demo pages exercise
+ * what real ones will. Replaces what was there; the files themselves are named by content, so a
+ * second run overwrites them with the same bytes.
+ */
+export async function seedPhotos(
+  db: Database,
+  store: ObjectStore,
+  slug: string,
+  photos: DemoPhoto[],
+): Promise<void> {
+  const [listing] = await db
+    .select({ id: schema.parkingLocations.id })
+    .from(schema.parkingLocations)
+    .where(eq(schema.parkingLocations.slug, slug));
+  if (!listing) throw new Error(`No listing ${slug} to add photos to`);
+  const rows = await Promise.all(
+    photos.map(async ({ file, alt }, position) => ({
+      ...(await storePhoto(await readFile(new URL(file, PHOTOS_DIRECTORY)), store)),
+      alt,
+      position,
+      locationId: listing.id,
+    })),
+  );
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.parkingPhotos).where(eq(schema.parkingPhotos.locationId, listing.id));
+    await tx.insert(schema.parkingPhotos).values(rows);
   });
 }
 

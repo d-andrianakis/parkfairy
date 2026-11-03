@@ -1,4 +1,5 @@
-import type { AreaId } from '@parkfairy/contracts';
+import type { AreaId, CancellationPolicy } from '@parkfairy/contracts';
+import type { PriceRules } from '../parking/pricing.js';
 
 /**
  * Demo marketplace for local development and the smoke suite. Listings are fictional (no
@@ -24,6 +25,8 @@ export interface DemoSpace {
   isCovered?: boolean;
   hasEvCharging?: boolean;
   isAccessible?: boolean;
+  /** This space's own rate, for listings whose spaces differ. */
+  hourlyRateMinor?: number;
 }
 
 export interface DemoListing {
@@ -38,6 +41,9 @@ export interface DemoListing {
   dailyMaxMinor: number | null;
   openingHours: DemoPeriod[];
   spaces: DemoSpace[];
+  cancellationPolicy: CancellationPolicy;
+  /** Only the kinds of price rule this listing shows off. */
+  priceRules?: Partial<PriceRules>;
 }
 
 const h = (hours: number, minutes = 0) => hours * 60 + minutes;
@@ -67,6 +73,7 @@ function spaces(
 export const DEMO_LISTINGS: DemoListing[] = [
   {
     slug: 'syntagma-square-garage',
+    cancellationPolicy: 'oneDay',
     name: 'Γκαράζ Πλατείας Συντάγματος',
     address: 'Όθωνος 10, Αθήνα 105 57',
     description: 'Υπόγειο γκαράζ δύο λεπτά από την πλατεία, ανοιχτό όλο το 24ωρο.',
@@ -84,6 +91,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'ermou-parking',
+    cancellationPolicy: 'oneHour',
     name: 'Πάρκινγκ Ερμού',
     address: 'Ερμού 45, Αθήνα 105 63',
     description: 'Στεγασμένος χώρος στην αρχή της Ερμού, ιδανικός για ψώνια.',
@@ -97,6 +105,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'monastiraki-open-lot',
+    cancellationPolicy: 'oneHour',
     name: 'Υπαίθριος χώρος Μοναστηρακίου',
     address: 'Αστίγγος 6, Αθήνα 105 55',
     description: 'Υπαίθριο πάρκινγκ δίπλα στον σταθμό του μετρό.',
@@ -110,6 +119,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'kolonaki-private-space',
+    cancellationPolicy: 'oneDayThenHalf',
     name: 'Ιδιωτική θέση Κολωνακίου',
     address: 'Πατριάρχου Ιωακείμ 20, Αθήνα 106 75',
     description: 'Μία θέση σε ιδιωτική πυλωτή, διαθέσιμη τις καθημερινές.',
@@ -123,6 +133,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'skoufa-garage',
+    cancellationPolicy: 'oneDay',
     name: 'Γκαράζ Σκουφά',
     address: 'Σκουφά 30, Αθήνα 106 73',
     description: 'Μικρό γκαράζ με φορτιστές ηλεκτρικών αυτοκινήτων. Κλειστό τις Κυριακές.',
@@ -136,6 +147,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'koukaki-acropolis-parking',
+    cancellationPolicy: 'oneDay',
     name: 'Πάρκινγκ Ακρόπολης – Κουκάκι',
     address: 'Βεΐκου 12, Αθήνα 117 42',
     description: 'Δέκα λεπτά με τα πόδια από το Μουσείο της Ακρόπολης.',
@@ -153,6 +165,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'piraeus-port-gate-e8',
+    cancellationPolicy: 'oneHour',
     name: 'Πάρκινγκ Λιμανιού Πειραιά (Πύλη Ε8)',
     address: 'Ακτή Κονδύλη 2, Πειραιάς 185 45',
     description: 'Δίπλα στις αναχωρήσεις για τα νησιά του Αργοσαρωνικού.',
@@ -166,6 +179,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'piraeus-long-stay',
+    cancellationPolicy: 'oneDayThenHalf',
     name: 'Μακροχρόνια στάθμευση Πειραιά',
     address: 'Γρηγορίου Λαμπράκη 100, Πειραιάς 185 34',
     description: 'Στεγασμένη στάθμευση για ταξίδια πολλών ημερών, με χαμηλό ημερήσιο όριο.',
@@ -179,6 +193,8 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'glyfada-marina-parking',
+    cancellationPolicy: 'oneHour',
+    priceRules: { weekendRateMinor: 350 },
     name: 'Πάρκινγκ Μαρίνας Γλυφάδας',
     address: 'Ποσειδώνος 50, Γλυφάδα 166 74',
     description: 'Ανοιχτό ως τις 2 τα ξημερώματα, κοντά σε εστιατόρια και μπαρ.',
@@ -192,6 +208,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'marousi-business-park',
+    cancellationPolicy: 'oneDay',
     name: 'Πάρκινγκ Επιχειρηματικού Κέντρου Αμαρουσίου',
     address: 'Κηφισίας 120, Μαρούσι 151 25',
     description: 'Για εργάσιμες μέρες· το Σάββατο έως τις 4 το απόγευμα.',
@@ -205,6 +222,13 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'athens-airport-park-and-fly',
+    cancellationPolicy: 'oneDayThenHalf',
+    priceRules: {
+      discounts: [
+        { minDays: 7, percent: 10 },
+        { minDays: 14, percent: 20 },
+      ],
+    },
     name: 'Park & Fly Αεροδρομίου Αθηνών',
     address: 'Λεωφόρος Σπάτων 5, Σπάτα 190 04',
     description: 'Δωρεάν μεταφορά προς τις αναχωρήσεις κάθε 15 λεπτά.',
@@ -218,10 +242,13 @@ export const DEMO_LISTINGS: DemoListing[] = [
       isCovered: n <= 10,
       isAccessible: n <= 3,
       hasEvCharging: n >= 28,
+      // Under cover costs more; the rest stay on the listing's rate.
+      ...(n <= 10 ? { hourlyRateMinor: 300 } : {}),
     })),
   },
   {
     slug: 'aristotelous-parking',
+    cancellationPolicy: 'oneHour',
     name: 'Πάρκινγκ Αριστοτέλους',
     address: 'Αριστοτέλους 5, Θεσσαλονίκη 546 24',
     description: 'Στο κέντρο της πόλης, λίγα βήματα από την παραλία.',
@@ -235,6 +262,8 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'ladadika-parking',
+    cancellationPolicy: 'oneHour',
+    priceRules: { night: { rateMinor: 180, fromMinute: h(23), toMinute: h(3) } },
     name: 'Πάρκινγκ Λαδάδικων',
     address: 'Κατούνη 8, Θεσσαλονίκη 546 25',
     description: 'Ανοιχτό ως τις 3 τα ξημερώματα για τη νυχτερινή ζωή της περιοχής.',
@@ -248,6 +277,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
   },
   {
     slug: 'thessaloniki-airport-parking',
+    cancellationPolicy: 'oneDayThenHalf',
     name: 'Στάθμευση Αεροδρομίου Μακεδονία',
     address: 'Αεροδρόμιο Μακεδονία, Θεσσαλονίκη 551 03',
     description: 'Στεγασμένες και υπαίθριες θέσεις, πέντε λεπτά από τον τερματικό σταθμό.',

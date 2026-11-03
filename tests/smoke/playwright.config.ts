@@ -41,6 +41,8 @@ export default defineConfig({
         {
           command: 'pnpm --filter @parkfairy/worker start',
           url: 'http://localhost:4100/health',
+          // As for the web app: owner emails must stay on this machine.
+          env: { RESEND_API_KEY: '' },
           reuseExistingServer: !isCI,
           timeout: 60_000,
         },

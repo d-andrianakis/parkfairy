@@ -22,6 +22,8 @@ export const CLIENT_NAMESPACES = {
   ],
   /** Account page: API identity, sign-out, two-factor settings. */
   account: ['Account', 'TwoFactorSettings', 'AuthErrors', 'Validation', 'Forms'],
+  /** The owner area: dashboard buttons and every onboarding step. */
+  owner: ['Owner', 'Validation', 'Forms', 'Features', 'Areas'],
   /** The search form's "use my location" button. */
   searchForm: ['SearchForm'],
 } as const satisfies Record<string, readonly Namespace[]>;

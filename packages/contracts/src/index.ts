@@ -7,3 +7,4 @@ export * from './users.js';
 export * from './areas.js';
 export * from './time.js';
 export * from './parking.js';
+export * from './owner.js';

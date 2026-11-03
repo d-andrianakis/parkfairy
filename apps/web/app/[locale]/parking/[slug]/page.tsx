@@ -15,9 +15,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { FeatureBadges } from '@/components/parking/feature-badges';
+import { ListingPhotoImage } from '@/components/parking/listing-photo';
 import { OpeningHours } from '@/components/parking/opening-hours';
 import { SpaceList } from '@/components/parking/space-list';
 import { StayRange } from '@/components/parking/stay-range';
+import { timeOptions } from '@/i18n/formats';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { loadListing } from '@/lib/api.server';
@@ -75,6 +77,19 @@ export default async function ListingPage(props: ListingPageProps) {
     format.number(amount.amountMinor / 100, { style: 'currency', currency: amount.currency });
   const availability = listing.availability;
   const available = availability ? availability.open && availability.freeSpaces > 0 : false;
+  const [firstPhoto, ...otherPhotos] = listing.photos;
+  const photoAlt = (alt: string | null, number: number) =>
+    alt || t('photoAlt', { name: listing.name, number });
+  const { priceRules } = listing;
+  const wallTime = (time: string) =>
+    format.dateTime(new Date(`2000-01-01T${time}:00Z`), {
+      ...timeOptions(locale),
+      timeZone: 'UTC',
+    });
+  const dateRange = (from: string, to: string) =>
+    format.dateTimeRange(new Date(`${from}T12:00:00Z`), new Date(`${to}T12:00:00Z`), {
+      dateStyle: 'long',
+    });
   // Both ends can fail the same way, so each message says which end it is about.
   const windowErrors = (['start', 'end'] as const).flatMap((part) => {
     const key = parsed.errors[part];
@@ -112,6 +127,37 @@ export default async function ListingPage(props: ListingPageProps) {
             <FeatureBadges features={listing.features} />
           </div>
         </div>
+
+        {firstPhoto ? (
+          <section aria-labelledby="photos-heading" className="grid gap-2">
+            <h2 id="photos-heading" className="sr-only">
+              {t('photosHeading')}
+            </h2>
+            <ListingPhotoImage
+              photo={firstPhoto}
+              alt={photoAlt(firstPhoto.alt, 1)}
+              lang={firstPhoto.alt ? listing.contentLocale : undefined}
+              sizes="(min-width: 1024px) 40rem, 100vw"
+              className="aspect-[3/2] w-full rounded-xl object-cover"
+              priority
+            />
+            {otherPhotos.length > 0 ? (
+              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {otherPhotos.map((photo, index) => (
+                  <li key={photo.key}>
+                    <ListingPhotoImage
+                      photo={photo}
+                      alt={photoAlt(photo.alt, index + 2)}
+                      lang={photo.alt ? listing.contentLocale : undefined}
+                      sizes="(min-width: 1024px) 13rem, (min-width: 640px) 33vw, 50vw"
+                      className="aspect-[3/2] w-full rounded-lg object-cover"
+                    />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        ) : null}
 
         {listing.description ? (
           <section aria-labelledby="about-heading">
@@ -154,12 +200,49 @@ export default async function ListingPage(props: ListingPageProps) {
               </h2>
             </CardTitle>
             <CardDescription>
-              {t('perHour', { price: money(listing.hourlyRate) })}
+              {t(listing.spacePricesVary ? 'perHourFrom' : 'perHour', {
+                price: money(listing.hourlyRate),
+              })}
               {listing.dailyMax ? (
                 <>
                   <br />
                   {t('dailyMax', { price: money(listing.dailyMax) })}
                 </>
+              ) : null}
+              {priceRules.weekendRate ? (
+                <>
+                  <br />
+                  {t('weekendRate', { price: money(priceRules.weekendRate) })}
+                </>
+              ) : null}
+              {priceRules.night ? (
+                <>
+                  <br />
+                  {t('nightRate', {
+                    price: money(priceRules.night.rate),
+                    from: wallTime(priceRules.night.from),
+                    to: wallTime(priceRules.night.to),
+                  })}
+                </>
+              ) : null}
+              {priceRules.dated.map(({ startsOn, endsOn, rate }) => (
+                <span key={startsOn} className="block">
+                  {t('datedRate', {
+                    price: money(rate),
+                    range: dateRange(startsOn, endsOn),
+                  })}
+                </span>
+              ))}
+              {priceRules.longStay.map(({ minDays, percent }) => (
+                <span key={minDays} className="block">
+                  {t('longStay', { percent, days: minDays })}
+                </span>
+              ))}
+              {listing.cancellationPolicy ? (
+                <span className="mt-2 block">
+                  <strong className="font-medium">{t('cancellationHeading')}: </strong>
+                  {t(`cancellation.${listing.cancellationPolicy}`)}
+                </span>
               ) : null}
             </CardDescription>
           </CardHeader>
@@ -178,7 +261,9 @@ export default async function ListingPage(props: ListingPageProps) {
                   {available ? <CircleCheck aria-hidden /> : <CircleAlert aria-hidden />}
                   {available ? (
                     <AlertTitle className="line-clamp-none">
-                      {t('totalPrice', { price: money(availability.total) })}
+                      {t(listing.spacePricesVary ? 'totalPriceFrom' : 'totalPrice', {
+                        price: money(availability.total),
+                      })}
                     </AlertTitle>
                   ) : null}
                   <AlertDescription>

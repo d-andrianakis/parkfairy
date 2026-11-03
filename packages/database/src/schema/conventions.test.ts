@@ -82,6 +82,23 @@ describe('parking inventory', () => {
   });
 });
 
+describe('owner data', () => {
+  it('never stores tax values under a plain column name', () => {
+    const columns = getTableConfig(schema.ownerProfiles).columns.map((column) => column.name);
+    for (const sensitive of ['tax_id', 'vat_id', 'birth_date', 'registration_number']) {
+      expect(columns).not.toContain(sensitive);
+      expect(columns).toContain(`${sensitive}_encrypted`);
+    }
+  });
+
+  it('keeps addresses and secrets out of the email outbox', () => {
+    const columns = getTableConfig(schema.emailOutbox).columns.map((column) => column.name);
+    expect(columns).not.toContain('email');
+    expect(columns).not.toContain('to');
+    expect(columns).not.toContain('body');
+  });
+});
+
 describe('parseEwkbPoint', () => {
   it('decodes PostGIS EWKB with an SRID (Syntagma Square)', () => {
     // SELECT ST_SetSRID(ST_MakePoint(23.7348, 37.9755), 4326)::geography

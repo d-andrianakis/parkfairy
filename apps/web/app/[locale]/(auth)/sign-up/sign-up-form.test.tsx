@@ -141,7 +141,7 @@ describe('SignUpForm', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Send it again' }));
 
       expect(resend).toHaveBeenCalledWith({ email: 'maria@example.gr' });
-      expect(await screen.findByRole('status')).toHaveTextContent('Sent. Check your inbox.');
+      expect(await screen.findByText('Sent. Check your inbox.')).toHaveAttribute('role', 'status');
     });
 
     it('explains when too many links were asked for', async () => {
@@ -152,7 +152,7 @@ describe('SignUpForm', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Send it again' }));
 
       expect(await screen.findByRole('alert')).toHaveTextContent('Too many attempts');
-      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      expect(screen.queryByText('Sent. Check your inbox.')).toBeNull();
     });
 
     it('ignores a repeat press while sending, keeping the button focusable', async () => {

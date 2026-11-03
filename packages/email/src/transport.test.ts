@@ -1,11 +1,8 @@
-// @vitest-environment node
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('server-only', () => ({}));
-const { outboxTransport, resendTransport } = await import('./transport');
+import { outboxTransport, resendTransport } from './transport.js';
 
 const email = {
   to: 'maria@example.gr',
@@ -33,7 +30,7 @@ const requestAt = (fetchFn: ReturnType<typeof resend>['fetchFn'], index: number)
   return {
     url,
     headers: new Headers(init?.headers),
-    body: JSON.parse(String(init?.body)) as object,
+    body: JSON.parse((init?.body ?? '') as string) as object,
   };
 };
 

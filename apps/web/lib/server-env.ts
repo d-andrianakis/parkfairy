@@ -33,6 +33,8 @@ const ServerEnvSchema = z
     /** e.g. `Parkfairy <no-reply@parkfairy.gr>`, on a domain verified with Resend. */
     EMAIL_FROM: z.preprocess(emptyToUndefined, z.string().optional()),
     EMAIL_OUTBOX_DIR: z.preprocess(emptyToUndefined, z.string().optional()),
+    /** Goes to owners' browsers, so a secret token pasted here would be published. */
+    MAPBOX_PUBLIC_TOKEN: z.preprocess(emptyToUndefined, z.string().startsWith('pk.').optional()),
   })
   .refine((env) => env.RESEND_API_KEY || isLoopback(env.BETTER_AUTH_URL), {
     // Keyed on the origin, not NODE_ENV: staging must not write live reset links to disk either.

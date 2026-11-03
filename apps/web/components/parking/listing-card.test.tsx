@@ -15,6 +15,8 @@ const listing: ParkingListingSummary = {
   dailyMax: { amountMinor: 2500, currency: 'EUR' },
   features: ['covered', 'evCharging'],
   spaceCount: 12,
+  spacePricesVary: false,
+  coverPhoto: null,
 };
 
 const result: ParkingSearchResult = {
@@ -25,6 +27,20 @@ const result: ParkingSearchResult = {
 };
 
 describe('ListingCard', () => {
+  it('leaves the cover photo out of what a screen reader hears', () => {
+    const photo = { key: 'a'.repeat(32), width: 1600, height: 1067, alt: 'x', color: '#112233' };
+    const { container } = renderWithProviders(
+      <ListingCard listing={{ ...listing, coverPhoto: photo }} />,
+    );
+    expect(container.querySelector('img')).toHaveAttribute('alt', '');
+  });
+
+  it('reads “from” when spaces cost different amounts', () => {
+    renderWithProviders(<ListingCard listing={{ ...result, spacePricesVary: true }} />);
+    expect(screen.getByText(/From €3\.50 an hour/)).toBeInTheDocument();
+    expect(screen.getByText('Total from')).toBeInTheDocument();
+  });
+
   it('links to the listing and marks the owner’s Greek text as Greek', async () => {
     const { container } = renderWithProviders(<ListingCard listing={listing} />);
     const link = screen.getByRole('link', { name: listing.name });

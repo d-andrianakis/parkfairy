@@ -1,5 +1,17 @@
+import { fileURLToPath } from 'node:url';
 import { parseOrigins } from '@parkfairy/auth';
 import { z } from 'zod';
+
+const emptyToUndefined = (value: unknown) => (value === '' ? undefined : value);
+
+/** This machine: the one place uploads may go to files, and a dev key may stand in. */
+const isLoopback = (url: string) =>
+  URL.canParse(url) && ['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname);
+
+/** The repository root, from both `src/config` and `dist/config`. */
+export const DEFAULT_OBJECT_STORE_DIR = fileURLToPath(
+  new URL('../../../../.uploads', import.meta.url),
+);
 
 const EnvSchema = z
   .object({
@@ -22,6 +34,31 @@ const EnvSchema = z
       .default('info'),
     /** Shared rate-limit counters across instances; required in production. */
     REDIS_URL: z.preprocess((value) => (value === '' ? undefined : value), z.url().optional()),
+    /** Uploads. Without a bucket they become files in OBJECT_STORE_DIR, on this machine only. */
+    S3_BUCKET: z.preprocess(emptyToUndefined, z.string().optional()),
+    S3_REGION: z.preprocess(emptyToUndefined, z.string().default('eu-central-1')),
+    /** For S3-compatible stores; leave empty for AWS. */
+    S3_ENDPOINT: z.preprocess(emptyToUndefined, z.url().optional()),
+    OBJECT_STORE_DIR: z.preprocess(emptyToUndefined, z.string().optional()),
+    /** Base64 of 32 random bytes; encrypts tax numbers and birth dates. */
+    OWNER_DATA_KEY: z.preprocess(
+      emptyToUndefined,
+      z
+        .string()
+        .refine((key) => Buffer.from(key, 'base64').length === 32, {
+          message: 'OWNER_DATA_KEY must be the base64 of 32 bytes',
+        })
+        .optional(),
+    ),
+  })
+  .refine((env) => env.S3_BUCKET || isLoopback(env.BETTER_AUTH_URL), {
+    // Keyed on the origin, not NODE_ENV: staging must not keep owners' documents on one disk.
+    message: 'S3_BUCKET is required unless BETTER_AUTH_URL is this machine',
+    path: ['S3_BUCKET'],
+  })
+  .refine((env) => env.OWNER_DATA_KEY || isLoopback(env.BETTER_AUTH_URL), {
+    message: 'OWNER_DATA_KEY is required unless BETTER_AUTH_URL is this machine',
+    path: ['OWNER_DATA_KEY'],
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.REDIS_URL, {
     message: 'REDIS_URL is required in production (rate limits must be shared across instances)',
@@ -53,6 +90,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env) {
     trustedOrigins: [...new Set([authOrigin, ...parseOrigins(env.TRUSTED_ORIGINS)])],
     corsOrigins: parseOrigins(env.API_CORS_ORIGINS),
     trustProxy: parseTrustProxy(env.TRUST_PROXY ?? 'loopback'),
+    objectStoreDir: env.OBJECT_STORE_DIR ?? DEFAULT_OBJECT_STORE_DIR,
   };
 }
 

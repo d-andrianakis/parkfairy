@@ -32,8 +32,11 @@ export function SiteHeader({ theme, signedIn }: { theme: Theme; signedIn: boolea
         <ThemeToggle initialTheme={theme} />
         <nav
           aria-label={t('accountNav')}
-          className="flex min-h-8 items-center justify-end gap-2 max-sm:basis-full"
+          className="flex min-h-8 flex-wrap items-center justify-end gap-2 max-sm:basis-full"
         >
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/owner">{t('listParking')}</Link>
+          </Button>
           {signedIn ? (
             <Button asChild variant="ghost" size="sm">
               <Link href="/account">{t('account')}</Link>

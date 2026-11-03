@@ -1,6 +1,6 @@
 'use client';
 
-import { isValidationMessage } from '@parkfairy/contracts';
+import { isValidationMessage } from '@parkfairy/contracts/validation';
 import { useTranslations } from 'next-intl';
 import { validationArgs } from './validation-args';
 

@@ -1,7 +1,35 @@
 import { findArea, PASSWORD_POLICY, SEARCH_RADIUS_METERS } from '@parkfairy/contracts';
 import { describe, expect, it } from 'vitest';
+import { PHOTO_LIMITS } from '@parkfairy/contracts';
+import { existsSync, statSync } from 'node:fs';
 import { DEMO_ACCOUNT, DEMO_LISTINGS } from './demo-data.js';
+import { DEMO_PHOTOS } from './demo-photos.js';
 import { assertLocalDatabase } from './seed.js';
+
+describe('demo photos', () => {
+  it('gives every listing a photo and nothing else one', () => {
+    expect(Object.keys(DEMO_PHOTOS).sort()).toEqual(DEMO_LISTINGS.map((l) => l.slug).sort());
+  });
+
+  it('points only at files that exist, within the limits', () => {
+    for (const photos of Object.values(DEMO_PHOTOS)) {
+      expect(photos.length).toBeGreaterThan(0);
+      expect(photos.length).toBeLessThanOrEqual(PHOTO_LIMITS.maxPerListing);
+      for (const { file, alt } of photos) {
+        const url = new URL(`../../seed-assets/photos/${file}`, import.meta.url);
+        expect(existsSync(url), file).toBe(true);
+        expect(statSync(url).size).toBeLessThan(PHOTO_LIMITS.maxBytes);
+        expect(alt.length, file).toBeGreaterThan(10);
+        expect(alt.length, file).toBeLessThanOrEqual(PHOTO_LIMITS.alt);
+      }
+    }
+  });
+
+  it('describes each photo differently', () => {
+    const texts = Object.values(DEMO_PHOTOS).flatMap((photos) => photos.map((p) => p.alt));
+    expect(new Set(texts).size).toBe(texts.length);
+  });
+});
 
 describe('assertLocalDatabase', () => {
   it('allows local databases outside production', () => {

@@ -6,7 +6,12 @@ import { renderWithProviders } from '@/test/render';
 import { SpaceList } from './space-list';
 
 const spaces = (count: number) =>
-  Array.from({ length: count }, (_, i) => ({ label: `P${i + 1}`, features: [] }));
+  Array.from({ length: count }, (_, i) => ({
+    label: `P${i + 1}`,
+    features: [],
+    hourlyRate: { amountMinor: 300, currency: 'EUR' as const },
+    total: null,
+  }));
 
 function renderList(spaceCount: number, locale: 'el' | 'en' = 'en') {
   return renderWithProviders(
@@ -18,6 +23,7 @@ function renderList(spaceCount: number, locale: 'el' | 'en' = 'en') {
           spaces: spaces(Math.min(spaceCount, LISTING_SPACES_LIMIT)),
           spaceCount,
           contentLocale: 'el',
+          spacePricesVary: false,
         }}
       />
     </>,
@@ -26,6 +32,22 @@ function renderList(spaceCount: number, locale: 'el' | 'en' = 'en') {
 }
 
 describe('SpaceList', () => {
+  it('shows each space’s price and total only where they differ', () => {
+    const total = { amountMinor: 700, currency: 'EUR' as const };
+    const priced = spaces(1).map((space) => ({ ...space, total }));
+    const list = (spacePricesVary: boolean) => (
+      <SpaceList
+        labelledBy="x"
+        listing={{ spaces: priced, spaceCount: 1, contentLocale: 'el', spacePricesVary }}
+      />
+    );
+    const { unmount } = renderWithProviders(list(true));
+    expect(screen.getByText('€3.00 an hour · €7.00 for your stay')).toBeInTheDocument();
+    unmount();
+    renderWithProviders(list(false));
+    expect(screen.queryByText(/an hour/)).not.toBeInTheDocument();
+  });
+
   it('names the spaces in the owner’s language', async () => {
     const { container } = renderList(2);
     expect(screen.getByRole('list', { name: 'Spaces' })).toBeInTheDocument();

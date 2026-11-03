@@ -11,6 +11,38 @@ describe('worker loadEnv', () => {
     expect(loadEnv(base)).toMatchObject({ WORKER_HEALTH_PORT: 4100, LOG_LEVEL: 'info' });
   });
 
+  it('points links at this machine by default', () => {
+    expect(loadEnv(base).webUrl).toBe('http://localhost:3000');
+    expect(
+      loadEnv({
+        ...base,
+        BETTER_AUTH_URL: 'https://parkfairy.gr',
+        RESEND_API_KEY: 'k',
+        EMAIL_FROM: 'a@b.gr',
+      }).webUrl,
+    ).toBe('https://parkfairy.gr');
+  });
+
+  it('refuses to write emails to disk anywhere but this machine', () => {
+    expect(() => loadEnv({ ...base, BETTER_AUTH_URL: 'https://parkfairy.gr' })).toThrow(
+      /RESEND_API_KEY/,
+    );
+  });
+
+  it('needs a sender with a key', () => {
+    expect(() => loadEnv({ ...base, RESEND_API_KEY: 'k' })).toThrow(/EMAIL_FROM/);
+  });
+
+  it('needs the real origin in production, for links in emails', () => {
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      RESEND_API_KEY: 'k',
+      EMAIL_FROM: 'a@b.gr',
+    };
+    expect(() => loadEnv(production)).toThrow(/BETTER_AUTH_URL/);
+  });
+
   it('refuses to start without Redis', () => {
     expect(() => loadEnv({ DATABASE_URL: base.DATABASE_URL })).toThrow(/REDIS_URL/);
   });

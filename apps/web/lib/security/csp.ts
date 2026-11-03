@@ -4,7 +4,12 @@ export interface CspOptions {
   isDev: boolean;
   /** Only meaningful over HTTPS; on plain-http localhost it would break subresource loads. */
   upgradeInsecureRequests: boolean;
+  /** The owner area, whose location step shows a Mapbox map. Nothing else gets these origins. */
+  maps?: boolean;
 }
+
+/** Tiles, styles, fonts and search come from the first; the second is its usage telemetry. */
+const MAPBOX_ORIGINS = ['https://api.mapbox.com', 'https://events.mapbox.com'];
 
 /**
  * Strict, nonce-based Content-Security-Policy. Next.js reads the nonce from the request's
@@ -15,6 +20,7 @@ export function buildContentSecurityPolicy({
   nonce,
   isDev,
   upgradeInsecureRequests,
+  maps = false,
 }: CspOptions): string {
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
@@ -29,7 +35,9 @@ export function buildContentSecurityPolicy({
     'style-src': ["'self'", "'unsafe-inline'"],
     'img-src': ["'self'", 'blob:', 'data:'],
     'font-src': ["'self'"],
-    'connect-src': ["'self'"],
+    'connect-src': ["'self'", ...(maps ? MAPBOX_ORIGINS : [])],
+    // Falling back to script-src would refuse the map's worker: strict-dynamic ignores 'self'.
+    ...(maps ? { 'worker-src': ["'self'"] } : {}),
     'object-src': ["'none'"],
     'base-uri': ["'self'"],
     'form-action': ["'self'"],

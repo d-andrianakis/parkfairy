@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import { message } from './validation.js';
-
-/** Enforced by Better Auth on the server and by the sign-up form on the client. */
-export const PASSWORD_POLICY = { minLength: 10, maxLength: 128 } as const;
-export const NAME_MAX_LENGTH = 100;
+import { message, NAME_MAX_LENGTH, PASSWORD_POLICY } from './validation.js';
 
 export const SignUpInputSchema = z.object({
   name: z

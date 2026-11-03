@@ -2,12 +2,14 @@ import { createServer } from 'node:http';
 import { createDatabase } from '@parkfairy/database';
 import { Queue, Worker, type ConnectionOptions } from 'bullmq';
 import { pino } from 'pino';
+import { chooseEmailTransport } from './email-transport.js';
 import { loadEnv } from './env.js';
 import { maintenanceProcessor } from './processors/maintenance.js';
+import { ownerEmailsProcessor } from './processors/owner-emails.js';
 import type { QueueProcessor } from './queues.js';
 import { createShutdown } from './shutdown.js';
 
-const processors: QueueProcessor[] = [maintenanceProcessor];
+const processors: QueueProcessor[] = [maintenanceProcessor, ownerEmailsProcessor];
 
 const env = loadEnv();
 const logger = pino({
@@ -25,6 +27,8 @@ const database = createDatabase({
   max: 5,
   applicationName: 'parkfairy-worker',
 });
+
+const email = { transport: chooseEmailTransport(env), webUrl: env.webUrl };
 
 const queues: Queue[] = [];
 const workers: Worker[] = [];
@@ -49,6 +53,7 @@ for (const processor of processors) {
       processor.process(job, {
         db: database.db,
         logger: logger.child({ queue: processor.queue, job: job.name }),
+        email,
       }),
     { connection, concurrency: processor.concurrency },
   );

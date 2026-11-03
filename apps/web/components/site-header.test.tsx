@@ -24,11 +24,19 @@ describe('SiteHeader', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('invites everyone to list parking', () => {
+    renderWithProviders(<SiteHeader theme="system" signedIn={false} />, { locale: 'el' });
+    expect(screen.getByRole('link', { name: 'Καταχώριση χώρου' })).toHaveAttribute(
+      'href',
+      '/en/owner',
+    );
+  });
+
   it('links signed-in readers to their account', () => {
     renderWithProviders(<SiteHeader theme="system" signedIn />);
 
     const account = screen.getByRole('navigation', { name: 'Account' });
-    expect(within(account).getAllByRole('link')).toHaveLength(1);
+    expect(within(account).getAllByRole('link')).toHaveLength(2);
     expect(within(account).getByRole('link', { name: 'Account' })).toHaveAttribute(
       'href',
       '/en/account',

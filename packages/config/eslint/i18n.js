@@ -36,7 +36,15 @@ export function noLiteralStrings(files) {
           'object-properties': { exclude: ['.*'] },
           // Translators are named t / tSomething (useTranslations namespaces).
           callees: {
-            exclude: ['t[A-Z]?\\w*', 'register', 'require', 'includes', 'startsWith', 'endsWith'],
+            exclude: [
+              't[A-Z]?\\w*',
+              'register',
+              'registerSaved',
+              'require',
+              'includes',
+              'startsWith',
+              'endsWith',
+            ],
           },
         },
       ],

@@ -3,15 +3,12 @@ import { AREA_IDS, AreaIdSchema } from './areas.js';
 import { DEFAULT_TIME_ZONE, LocaleSchema } from './i18n.js';
 import { contractsRegistry } from './registry.js';
 import { wallClockMs } from './time.js';
-import { message } from './validation.js';
+import { MAX_BOOKING_DAYS, MAX_START_AHEAD_DAYS, message } from './validation.js';
 
 /** Bookings and searches move in half-hour steps. Athens' UTC offset is whole hours, so
  * local :00/:30 boundaries are UTC :00/:30 boundaries too. */
 export const BOOKING_STEP_MINUTES = 30;
 export const MIN_BOOKING_MINUTES = 30;
-export const MAX_BOOKING_DAYS = 30;
-/** How far ahead a stay may start. Also keeps every date the API walks within year 9999. */
-export const MAX_START_AHEAD_DAYS = 365;
 const DAY_MS = 24 * 60 * 60_000;
 const STEP_MS = BOOKING_STEP_MINUTES * 60_000;
 
@@ -24,6 +21,19 @@ export const LISTING_LIMITS = {
   description: 2000,
   spaceLabel: 20,
 } as const;
+
+/** A listing's life. Drafts and listings sent back may be incomplete; the rest may not. */
+export const LISTING_STATUSES = [
+  'draft',
+  'in_review',
+  'changes_requested',
+  'published',
+  'suspended',
+] as const;
+export const ListingStatusSchema = z.enum(LISTING_STATUSES).register(contractsRegistry, {
+  id: 'ListingStatus',
+});
+export type ListingStatus = z.infer<typeof ListingStatusSchema>;
 
 /** Zones listings may use. Athens only until listings outside Greece exist: the web app shows
  * and parses times in DEFAULT_TIME_ZONE. */
@@ -136,6 +146,29 @@ export const ParkingListingQuerySchema = z
   });
 export type ParkingListingQuery = z.infer<typeof ParkingListingQuerySchema>;
 
+/** Widths each photo is stored at; pages pick one with `srcset`. */
+export const PHOTO_WIDTHS = [480, 960, 1600] as const;
+
+export const ListingPhotoSchema = z
+  .object({
+    /** Content hash: names the stored files, so they can be cached for ever. */
+    key: z.string().regex(/^[0-9a-f]{32}$/),
+    /** Size of the largest stored file. */
+    width: z.int().positive(),
+    height: z.int().positive(),
+    /** Text alternative in the listing's language; null falls back to a generated one. */
+    alt: z.string().nullable(),
+    /** Dominant colour, painted while the photo loads. */
+    color: z.string().regex(/^#[0-9a-f]{6}$/),
+  })
+  .register(contractsRegistry, { id: 'ListingPhoto' });
+export type ListingPhoto = z.infer<typeof ListingPhotoSchema>;
+
+/** Where the browser finds a stored photo: same origin, so the CSP stays as it is. */
+export function photoUrl(key: string, width: (typeof PHOTO_WIDTHS)[number]): string {
+  return `/api/v1/media/photos/${key}/${width}.webp`;
+}
+
 export const ParkingListingSummarySchema = z
   .object({
     slug: z.string(),
@@ -144,11 +177,15 @@ export const ParkingListingSummarySchema = z
     area: AreaIdSchema,
     /** Language the owner wrote name, address and description in (mark up with `lang`). */
     contentLocale: LocaleSchema,
+    /** The listing's rate, or the cheapest space's when `spacePricesVary`. */
     hourlyRate: MoneySchema,
     /** Most a single day (24 h) can cost, if the owner caps it. */
     dailyMax: MoneySchema.nullable(),
+    /** Spaces cost different amounts, so prices read "from". */
+    spacePricesVary: z.boolean(),
     features: z.array(ParkingFeatureSchema),
     spaceCount: z.int().nonnegative(),
+    coverPhoto: ListingPhotoSchema.nullable(),
   })
   .register(contractsRegistry, { id: 'ParkingListingSummary' });
 export type ParkingListingSummary = z.infer<typeof ParkingListingSummarySchema>;
@@ -162,6 +199,7 @@ export const ParkingSearchResultSchema = ParkingListingSummarySchema.extend({
   distanceMeters: z.int().nonnegative(),
   /** Spaces free for the whole window. */
   freeSpaces: z.int().nonnegative(),
+  /** For the cheapest free space. */
   total: MoneySchema,
 }).register(contractsRegistry, { id: 'ParkingSearchResult' });
 export type ParkingSearchResult = z.infer<typeof ParkingSearchResultSchema>;
@@ -190,7 +228,13 @@ export const OpeningPeriodSchema = z
 export type OpeningPeriod = z.infer<typeof OpeningPeriodSchema>;
 
 export const ParkingSpaceSchema = z
-  .object({ label: z.string(), features: z.array(ParkingFeatureSchema) })
+  .object({
+    label: z.string(),
+    features: z.array(ParkingFeatureSchema),
+    hourlyRate: MoneySchema,
+    /** For this space and the requested window; null when the request named none. */
+    total: MoneySchema.nullable(),
+  })
   .register(contractsRegistry, { id: 'ParkingSpace' });
 export type ParkingSpace = z.infer<typeof ParkingSpaceSchema>;
 
@@ -201,10 +245,32 @@ export const ParkingAvailabilitySchema = z
     /** Open for the whole window. */
     open: z.boolean(),
     freeSpaces: z.int().nonnegative(),
+    /** For the cheapest free space. */
     total: MoneySchema,
   })
   .register(contractsRegistry, { id: 'ParkingAvailability' });
 export type ParkingAvailability = z.infer<typeof ParkingAvailabilitySchema>;
+
+export const CANCELLATION_POLICIES = ['oneHour', 'oneDay', 'oneDayThenHalf'] as const;
+export const CancellationPolicySchema = z.enum(CANCELLATION_POLICIES).register(contractsRegistry, {
+  id: 'CancellationPolicy',
+  description:
+    'oneHour: full refund until 1 hour before the start. oneDay: until 24 hours before. ' +
+    'oneDayThenHalf: full refund until 24 hours before, 50% until the start.',
+});
+export type CancellationPolicy = z.infer<typeof CancellationPolicySchema>;
+
+/** Prices on top of the hourly rate, for drivers to read. Space prices scale all of them. */
+export const ListingPriceRulesSchema = z
+  .object({
+    weekendRate: MoneySchema.nullable(),
+    night: z.object({ rate: MoneySchema, from: z.string(), to: z.string() }).nullable(),
+    /** Dated prices that have not ended yet. */
+    dated: z.array(z.object({ startsOn: z.iso.date(), endsOn: z.iso.date(), rate: MoneySchema })),
+    longStay: z.array(z.object({ minDays: z.int().positive(), percent: z.int().positive() })),
+  })
+  .register(contractsRegistry, { id: 'ListingPriceRules' });
+export type ListingPriceRules = z.infer<typeof ListingPriceRulesSchema>;
 
 /** Big garages have hundreds of spaces, and drivers don't pick one until booking. */
 export const LISTING_SPACES_LIMIT = 48;
@@ -217,6 +283,9 @@ export const ParkingListingDetailSchema = ParkingListingSummarySchema.extend({
   openingHours: z.array(OpeningPeriodSchema),
   /** The first spaces in label order; `spaceCount` says how many there are in all. */
   spaces: z.array(ParkingSpaceSchema).max(LISTING_SPACES_LIMIT),
+  photos: z.array(ListingPhotoSchema),
+  priceRules: ListingPriceRulesSchema,
+  cancellationPolicy: CancellationPolicySchema.nullable(),
   /** Present when the request named a window. */
   availability: ParkingAvailabilitySchema.nullable(),
 }).register(contractsRegistry, { id: 'ParkingListingDetail' });

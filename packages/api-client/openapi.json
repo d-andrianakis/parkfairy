@@ -89,6 +89,60 @@
         ]
       }
     },
+    "/v1/media/photos/{key}/{width}.webp": {
+      "get": {
+        "operationId": "getListingPhoto",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "width",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "480",
+                "960",
+                "1600"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "media"
+        ]
+      }
+    },
     "/v1/parking/featured": {
       "get": {
         "operationId": "getFeaturedParking",
@@ -264,6 +318,1441 @@
           "parking"
         ]
       }
+    },
+    "/v1/owner/onboarding": {
+      "get": {
+        "operationId": "getOwnerOnboarding",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerOnboarding"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/profile": {
+      "get": {
+        "operationId": "getOwnerProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      },
+      "patch": {
+        "operationId": "updateOwnerProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerProfilePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/profile/tax": {
+      "put": {
+        "operationId": "saveOwnerTaxDetails",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerTaxInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings": {
+      "post": {
+        "operationId": "createOwnerListing",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerListingCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}": {
+      "get": {
+        "operationId": "getOwnerListing",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerListing"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      },
+      "delete": {
+        "operationId": "deleteOwnerListing",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/location": {
+      "patch": {
+        "operationId": "saveListingLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListingLocationPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerListingProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/spaces": {
+      "put": {
+        "operationId": "saveListingSpaces",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListingSpacesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerListingProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/hours": {
+      "put": {
+        "operationId": "saveListingHours",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListingHoursInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerListingProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/prices": {
+      "put": {
+        "operationId": "saveListingPrices",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListingPricesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerListingProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/photos": {
+      "post": {
+        "operationId": "uploadListingPhoto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerPhoto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/photos/order": {
+      "put": {
+        "operationId": "reorderListingPhotos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListingPhotoOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/photos/{photoId}": {
+      "patch": {
+        "operationId": "updateListingPhoto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListingPhotoUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      },
+      "delete": {
+        "operationId": "deleteListingPhoto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/proofs": {
+      "post": {
+        "operationId": "uploadListingProof",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-file-name",
+            "in": "header",
+            "description": "URI-encoded: names stay out of request logs.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "titleDeed",
+                "lease",
+                "operatingLicence",
+                "other"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/pdf": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerProof"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/proofs/{proofId}": {
+      "get": {
+        "operationId": "downloadListingProof",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proofId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      },
+      "delete": {
+        "operationId": "deleteListingProof",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proofId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/proof-details": {
+      "patch": {
+        "operationId": "saveListingProofDetails",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListingProofPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerListingProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/listings/{id}/submit": {
+      "post": {
+        "operationId": "submitOwnerListing",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListingSubmitInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerListingProgress"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
     }
   },
   "info": {
@@ -419,6 +1908,16 @@
           "thessalonikiAirport"
         ]
       },
+      "ListingStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "in_review",
+          "changes_requested",
+          "published",
+          "suspended"
+        ]
+      },
       "Currency": {
         "type": "string",
         "enum": [
@@ -451,6 +1950,43 @@
           "accessible"
         ]
       },
+      "ListingPhoto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "alt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$"
+          }
+        },
+        "required": [
+          "key",
+          "width",
+          "height",
+          "alt",
+          "color"
+        ],
+        "additionalProperties": false
+      },
       "ParkingListingSummary": {
         "type": "object",
         "properties": {
@@ -480,6 +2016,9 @@
               }
             ]
           },
+          "spacePricesVary": {
+            "type": "boolean"
+          },
           "features": {
             "type": "array",
             "items": {
@@ -490,6 +2029,14 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "coverPhoto": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ListingPhoto"
+              }
+            ]
           }
         },
         "required": [
@@ -500,8 +2047,10 @@
           "contentLocale",
           "hourlyRate",
           "dailyMax",
+          "spacePricesVary",
           "features",
-          "spaceCount"
+          "spaceCount",
+          "coverPhoto"
         ],
         "additionalProperties": false
       },
@@ -549,6 +2098,9 @@
               }
             ]
           },
+          "spacePricesVary": {
+            "type": "boolean"
+          },
           "features": {
             "type": "array",
             "items": {
@@ -559,6 +2111,14 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "coverPhoto": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ListingPhoto"
+              }
+            ]
           },
           "distanceMeters": {
             "type": "integer",
@@ -582,8 +2142,10 @@
           "contentLocale",
           "hourlyRate",
           "dailyMax",
+          "spacePricesVary",
           "features",
           "spaceCount",
+          "coverPhoto",
           "distanceMeters",
           "freeSpaces",
           "total"
@@ -652,11 +2214,24 @@
             "items": {
               "$ref": "#/components/schemas/ParkingFeature"
             }
+          },
+          "hourlyRate": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "total": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
           }
         },
         "required": [
           "label",
-          "features"
+          "features",
+          "hourlyRate",
+          "total"
         ],
         "additionalProperties": false
       },
@@ -694,6 +2269,107 @@
         ],
         "additionalProperties": false
       },
+      "CancellationPolicy": {
+        "type": "string",
+        "enum": [
+          "oneHour",
+          "oneDay",
+          "oneDayThenHalf"
+        ]
+      },
+      "ListingPriceRules": {
+        "type": "object",
+        "properties": {
+          "weekendRate": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
+          },
+          "night": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "rate": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "rate",
+              "from",
+              "to"
+            ],
+            "additionalProperties": false
+          },
+          "dated": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "startsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "endsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "rate": {
+                  "$ref": "#/components/schemas/Money"
+                }
+              },
+              "required": [
+                "startsOn",
+                "endsOn",
+                "rate"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "longStay": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "minDays": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true,
+                  "maximum": 9007199254740991
+                },
+                "percent": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "minDays",
+                "percent"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "weekendRate",
+          "night",
+          "dated",
+          "longStay"
+        ],
+        "additionalProperties": false
+      },
       "ParkingListingDetail": {
         "type": "object",
         "properties": {
@@ -723,6 +2399,9 @@
               }
             ]
           },
+          "spacePricesVary": {
+            "type": "boolean"
+          },
           "features": {
             "type": "array",
             "items": {
@@ -733,6 +2412,14 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "coverPhoto": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ListingPhoto"
+              }
+            ]
           },
           "description": {
             "nullable": true,
@@ -760,6 +2447,23 @@
               "$ref": "#/components/schemas/ParkingSpace"
             }
           },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingPhoto"
+            }
+          },
+          "priceRules": {
+            "$ref": "#/components/schemas/ListingPriceRules"
+          },
+          "cancellationPolicy": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CancellationPolicy"
+              }
+            ]
+          },
           "availability": {
             "nullable": true,
             "allOf": [
@@ -777,15 +2481,1363 @@
           "contentLocale",
           "hourlyRate",
           "dailyMax",
+          "spacePricesVary",
           "features",
           "spaceCount",
+          "coverPhoto",
           "description",
           "latitude",
           "longitude",
           "timeZone",
           "openingHours",
           "spaces",
+          "photos",
+          "priceRules",
+          "cancellationPolicy",
           "availability"
+        ],
+        "additionalProperties": false
+      },
+      "OwnerKind": {
+        "type": "string",
+        "enum": [
+          "individual",
+          "business"
+        ]
+      },
+      "OwnerVerification": {
+        "type": "string",
+        "enum": [
+          "unverified",
+          "pending",
+          "verified",
+          "rejected"
+        ]
+      },
+      "OwnerCountry": {
+        "type": "string",
+        "enum": [
+          "AT",
+          "BE",
+          "BG",
+          "CY",
+          "CZ",
+          "DE",
+          "DK",
+          "EE",
+          "ES",
+          "FI",
+          "FR",
+          "GR",
+          "HR",
+          "HU",
+          "IE",
+          "IT",
+          "LT",
+          "LU",
+          "LV",
+          "MT",
+          "NL",
+          "PL",
+          "PT",
+          "RO",
+          "SE",
+          "SI",
+          "SK"
+        ]
+      },
+      "OwnerProfileInput": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "business"
+            ]
+          },
+          "firstName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "lastName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "legalName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "allOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^\\+?[0-9][0-9 ()-]{5,18}[0-9]$"
+              }
+            ]
+          },
+          "addressLine": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "postalCode": {
+            "type": "string",
+            "allOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z][0-9A-Za-z -]{1,10}[0-9A-Za-z]$"
+              }
+            ]
+          },
+          "country": {
+            "type": "string",
+            "enum": [
+              "AT",
+              "BE",
+              "BG",
+              "CY",
+              "CZ",
+              "DE",
+              "DK",
+              "EE",
+              "ES",
+              "FI",
+              "FR",
+              "GR",
+              "HR",
+              "HU",
+              "IE",
+              "IT",
+              "LT",
+              "LU",
+              "LV",
+              "MT",
+              "NL",
+              "PL",
+              "PT",
+              "RO",
+              "SE",
+              "SI",
+              "SK"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "phone",
+          "addressLine",
+          "city",
+          "postalCode",
+          "country"
+        ],
+        "additionalProperties": false
+      },
+      "OwnerProfilePatch": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "business"
+            ]
+          },
+          "firstName": {
+            "nullable": true,
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "lastName": {
+            "nullable": true,
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "legalName": {
+            "nullable": true,
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "phone": {
+            "nullable": true,
+            "type": "string",
+            "allOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^\\+?[0-9][0-9 ()-]{5,18}[0-9]$"
+              }
+            ]
+          },
+          "addressLine": {
+            "nullable": true,
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "city": {
+            "nullable": true,
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "postalCode": {
+            "nullable": true,
+            "type": "string",
+            "allOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z][0-9A-Za-z -]{1,10}[0-9A-Za-z]$"
+              }
+            ]
+          },
+          "country": {
+            "type": "string",
+            "enum": [
+              "AT",
+              "BE",
+              "BG",
+              "CY",
+              "CZ",
+              "DE",
+              "DK",
+              "EE",
+              "ES",
+              "FI",
+              "FR",
+              "GR",
+              "HR",
+              "HU",
+              "IE",
+              "IT",
+              "LT",
+              "LU",
+              "LV",
+              "MT",
+              "NL",
+              "PL",
+              "PT",
+              "RO",
+              "SE",
+              "SI",
+              "SK"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerTaxInput": {
+        "type": "object",
+        "properties": {
+          "taxCountry": {
+            "type": "string",
+            "enum": [
+              "AT",
+              "BE",
+              "BG",
+              "CY",
+              "CZ",
+              "DE",
+              "DK",
+              "EE",
+              "ES",
+              "FI",
+              "FR",
+              "GR",
+              "HR",
+              "HU",
+              "IE",
+              "IT",
+              "LT",
+              "LU",
+              "LV",
+              "MT",
+              "NL",
+              "PL",
+              "PT",
+              "RO",
+              "SE",
+              "SI",
+              "SK"
+            ]
+          },
+          "taxId": {
+            "type": "string",
+            "maxLength": 20,
+            "allOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z][0-9A-Za-z./ -]*$"
+              }
+            ]
+          },
+          "vatId": {
+            "type": "string",
+            "maxLength": 20,
+            "allOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z][0-9A-Za-z./ -]*$"
+              }
+            ]
+          },
+          "registrationNumber": {
+            "type": "string",
+            "maxLength": 30,
+            "allOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z][0-9A-Za-z./ -]*$"
+              }
+            ]
+          },
+          "birthDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": [
+          "taxCountry"
+        ],
+        "additionalProperties": false
+      },
+      "OwnerTaxSummary": {
+        "type": "object",
+        "properties": {
+          "taxCountry": {
+            "$ref": "#/components/schemas/OwnerCountry"
+          },
+          "taxIdEnding": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vatIdEnding": {
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationEnding": {
+            "nullable": true,
+            "type": "string"
+          },
+          "birthDateSaved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "taxCountry",
+          "taxIdEnding",
+          "vatIdEnding",
+          "registrationEnding",
+          "birthDateSaved"
+        ],
+        "additionalProperties": false
+      },
+      "OwnerProfile": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OwnerKind"
+              }
+            ]
+          },
+          "firstName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "lastName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "legalName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "phone": {
+            "nullable": true,
+            "type": "string"
+          },
+          "addressLine": {
+            "nullable": true,
+            "type": "string"
+          },
+          "city": {
+            "nullable": true,
+            "type": "string"
+          },
+          "postalCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "country": {
+            "$ref": "#/components/schemas/OwnerCountry"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/OwnerVerification"
+          },
+          "tax": {
+            "$ref": "#/components/schemas/OwnerTaxSummary"
+          }
+        },
+        "required": [
+          "kind",
+          "firstName",
+          "lastName",
+          "legalName",
+          "phone",
+          "addressLine",
+          "city",
+          "postalCode",
+          "country",
+          "verification",
+          "tax"
+        ],
+        "additionalProperties": false
+      },
+      "ListingLocationInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "areaId": {
+            "type": "string",
+            "enum": [
+              "syntagma",
+              "monastiraki",
+              "kolonaki",
+              "koukaki",
+              "piraeusPort",
+              "glyfada",
+              "marousi",
+              "athensAirport",
+              "thessalonikiCentre",
+              "ladadika",
+              "thessalonikiAirport"
+            ]
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "description": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 2000,
+            "pattern": "^(?:[^\\p{Cc}\\p{Cs}]|[\\t\\n\\r])*$"
+          },
+          "contentLocale": {
+            "$ref": "#/components/schemas/Locale"
+          }
+        },
+        "required": [
+          "name",
+          "address",
+          "areaId",
+          "latitude",
+          "longitude",
+          "contentLocale"
+        ],
+        "additionalProperties": false
+      },
+      "ListingLocationPatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "nullable": true,
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "address": {
+            "nullable": true,
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "areaId": {
+            "nullable": true,
+            "type": "string",
+            "enum": [
+              "syntagma",
+              "monastiraki",
+              "kolonaki",
+              "koukaki",
+              "piraeusPort",
+              "glyfada",
+              "marousi",
+              "athensAirport",
+              "thessalonikiCentre",
+              "ladadika",
+              "thessalonikiAirport"
+            ]
+          },
+          "latitude": {
+            "nullable": true,
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "nullable": true,
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "description": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 2000,
+            "pattern": "^(?:[^\\p{Cc}\\p{Cs}]|[\\t\\n\\r])*$"
+          },
+          "contentLocale": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Locale"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ListingSpaceInput": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          },
+          "features": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParkingFeature"
+            }
+          },
+          "hourlyRateMinor": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 100000
+          }
+        },
+        "required": [
+          "label",
+          "features",
+          "hourlyRateMinor"
+        ],
+        "additionalProperties": false
+      },
+      "ListingSpacesInput": {
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingSpaceInput"
+            }
+          }
+        },
+        "required": [
+          "spaces"
+        ],
+        "additionalProperties": false
+      },
+      "ListingHoursInput": {
+        "type": "object",
+        "properties": {
+          "periods": {
+            "minItems": 1,
+            "maxItems": 14,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpeningPeriod"
+            }
+          }
+        },
+        "required": [
+          "periods"
+        ],
+        "additionalProperties": false
+      },
+      "ListingPricesInput": {
+        "type": "object",
+        "properties": {
+          "hourlyRateMinor": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 100000
+          },
+          "dailyMaxMinor": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 100000
+          },
+          "bookingGapMinutes": {
+            "type": "number",
+            "enum": [
+              0,
+              30,
+              60
+            ]
+          },
+          "cancellationPolicy": {
+            "type": "string",
+            "enum": [
+              "oneHour",
+              "oneDay",
+              "oneDayThenHalf"
+            ]
+          },
+          "weekendRateMinor": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 100000
+          },
+          "night": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "rateMinor": {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 100000
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^(?:[01]\\d|2[0-3]):(?:00|30)$"
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^(?:[01]\\d|2[0-3]):(?:00|30)$"
+              }
+            },
+            "required": [
+              "rateMinor",
+              "from",
+              "to"
+            ],
+            "additionalProperties": false
+          },
+          "datedPrices": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "nullable": true,
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+                },
+                "startsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "endsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "rateMinor": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 100000
+                }
+              },
+              "required": [
+                "label",
+                "startsOn",
+                "endsOn",
+                "rateMinor"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "longStayDiscounts": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "minDays": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30
+                },
+                "percent": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 90
+                }
+              },
+              "required": [
+                "minDays",
+                "percent"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "hourlyRateMinor",
+          "dailyMaxMinor",
+          "bookingGapMinutes",
+          "cancellationPolicy",
+          "weekendRateMinor",
+          "night",
+          "datedPrices",
+          "longStayDiscounts"
+        ],
+        "additionalProperties": false
+      },
+      "ListingPhotoUpdate": {
+        "type": "object",
+        "properties": {
+          "alt": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 160,
+            "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+          }
+        },
+        "required": [
+          "alt"
+        ],
+        "additionalProperties": false
+      },
+      "ListingPhotoOrder": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "additionalProperties": false
+      },
+      "OwnerPhoto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "alt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "key",
+          "width",
+          "height",
+          "alt",
+          "color",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "ProofKind": {
+        "type": "string",
+        "enum": [
+          "titleDeed",
+          "lease",
+          "operatingLicence",
+          "other"
+        ]
+      },
+      "OwnerProof": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProofKind"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "application/pdf",
+              "image/jpeg",
+              "image/png"
+            ]
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "fileName",
+          "contentType",
+          "sizeBytes",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "ListingProofPatch": {
+        "type": "object",
+        "properties": {
+          "landRegistrationNumber": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 30,
+            "allOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z][0-9A-Za-z./ -]*$"
+              }
+            ]
+          }
+        },
+        "required": [
+          "landRegistrationNumber"
+        ],
+        "additionalProperties": false
+      },
+      "ListingSubmitInput": {
+        "type": "object",
+        "properties": {
+          "confirmed": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "confirmed"
+        ],
+        "additionalProperties": false
+      },
+      "AccountStep": {
+        "type": "string",
+        "enum": [
+          "profile",
+          "tax"
+        ]
+      },
+      "ListingStep": {
+        "type": "string",
+        "enum": [
+          "location",
+          "spaces",
+          "hours",
+          "prices",
+          "photos",
+          "proof",
+          "review"
+        ]
+      },
+      "OwnerListingProgress": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "nullable": true,
+            "type": "string"
+          },
+          "contentLocale": {
+            "$ref": "#/components/schemas/Locale"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ListingStatus"
+          },
+          "slug": {
+            "nullable": true,
+            "type": "string"
+          },
+          "coverPhoto": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ListingPhoto"
+              }
+            ]
+          },
+          "doneSteps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingStep"
+            }
+          },
+          "nextStep": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ListingStep"
+              }
+            ]
+          },
+          "reviewNote": {
+            "nullable": true,
+            "type": "string"
+          },
+          "submittedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "contentLocale",
+          "status",
+          "slug",
+          "coverPhoto",
+          "doneSteps",
+          "nextStep",
+          "reviewNote",
+          "submittedAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "OwnerOnboarding": {
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          },
+          "doneAccountSteps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountStep"
+            }
+          },
+          "listings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerListingProgress"
+            }
+          }
+        },
+        "required": [
+          "started",
+          "doneAccountSteps",
+          "listings"
+        ],
+        "additionalProperties": false
+      },
+      "OwnerSpace": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParkingFeature"
+            }
+          },
+          "hourlyRateMinor": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "features",
+          "hourlyRateMinor"
+        ],
+        "additionalProperties": false
+      },
+      "OwnerPrices": {
+        "type": "object",
+        "properties": {
+          "hourlyRateMinor": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "dailyMaxMinor": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "bookingGapMinutes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "cancellationPolicy": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CancellationPolicy"
+              }
+            ]
+          },
+          "weekendRateMinor": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "night": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "rateMinor": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "rateMinor",
+              "from",
+              "to"
+            ],
+            "additionalProperties": false
+          },
+          "datedPrices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "startsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "endsOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "rateMinor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "label",
+                "startsOn",
+                "endsOn",
+                "rateMinor"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "longStayDiscounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "minDays": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "percent": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "minDays",
+                "percent"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "hourlyRateMinor",
+          "dailyMaxMinor",
+          "bookingGapMinutes",
+          "cancellationPolicy",
+          "weekendRateMinor",
+          "night",
+          "datedPrices",
+          "longStayDiscounts"
+        ],
+        "additionalProperties": false
+      },
+      "OwnerListing": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ListingStatus"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/OwnerListingProgress"
+          },
+          "doneAccountSteps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountStep"
+            }
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "nullable": true,
+                "type": "string"
+              },
+              "address": {
+                "nullable": true,
+                "type": "string"
+              },
+              "areaId": {
+                "nullable": true,
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AreaId"
+                  }
+                ]
+              },
+              "latitude": {
+                "nullable": true,
+                "type": "number"
+              },
+              "longitude": {
+                "nullable": true,
+                "type": "number"
+              },
+              "description": {
+                "nullable": true,
+                "type": "string"
+              },
+              "contentLocale": {
+                "$ref": "#/components/schemas/Locale"
+              }
+            },
+            "required": [
+              "name",
+              "address",
+              "areaId",
+              "latitude",
+              "longitude",
+              "description",
+              "contentLocale"
+            ],
+            "additionalProperties": false
+          },
+          "spaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerSpace"
+            }
+          },
+          "openingHours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpeningPeriod"
+            }
+          },
+          "prices": {
+            "$ref": "#/components/schemas/OwnerPrices"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerPhoto"
+            }
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerProof"
+            }
+          },
+          "landRegistrationNumber": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "locked",
+          "progress",
+          "doneAccountSteps",
+          "location",
+          "spaces",
+          "openingHours",
+          "prices",
+          "photos",
+          "proofs",
+          "landRegistrationNumber"
+        ],
+        "additionalProperties": false
+      },
+      "OwnerListingCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
         ],
         "additionalProperties": false
       }

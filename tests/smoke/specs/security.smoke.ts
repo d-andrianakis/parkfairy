@@ -113,6 +113,18 @@ test.describe('signed in', () => {
     }
   });
 
+  test('an owner’s data cannot be changed from another site', async ({ page }) => {
+    await page.goto('/en');
+    const headers = { origin: 'https://evil.example' };
+    const created = await page.request.post('/api/v1/owner/listings', { headers });
+    expect(created.status()).toBe(403);
+    const edited = await page.request.patch('/api/v1/owner/profile', {
+      headers,
+      data: { firstName: 'Hijacked' },
+    });
+    expect(edited.status()).toBe(403);
+  });
+
   test('sign-in ignores off-site return URLs', async ({ page }) => {
     await page.goto('/en/sign-in?next=//evil.example/phish');
     await expect(page).toHaveURL('/en/account');

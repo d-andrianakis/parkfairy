@@ -17,6 +17,7 @@ const publicPages = [
   '/verify-email',
   '/verify-email?token=not-a-real-token',
   '/no-such-page',
+  '/owner',
   // Public catalogue (demo listings from pnpm db:seed).
   ...(DEMO_DATA ? ['/search?area=syntagma', '/parking/syntagma-square-garage'] : []),
 ];
@@ -58,7 +59,7 @@ test.describe('narrow screens', () => {
       test(`/${locale}${path} reflows at 320px`, async ({ page }) => {
         await page.goto(`/${locale}${path}`);
         await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-        await expectNoSidewaysScroll(page, locale, 2);
+        await expectNoSidewaysScroll(page, locale, 3);
       });
     }
   }
@@ -116,11 +117,36 @@ test.describe('signed in', () => {
     });
   }
 
+  // Every step, with its forms filled in, is checked along the way in owner-onboarding.smoke.ts.
+  for (const locale of locales) {
+    for (const path of ['/owner', '/owner/profile', '/owner/tax']) {
+      test(`/${locale}${path} has no WCAG 2.2 AA violations, signed in`, async ({ page }) => {
+        await page.goto(`/${locale}${path}`);
+        await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+        await expectAccessible(page);
+      });
+    }
+  }
+
+  test('/en/owner/profile has no WCAG 2.2 AA violations in dark mode', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('/en/owner/profile');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expectAccessible(page);
+  });
+
+  test('/el/owner reflows at 320px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('/el/owner');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expectNoSidewaysScroll(page, 'el', 2);
+  });
+
   test('/el/account reflows at 320px', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('/el/account');
     await expect(page.getByTestId('api-user-id')).toHaveText(/^[0-9a-f-]{36}$/); // long UUID and email
-    await expectNoSidewaysScroll(page, 'el', 1);
+    await expectNoSidewaysScroll(page, 'el', 2);
   });
 
   test('/en/account has no WCAG 2.2 AA violations in dark mode', async ({ page }) => {

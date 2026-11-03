@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@parkfairy/database": "workspace:*",
+    "@parkfairy/email": "workspace:*",
     "bullmq": "6.5.0",
     "drizzle-orm": "0.45.4",
     "ioredis": "6.0.0",
