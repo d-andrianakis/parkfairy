@@ -10,6 +10,54 @@ describe('FocusHeading', () => {
   it('takes the focus when it appears', () => {
     render(<FocusHeading>Check your inbox</FocusHeading>);
     expect(screen.getByRole('heading', { level: 2 })).toHaveFocus();
+    // The focus reads it out; the status would say it twice.
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('takes it from the main region, where a route change leaves it', () => {
+    render(
+      <main id="main-content" tabIndex={-1} data-testid="main">
+        <button type="button">Back</button>
+      </main>,
+    );
+    screen.getByTestId('main').focus();
+
+    render(<FocusHeading>Check your inbox</FocusHeading>);
+
+    expect(screen.getByRole('heading')).toHaveFocus();
+  });
+
+  it('takes it when the form that held it goes', () => {
+    const { rerender } = render(<input aria-label="Email" />);
+    screen.getByRole('textbox').focus();
+
+    rerender(<FocusHeading>Check your inbox</FocusHeading>);
+
+    expect(screen.getByRole('heading')).toHaveFocus();
+  });
+
+  it('leaves someone who has moved on where they are, tells them, and renames the tab', () => {
+    render(<button type="button">Help</button>);
+    screen.getByRole('button').focus();
+
+    render(<FocusHeading retitle>Check your inbox</FocusHeading>);
+
+    expect(screen.getByRole('button')).toHaveFocus();
+    expect(screen.getByRole('status')).toHaveTextContent('Check your inbox');
+    expect(document.title).toBe('Check your inbox · Parkfairy');
+  });
+
+  it('leaves someone inside the main region where they are, too', () => {
+    render(
+      <main id="main-content" tabIndex={-1}>
+        <button type="button">Back</button>
+      </main>,
+    );
+    screen.getByRole('button').focus();
+
+    render(<FocusHeading>Check your inbox</FocusHeading>);
+
+    expect(screen.getByRole('button')).toHaveFocus();
   });
 
   it('can be a lower heading, and leaves the tab title alone by default', () => {
