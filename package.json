@@ -24,7 +24,7 @@
     "test:smoke": "turbo run test:smoke"
   },
   "devDependencies": {
-    "@playwright/mcp": "0.0.83",
+    "@playwright/mcp": "0.0.84",
     "prettier": "3.9.10",
     "turbo": "2.11.10",
     "typescript": "6.0.3"
