@@ -70,6 +70,22 @@ Answered by the product owner on 2026-11-02, for owner onboarding:
     answers #18. Payout account details wait for Stripe in Phase 4.
 23. Also in this round: **the full price rules (#17), status emails and one reminder email.**
 
+Answered by the product owner on 2026-11-03, for closures and special hours:
+
+24. Who can change them, and when: **the owner, at any status, with no new review.** They only change
+    when drivers can come; nothing staff checked changes, and a live listing needs them most.
+25. What one entry says: **a date range, either closed all day or open one set of hours each day.**
+    It replaces the weekly hours for those days, midnight to midnight.
+26. What drivers see: **upcoming dates and hours on the listing page, never the owner's note.** Text
+    changed on a live listing skips review, so none of it goes public.
+27. Closing days that already have bookings (Phase 3): **refused until the owner cancels those
+    bookings**, each driver fully refunded, so nobody arrives at a closed gate.
+28. Closed hours inside a day, asked for the same day: **both** a break in the weekly hours (per
+    weekday, e.g. closed 14:00–17:00) and, on a dated entry, "closed from … to …" with the weekly
+    hours around it.
+29. Several listings: **the owner chooses which of their listings get a listing's closures, all of
+    them included.** Built as copying: the entries are added to each chosen listing.
+
 Still open, both waiting on people outside the project:
 
 18. For the accountant and lawyer, before Phase 4: VAT on parking and on commission; who issues
@@ -421,6 +437,34 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   Clock changes are found by halving rather than asking `Intl` per half hour: a 30-day stay across
   50 results would be 72,000 lookups.
 
+- **2026-11-03 · Closures and special hours are a page of their own, not a step**
+  (`/owner/listings/:id/closures`), because nothing there is needed to send a listing in and, unlike
+  the steps, it stays open once staff have the listing or it is live (#24). Saves go through the
+  same row lock as the steps with `edit(…, { anyStatus: true })`. An entry is a date range with
+  three kinds (#25, #28): other hours, closed all day, or the week's hours less a closed window.
+  Days are whole calendar days on the listing's wall clock, so "closed on the 25th" also closes the
+  small hours that the weekly hours give to the 24th's night. A save replaces the list, and entries
+  that have ended are never sent back, so they go on the next save; the worker sweeps the rest every
+  6 hours, because the note is the owner's free text (GDPR). Copying (#29) is one transaction that
+  locks the targets in id order (two copies can't deadlock), each listing all or nothing: an
+  identical entry counts as copied, a different one on a shared day is a clash and that listing is
+  left alone. It first deletes the targets' ended entries, which nobody can see but the exclusion
+  constraint still does. It has its own limit (10 a minute): it can write to 50 listings. A listing
+  with staff or live keeps its `updated_at` (only drafts' reminders read it; touching it rewrites
+  every index, search's GiST included). The note never leaves the owner API (#26). A first day may
+  be up to two horizons back, since an entry still running is sent again on every save. Search drops
+  listings closed all day on the stay's days in SQL, because a holiday closes many at once and they
+  would fill the candidate batches. **Phase 3:** progress.md lists what must refuse closing time
+  over a booking (#27).
+- **2026-11-03 · A break in the weekly hours is two periods on the day** (#28), read back by
+  `periodsToDays` as the first and last of the day's own periods. The form allows one break a day,
+  before midnight, so a night that runs past midnight with a break is three periods on one weekday
+  (its small hours, morning, evening): `OPENING_PERIODS_MAX` is 21. A morning only counts as the
+  night before's when it ends by the time that day opens; otherwise "closes before it opens" can't
+  say it, and an untouched save once dropped the day. Known and accepted: a week open all day with a
+  daily break is equally "17:00 to 14:00 every night", and reads back that way. The hours are the
+  same.
+
 ## Conventions
 
 - **Data:** UUID PKs, `timestamptz` (UTC instants), snake_case SQL, money as integer minor
@@ -465,6 +509,21 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
 
 ## Gotchas and environment quirks
 
+- **The web app's tests and typecheck read `@parkfairy/contracts` from its `dist`.** After changing
+  the contracts, run `pnpm --filter @parkfairy/contracts build` (the same for database and
+  api-client), or web tests check against the old values (2026-11-03: a raised period cap looked
+  refused).
+- **Owner text inside a sentence goes through `t.rich`** with a tag around it
+  (`“<listing>{name}</listing>”`), so it can carry its own `lang`. `catalogs.test.ts` checks both
+  catalogs use the same tags and formats such messages with `t.rich` (2026-11-03, the first ones).
+- **A race test needs several pairs at once.** Locally, two requests in a `Promise.all` rarely
+  interleave: the closures race test passed with the row lock removed until it ran three listings'
+  pairs per round (2026-11-03).
+- **Routes with their own `@Throttle` meet it in integration tests,** where each test user is one
+  visitor: copying allows 10 a minute, so its tests use an owner each.
+- **Python fed by a bash heredoc on this machine mangles non-ASCII** such as ’ (Windows code page),
+  so a replacement silently fails to match or writes mojibake. Put such scripts in a file written
+  with the editor tool, or edit directly (2026-11-03).
 - **Returning a `Buffer` from a Nest route sends JSON** (`{"type":"Buffer","data":[…]}`), with a 200
   and no error. Use `StreamableFile`. Only comparing the bytes in a test caught it.
 - **`sharp()` throws at construction on an empty buffer,** before any `await`. Build it inside the
@@ -696,6 +755,9 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
 - 2026-11-03 (owner onboarding): `/en/owner`, its profile and tax pages and the location step are
   held to the 250 KiB budget in `performance.smoke.ts`. The location step must request nothing from
   Mapbox on a first visit, because the map loads on intent.
+- 2026-11-03 (closures, estimated from the build by the performance review): the closures page
+  about 227 KiB (zod 31 KiB of it), a listing step about 237 KiB (13 KiB under the budget), the
+  public listing page unchanged at 167 KiB: its closures table renders on the server only.
 
 ## Translation notes
 

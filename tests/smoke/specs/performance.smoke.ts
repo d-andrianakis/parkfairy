@@ -166,6 +166,18 @@ test.describe('signed in', () => {
     }
   });
 
+  test('closures and special hours stay within the first-visit budget', async ({ page }) => {
+    const headers = { origin: WEB_URL };
+    const created = await page.request.post('/api/v1/owner/listings', { headers });
+    expect(created.status()).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    try {
+      await expectWithinBudget(page, `/en/owner/listings/${id}/closures`);
+    } finally {
+      await page.request.delete(`/api/v1/owner/listings/${id}`, { headers });
+    }
+  });
+
   test('/en/account does not shift while the API answers, on a phone', async ({ page }) => {
     const cls = await measureLayoutShift(page, '/en/account', () =>
       expect(page.getByTestId('api-user-id')).toHaveText(/^[0-9a-f-]{36}$/),

@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { ClientMessages } from '@/components/client-messages';
+import { ClosuresLink } from '@/components/owner/closures-link';
 import { HoursForm } from '@/components/owner/hours-form';
 import { LocationForm } from '@/components/owner/location-form';
 import { PhotosStep } from '@/components/owner/photos-step';
@@ -50,7 +51,14 @@ function StepForm({
     case 'spaces':
       return <SpacesForm listing={listing} />;
     case 'hours':
-      return <HoursForm listing={listing} />;
+      return (
+        <>
+          <HoursForm listing={listing} />
+          <div className="border-t pt-6">
+            <ClosuresLink id={listing.id} lead="hoursHint" />
+          </div>
+        </>
+      );
     case 'prices':
       return <PricesForm listing={listing} />;
     case 'photos':
@@ -101,6 +109,7 @@ export default async function ListingStepPage({ params }: StepPageProps) {
             </AlertTitle>
             <AlertDescription>{t('review.locked')}</AlertDescription>
           </Alert>
+          <ClosuresLink id={listing.id} lead="stillOpen" />
           <ReviewSummary listing={listing} doneAccountSteps={doneAccountSteps} />
         </>
       ) : step === 'review' ? (

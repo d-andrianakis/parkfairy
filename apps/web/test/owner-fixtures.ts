@@ -57,6 +57,7 @@ export const listingFixture = (overrides: Partial<OwnerListing> = {}): OwnerList
   },
   spaces: [],
   openingHours: [],
+  hoursExceptions: [],
   prices: {
     hourlyRateMinor: null,
     dailyMaxMinor: null,

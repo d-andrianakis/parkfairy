@@ -1,11 +1,18 @@
-import { deleteUnconfirmedAccounts, type Database } from '@parkfairy/database';
+import {
+  deleteEndedHoursExceptions,
+  deleteUnconfirmedAccounts,
+  type Database,
+} from '@parkfairy/database';
 import type { Job } from 'bullmq';
 import { pino } from 'pino';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QUEUES } from '../queues.js';
 import { maintenanceProcessor, UNCONFIRMED_ACCOUNT_DAYS } from './maintenance.js';
 
-vi.mock('@parkfairy/database', () => ({ deleteUnconfirmedAccounts: vi.fn() }));
+vi.mock('@parkfairy/database', () => ({
+  deleteEndedHoursExceptions: vi.fn(),
+  deleteUnconfirmedAccounts: vi.fn(),
+}));
 
 const logger = pino({ level: 'silent' });
 const email = { transport: { send: () => Promise.resolve() }, webUrl: 'http://localhost:3000' };
@@ -57,6 +64,34 @@ describe('maintenance processor', () => {
 
       expect(UNCONFIRMED_ACCOUNT_DAYS).toBeGreaterThan(1); // the emailed link lasts a day
       expect(remove).toHaveBeenCalledWith(db, new Date('2026-10-23T12:00:00Z'));
+    });
+  });
+
+  describe('deleting ended closures and special hours', () => {
+    const remove = vi.mocked(deleteEndedHoursExceptions);
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('runs several times a day', () => {
+      expect(maintenanceProcessor.schedules).toContainEqual({
+        id: 'delete-ended-hours-exceptions',
+        everyMs: 6 * 60 * 60 * 1000,
+      });
+    });
+
+    it('removes entries that ended before now, and reports how many', async () => {
+      vi.useFakeTimers({ now: new Date('2026-12-26T09:00:00Z'), toFake: ['Date'] });
+      remove.mockResolvedValue(4);
+      const db = {} as Database;
+      await expect(
+        maintenanceProcessor.process(jobNamed('delete-ended-hours-exceptions'), {
+          db,
+          logger,
+          email,
+        }),
+      ).resolves.toEqual({ deleted: 4 });
+      expect(remove).toHaveBeenCalledWith(db, new Date('2026-12-26T09:00:00Z'));
     });
   });
 

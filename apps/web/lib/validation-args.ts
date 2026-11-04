@@ -1,4 +1,5 @@
 import {
+  HOURS_EXCEPTION_AHEAD_DAYS,
   MAX_BOOKING_DAYS,
   MAX_START_AHEAD_DAYS,
   NAME_MAX_LENGTH,
@@ -15,6 +16,8 @@ export function validationArgs(key: ValidationMessage) {
         ? MAX_BOOKING_DAYS
         : key === 'startTooFar'
           ? MAX_START_AHEAD_DAYS
-          : PASSWORD_POLICY.maxLength;
+          : key === 'dateTooFar'
+            ? HOURS_EXCEPTION_AHEAD_DAYS
+            : PASSWORD_POLICY.maxLength;
   return { min: PASSWORD_POLICY.minLength, max };
 }

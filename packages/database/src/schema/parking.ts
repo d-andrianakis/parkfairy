@@ -1,7 +1,7 @@
 /**
  * Parking inventory: listings (facilities), their individually named spaces, weekly opening
- * hours, price rules, photos and proof of the right to rent. Bookings (Phase 3) will reserve a
- * space for a `[start, end)` interval.
+ * hours and the dates that break them, price rules, photos and proof of the right to rent.
+ * Bookings (Phase 3) will reserve a space for a `[start, end)` interval.
  *
  * An owner builds a listing step by step, so a draft may lack most of its columns;
  * `parking_locations_complete_check` holds every other status to the full set.
@@ -9,10 +9,12 @@
 import {
   AREA_IDS,
   BOOKING_GAPS,
+  BOOKING_STEP_MINUTES,
   CANCELLATION_POLICIES,
   CURRENCIES,
   DEFAULT_TIME_ZONE,
   DISCOUNT_LIMITS,
+  HOURS_EXCEPTION_LABEL_MAX,
   LISTING_LIMITS,
   LISTING_STATUSES,
   MAX_BOOKING_DAYS,
@@ -251,6 +253,47 @@ export const parkingOpeningHours = pgTable(
     check(
       'parking_opening_hours_period_check',
       sql`${t.opensMinute} >= 0 and ${t.closesMinute} <= 1440 and ${t.opensMinute} < ${t.closesMinute}`,
+    ),
+  ],
+);
+
+/**
+ * Days, both ends included, when the weekly hours give way, on the listing's wall clock: open
+ * `[opens_minute, closes_minute)` each day instead (decision #25), or the week's hours less
+ * `[closed_from_minute, closed_to_minute)` (decision #28), or with neither pair closed all day.
+ * Ranges of one listing never overlap (exclusion constraint in migration 0012). The label is the
+ * owner's own and never public (decision #26).
+ */
+export const parkingHoursExceptions = pgTable(
+  'parking_hours_exceptions',
+  {
+    id: id(),
+    locationId: uuid('location_id')
+      .notNull()
+      .references(() => parkingLocations.id, { onDelete: 'cascade' }),
+    startsOn: date('starts_on').notNull(),
+    endsOn: date('ends_on').notNull(),
+    opensMinute: smallint('opens_minute'),
+    closesMinute: smallint('closes_minute'),
+    closedFromMinute: smallint('closed_from_minute'),
+    closedToMinute: smallint('closed_to_minute'),
+    label: text('label'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('parking_hours_exceptions_location_ends_idx').on(t.locationId, t.endsOn),
+    check('parking_hours_exceptions_range_check', sql`${t.startsOn} <= ${t.endsOn}`),
+    check(
+      'parking_hours_exceptions_period_check',
+      sql`(${t.opensMinute} is null) = (${t.closesMinute} is null) and (${t.opensMinute} is null or (${t.opensMinute} >= 0 and ${t.closesMinute} <= 1440 and ${t.opensMinute} < ${t.closesMinute} and ${t.opensMinute} % ${limit(BOOKING_STEP_MINUTES)} = 0 and ${t.closesMinute} % ${limit(BOOKING_STEP_MINUTES)} = 0))`,
+    ),
+    check(
+      'parking_hours_exceptions_closed_part_check',
+      sql`(${t.closedFromMinute} is null) = (${t.closedToMinute} is null) and (${t.closedFromMinute} is null or (${t.opensMinute} is null and ${t.closedFromMinute} >= 0 and ${t.closedToMinute} <= 1440 and ${t.closedFromMinute} < ${t.closedToMinute} and ${t.closedFromMinute} % ${limit(BOOKING_STEP_MINUTES)} = 0 and ${t.closedToMinute} % ${limit(BOOKING_STEP_MINUTES)} = 0))`,
+    ),
+    check(
+      'parking_hours_exceptions_label_check',
+      sql`${t.label} is null or char_length(${t.label}) <= ${limit(HOURS_EXCEPTION_LABEL_MAX)}`,
     ),
   ],
 );

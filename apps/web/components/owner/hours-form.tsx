@@ -15,6 +15,8 @@ import { listingStepHref } from '@/lib/owner';
 import { attempt, useOwnerError } from '@/lib/owner-client';
 import {
   ALL_WEEK,
+  closedPartProblem,
+  DEFAULT_CLOSED_PART,
   daysToPeriods,
   periodsToDays,
   WEEKDAYS,
@@ -45,6 +47,8 @@ export function HoursForm({ listing }: { listing: OwnerListing }) {
   const [days, setDays] = useState<DayHours[]>(() => periodsToDays(listing.openingHours));
   /** Keyed by weekday, shown on that day's closing time. */
   const [dayErrors, setDayErrors] = useState<Record<number, string>>({});
+  /** Keyed by the time's id (`closed-to-1`), shown on whichever of a closed part's times is wrong. */
+  const [partErrors, setPartErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -57,6 +61,22 @@ export function HoursForm({ listing }: { listing: OwnerListing }) {
   async function save(destination: 'next' | 'later') {
     if (saving) return;
     setFailure(null);
+    // A closed part outside the hours would make periods the owner never meant.
+    const problems = WEEKDAYS.flatMap((weekday, index) => {
+      const day = days[index];
+      const problem = day?.open ? closedPartProblem(day) : null;
+      if (!problem) return [];
+      const text = problem.reason === 'order' ? message('closedTimeOrder') : t('closedPartInvalid');
+      return [[`closed-${problem.field}-${weekday}`, text ?? ''] as const];
+    });
+    setPartErrors(Object.fromEntries(problems));
+    const [firstProblem] = problems;
+    if (firstProblem) {
+      setDayErrors({});
+      invalid.report(problems.length);
+      focusAfter(firstProblem[0]);
+      return;
+    }
     const periods = daysToPeriods(days);
     const parsed = ListingHoursInputSchema.safeParse({ periods });
     if (!parsed.success) {
@@ -99,6 +119,7 @@ export function HoursForm({ listing }: { listing: OwnerListing }) {
   function preset(hours: DayHours[], announcement: string) {
     setDays(hours.map((day) => ({ ...day })));
     setDayErrors({});
+    setPartErrors({});
     announce(announcement);
   }
 
@@ -171,6 +192,63 @@ export function HoursForm({ listing }: { listing: OwnerListing }) {
                         </SelectOption>
                       ))}
                     </SelectField>
+                    <div className="sm:col-span-2 sm:col-start-2">
+                      <CheckboxField
+                        id={`closed-part-${weekday}`}
+                        label={t('closedPart')}
+                        ariaLabel={t('closedPartOn', { day: name })}
+                        checked={day.closedPart !== undefined}
+                        onChange={(on) =>
+                          update(index, { closedPart: on ? { ...DEFAULT_CLOSED_PART } : undefined })
+                        }
+                      />
+                    </div>
+                    {day.closedPart ? (
+                      <div className="grid gap-3 sm:col-span-2 sm:col-start-2 sm:grid-cols-2">
+                        <SelectField
+                          id={`closed-from-${weekday}`}
+                          label={t('closedFrom')}
+                          aria-label={t('closedFromOn', { day: name })}
+                          value={day.closedPart.from}
+                          error={partErrors[`closed-from-${weekday}`]}
+                          onChange={(event) =>
+                            update(index, {
+                              closedPart: {
+                                to: day.closedPart?.to ?? '',
+                                from: event.target.value,
+                              },
+                            })
+                          }
+                        >
+                          {TIME_OPTIONS.map((time) => (
+                            <SelectOption key={time} value={time}>
+                              {time}
+                            </SelectOption>
+                          ))}
+                        </SelectField>
+                        <SelectField
+                          id={`closed-to-${weekday}`}
+                          label={t('closedTo')}
+                          aria-label={t('closedToOn', { day: name })}
+                          value={day.closedPart.to}
+                          error={partErrors[`closed-to-${weekday}`]}
+                          onChange={(event) =>
+                            update(index, {
+                              closedPart: {
+                                from: day.closedPart?.from ?? '',
+                                to: event.target.value,
+                              },
+                            })
+                          }
+                        >
+                          {TIME_OPTIONS.map((time) => (
+                            <SelectOption key={time} value={time}>
+                              {time}
+                            </SelectOption>
+                          ))}
+                        </SelectField>
+                      </div>
+                    ) : null}
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground sm:col-span-2">{t('closed')}</p>

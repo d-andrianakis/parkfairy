@@ -1,4 +1,4 @@
-import { deleteUnconfirmedAccounts } from '@parkfairy/database';
+import { deleteEndedHoursExceptions, deleteUnconfirmedAccounts } from '@parkfairy/database';
 import { sql } from 'drizzle-orm';
 import { QUEUES, type QueueProcessor } from '../queues.js';
 
@@ -16,6 +16,8 @@ export const maintenanceProcessor: QueueProcessor = {
   schedules: [
     { id: 'heartbeat', everyMs: 60_000 },
     { id: 'delete-unconfirmed-accounts', everyMs: DAY_MS / 4 },
+    // Often enough that an entry goes within hours of its last day.
+    { id: 'delete-ended-hours-exceptions', everyMs: DAY_MS / 4 },
   ],
   async process(job, { db, logger }) {
     switch (job.name) {
@@ -29,6 +31,11 @@ export const maintenanceProcessor: QueueProcessor = {
         const before = new Date(Date.now() - UNCONFIRMED_ACCOUNT_DAYS * DAY_MS);
         const deleted = await deleteUnconfirmedAccounts(db, before);
         logger.info({ deleted }, 'unconfirmed accounts deleted');
+        return { deleted };
+      }
+      case 'delete-ended-hours-exceptions': {
+        const deleted = await deleteEndedHoursExceptions(db, new Date());
+        logger.info({ deleted }, 'ended closures and special hours deleted');
         return { deleted };
       }
       default:

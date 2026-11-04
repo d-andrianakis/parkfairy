@@ -14,10 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@parkfairy/ui/components/card';
-import { CircleAlert, ImageOff } from 'lucide-react';
+import { CalendarX, CircleAlert, ImageOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
+import { closuresHref } from '@/lib/owner-href';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 import { DeleteDraftButton } from './listing-actions';
 import { StepLink } from './navigation';
@@ -133,11 +134,27 @@ export function ListingMilestones({ listing }: { listing: OwnerListingProgress }
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {listing.status === 'published' && listing.slug ? (
+          <div className="flex flex-wrap gap-3">
+            {listing.status === 'published' && listing.slug ? (
+              <Button asChild variant="outline" size="sm" className={WRAPPING_BUTTON}>
+                <Link href={`/parking/${listing.slug}`}>{t('dashboard.viewLive', { name })}</Link>
+              </Button>
+            ) : null}
+            {/* Whatever the status: closures need no review (decision #24). */}
             <Button asChild variant="outline" size="sm" className={WRAPPING_BUTTON}>
-              <Link href={`/parking/${listing.slug}`}>{t('dashboard.viewLive', { name })}</Link>
+              <Link href={closuresHref(listing.id)}>
+                <CalendarX aria-hidden />
+                {/* One flex item: the button's gap would otherwise open around the name. */}
+                <span>
+                  {t.rich('dashboard.closures', {
+                    name,
+                    // The owner's name for it, read in the language they wrote it in.
+                    listing: (chunks) => <span lang={nameLang}>{chunks}</span>,
+                  })}
+                </span>
+              </Link>
             </Button>
-          ) : null}
+          </div>
           {listing.status === 'draft' ? (
             <DeleteDraftButton id={listing.id} name={listing.name} />
           ) : null}

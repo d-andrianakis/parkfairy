@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  HOURS_EXCEPTION_LABEL_MAX,
   isAdult,
   isValidAfm,
+  ListingHoursExceptionsCopyInputSchema,
+  ListingHoursExceptionsInputSchema,
   ListingHoursInputSchema,
   ListingLocationInputSchema,
   ListingLocationPatchSchema,
@@ -12,13 +15,19 @@ import {
   LISTING_MILESTONES,
   LISTING_SPACES_MAX,
   LISTING_STEPS,
+  OWNER_LISTINGS_MAX,
   OwnerProfileInputSchema,
   OwnerProfilePatchSchema,
   OwnerTaxInputSchema,
   wallMinutes,
 } from './owner.js';
 import { photoUrl } from './parking.js';
-import { VALIDATION_MESSAGES } from './validation.js';
+import { addDays } from './time.js';
+import {
+  HOURS_EXCEPTION_AHEAD_DAYS,
+  HOURS_EXCEPTIONS_MAX,
+  VALIDATION_MESSAGES,
+} from './validation.js';
 
 const messages = (result: { success: boolean; error?: { issues: { message: string }[] } }) =>
   result.error?.issues.map((issue) => issue.message) ?? [];
@@ -340,6 +349,158 @@ describe('prices', () => {
   });
 });
 
+describe('closures and special hours', () => {
+  // Midday in Athens on 10 March 2027 (UTC+2 until the end of the month).
+  const TODAY = '2027-03-10';
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2027-03-10T10:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const entry = (
+    startsOn: string,
+    endsOn = startsOn,
+    hours: { opens: string; closes: string } | null = null,
+    closedHours: { from: string; to: string } | null = null,
+  ) => ({ label: null, startsOn, endsOn, hours, closedHours });
+  const check = (...exceptions: object[]) =>
+    ListingHoursExceptionsInputSchema.safeParse({ exceptions });
+  const paths = (result: ReturnType<typeof check>) =>
+    result.error?.issues.map((issue) => issue.path.join('.')) ?? [];
+
+  it('accepts none, a closed day, and a range with other hours', () => {
+    expect(check().success).toBe(true);
+    expect(check(entry('2027-12-25')).success).toBe(true);
+    expect(
+      check({
+        ...entry('2027-12-24', '2027-12-31', { opens: '08:00', closes: '14:00' }),
+        label: 'Γιορτές',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('keeps an entry that ends today, and one that started before it', () => {
+    expect(check(entry(TODAY)).success).toBe(true);
+    expect(check(entry('2027-03-01', TODAY)).success).toBe(true);
+  });
+
+  it('refuses an entry that has ended, read on the Athens calendar', () => {
+    expect(messages(check(entry('2027-03-09')))).toEqual(['dateInPast']);
+    // 00:30 on the 10th in Athens, still the 9th in UTC.
+    vi.setSystemTime(new Date('2027-03-09T22:30:00Z'));
+    expect(messages(check(entry('2027-03-09')))).toEqual(['dateInPast']);
+  });
+
+  it('refuses dates backwards, on the end the owner set', () => {
+    const result = check(entry('2027-12-26', '2027-12-25'));
+    expect(messages(result)).toEqual(['lastDayBeforeFirst']);
+    expect(paths(result)).toEqual(['exceptions.0.endsOn']);
+  });
+
+  it('reaches as far as a stay can, and no further', () => {
+    const latest = addDays(TODAY, HOURS_EXCEPTION_AHEAD_DAYS);
+    expect(check(entry(latest)).success).toBe(true);
+    expect(messages(check(entry(addDays(latest, 1))))).toEqual(['dateTooFar']);
+    expect(messages(check(entry(TODAY, addDays(latest, 1))))).toEqual(['dateTooFar']);
+  });
+
+  it('asks for a date where there is none, or none that exists, without a second message', () => {
+    expect(messages(check(entry('2027-12-01', '2027-02-30')))).toEqual(['dateRequired']);
+    expect(paths(check(entry('2027-02-30', '2027-12-01')))).toEqual(['exceptions.0.startsOn']);
+    expect(messages(check(entry('')))).toEqual(['dateRequired', 'dateRequired']);
+  });
+
+  it('keeps a first day long past while the entry runs, but not one from another age', () => {
+    const earliest = addDays(TODAY, -2 * HOURS_EXCEPTION_AHEAD_DAYS);
+    expect(check(entry(earliest, TODAY)).success).toBe(true);
+    const ancient = check(entry(addDays(earliest, -1), TODAY));
+    expect(messages(ancient)).toEqual(['dateInPast']);
+    expect(paths(ancient)).toEqual(['exceptions.0.startsOn']);
+    // Postgres can't store year 0, so this must never reach it.
+    expect(check(entry('0000-01-01', TODAY)).success).toBe(false);
+  });
+
+  it('opens before it closes, on the half hour, by midnight', () => {
+    const hours = (opens: string, closes: string) =>
+      check(entry('2027-12-24', '2027-12-24', { opens, closes }));
+    expect(hours('08:00', '24:00').success).toBe(true);
+    expect(hours('00:00', '00:30').success).toBe(true);
+    expect(messages(hours('14:00', '08:00'))).toEqual(['hoursOrder']);
+    expect(paths(hours('14:00', '14:00'))).toEqual(['exceptions.0.hours.closes']);
+    expect(messages(hours('08:15', '14:00'))).toEqual(['timeNotOnStep']);
+    expect(hours('24:00', '24:00').success).toBe(false);
+  });
+
+  it('closes part of a day, the right way round and by midnight', () => {
+    const part = (from: string, to: string) =>
+      check(entry('2027-12-24', '2027-12-24', null, { from, to }));
+    expect(part('10:00', '14:00').success).toBe(true);
+    expect(part('20:00', '24:00').success).toBe(true);
+    expect(messages(part('14:00', '10:00'))).toEqual(['closedTimeOrder']);
+    expect(paths(part('14:00', '14:00'))).toEqual(['exceptions.0.closedHours.to']);
+    expect(messages(part('10:10', '14:00'))).toEqual(['timeNotOnStep']);
+  });
+
+  it('never takes other hours and a closed part for the same days', () => {
+    const both = check(
+      entry(
+        '2027-12-24',
+        '2027-12-24',
+        { opens: '08:00', closes: '14:00' },
+        { from: '10:00', to: '11:00' },
+      ),
+    );
+    expect(messages(both)).toEqual(['invalid']);
+    expect(paths(both)).toEqual(['exceptions.0.closedHours']);
+  });
+
+  it('names every entry that shares a day with another, wherever it sits in the list', () => {
+    const long = entry('2027-12-20', '2027-12-31');
+    const result = check(entry('2027-12-28'), long, entry('2027-12-22', '2027-12-23'));
+    expect(paths(result)).toEqual(['exceptions.2.startsOn', 'exceptions.0.startsOn']);
+    expect(new Set(messages(result))).toEqual(new Set(['exceptionOverlap']));
+    expect(messages(check(entry('2027-12-24', '2027-12-25'), entry('2027-12-25')))).toEqual([
+      'exceptionOverlap',
+    ]);
+    expect(check(entry('2027-12-24'), entry('2027-12-25')).success).toBe(true);
+  });
+
+  it('caps the list, the note and what the note may hold', () => {
+    const many = Array.from({ length: HOURS_EXCEPTIONS_MAX + 1 }, (_, day) =>
+      entry(addDays('2027-04-01', day)),
+    );
+    expect(messages(check(...many))).toEqual(['invalid']);
+    expect(check(...many.slice(1)).success).toBe(true);
+    const label = (text: string) => check({ ...entry('2027-12-25'), label: text });
+    expect(label('x'.repeat(HOURS_EXCEPTION_LABEL_MAX)).success).toBe(true);
+    expect(messages(label('x'.repeat(HOURS_EXCEPTION_LABEL_MAX + 1)))).toEqual(['textTooLong']);
+    expect(messages(label('Χριστούγεννα\u0000'))).toEqual(['invalid']);
+    expect(label('  Χριστούγεννα  ').data?.exceptions[0]?.label).toBe('Χριστούγεννα');
+  });
+
+  it('takes nothing it does not know, and no list that is not one', () => {
+    expect(
+      ListingHoursExceptionsInputSchema.safeParse({ exceptions: [], locationId: 'x' }).success,
+    ).toBe(false);
+    expect(ListingHoursExceptionsInputSchema.safeParse({ exceptions: 'all' }).success).toBe(false);
+    expect(ListingHoursExceptionsInputSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('says which way round the dates are wrong, not just that they are', () => {
+    expect(paths(check(entry('2027-12-26', '2027-12-25')))).toEqual(['exceptions.0.endsOn']);
+  });
+
+  it('only ever says what the catalogs can translate', () => {
+    const result = check(entry('2027-03-01'), entry('2027-12-26', '2027-12-25'));
+    for (const text of messages(result)) {
+      expect(VALIDATION_MESSAGES).toContain(text);
+    }
+  });
+});
+
 describe('the rest', () => {
   it('needs the box ticked to submit', () => {
     expect(ListingSubmitInputSchema.safeParse({ confirmed: true }).success).toBe(true);
@@ -363,5 +524,32 @@ describe('the rest', () => {
 
   it('keeps every validation key unique', () => {
     expect(new Set(VALIDATION_MESSAGES).size).toBe(VALIDATION_MESSAGES.length);
+  });
+});
+
+describe('copying closures to other listings', () => {
+  const ids = (count: number) =>
+    Array.from(
+      { length: count },
+      (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+    );
+  const copy = (body: unknown) => ListingHoursExceptionsCopyInputSchema.safeParse(body);
+
+  it('takes from one listing up to as many as an owner can have', () => {
+    expect(copy({ to: ids(1) }).success).toBe(true);
+    expect(copy({ to: ids(OWNER_LISTINGS_MAX) }).success).toBe(true);
+    expect(messages(copy({ to: ids(OWNER_LISTINGS_MAX + 1) }))).toEqual(['invalid']);
+    expect(messages(copy({ to: [] }))).toEqual(['invalid']);
+  });
+
+  it('takes each listing once, and only ids', () => {
+    const [one = ''] = ids(1);
+    expect(copy({ to: [one, one] }).success).toBe(false);
+    expect(copy({ to: ['not-an-id'] }).success).toBe(false);
+  });
+
+  it('takes nothing else, so no other field can steer it', () => {
+    expect(copy({ to: ids(1), from: ids(1)[0] }).success).toBe(false);
+    expect(copy({}).success).toBe(false);
   });
 });

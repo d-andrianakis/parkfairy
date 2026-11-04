@@ -123,6 +123,20 @@ test.describe('signed in', () => {
       data: { firstName: 'Hijacked' },
     });
     expect(edited.status()).toBe(403);
+    // Closures change a live listing with no review, so the same holds for them.
+    const listing = '11111111-1111-4111-8111-111111111111';
+    const closures = await page.request.put(`/api/v1/owner/listings/${listing}/hours-exceptions`, {
+      headers,
+      data: { exceptions: [] },
+    });
+    expect(closures.status()).toBe(403);
+    expect(await closures.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
+    const copied = await page.request.post(
+      `/api/v1/owner/listings/${listing}/hours-exceptions/copy`,
+      { headers, data: { to: [listing] } },
+    );
+    expect(copied.status()).toBe(403);
+    expect(await copied.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
   });
 
   test('sign-in ignores off-site return URLs', async ({ page }) => {

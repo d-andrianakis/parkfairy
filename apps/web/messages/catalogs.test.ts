@@ -40,6 +40,13 @@ function icuArguments(message: string): string[] {
   return [...names].sort();
 }
 
+/** Rich-text tags (`<link>…</link>`), which the component fills in with an element. */
+function richTags(message: string): string[] {
+  return [...new Set([...message.matchAll(/<([A-Za-z]\w*)>/g)].map((match) => match[1] ?? ''))]
+    .filter(Boolean)
+    .sort();
+}
+
 describe('message catalogs', () => {
   it('exist for exactly the supported locales', () => {
     expect(Object.keys(catalogs).sort()).toEqual([...SUPPORTED_LOCALES].sort());
@@ -58,6 +65,12 @@ describe('message catalogs', () => {
       }
     });
 
+    it('wraps the same words in the same tags as English', () => {
+      for (const [key, message] of Object.entries(messages)) {
+        expect(richTags(message), key).toEqual(richTags(reference[key] ?? ''));
+      }
+    });
+
     it('has no empty messages and every message formats', () => {
       const t = createTranslator({
         locale,
@@ -69,7 +82,14 @@ describe('message catalogs', () => {
       for (const [key, message] of Object.entries(messages)) {
         expect(message.trim(), key).not.toBe('');
         const args = Object.fromEntries(icuArguments(message).map((name) => [name, 'x']));
-        expect(() => (t as (k: string, a: object) => string)(key, args), key).not.toThrow();
+        const tags = richTags(message);
+        if (tags.length > 0) {
+          const rich = Object.fromEntries(tags.map((tag) => [tag, (chunks: unknown) => chunks]));
+          const format = t.rich as (k: string, a: object) => unknown;
+          expect(() => format(key, { ...args, ...rich }), key).not.toThrow();
+        } else {
+          expect(() => (t as (k: string, a: object) => string)(key, args), key).not.toThrow();
+        }
       }
     });
   });

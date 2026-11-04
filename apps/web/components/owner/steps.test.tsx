@@ -223,6 +223,104 @@ describe('HoursForm', () => {
     expect(closing).toHaveAttribute('aria-invalid', 'true');
   });
 
+  it('takes a closed part out of a day, and sends two periods', async () => {
+    const { container } = renderInSubtree(<HoursForm listing={listingFixture()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Monday to Friday, 08:00–20:00' }));
+    expect(screen.queryByLabelText('Closed from, Monday')).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Closed for part of the day, Monday' }),
+    );
+    expect(screen.getByLabelText('Closed from, Monday')).toHaveValue('14:00');
+    await userEvent.selectOptions(screen.getByLabelText('Closed until, Monday'), '16:30');
+    await expectNoAxeViolations(container);
+    await userEvent.click(continueButton());
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(periods()?.slice(0, 3)).toEqual([
+      { weekday: 1, opens: '08:00', closes: '14:00' },
+      { weekday: 1, opens: '16:30', closes: '20:00' },
+      { weekday: 2, opens: '08:00', closes: '20:00' },
+    ]);
+  });
+
+  it('refuses a closed part outside the hours, at the time to change', async () => {
+    renderInSubtree(<HoursForm listing={listingFixture()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Monday to Friday, 08:00–20:00' }));
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Closed for part of the day, Tuesday' }),
+    );
+    await userEvent.selectOptions(screen.getByLabelText('Closed until, Tuesday'), '21:00');
+    await userEvent.click(continueButton());
+    const until = screen.getByLabelText('Closed until, Tuesday');
+    await waitFor(() => expect(until).toHaveFocus());
+    expect(until).toHaveAccessibleDescription(
+      'Choose a closed time inside the opening hours, before midnight',
+    );
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('says which of a closed part’s times is wrong, and why', async () => {
+    renderInSubtree(<HoursForm listing={listingFixture()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Monday to Friday, 08:00–20:00' }));
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Closed for part of the day, Monday' }),
+    );
+    // Starting before the day opens: the start is what needs changing.
+    await userEvent.selectOptions(screen.getByLabelText('Closed from, Monday'), '07:00');
+    await userEvent.click(continueButton());
+    const from = screen.getByLabelText('Closed from, Monday');
+    await waitFor(() => expect(from).toHaveFocus());
+    expect(from).toHaveAccessibleDescription(
+      'Choose a closed time inside the opening hours, before midnight',
+    );
+    // Backwards: said on its end, in those words.
+    await userEvent.selectOptions(from, '15:00');
+    await userEvent.selectOptions(screen.getByLabelText('Closed until, Monday'), '12:00');
+    await userEvent.click(continueButton());
+    const until = screen.getByLabelText('Closed until, Monday');
+    await waitFor(() => expect(until).toHaveFocus());
+    expect(until).toHaveAccessibleDescription('The closed time must end after it starts');
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('clears closed parts when a preset fills the week', async () => {
+    renderInSubtree(<HoursForm listing={listingFixture()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Monday to Friday, 08:00–20:00' }));
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Closed for part of the day, Monday' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Monday to Friday, 08:00–20:00' }));
+    expect(
+      screen.getByRole('checkbox', { name: 'Closed for part of the day, Monday' }),
+    ).not.toBeChecked();
+  });
+
+  it('drops a closed part when the owner unticks it', async () => {
+    renderInSubtree(<HoursForm listing={listingFixture()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Monday to Friday, 08:00–20:00' }));
+    const toggle = screen.getByRole('checkbox', { name: 'Closed for part of the day, Monday' });
+    await userEvent.click(toggle);
+    await userEvent.click(toggle);
+    await userEvent.click(continueButton());
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(periods()?.[0]).toEqual({ weekday: 1, opens: '08:00', closes: '20:00' });
+  });
+
+  it('shows a saved break as the owner set it, in Greek', () => {
+    const listing = listingFixture({
+      openingHours: [
+        { weekday: 1, opens: '08:00', closes: '14:00' },
+        { weekday: 1, opens: '17:00', closes: '20:00' },
+      ],
+    });
+    renderInSubtree(<HoursForm listing={listing} />, { locale: 'el' });
+    expect(
+      screen.getByRole('checkbox', { name: 'Κλειστά για μέρος της ημέρας: Δευτέρα' }),
+    ).toBeChecked();
+    expect(screen.getByLabelText('Κλειστά από: Δευτέρα')).toHaveValue('14:00');
+    expect(screen.getByLabelText('Κλειστά έως: Δευτέρα')).toHaveValue('17:00');
+    expect(screen.getByLabelText('Κλείνει: Δευτέρα')).toHaveValue('20:00');
+  });
+
   it('shows saved hours as they were entered, in Greek day names', () => {
     const listing = listingFixture({
       openingHours: [

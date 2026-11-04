@@ -78,6 +78,27 @@
       "when": 1793655040779,
       "tag": "0010_review_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793720676078,
+      "tag": "0011_hours_exceptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793720680591,
+      "tag": "0012_hours_exceptions_no_overlap",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793723498851,
+      "tag": "0013_hours_exceptions_closed_part",
+      "breakpoints": true
     }
   ]
 }

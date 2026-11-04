@@ -1,12 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  HOURS_EXCEPTIONS_MAX,
+  OWNER_LISTINGS_MAX,
+  OwnerHoursExceptionsCopySchema,
+  OwnerHoursExceptionsSchema,
   OwnerListingProgressSchema,
   OwnerListingSchema,
   OwnerOnboardingSchema,
   PHOTO_LIMITS,
   PROOF_LIMITS,
   wallMinutes,
+  zonedParts,
+  type ListingHoursExceptionsCopyInput,
+  type ListingHoursExceptionsInput,
   type ListingHoursInput,
   type ListingLocationPatch,
   type ListingPhotoOrder,
@@ -14,6 +21,9 @@ import {
   type ListingPricesInput,
   type ListingProofPatch,
   type ListingSpacesInput,
+  type OwnerHoursException,
+  type OwnerHoursExceptions,
+  type OwnerHoursExceptionsCopy,
   type OwnerListing,
   type OwnerListingProgress,
   type OwnerOnboarding,
@@ -24,9 +34,9 @@ import {
   type ProofKind,
 } from '@parkfairy/contracts';
 import { schema, type Database } from '@parkfairy/database';
-import { and, asc, count, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, lt, ne } from 'drizzle-orm';
 import { DB } from '../database/database.module.js';
-import { wallTime } from '../parking/opening-hours.js';
+import { hoursOf, wallTime } from '../parking/opening-hours.js';
 import { OBJECT_STORE, type ObjectStore } from '../storage/object-store.js';
 import {
   cleanScan,
@@ -50,12 +60,15 @@ const listing = schema.parkingLocations;
 const profile = schema.ownerProfiles;
 const space = schema.parkingSpaces;
 const hours = schema.parkingOpeningHours;
+const exception = schema.parkingHoursExceptions;
 const rules = schema.parkingPriceRules;
 const discounts = schema.parkingStayDiscounts;
 const photo = schema.parkingPhotos;
 const proof = schema.parkingProofDocuments;
 
 type ListingRow = typeof listing.$inferSelect;
+type ExceptionRow = typeof exception.$inferSelect;
+type CopyOutcome = OwnerHoursExceptionsCopy['results'][number]['outcome'];
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 type Reader = Pick<Database, 'select' | 'selectDistinctOn'>;
 
@@ -74,8 +87,7 @@ interface Cover {
   color: string;
 }
 
-/** Enough for a chain of garages, and a ceiling on what one account can make us store. */
-export const OWNER_LISTINGS_MAX = 50;
+export { OWNER_LISTINGS_MAX };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -113,6 +125,18 @@ export function safeFileName(name: string, contentType: OwnerProof['contentType'
   const stem = clean.replace(/\.[^.]*$/, '').slice(0, PROOF_LIMITS.fileName - 5) || 'document';
   return `${stem}${EXTENSIONS[contentType]}`;
 }
+
+/** The same days and the same hours; the owner's note doesn't matter. */
+const sameEntry = (a: ExceptionRow, b: ExceptionRow) =>
+  a.startsOn === b.startsOn &&
+  a.endsOn === b.endsOn &&
+  a.opensMinute === b.opensMinute &&
+  a.closesMinute === b.closesMinute &&
+  a.closedFromMinute === b.closedFromMinute &&
+  a.closedToMinute === b.closedToMinute;
+
+const shareADay = (a: ExceptionRow, b: ExceptionRow) =>
+  a.startsOn <= b.endsOn && b.startsOn <= a.endsOn;
 
 const isUniqueViolation = (error: unknown, constraint: string) => {
   const cause = (error as { cause?: { code?: string; constraint?: string } }).cause ?? error;
@@ -173,7 +197,7 @@ export class OwnerListingsService {
 
   async get(userId: string, id: string): Promise<OwnerListing> {
     const row = await this.owned(userId, id);
-    const [spaces, periods, prices, photos, proofs, owner] = await Promise.all([
+    const [spaces, periods, exceptions, prices, photos, proofs, owner] = await Promise.all([
       this.db
         .select()
         .from(space)
@@ -184,6 +208,7 @@ export class OwnerListingsService {
         .from(hours)
         .where(eq(hours.locationId, row.id))
         .orderBy(asc(hours.weekday), asc(hours.opensMinute)),
+      this.hoursExceptions(this.db, row),
       this.prices(row),
       this.photos(this.db, row.id),
       this.proofs(row.id),
@@ -227,6 +252,7 @@ export class OwnerListingsService {
         opens: wallTime(period.opensMinute),
         closes: wallTime(period.closesMinute),
       })),
+      hoursExceptions: exceptions,
       prices,
       photos,
       proofs,
@@ -313,6 +339,130 @@ export class OwnerListingsService {
       );
     });
     return this.progress(userId, id);
+  }
+
+  /**
+   * Closures and special hours, whatever the status and with no new review (decision #24): they
+   * only change when drivers can come. What is sent replaces what is stored, so entries that have
+   * ended go too; nobody sees them again. Phase 3 refuses this over a booking (decision #27), here,
+   * under the same lock.
+   */
+  async saveHoursExceptions(
+    userId: string,
+    id: string,
+    { exceptions }: ListingHoursExceptionsInput,
+  ): Promise<OwnerHoursExceptions> {
+    return this.edit(
+      userId,
+      id,
+      async (tx, row) => {
+        await tx.delete(exception).where(eq(exception.locationId, row.id));
+        if (exceptions.length > 0) {
+          await tx.insert(exception).values(
+            exceptions.map(({ label, startsOn, endsOn, hours: open, closedHours: shut }) => ({
+              locationId: row.id,
+              label,
+              startsOn,
+              endsOn,
+              opensMinute: open ? wallMinutes(open.opens) : null,
+              closesMinute: open ? wallMinutes(open.closes) : null,
+              closedFromMinute: shut ? wallMinutes(shut.from) : null,
+              closedToMinute: shut ? wallMinutes(shut.to) : null,
+            })),
+          );
+        }
+        return OwnerHoursExceptionsSchema.parse({
+          exceptions: await this.hoursExceptions(tx, row),
+        });
+      },
+      { anyStatus: true },
+    );
+  }
+
+  /**
+   * Adds this listing's closures and special hours to other listings of the owner's (decision
+   * #29). One transaction, a handful of statements, each listing all or nothing: an entry a
+   * listing already has, the same days and hours, counts as copied. Any other entry on one of those
+   * days is a clash, and that listing is left as it was: which of the two the owner meant is
+   * theirs to say. The targets are locked in id order, so two copies at once can't deadlock.
+   */
+  async copyHoursExceptions(
+    userId: string,
+    id: string,
+    { to }: ListingHoursExceptionsCopyInput,
+  ): Promise<OwnerHoursExceptionsCopy> {
+    const source = await this.owned(userId, id);
+    // Postgres reads a uuid whatever its case; the comparisons here must too.
+    const targets = to
+      .map((target) => target.toLowerCase())
+      .filter((target) => target !== source.id);
+    if (targets.length === 0) return OwnerHoursExceptionsCopySchema.parse({ results: [] });
+    // One reading of the clock for every date below. All listings share one zone (its CHECK).
+    const today = zonedParts(new Date(), source.timeZone).date;
+
+    const outcomes = await this.db.transaction(async (tx) => {
+      const locked = await tx
+        .select({ id: listing.id, status: listing.status })
+        .from(listing)
+        .innerJoin(profile, eq(profile.id, listing.ownerId))
+        .where(and(inArray(listing.id, targets), eq(profile.userId, userId)))
+        .orderBy(asc(listing.id))
+        .for('no key update', { of: listing });
+      // A listing that isn't theirs refuses the lot, with the same 404 as one that doesn't exist.
+      if (locked.length !== targets.length) throw listingNotFound();
+
+      // Ended entries are never shown again, but the overlap constraint still sees them.
+      await tx
+        .delete(exception)
+        .where(and(inArray(exception.locationId, targets), lt(exception.endsOn, today)));
+      const entries = await this.exceptionRows(tx, source.id, today);
+      const heldBy = new Map<string, ExceptionRow[]>();
+      for (const row of await tx
+        .select()
+        .from(exception)
+        .where(inArray(exception.locationId, targets))) {
+        heldBy.set(row.locationId, [...(heldBy.get(row.locationId) ?? []), row]);
+      }
+
+      const result = new Map<string, CopyOutcome>();
+      const added: ExceptionRow[] = [];
+      for (const target of targets) {
+        const held = heldBy.get(target) ?? [];
+        const fresh = entries.filter((entry) => !held.some((own) => sameEntry(own, entry)));
+        if (fresh.some((entry) => held.some((own) => shareADay(own, entry)))) {
+          result.set(target, 'clash');
+        } else if (held.length + fresh.length > HOURS_EXCEPTIONS_MAX) {
+          result.set(target, 'full');
+        } else {
+          result.set(target, 'copied');
+          added.push(...fresh.map((entry) => ({ ...entry, locationId: target })));
+        }
+      }
+      if (added.length > 0) {
+        await tx
+          .insert(exception)
+          .values(added.map(({ id: _id, createdAt: _createdAt, ...entry }) => entry));
+      }
+      // As `edit` does: a draft's last change moves, for its reminder; others keep their row.
+      const touched = locked.filter(
+        (row) => isEditable(row.status) && added.some((entry) => entry.locationId === row.id),
+      );
+      if (touched.length > 0) {
+        await tx
+          .update(listing)
+          .set({ updatedAt: new Date() })
+          .where(
+            inArray(
+              listing.id,
+              touched.map((row) => row.id),
+            ),
+          );
+      }
+      return result;
+    });
+    return OwnerHoursExceptionsCopySchema.parse({
+      results: targets.map((target) => ({ id: target, outcome: outcomes.get(target) })),
+    });
   }
 
   async savePrices(
@@ -744,6 +894,28 @@ export class OwnerListingsService {
     };
   }
 
+  /** Closures and special hours that have not ended on the listing's calendar, soonest first. */
+  private exceptionRows(db: Reader, locationId: string, today: string) {
+    return db
+      .select()
+      .from(exception)
+      .where(and(eq(exception.locationId, locationId), gte(exception.endsOn, today)))
+      .orderBy(asc(exception.startsOn));
+  }
+
+  private async hoursExceptions(
+    db: Reader,
+    row: Pick<ListingRow, 'id' | 'timeZone'>,
+  ): Promise<OwnerHoursException[]> {
+    const rows = await this.exceptionRows(db, row.id, zonedParts(new Date(), row.timeZone).date);
+    return rows.map((row) => ({
+      label: row.label,
+      startsOn: row.startsOn,
+      endsOn: row.endsOn,
+      ...hoursOf(row),
+    }));
+  }
+
   private photos(db: Reader, id: string) {
     return db
       .select({
@@ -814,19 +986,24 @@ export class OwnerListingsService {
   /**
    * Every change to a listing: owned, still editable, and done under its row lock. The status is
    * read inside the lock, so a save that started before a submission can't land after it, and
-   * `updated_at`, which the reminder reads, moves with every change.
+   * a draft's `updated_at`, which the reminder reads, moves with every change. `anyStatus` is for
+   * what an owner may change on a listing staff have or that is live; such a listing's row is
+   * left alone, since rewriting it moves every one of its indexes, search's included.
    */
   private async edit<T>(
     userId: string,
     id: string,
     work: (tx: Transaction, row: ListingRow) => Promise<T>,
+    { anyStatus = false }: { anyStatus?: boolean } = {},
   ): Promise<T> {
     const owned = await this.owned(userId, id);
     return this.db.transaction(async (tx) => {
       const [row] = await tx.select().from(listing).where(eq(listing.id, owned.id)).for('update');
-      if (!row || !isEditable(row.status)) throw conflict('LISTING_LOCKED');
+      if (!row || (!anyStatus && !isEditable(row.status))) throw conflict('LISTING_LOCKED');
       const result = await work(tx, row);
-      await tx.update(listing).set({ updatedAt: new Date() }).where(eq(listing.id, owned.id));
+      if (isEditable(row.status)) {
+        await tx.update(listing).set({ updatedAt: new Date() }).where(eq(listing.id, owned.id));
+      }
       return result;
     });
   }

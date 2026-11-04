@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs';
 import {
   addDays,
   DEFAULT_TIME_ZONE,
+  HOURS_EXCEPTIONS_MAX,
+  OwnerHoursExceptionsCopySchema,
+  OwnerHoursExceptionsSchema,
   OwnerListingProgressSchema,
   OwnerListingSchema,
   OwnerOnboardingSchema,
@@ -20,6 +23,7 @@ import {
 import {
   claimDueEmails,
   countOverdueEmails,
+  deleteEndedHoursExceptions,
   enqueueListingStatusEmails,
   enqueueOnboardingReminders,
   markEmailFailed,
@@ -33,7 +37,7 @@ import {
 import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { DB } from '../src/database/database.module.js';
 import { OWNER_LISTINGS_MAX } from '../src/owner/owner-listings.service.js';
 import { OBJECT_STORE, type ObjectStore } from '../src/storage/object-store.js';
@@ -1172,6 +1176,656 @@ describe('owner onboarding', () => {
       // Nothing about the owner reaches the public.
       expect(JSON.stringify(response.body)).not.toContain('Παπαδοπούλου');
       expect(JSON.stringify(response.body)).not.toContain('μισθωτήριο');
+    });
+  });
+
+  describe('closures and special hours', () => {
+    let keeper: TestUser;
+    const today = () => zonedParts(new Date(), DEFAULT_TIME_ZONE).date;
+    const inDays = (days: number) => addDays(today(), days);
+    const closed = (startsOn: string, endsOn = startsOn, label: string | null = null) => ({
+      label,
+      startsOn,
+      endsOn,
+      hours: null,
+      closedHours: null,
+    });
+    const save = (user: TestUser, id: string, exceptions: object[]) =>
+      api(user, 'put', `/listings/${id}/hours-exceptions`).send({ exceptions });
+    const at = (day: string, from: string, to: string) => ({
+      start: zonedTimeToUtc(day, from, DEFAULT_TIME_ZONE)?.toISOString(),
+      end: zonedTimeToUtc(day, to, DEFAULT_TIME_ZONE)?.toISOString(),
+    });
+
+    const live: string[] = [];
+
+    /** Sent in, then put live by hand, as staff do until the admin screen exists. */
+    async function liveListing(): Promise<{ id: string; slug: string }> {
+      const id = await readyListing(keeper);
+      live.push(id);
+      const done = await api(keeper, 'post', `/listings/${id}/submit`)
+        .send({ confirmed: true })
+        .expect(200);
+      await db
+        .update(schema.parkingLocations)
+        .set({ status: 'published' })
+        .where(eq(schema.parkingLocations.id, id));
+      return { id, slug: OwnerListingProgressSchema.parse(done.body).slug ?? '' };
+    }
+
+    async function publishAgain(id: string) {
+      await db
+        .update(schema.parkingLocations)
+        .set({ status: 'published' })
+        .where(eq(schema.parkingLocations.id, id));
+    }
+
+    /** Back out of the public catalogue, so other tests' searches never meet it. */
+    async function unpublish(id: string) {
+      await db
+        .update(schema.parkingLocations)
+        .set({ status: 'draft', slug: `draft-${id}` })
+        .where(eq(schema.parkingLocations.id, id));
+    }
+
+    beforeAll(async () => {
+      keeper = await signUpUser(app);
+      await api(keeper, 'patch', '/profile').send(profile).expect(200);
+      await api(keeper, 'put', '/profile/tax').send(tax).expect(200);
+    });
+
+    afterEach(async () => {
+      for (const id of live.splice(0)) await unpublish(id);
+    });
+
+    it('keeps what is saved, soonest first, with the owner’s note', async () => {
+      const id = await newListing(keeper);
+      const eve = {
+        label: 'Παραμονή',
+        startsOn: inDays(40),
+        endsOn: inDays(40),
+        hours: { opens: '08:00', closes: '14:00' },
+        closedHours: null,
+      };
+      const response = await save(keeper, id, [
+        closed(inDays(41), inDays(42), 'Χριστούγεννα'),
+        eve,
+      ]).expect(200);
+      const expected = [eve, closed(inDays(41), inDays(42), 'Χριστούγεννα')];
+      expect(OwnerHoursExceptionsSchema.parse(response.body).exceptions).toEqual(expected);
+      const listing = OwnerListingSchema.parse(
+        (await api(keeper, 'get', `/listings/${id}`).expect(200)).body,
+      );
+      expect(listing.hoursExceptions).toEqual(expected);
+      // Optional: nothing about the steps moves.
+      expect(listing.progress.doneSteps).toEqual([]);
+    });
+
+    it('replaces the whole list, and an empty one clears it', async () => {
+      const id = await newListing(keeper);
+      await save(keeper, id, [closed(inDays(10)), closed(inDays(12))]).expect(200);
+      await save(keeper, id, [closed(inDays(11))]).expect(200);
+      const kept = await db
+        .select()
+        .from(schema.parkingHoursExceptions)
+        .where(eq(schema.parkingHoursExceptions.locationId, id));
+      expect(kept.map((row) => row.startsOn)).toEqual([inDays(11)]);
+      const cleared = await save(keeper, id, []).expect(200);
+      expect(OwnerHoursExceptionsSchema.parse(cleared.body).exceptions).toEqual([]);
+    });
+
+    it('lets nobody else read or change them', async () => {
+      const id = await newListing(keeper);
+      await save(keeper, id, [closed(inDays(5), inDays(5), 'Ιδιωτικό')]).expect(200);
+      const theirs = await save(stranger, id, []).expect(404);
+      expect((theirs.body as { code: string }).code).toBe('LISTING_NOT_FOUND');
+      await save(stranger, 'not-a-uuid', []).expect(404);
+      const listing = OwnerListingSchema.parse(
+        (await api(keeper, 'get', `/listings/${id}`).expect(200)).body,
+      );
+      expect(listing.hoursExceptions).toHaveLength(1);
+    });
+
+    it('refuses what can’t be meant, naming the entry and the field', async () => {
+      const id = await newListing(keeper);
+      const overlap = await save(keeper, id, [
+        closed(inDays(10), inDays(12)),
+        closed(inDays(12)),
+      ]).expect(400);
+      expect(overlap.body).toMatchObject({
+        code: 'VALIDATION_FAILED',
+        message: ['exceptionOverlap'],
+      });
+      const ended = await save(keeper, id, [closed(inDays(-1))]).expect(400);
+      expect((ended.body as { message: string[] }).message).toEqual(['dateInPast']);
+      await save(keeper, id, [closed(inDays(400))]).expect(400);
+      await save(keeper, id, [
+        { ...closed(inDays(3)), hours: { opens: '14:00', closes: '08:00' } },
+      ]).expect(400);
+      await api(keeper, 'put', `/listings/${id}/hours-exceptions`)
+        .send({ exceptions: [], locationId: randomUUID() })
+        .expect(400);
+    });
+
+    it('stays open to the owner while staff have the listing and once it is live', async () => {
+      const id = await readyListing(keeper);
+      await api(keeper, 'post', `/listings/${id}/submit`).send({ confirmed: true }).expect(200);
+      await save(keeper, id, [closed(inDays(3))]).expect(200);
+      // The steps themselves stay locked.
+      await api(keeper, 'put', `/listings/${id}/hours`).send(hours).expect(409);
+
+      for (const status of ['published', 'suspended', 'changes_requested'] as const) {
+        await db
+          .update(schema.parkingLocations)
+          .set({ status })
+          .where(eq(schema.parkingLocations.id, id));
+        await save(keeper, id, [closed(inDays(4))]).expect(200);
+      }
+      // No new review: the status is where staff left it.
+      expect((await progress(keeper, id)).status).toBe('changes_requested');
+      await unpublish(id);
+    });
+
+    it('takes a closed day out of search and says so on the listing page', async () => {
+      const { id, slug } = await liveListing();
+      const shut = inDays(20);
+      const short = inDays(21);
+      await save(keeper, id, [
+        closed(shut, shut, 'Απογραφή'),
+        {
+          label: null,
+          startsOn: short,
+          endsOn: short,
+          hours: { opens: '08:00', closes: '14:00' },
+          closedHours: null,
+        },
+      ]).expect(200);
+
+      const found = async (window: object) => {
+        const response = await request(app.getHttpServer())
+          .get('/v1/parking/search')
+          .query({ ...HERE, ...window })
+          .expect(200);
+        return ParkingSearchResponseSchema.parse(response.body).results.some(
+          (result) => result.slug === slug,
+        );
+      };
+      const page = async (window: object) =>
+        ParkingListingDetailSchema.parse(
+          (await request(app.getHttpServer()).get(`/v1/parking/${slug}`).query(window).expect(200))
+            .body,
+        );
+
+      expect(await found(at(shut, '10:00', '12:00'))).toBe(false);
+      // 22:30 the evening before in UTC: the closed day is still the one the stay is on.
+      expect(await found(at(shut, '00:30', '01:30'))).toBe(false);
+      expect(await found(at(inDays(19), '10:00', '12:00'))).toBe(true);
+      expect(await found(at(inDays(19), '22:30', '23:30'))).toBe(true);
+      expect(await found(at(short, '09:00', '13:00'))).toBe(true);
+      expect(await found(at(short, '13:00', '15:00'))).toBe(false);
+      // A stay of several days fails on the one closed day in the middle.
+      expect(
+        await found({
+          start: at(inDays(19), '10:00', '12:00').start,
+          end: at(inDays(22), '10:00', '12:00').end,
+        }),
+      ).toBe(false);
+
+      const closedDay = await page(at(shut, '10:00', '12:00'));
+      expect(closedDay.availability?.open).toBe(false);
+      expect((await page(at(short, '09:00', '13:00'))).availability?.open).toBe(true);
+      expect(closedDay.hoursExceptions).toEqual([
+        { startsOn: shut, endsOn: shut, hours: null, closedHours: null },
+        {
+          startsOn: short,
+          endsOn: short,
+          hours: { opens: '08:00', closes: '14:00' },
+          closedHours: null,
+        },
+      ]);
+      // The owner's note never reaches the public.
+      const raw = await request(app.getHttpServer()).get(`/v1/parking/${slug}`).expect(200);
+      expect(JSON.stringify(raw.body)).not.toContain('Απογραφή');
+      for (const entry of (raw.body as { hoursExceptions: object[] }).hoursExceptions) {
+        expect(Object.keys(entry).sort()).toEqual(['closedHours', 'endsOn', 'hours', 'startsOn']);
+      }
+      await unpublish(id);
+    });
+
+    it('drops an entry once it has ended, for the owner and the public alike', async () => {
+      const { id, slug } = await liveListing();
+      await db.insert(schema.parkingHoursExceptions).values([
+        { locationId: id, startsOn: inDays(-3), endsOn: inDays(-1) },
+        { locationId: id, startsOn: inDays(0), endsOn: inDays(0) },
+      ]);
+      const owned = OwnerListingSchema.parse(
+        (await api(keeper, 'get', `/listings/${id}`).expect(200)).body,
+      );
+      expect(owned.hoursExceptions.map((entry) => entry.endsOn)).toEqual([inDays(0)]);
+      const shown = ParkingListingDetailSchema.parse(
+        (await request(app.getHttpServer()).get(`/v1/parking/${slug}`).expect(200)).body,
+      );
+      expect(shown.hoursExceptions.map((entry) => entry.endsOn)).toEqual([inDays(0)]);
+      await unpublish(id);
+    });
+
+    it('closes part of a day and keeps the week’s hours around it, in search and on the page', async () => {
+      const { id, slug } = await liveListing();
+      const cleaning = inDays(25);
+      await save(keeper, id, [
+        { ...closed(cleaning), closedHours: { from: '10:00', to: '14:00' } },
+      ]).expect(200);
+      const owned = OwnerListingSchema.parse(
+        (await api(keeper, 'get', `/listings/${id}`).expect(200)).body,
+      );
+      expect(owned.hoursExceptions[0]).toMatchObject({
+        hours: null,
+        closedHours: { from: '10:00', to: '14:00' },
+      });
+
+      const found = async (from: string, to: string) => {
+        const response = await request(app.getHttpServer())
+          .get('/v1/parking/search')
+          .query({ ...HERE, ...at(cleaning, from, to) })
+          .expect(200);
+        return ParkingSearchResponseSchema.parse(response.body).results.some(
+          (result) => result.slug === slug,
+        );
+      };
+      expect(await found('08:00', '10:00')).toBe(true);
+      expect(await found('14:00', '20:00')).toBe(true);
+      expect(await found('09:00', '11:00')).toBe(false);
+      expect(await found('13:30', '15:00')).toBe(false);
+
+      const shown = ParkingListingDetailSchema.parse(
+        (await request(app.getHttpServer()).get(`/v1/parking/${slug}`).expect(200)).body,
+      );
+      expect(shown.hoursExceptions).toEqual([
+        {
+          startsOn: cleaning,
+          endsOn: cleaning,
+          hours: null,
+          closedHours: { from: '10:00', to: '14:00' },
+        },
+      ]);
+      await unpublish(id);
+    });
+
+    it('takes a break in the weekly hours, and search keeps to it', async () => {
+      const { id, slug } = await liveListing();
+      // Every day 08:00–20:00, closed 14:00–17:00: two periods a day, three on none.
+      const week = WEEK.flatMap((weekday) => [
+        { weekday, opens: '08:00', closes: '14:00' },
+        { weekday, opens: '17:00', closes: '20:00' },
+      ]);
+      await db
+        .update(schema.parkingLocations)
+        .set({ status: 'draft' })
+        .where(eq(schema.parkingLocations.id, id));
+      await api(keeper, 'put', `/listings/${id}/hours`).send({ periods: week }).expect(200);
+      await publishAgain(id);
+      const owned = OwnerListingSchema.parse(
+        (await api(keeper, 'get', `/listings/${id}`).expect(200)).body,
+      );
+      expect(owned.openingHours.filter((period) => period.weekday === 1)).toEqual(week.slice(0, 2));
+
+      const found = async (from: string, to: string) => {
+        const response = await request(app.getHttpServer())
+          .get('/v1/parking/search')
+          .query({ ...HERE, ...at(inDays(9), from, to) })
+          .expect(200);
+        return ParkingSearchResponseSchema.parse(response.body).results.some(
+          (result) => result.slug === slug,
+        );
+      };
+      expect(await found('09:00', '13:00')).toBe(true);
+      expect(await found('13:00', '15:00')).toBe(false);
+      expect(await found('17:00', '19:00')).toBe(true);
+      await unpublish(id);
+    });
+
+    it('takes up to three weekly periods a day, which a night with a break needs', async () => {
+      const id = await newListing(keeper);
+      const nights = WEEK.flatMap((weekday) => [
+        { weekday, opens: '00:00', closes: '02:00' },
+        { weekday, opens: '08:00', closes: '14:00' },
+        { weekday, opens: '17:00', closes: '24:00' },
+      ]);
+      await api(keeper, 'put', `/listings/${id}/hours`).send({ periods: nights }).expect(200);
+      await api(keeper, 'put', `/listings/${id}/hours`)
+        .send({ periods: [...nights, { weekday: 1, opens: '03:00', closes: '04:00' }] })
+        .expect(400);
+    });
+
+    describe('copied to the owner’s other listings', () => {
+      const entries = () => [
+        closed(inDays(30), inDays(30), 'Αργία'),
+        { ...closed(inDays(31)), closedHours: { from: '12:00', to: '15:00' } },
+      ];
+      const copy = (user: TestUser, id: string, to: string[]) =>
+        api(user, 'post', `/listings/${id}/hours-exceptions/copy`).send({ to });
+      const outcomes = (response: request.Response) =>
+        OwnerHoursExceptionsCopySchema.parse(response.body).results;
+      const held = async (user: TestUser, id: string) =>
+        OwnerListingSchema.parse((await api(user, 'get', `/listings/${id}`).expect(200)).body)
+          .hoursExceptions;
+      // Copying has its own limit per visitor, and each test user is one: a new owner per test.
+      const freshOwner = () => signUpUser(app);
+
+      it('adds the entries to each listing chosen, live or not, notes and all', async () => {
+        const source = await newListing(keeper);
+        const draft = await newListing(keeper);
+        const { id: live } = await liveListing();
+        await save(keeper, source, entries()).expect(200);
+        await save(keeper, draft, [closed(inDays(40))]).expect(200);
+
+        const response = await copy(keeper, source, [draft, live]).expect(200);
+        expect(outcomes(response)).toEqual([
+          { id: draft, outcome: 'copied' },
+          { id: live, outcome: 'copied' },
+        ]);
+        expect(await held(keeper, draft)).toEqual([...entries(), closed(inDays(40))]);
+        expect(await held(keeper, live)).toEqual(entries());
+        expect((await progress(keeper, live)).status).toBe('published');
+      });
+
+      it('counts what a listing already has as copied, so copying twice is harmless', async () => {
+        const owner = await freshOwner();
+        const source = await newListing(owner);
+        const other = await newListing(owner);
+        await save(owner, source, entries()).expect(200);
+        await copy(owner, source, [other]).expect(200);
+        expect(outcomes(await copy(owner, source, [other]).expect(200))[0]?.outcome).toBe('copied');
+        expect(await held(owner, other)).toHaveLength(2);
+      });
+
+      it('keeps a listing’s own note on an entry it already has', async () => {
+        const owner = await freshOwner();
+        const source = await newListing(owner);
+        const other = await newListing(owner);
+        await save(owner, source, [closed(inDays(30), inDays(30), 'Αργία')]).expect(200);
+        await save(owner, other, [closed(inDays(30), inDays(30), 'Δική μου')]).expect(200);
+        expect(outcomes(await copy(owner, source, [other]).expect(200))[0]?.outcome).toBe('copied');
+        expect(await held(owner, other)).toEqual([closed(inDays(30), inDays(30), 'Δική μου')]);
+      });
+
+      it('leaves a listing with other hours on one of those days exactly as it was', async () => {
+        const owner = await freshOwner();
+        const source = await newListing(owner);
+        const busy = await newListing(owner);
+        await save(owner, source, entries()).expect(200);
+        const own = [{ ...closed(inDays(31)), hours: { opens: '09:00', closes: '12:00' } }];
+        await save(owner, busy, own).expect(200);
+        expect(outcomes(await copy(owner, source, [busy]).expect(200))).toEqual([
+          { id: busy, outcome: 'clash' },
+        ]);
+        expect(await held(owner, busy)).toEqual(own);
+      });
+
+      it('answers for each listing on its own: one clash stops none of the others', async () => {
+        const owner = await freshOwner();
+        const source = await newListing(owner);
+        const busy = await newListing(owner);
+        const free = await newListing(owner);
+        await save(owner, source, entries()).expect(200);
+        const own = [{ ...closed(inDays(30)), hours: { opens: '09:00', closes: '12:00' } }];
+        await save(owner, busy, own).expect(200);
+        expect(outcomes(await copy(owner, source, [busy, free]).expect(200))).toEqual([
+          { id: busy, outcome: 'clash' },
+          { id: free, outcome: 'copied' },
+        ]);
+        expect(await held(owner, busy)).toEqual(own);
+        expect(await held(owner, free)).toEqual(entries());
+      });
+
+      it('fills a listing to the limit exactly, and no further', async () => {
+        const owner = await freshOwner();
+        const source = await newListing(owner);
+        const room = await newListing(owner);
+        const full = await newListing(owner);
+        await save(owner, source, entries()).expect(200);
+        const others = (count: number) =>
+          Array.from({ length: count }, (_, day) => closed(inDays(100 + day)));
+        await save(owner, room, others(HOURS_EXCEPTIONS_MAX - 2)).expect(200);
+        await save(owner, full, others(HOURS_EXCEPTIONS_MAX - 1)).expect(200);
+        expect(outcomes(await copy(owner, source, [room, full]).expect(200))).toEqual([
+          { id: room, outcome: 'copied' },
+          { id: full, outcome: 'full' },
+        ]);
+        expect(await held(owner, room)).toHaveLength(HOURS_EXCEPTIONS_MAX);
+        expect(await held(owner, full)).toHaveLength(HOURS_EXCEPTIONS_MAX - 1);
+      });
+
+      it('clears entries that ended, which would otherwise block a copy unseen', async () => {
+        const owner = await freshOwner();
+        const source = await newListing(owner);
+        const other = await newListing(owner);
+        await save(owner, source, [closed(inDays(-2), inDays(3))]).expect(200);
+        await db
+          .insert(schema.parkingHoursExceptions)
+          .values({ locationId: other, startsOn: inDays(-2), endsOn: inDays(-1) });
+        expect(outcomes(await copy(owner, source, [other]).expect(200))[0]?.outcome).toBe('copied');
+      });
+
+      it('copies nothing anywhere when one listing named is not the owner’s', async () => {
+        const owner = await freshOwner();
+        const source = await newListing(owner);
+        const mine = await newListing(owner);
+        const theirs = await newListing(stranger);
+        await save(owner, source, entries()).expect(200);
+        const response = await copy(owner, source, [mine, theirs]).expect(404);
+        expect((response.body as { code: string }).code).toBe('LISTING_NOT_FOUND');
+        expect(await held(owner, mine)).toEqual([]);
+        await copy(owner, source, [randomUUID()]).expect(404);
+        // Nor from a listing that isn't theirs.
+        await copy(stranger, source, [theirs]).expect(404);
+      });
+
+      it('passes over the listing copied from, and refuses a list that makes no sense', async () => {
+        const owner = await freshOwner();
+        const source = await newListing(owner);
+        await save(owner, source, entries()).expect(200);
+        expect(outcomes(await copy(owner, source, [source]).expect(200))).toEqual([]);
+        // The same listing in capitals is still that listing.
+        expect(outcomes(await copy(owner, source, [source.toUpperCase()]).expect(200))).toEqual([]);
+        await copy(owner, source, []).expect(400);
+        await copy(owner, source, ['not-a-uuid']).expect(400);
+        const other = await newListing(owner);
+        await copy(owner, source, [other, other]).expect(400);
+      });
+
+      it('has a limit of its own, well below the general one', async () => {
+        const owner = await freshOwner();
+        const source = await newListing(owner);
+        const other = await newListing(owner);
+        const answers = [];
+        for (let call = 0; call < 11; call++) {
+          answers.push((await copy(owner, source, [other])).status);
+        }
+        expect(answers.slice(0, 10).every((status) => status === 200)).toBe(true);
+        expect(answers[10]).toBe(429);
+      });
+
+      it('leaves a live listing’s row alone, and moves a draft’s for its reminder', async () => {
+        const source = await newListing(keeper);
+        const draft = await newListing(keeper);
+        const { id: live } = await liveListing();
+        await save(keeper, source, [closed(inDays(60))]).expect(200);
+        const before = async (id: string) =>
+          (
+            await db
+              .select({ updatedAt: schema.parkingLocations.updatedAt })
+              .from(schema.parkingLocations)
+              .where(eq(schema.parkingLocations.id, id))
+          )[0]?.updatedAt.getTime() ?? 0;
+        const [draftBefore, liveBefore] = [await before(draft), await before(live)];
+        await copy(keeper, source, [draft, live]).expect(200);
+        expect(await before(draft)).toBeGreaterThan(draftBefore);
+        expect(await before(live)).toBe(liveBefore);
+      });
+    });
+
+    describe('at the same moment', () => {
+      it('takes two saves of one listing, keeping exactly one of the two lists', async () => {
+        const owner = await signUpUser(app);
+        const one = [closed(inDays(10), inDays(12))];
+        const two = [closed(inDays(11)), closed(inDays(14))];
+        // Several rounds, several listings at once: one pair alone rarely interleaves locally.
+        for (let round = 0; round < 4; round++) {
+          const ids = [await newListing(owner), await newListing(owner), await newListing(owner)];
+          const answers = await Promise.all(
+            ids.flatMap((id) => [save(owner, id, one), save(owner, id, two)]),
+          );
+          expect(answers.map((answer) => answer.status)).toEqual(answers.map(() => 200));
+          for (const id of ids) {
+            const stored = OwnerListingSchema.parse(
+              (await api(owner, 'get', `/listings/${id}`).expect(200)).body,
+            ).hoursExceptions;
+            expect([one, two]).toContainEqual(stored);
+          }
+        }
+      });
+
+      it('takes a copy into a listing and a save of it one after the other', async () => {
+        const owner = await signUpUser(app);
+        const source = await newListing(owner);
+        const target = await newListing(owner);
+        await save(owner, source, [closed(inDays(31))]).expect(200);
+        const own = [{ ...closed(inDays(31)), hours: { opens: '08:00', closes: '12:00' } }];
+        const [saved, copied] = await Promise.all([
+          save(owner, target, own),
+          api(owner, 'post', `/listings/${source}/hours-exceptions/copy`).send({ to: [target] }),
+        ]);
+        expect([saved.status, copied.status]).toEqual([200, 200]);
+        const outcome = OwnerHoursExceptionsCopySchema.parse(copied.body).results[0]?.outcome;
+        const stored = OwnerListingSchema.parse(
+          (await api(owner, 'get', `/listings/${target}`).expect(200)).body,
+        ).hoursExceptions;
+        // The save replaces the list whichever came first; a copy after it found the clash.
+        expect(stored).toEqual(own);
+        expect(['copied', 'clash']).toContain(outcome);
+      });
+
+      it('copies two listings into one: one gets in, the other clashes', async () => {
+        const owner = await signUpUser(app);
+        const [first, second, target] = [
+          await newListing(owner),
+          await newListing(owner),
+          await newListing(owner),
+        ];
+        await save(owner, first, [closed(inDays(31))]).expect(200);
+        await save(owner, second, [
+          { ...closed(inDays(31)), hours: { opens: '08:00', closes: '12:00' } },
+        ]).expect(200);
+        const copy = (source: string) =>
+          api(owner, 'post', `/listings/${source}/hours-exceptions/copy`).send({ to: [target] });
+        const answers = await Promise.all([copy(first), copy(second)]);
+        expect(answers.map((answer) => answer.status)).toEqual([200, 200]);
+        const results = answers.map(
+          (answer) => OwnerHoursExceptionsCopySchema.parse(answer.body).results[0]?.outcome,
+        );
+        expect(results.toSorted()).toEqual(['clash', 'copied']);
+        const stored = OwnerListingSchema.parse(
+          (await api(owner, 'get', `/listings/${target}`).expect(200)).body,
+        ).hoursExceptions;
+        expect(stored).toHaveLength(1);
+      });
+    });
+
+    it('sweeps away entries once they end, notes and all, on the listing’s own calendar', async () => {
+      const id = await newListing(keeper);
+      const [yesterday, todayDate] = [inDays(-1), today()];
+      await db.insert(schema.parkingHoursExceptions).values([
+        { locationId: id, startsOn: inDays(-3), endsOn: yesterday, label: 'Ιδιωτικό' },
+        { locationId: id, startsOn: todayDate, endsOn: todayDate },
+      ]);
+      const left = async () =>
+        (
+          await db
+            .select({ endsOn: schema.parkingHoursExceptions.endsOn })
+            .from(schema.parkingHoursExceptions)
+            .where(eq(schema.parkingHoursExceptions.locationId, id))
+        ).map((row) => row.endsOn);
+      // Moments that have passed, so nothing still running anywhere is touched. At 23:30 on
+      // yesterday's date in Athens, yesterday hasn't ended.
+      await deleteEndedHoursExceptions(db, zonedTimeToUtc(yesterday, '23:30', DEFAULT_TIME_ZONE)!);
+      expect(await left()).toEqual([yesterday, todayDate]);
+      // Half an hour into today in Athens it has, though in UTC it is still yesterday evening.
+      const justAfter = zonedTimeToUtc(todayDate, '00:30', DEFAULT_TIME_ZONE)!;
+      expect(justAfter.toISOString().slice(0, 10)).toBe(yesterday);
+      await deleteEndedHoursExceptions(db, justAfter);
+      expect(await left()).toEqual([todayDate]);
+    });
+
+    it.todo('refuses closing time over a confirmed booking until the owner cancels it (#27)');
+
+    describe('the database’s own rules', () => {
+      /** The constraint the database named in refusing, so a test can't pass on the wrong one. */
+      const refusedBy = async (insert: Promise<unknown>) => {
+        try {
+          await insert;
+        } catch (error) {
+          const cause = (error as { cause?: { constraint?: string } }).cause;
+          return cause?.constraint;
+        }
+        return 'accepted';
+      };
+      const insert = (values: Partial<typeof schema.parkingHoursExceptions.$inferInsert>) =>
+        db.insert(schema.parkingHoursExceptions).values({
+          locationId: '',
+          startsOn: '2099-02-01',
+          endsOn: '2099-02-01',
+          ...values,
+        });
+
+      it('refuses two entries on one day', async () => {
+        const id = await newListing(keeper);
+        await insert({ locationId: id, startsOn: '2099-01-01', endsOn: '2099-01-03' });
+        expect(
+          await refusedBy(insert({ locationId: id, startsOn: '2099-01-03', endsOn: '2099-01-05' })),
+        ).toBe('parking_hours_exceptions_no_overlap');
+      });
+
+      it('refuses dates backwards, half a time and times off the half hour', async () => {
+        const id = await newListing(keeper);
+        expect(
+          await refusedBy(insert({ locationId: id, startsOn: '2099-02-02', endsOn: '2099-02-01' })),
+        ).toBe('parking_hours_exceptions_range_check');
+        expect(await refusedBy(insert({ locationId: id, opensMinute: 480 }))).toBe(
+          'parking_hours_exceptions_period_check',
+        );
+        expect(
+          await refusedBy(insert({ locationId: id, opensMinute: 480, closesMinute: 495 })),
+        ).toBe('parking_hours_exceptions_period_check');
+      });
+
+      it('refuses a closed part that is half there, backwards, or beside other hours', async () => {
+        const id = await newListing(keeper);
+        expect(await refusedBy(insert({ locationId: id, closedFromMinute: 600 }))).toBe(
+          'parking_hours_exceptions_closed_part_check',
+        );
+        expect(
+          await refusedBy(insert({ locationId: id, closedFromMinute: 840, closedToMinute: 600 })),
+        ).toBe('parking_hours_exceptions_closed_part_check');
+        expect(
+          await refusedBy(
+            insert({
+              locationId: id,
+              opensMinute: 480,
+              closesMinute: 1200,
+              closedFromMinute: 600,
+              closedToMinute: 840,
+            }),
+          ),
+        ).toBe('parking_hours_exceptions_closed_part_check');
+      });
+
+      it('refuses a note longer than the form allows', async () => {
+        const id = await newListing(keeper);
+        expect(await refusedBy(insert({ locationId: id, label: 'x'.repeat(81) }))).toBe(
+          'parking_hours_exceptions_label_check',
+        );
+      });
     });
   });
 

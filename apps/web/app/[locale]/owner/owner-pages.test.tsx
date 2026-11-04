@@ -2,14 +2,19 @@ import { LISTING_STEPS } from '@parkfairy/contracts';
 import { screen } from '@testing-library/react';
 import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadOwnerListing, loadOwnerProfile } from '@/lib/owner.server';
+import { loadOwnerListing, loadOwnerOnboarding, loadOwnerProfile } from '@/lib/owner.server';
 import { requireSession } from '@/lib/session';
 import { LISTING_ID, listingFixture, profileFixture, progressFixture } from '@/test/owner-fixtures';
 import { renderWithProviders } from '@/test/render';
 import ListingStepPage from './listings/[id]/[step]/page';
+import ClosuresPage from './listings/[id]/closures/page';
 import OwnerTaxPage from './tax/page';
 
-vi.mock('@/lib/owner.server', () => ({ loadOwnerListing: vi.fn(), loadOwnerProfile: vi.fn() }));
+vi.mock('@/lib/owner.server', () => ({
+  loadOwnerListing: vi.fn(),
+  loadOwnerOnboarding: vi.fn(() => Promise.resolve(null)),
+  loadOwnerProfile: vi.fn(),
+}));
 vi.mock('@/lib/session', () => ({ requireSession: vi.fn(() => Promise.resolve()) }));
 vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
@@ -99,6 +104,111 @@ describe('a listing’s step page', () => {
     expect(screen.getByText(/^You can’t change this listing/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save and continue' })).not.toBeInTheDocument();
     expect(sendButton()).not.toBeInTheDocument();
+    // Closures are the one thing still open (decision #24).
+    expect(screen.getByText(/^You can still set/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'closures and special hours' })).toHaveAttribute(
+      'href',
+      `/en/owner/listings/${LISTING_ID}/closures`,
+    );
+  });
+
+  it('points from the weekly hours to closures and special hours', async () => {
+    await stepPage('hours', listingFixture());
+    expect(screen.getByText(/^Closed on holidays/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Set closures and special hours' })).toHaveAttribute(
+      'href',
+      `/en/owner/listings/${LISTING_ID}/closures`,
+    );
+  });
+});
+
+describe('the closures page', () => {
+  const page = async (listing?: Awaited<ReturnType<typeof loadOwnerListing>>) => {
+    if (listing !== undefined) vi.mocked(loadOwnerListing).mockResolvedValue(listing);
+    const params = Promise.resolve({ locale: 'en', id: LISTING_ID });
+    return renderWithProviders(await ClosuresPage({ params }));
+  };
+
+  beforeEach(() => {
+    vi.mocked(loadOwnerListing).mockReset();
+    vi.mocked(requireSession).mockClear();
+  });
+
+  it('sends a stranger to sign in and back here', async () => {
+    await page(listingFixture());
+    expect(requireSession).toHaveBeenCalledWith(`/owner/listings/${LISTING_ID}/closures`);
+  });
+
+  it('can be changed on a live listing, which the steps can’t', async () => {
+    const live = listingFixture({
+      status: 'published',
+      locked: true,
+      location: { ...listingFixture().location, name: 'Γκαράζ Ερμού', contentLocale: 'el' },
+      hoursExceptions: [
+        {
+          label: 'Χριστούγεννα',
+          startsOn: '2099-12-25',
+          endsOn: '2099-12-25',
+          hours: null,
+          closedHours: null,
+        },
+      ],
+    });
+    await page(live);
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Closures and special hours' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Γκαράζ Ερμού')).toHaveAttribute('lang', 'el');
+    expect(screen.getByLabelText('First day')).toHaveValue('2099-12-25');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to your parking' })).toHaveAttribute(
+      'href',
+      '/en/owner',
+    );
+  });
+
+  it('treats a listing it can’t find as no page at all', async () => {
+    await expect(page('not-found')).rejects.toThrow('not found');
+  });
+
+  it('offers the owner’s other listings to copy to, never this one', async () => {
+    vi.mocked(loadOwnerOnboarding).mockResolvedValueOnce({
+      started: true,
+      doneAccountSteps: [],
+      listings: [
+        progressFixture({ name: 'Αυτό εδώ' }),
+        progressFixture({ id: '22222222-2222-4222-8222-222222222222', name: 'Γκαράζ Πειραιά' }),
+      ],
+    });
+    const christmas = {
+      label: null,
+      startsOn: '2099-12-25',
+      endsOn: '2099-12-25',
+      hours: null,
+      closedHours: null,
+    };
+    await page(listingFixture({ hoursExceptions: [christmas] }));
+    expect(
+      screen.getByRole('heading', { name: 'Copy to your other listings' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Γκαράζ Πειραιά' })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Αυτό εδώ' })).not.toBeInTheDocument();
+  });
+
+  it('still works without the list of other listings', async () => {
+    await page(listingFixture());
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Copy to your other listings' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('explains an outage, with a heading to land on', async () => {
+    await page('unavailable');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Closures and special hours',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('try again');
   });
 });
 

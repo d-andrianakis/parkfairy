@@ -227,6 +227,25 @@ export const OpeningPeriodSchema = z
   .register(contractsRegistry, { id: 'OpeningPeriod' });
 export type OpeningPeriod = z.infer<typeof OpeningPeriodSchema>;
 
+/**
+ * Days, both ends included, that keep other hours than the week's, on the listing's wall clock.
+ * With `hours`, open `[opens, closes)` each day instead of the week's hours. With `closedHours`,
+ * the week's hours less `[from, to)`. With neither, closed all day. Never both.
+ */
+export const HoursExceptionSchema = z
+  .object({
+    startsOn: z.iso.date(),
+    endsOn: z.iso.date(),
+    hours: z
+      .object({ opens: z.string().regex(WALL_TIME), closes: z.string().regex(WALL_TIME) })
+      .nullable(),
+    closedHours: z
+      .object({ from: z.string().regex(WALL_TIME), to: z.string().regex(WALL_TIME) })
+      .nullable(),
+  })
+  .register(contractsRegistry, { id: 'HoursException' });
+export type HoursException = z.infer<typeof HoursExceptionSchema>;
+
 export const ParkingSpaceSchema = z
   .object({
     label: z.string(),
@@ -281,6 +300,8 @@ export const ParkingListingDetailSchema = ParkingListingSummarySchema.extend({
   longitude: z.number(),
   timeZone: z.string(),
   openingHours: z.array(OpeningPeriodSchema),
+  /** Closures and special hours that have not ended, soonest first. The owner's notes stay out. */
+  hoursExceptions: z.array(HoursExceptionSchema),
   /** The first spaces in label order; `spaceCount` says how many there are in all. */
   spaces: z.array(ParkingSpaceSchema).max(LISTING_SPACES_LIMIT),
   photos: z.array(ListingPhotoSchema),

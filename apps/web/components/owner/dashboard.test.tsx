@@ -1,3 +1,4 @@
+import { LISTING_STATUSES } from '@parkfairy/contracts';
 import { createOwnerListing, deleteOwnerListing, submitOwnerListing } from '@parkfairy/api-client';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -167,6 +168,24 @@ describe('ListingMilestones', () => {
       'href',
       '/en/parking/garaz-ermou',
     );
+  });
+
+  it.each(LISTING_STATUSES)(
+    'offers closures and special hours on a listing that is %s, named for it',
+    (status) => {
+      renderInSubtree(<ListingMilestones listing={progressFixture({ status })} />);
+      expect(
+        screen.getByRole('link', { name: 'Closures and special hours for “Γκαράζ Ερμού”' }),
+      ).toHaveAttribute('href', `/en/owner/listings/${LISTING_ID}/closures`);
+    },
+  );
+
+  it('reads the listing’s name in its own language inside the link', () => {
+    renderInSubtree(<ListingMilestones listing={progressFixture()} />, { locale: 'el' });
+    const link = screen.getByRole('link', {
+      name: 'Κλειστές ημέρες και ειδικό ωράριο για «Γκαράζ Ερμού»',
+    });
+    expect(within(link).getByText('Γκαράζ Ερμού')).toHaveAttribute('lang', 'el');
   });
 
   it('shows the owner’s cover photo as decoration', () => {

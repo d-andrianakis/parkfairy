@@ -137,7 +137,9 @@
       "oneHour": "Full refund until 1 hour before arrival.",
       "oneDay": "Full refund until 24 hours before arrival.",
       "oneDayThenHalf": "Full refund until 24 hours before arrival, then 50% until arrival."
-    }
+    },
+    "exceptionsHeading": "Closures and special hours",
+    "closedBetween": "Closed from {from} to {to}"
   },
   "Features": {
     "label": "Features",
@@ -302,7 +304,13 @@
     "discountDuplicate": "Another discount uses this number of days",
     "policyRequired": "Choose a cancellation policy",
     "confirmRequired": "Tick this to send your parking for review",
-    "landRegistrationInvalid": "Check this number"
+    "landRegistrationInvalid": "Check this number",
+    "dateInPast": "This date has passed",
+    "dateTooFar": "{max, plural, one {Choose a date within the next day} other {Choose a date within the next # days}}",
+    "exceptionOverlap": "These dates overlap another period",
+    "closedTimeOrder": "The closed time must end after it starts",
+    "dateRequired": "Choose a date",
+    "lastDayBeforeFirst": "The last day must be the same as the first or after it"
   },
   "Forms": {
     "invalidSummary": "{count, plural, one {# field needs your attention} other {# fields need your attention}}",
@@ -480,7 +488,8 @@
       },
       "deleteDraftUnnamed": "Delete this draft",
       "deleteQuestionUnnamed": "Delete this draft and everything in it? This can’t be undone.",
-      "deleted": "Draft deleted"
+      "deleted": "Draft deleted",
+      "closures": "Closures and special hours for “<listing>{name}</listing>”"
     },
     "state": {
       "done": "Done",
@@ -631,7 +640,55 @@
       "opensOn": "Opens on {day}",
       "closes": "Closes",
       "closesOn": "Closes on {day}",
-      "closed": "Closed"
+      "closed": "Closed",
+      "closedPart": "Closed for part of the day",
+      "closedPartOn": "Closed for part of the day, {day}",
+      "closedFrom": "Closed from",
+      "closedFromOn": "Closed from, {day}",
+      "closedTo": "Closed until",
+      "closedToOn": "Closed until, {day}",
+      "closedPartInvalid": "Choose a closed time inside the opening hours, before midnight"
+    },
+    "closures": {
+      "title": "Closures and special hours",
+      "lead": "Days when your parking is closed, or open at other times than usual. On those days, from midnight to midnight, what you set here replaces your weekly hours, unless you close only part of the day.",
+      "anyTime": "You can change them at any time, even once your listing is live, without another review. Drivers see the dates and hours, never your notes.",
+      "empty": "No closures or special hours yet.",
+      "group": "Period {number}",
+      "from": "First day",
+      "to": "Last day",
+      "kind": "On these days",
+      "closedAllDay": "Closed all day",
+      "openOther": "Open at other hours",
+      "opens": "Opens",
+      "closes": "Closes",
+      "note": "Your note for period {number}",
+      "noteHint": "Only you see it.",
+      "add": "Add dates",
+      "remove": "Remove period {number}",
+      "removed": "Period {number} removed",
+      "save": "Save",
+      "hoursHint": "Closed on holidays, or open at other hours on some days? <link>Set closures and special hours</link>",
+      "stillOpen": "You can still set <link>closures and special hours</link>.",
+      "closedPart": "Closed for part of the day",
+      "closedPartHint": "The weekly hours apply the rest of the day.",
+      "closedFrom": "Closed from",
+      "closedTo": "Closed until",
+      "copyHeading": "Copy to your other listings",
+      "copyLead": "Adds the dates saved above to each listing you choose. A listing that already has its own closures or special hours on any of those days is left as it is.",
+      "copyLegend": "Listings to copy to",
+      "copyAll": "All your other listings",
+      "copyButton": "Copy dates",
+      "copying": "Copying…",
+      "copyNone": "Choose at least one listing",
+      "copyUnsaved": "Save your changes first: only saved dates are copied.",
+      "copyDone": "{count, plural, one {Copied to # listing} other {Copied to # listings}}",
+      "copyClash": "Not copied to “<listing>{name}</listing>”: it already has its own closures or special hours on one of these days.",
+      "copyFull": "Not copied to “<listing>{name}</listing>”: it would go over the limit of {max} periods.",
+      "metaTitle": "Closures and special hours: {name}",
+      "fromHint": "Any day from today to {latest}.",
+      "overlapWith": "These dates overlap period {number}",
+      "limit": "You’ve reached {max} periods, the most one listing can have. Remove one to add another."
     },
     "prices": {
       "hourly": "Hourly rate (€)",

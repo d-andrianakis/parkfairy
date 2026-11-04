@@ -34,10 +34,12 @@ export function noLiteralStrings(files) {
           'jsx-attributes': { include: USER_VISIBLE_ATTRIBUTES },
           // Option objects such as { dateStyle: 'long' } are configuration, not copy.
           'object-properties': { exclude: ['.*'] },
-          // Translators are named t / tSomething (useTranslations namespaces).
+          // Translators are named t / tSomething (useTranslations namespaces), and t.rich is
+          // the same translator filling tags with elements.
           callees: {
             exclude: [
               't[A-Z]?\\w*',
+              't[A-Z]?\\w*\\.rich',
               'register',
               'registerSaved',
               'require',

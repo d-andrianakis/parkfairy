@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { DEMO_DATA, SIGNED_IN_STATE } from '../support/env';
+import { DEMO_DATA, SIGNED_IN_STATE, WEB_URL } from '../support/env';
 import { expectAccessible } from '../support/fixtures';
 
 // Feature: accessibility — every page passes WCAG 2.2 AA automated checks in both
@@ -127,6 +127,36 @@ test.describe('signed in', () => {
       });
     }
   }
+
+  // On a draft of the shared account's own, so it runs anywhere: no database or outbox needed.
+  test('closures and special hours have no WCAG 2.2 AA violations, by keyboard, both languages, dark', async ({
+    page,
+  }) => {
+    const headers = { origin: WEB_URL };
+    const created = await page.request.post('/api/v1/owner/listings', { headers });
+    expect(created.status()).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    try {
+      for (const locale of locales) {
+        await page.goto(`/${locale}/owner/listings/${id}/closures`);
+        await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+        await expectAccessible(page);
+      }
+      // Add a period and save it empty, all from the keyboard: the error state, in dark mode.
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.goto(`/en/owner/listings/${id}/closures`);
+      await page.getByRole('button', { name: 'Add dates' }).focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByLabel('First day')).toBeFocused();
+      await page.getByRole('button', { name: 'Save' }).focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByLabel('First day')).toBeFocused();
+      await expect(page.getByLabel('First day')).toHaveAttribute('aria-invalid', 'true');
+      await expectAccessible(page);
+    } finally {
+      await page.request.delete(`/api/v1/owner/listings/${id}`, { headers });
+    }
+  });
 
   test('/en/owner/profile has no WCAG 2.2 AA violations in dark mode', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });

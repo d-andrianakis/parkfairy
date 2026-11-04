@@ -101,6 +101,19 @@ export type OpeningPeriod = {
     closes: string;
 };
 
+export type HoursException = {
+    startsOn: string;
+    endsOn: string;
+    hours: {
+        opens: string;
+        closes: string;
+    } | null;
+    closedHours: {
+        from: string;
+        to: string;
+    } | null;
+};
+
 export type ParkingSpace = {
     label: string;
     features: Array<ParkingFeature>;
@@ -153,6 +166,7 @@ export type ParkingListingDetail = {
     longitude: number;
     timeZone: string;
     openingHours: Array<OpeningPeriod>;
+    hoursExceptions: Array<HoursException>;
     spaces: Array<ParkingSpace>;
     photos: Array<ListingPhoto>;
     priceRules: ListingPriceRules;
@@ -277,6 +291,51 @@ export type ListingPricesInput = {
     }>;
 };
 
+export type ListingHoursExceptionsInput = {
+    exceptions: Array<{
+        label: string | null;
+        startsOn: string;
+        endsOn: string;
+        hours: {
+            opens: string;
+            closes: string;
+        } | null;
+        closedHours: {
+            from: string;
+            to: string;
+        } | null;
+    }>;
+};
+
+export type ListingHoursExceptionsCopyInput = {
+    to: Array<string>;
+};
+
+export type OwnerHoursExceptionsCopy = {
+    results: Array<{
+        id: string;
+        outcome: 'copied' | 'clash' | 'full';
+    }>;
+};
+
+export type OwnerHoursException = {
+    startsOn: string;
+    endsOn: string;
+    hours: {
+        opens: string;
+        closes: string;
+    } | null;
+    closedHours: {
+        from: string;
+        to: string;
+    } | null;
+    label: string | null;
+};
+
+export type OwnerHoursExceptions = {
+    exceptions: Array<OwnerHoursException>;
+};
+
 export type ListingPhotoUpdate = {
     alt: string | null;
 };
@@ -384,6 +443,7 @@ export type OwnerListing = {
     };
     spaces: Array<OwnerSpace>;
     openingHours: Array<OpeningPeriod>;
+    hoursExceptions: Array<OwnerHoursException>;
     prices: OwnerPrices;
     photos: Array<OwnerPhoto>;
     proofs: Array<OwnerProof>;
@@ -757,6 +817,52 @@ export type SaveListingHoursResponses = {
 };
 
 export type SaveListingHoursResponse = SaveListingHoursResponses[keyof SaveListingHoursResponses];
+
+export type SaveListingHoursExceptionsData = {
+    body: ListingHoursExceptionsInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/hours-exceptions';
+};
+
+export type SaveListingHoursExceptionsErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type SaveListingHoursExceptionsError = SaveListingHoursExceptionsErrors[keyof SaveListingHoursExceptionsErrors];
+
+export type SaveListingHoursExceptionsResponses = {
+    200: OwnerHoursExceptions;
+};
+
+export type SaveListingHoursExceptionsResponse = SaveListingHoursExceptionsResponses[keyof SaveListingHoursExceptionsResponses];
+
+export type CopyListingHoursExceptionsData = {
+    body: ListingHoursExceptionsCopyInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/hours-exceptions/copy';
+};
+
+export type CopyListingHoursExceptionsErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type CopyListingHoursExceptionsError = CopyListingHoursExceptionsErrors[keyof CopyListingHoursExceptionsErrors];
+
+export type CopyListingHoursExceptionsResponses = {
+    200: OwnerHoursExceptionsCopy;
+};
+
+export type CopyListingHoursExceptionsResponse = CopyListingHoursExceptionsResponses[keyof CopyListingHoursExceptionsResponses];
 
 export type SaveListingPricesData = {
     body: ListingPricesInput;

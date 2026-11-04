@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { AREA_IDS, AreaIdSchema } from './areas.js';
-import { LocaleSchema } from './i18n.js';
+import { DEFAULT_TIME_ZONE, LocaleSchema } from './i18n.js';
 import {
   BOOKING_STEP_MINUTES,
   CANCELLATION_POLICIES,
   CancellationPolicySchema,
+  HoursExceptionSchema,
   LISTING_LIMITS,
   ListingPhotoSchema,
   ListingStatusSchema,
@@ -14,7 +15,14 @@ import {
   type OpeningPeriod,
 } from './parking.js';
 import { contractsRegistry } from './registry.js';
-import { MAX_BOOKING_DAYS, message } from './validation.js';
+import { addDays, zonedParts } from './time.js';
+import {
+  HOURS_EXCEPTION_AHEAD_DAYS,
+  HOURS_EXCEPTIONS_MAX,
+  MAX_BOOKING_DAYS,
+  message,
+  type ValidationMessage,
+} from './validation.js';
 
 export const OWNER_KINDS = ['individual', 'business'] as const;
 export const OwnerKindSchema = z.enum(OWNER_KINDS).register(contractsRegistry, { id: 'OwnerKind' });
@@ -358,8 +366,11 @@ export function wallMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
-/** `[opens, closes)` per day: at most two periods, which is what an overnight break needs. */
-export const OPENING_PERIODS_MAX = 7 * 2;
+/**
+ * `[opens, closes)` per day: at most three, which is a day with a break (decision #28) whose
+ * small hours belong to the night before.
+ */
+export const OPENING_PERIODS_MAX = 7 * 3;
 
 export function checkOpeningPeriods(periods: OpeningPeriod[], ctx: z.RefinementCtx): void {
   const byDay = new Map<number, [number, number][]>();
@@ -479,6 +490,113 @@ export const ListingPricesInputSchema = z
   })
   .register(contractsRegistry, { id: 'ListingPricesInput' });
 export type ListingPricesInput = z.infer<typeof ListingPricesInputSchema>;
+
+export const HOURS_EXCEPTION_LABEL_MAX = 80;
+
+const CLOSING_TIME = /^(?:[01]\d|2[0-3]):(?:00|30)$|^24:00$/;
+/** Only real days are compared: a field that failed its own check has already said so. */
+const isoDate = z.iso.date();
+const isDate = (value: unknown) => isoDate.safeParse(value).success;
+
+const HoursExceptionInputSchema = z.object({
+  /** The owner's own reminder, e.g. a holiday; drivers never see it. */
+  label: trimmed().max(HOURS_EXCEPTION_LABEL_MAX, message('textTooLong')).nullable(),
+  startsOn: z.iso.date(message('dateRequired')),
+  endsOn: z.iso.date(message('dateRequired')),
+  /** Open these hours each day instead of the week's, ending by midnight. */
+  hours: z
+    .object({ opens: halfHour, closes: z.string().regex(CLOSING_TIME, message('timeNotOnStep')) })
+    .nullable(),
+  /** Or closed for this part of each day, the week's hours around it (decision #28). */
+  closedHours: z
+    .object({ from: halfHour, to: z.string().regex(CLOSING_TIME, message('timeNotOnStep')) })
+    .nullable(),
+});
+
+/**
+ * Closures and special hours, all of them at once: what is sent replaces what is stored. An entry
+ * that has ended is refused rather than kept, because the owner never sees one again.
+ */
+export const ListingHoursExceptionsInputSchema = z
+  .object({
+    exceptions: z.array(HoursExceptionInputSchema).max(HOURS_EXCEPTIONS_MAX, message('invalid')),
+  })
+  .strict()
+  .superRefine(({ exceptions }, ctx) => {
+    // Refinements run even when a field failed its own check.
+    if (!Array.isArray(exceptions)) return;
+    const today = zonedParts(new Date(), DEFAULT_TIME_ZONE).date;
+    const latest = addDays(today, HOURS_EXCEPTION_AHEAD_DAYS);
+    // An entry still running comes back with every save, so its first day may be long gone: as
+    // far back as one saved on the last day it could reach. Earlier than that is a slip (year 1).
+    const earliest = addDays(today, -2 * HOURS_EXCEPTION_AHEAD_DAYS);
+    const issue = (path: (string | number)[], key: ValidationMessage) =>
+      ctx.addIssue({ code: 'custom', path: ['exceptions', ...path], message: message(key) });
+
+    const ranges: { index: number; startsOn: string; endsOn: string }[] = [];
+    exceptions.forEach(({ startsOn, endsOn, hours, closedHours }, index) => {
+      if (hours && wallMinutes(hours.opens) >= wallMinutes(hours.closes)) {
+        issue([index, 'hours', 'closes'], 'hoursOrder');
+      }
+      if (closedHours && wallMinutes(closedHours.from) >= wallMinutes(closedHours.to)) {
+        issue([index, 'closedHours', 'to'], 'closedTimeOrder');
+      }
+      // Other hours and a closed part of the week's are two answers for one day.
+      if (hours && closedHours) issue([index, 'closedHours'], 'invalid');
+      if (!isDate(startsOn) || !isDate(endsOn)) return;
+      if (endsOn < startsOn) issue([index, 'endsOn'], 'lastDayBeforeFirst');
+      else if (startsOn < earliest) issue([index, 'startsOn'], 'dateInPast');
+      else if (endsOn < today) issue([index, 'endsOn'], 'dateInPast');
+      else if (endsOn > latest) issue([index, 'endsOn'], 'dateTooFar');
+      else ranges.push({ index, startsOn, endsOn });
+    });
+    // Against the furthest end so far, so a long range overlapping two short ones names both.
+    let reached = '';
+    for (const range of ranges.toSorted((a, b) => a.startsOn.localeCompare(b.startsOn))) {
+      if (range.startsOn <= reached) issue([range.index, 'startsOn'], 'exceptionOverlap');
+      if (range.endsOn > reached) reached = range.endsOn;
+    }
+  })
+  .register(contractsRegistry, { id: 'ListingHoursExceptionsInput' });
+export type ListingHoursExceptionsInput = z.infer<typeof ListingHoursExceptionsInputSchema>;
+
+/** Enough for a chain of garages, and a ceiling on what one account can make us store. */
+export const OWNER_LISTINGS_MAX = 50;
+
+/** The owner's other listings that get this one's closures and special hours (decision #29). */
+export const ListingHoursExceptionsCopyInputSchema = z
+  .object({
+    to: z
+      .array(z.uuid(message('invalid')))
+      .min(1, message('invalid'))
+      .max(OWNER_LISTINGS_MAX, message('invalid'))
+      .refine((ids) => new Set(ids).size === ids.length, message('invalid')),
+  })
+  .strict()
+  .register(contractsRegistry, { id: 'ListingHoursExceptionsCopyInput' });
+export type ListingHoursExceptionsCopyInput = z.infer<typeof ListingHoursExceptionsCopyInputSchema>;
+
+/**
+ * What became of each listing: `copied` (entries it already had count as copied), `clash` (it has
+ * other hours on one of those days, so nothing was added) or `full` (no room for them all).
+ */
+export const HOURS_EXCEPTIONS_COPY_OUTCOMES = ['copied', 'clash', 'full'] as const;
+export const OwnerHoursExceptionsCopySchema = z
+  .object({
+    results: z.array(z.object({ id: z.uuid(), outcome: z.enum(HOURS_EXCEPTIONS_COPY_OUTCOMES) })),
+  })
+  .register(contractsRegistry, { id: 'OwnerHoursExceptionsCopy' });
+export type OwnerHoursExceptionsCopy = z.infer<typeof OwnerHoursExceptionsCopySchema>;
+
+export const OwnerHoursExceptionSchema = HoursExceptionSchema.extend({
+  label: z.string().nullable(),
+}).register(contractsRegistry, { id: 'OwnerHoursException' });
+export type OwnerHoursException = z.infer<typeof OwnerHoursExceptionSchema>;
+
+export const OwnerHoursExceptionsSchema = z
+  .object({ exceptions: z.array(OwnerHoursExceptionSchema) })
+  .register(contractsRegistry, { id: 'OwnerHoursExceptions' });
+export type OwnerHoursExceptions = z.infer<typeof OwnerHoursExceptionsSchema>;
 
 export const PHOTO_LIMITS = {
   maxBytes: 10 * 1024 * 1024,
@@ -661,6 +779,8 @@ export const OwnerListingSchema = z
     }),
     spaces: z.array(OwnerSpaceSchema),
     openingHours: z.array(OpeningPeriodSchema),
+    /** Those that have not ended, soonest first. Editable whatever the status. */
+    hoursExceptions: z.array(OwnerHoursExceptionSchema),
     prices: OwnerPricesSchema,
     photos: z.array(OwnerPhotoSchema),
     proofs: z.array(OwnerProofSchema),

@@ -430,8 +430,8 @@ always opens the first unfinished step. Decisions #20-#23 in memory.md.
   edit them. The location step's map is unverified
 - [x] Named units (decision: named spaces, no pooled inventory)
 - [~] Photos (S3), listing status, amenities: all work on local files; S3 only against a mocked client
-- [~] Schedules and availability exceptions (DST-safe in Europe/Athens): weekly hours done, owners
-  set them; exceptions (holidays, closures) missing
+- [x] Schedules and availability exceptions (DST-safe in Europe/Athens): weekly hours, with a break
+      if wanted, and closures and special hours (2.2)
 - [x] Pricing rules + server-side quotes (integer minor units): weekend, day and night, long-stay,
       per-space and dated prices (memory.md #17), and search showing "from" the cheapest free space
 - [x] Owner setting: gap between bookings on a space (none, 30 or 60 minutes). Saved here; Phase 3
@@ -477,6 +477,63 @@ always opens the first unfinished step. Decisions #20-#23 in memory.md.
       email kinds
 - [ ] The Mapbox strings
 
+### 2.2 Closures and special hours (2026-11-03)
+
+Dates when a listing keeps other hours than its week: closed all day, open other hours, or closed
+for part of the day. Also a break inside the weekly hours, and copying one listing's dates to the
+owner's others. Decisions #24–#29 in memory.md: owners change them at any status without review,
+drivers see dates and hours but never the note, and Phase 3 refuses closing time over bookings.
+
+- [x] **Implemented** behind the API's authorization rules: `/owner/listings/:id/closures` (any
+      status, no review), `PUT …/hours-exceptions`, `POST …/hours-exceptions/copy` (one
+      transaction, 10 a minute), the break on the hours step, search and the listing page honouring
+      all three kinds (full-day closures filtered in search's SQL), dates and hours on the listing
+      page without the note, migrations 0011–0013, and a sweep of ended entries every 6 hours
+- [x] **Unit tests**: contracts, `opening-hours.test.ts` (both clock changes), `owner-hours.test.ts`,
+      the form, copy and public-table components, owner pages, dashboard, the worker job.
+      Integration (`owner.integration.test.ts`, "closures and special hours"): strangers, every
+      status, search and listing page, copy outcomes and limit, races, the sweep on the Athens
+      calendar, each database constraint by name
+- [x] **Smoke test** `owner-closures.smoke.ts`: dashboard to a live listing, all three kinds, an
+      overlap, a save with Enter, copying, the weekly break, Greek at 320 px, search, the listing
+      page in both languages, strangers. Also the page in `accessibility.smoke.ts` (keyboard, dark,
+      no database needed), cross-site writes in `security.smoke.ts`, and the JS budget
+- [x] **Security** review: nothing critical or high. Fixed: copy's own limit and cost, a floor on the
+      first day (year 0 was a 500), ended notes swept, copy's partial failure and midnight race (one
+      transaction now). Accepted: the dates of a private owner's closures are public (#26; Phase 6)
+- [x] **Performance** review: nothing high. Fixed: copying in about 7 statements, full-day closures
+      filtered in search's SQL (holidays filled the candidate batches), live listings' rows no
+      longer rewritten, two date formatters per page. Left open below
+- [x] **Accessibility** review: fixed focus lost after a save with Enter (serious), specific date
+      messages, the first error as the page reads, visible period headings, the overlap naming its
+      period, copy errors on the checkbox and repeated, `lang` on names inside sentences, hints for
+      the date range and the limit, break errors on the right time, the table named by its heading
+      with `<time>`, a page title naming the listing. Manual checks below
+- [x] **i18n** review: copy wording (it misstated the clash rule), "from" in a closed part, "Period"
+      for an entry, the limit stated, Greek wording. `catalogs.test.ts` now checks rich-text tags.
+      Native-speaker list below
+- [x] **Contracts & docs**: OpenAPI and client regenerated, migrations 0011–0013 reviewed (a new
+      table, then nullable columns), memory.md
+
+Left open:
+
+- [ ] Performance, deferred as low: a search batch fans out 6 queries against a pool of 10; the
+      closures page makes two API reads where one lean endpoint would do; every row re-renders on
+      each keystroke (not measured at 30 rows); the demo seed has no closures, so the search latency
+      budget never meets one
+- [ ] Known: a week open all day with a daily break reads back as "17:00 to 14:00" each night. The
+      same hours, saved again unchanged, but not as entered (memory.md)
+- [ ] Manual NVDA and VoiceOver: removing a period (the announcement, then the focus on Add), an
+      invalid save (the count and the field's error), copying with nothing ticked, the radio group
+      inside the named period, date fields (segments, min and max; the browser orders the date its
+      own way), the Greek public table, Greek listing names in English copy results
+- [ ] Native speaker: `Owner.closures.*`, `Owner.hours.closedPart*`, `closedFrom*`, `closedTo*`,
+      `closedPartInvalid`, `Owner.dashboard.closures`, `Listing.exceptionsHeading`,
+      `Listing.closedBetween`, `Validation.dateInPast`, `dateTooFar`, `exceptionOverlap`,
+      `closedTimeOrder`, `dateRequired`, `lastDayBeforeFirst`. Questions: does "Κλειστά από:
+      Δευτέρα" heard alone suggest "from Monday on"; `copyDone` "σε 1 χώρο" or "σε έναν χώρο";
+      "για «{name}»" or "για τον χώρο «{name}»"
+
 ## Phase 3: Search and booking engine
 
 - [~] Geospatial search + listing pages: done with curated areas + browser location (1.11);
@@ -486,6 +543,12 @@ always opens the first unfinished step. Decisions #20-#23 in memory.md.
 - [ ] Transactional allocation + holds (exclusion constraints, `[start, end)`): the driver picks
       the space from a list, 10-minute hold, the owner's gap counts as overlap, a "just taken"
       state, and the listing's 48-space cap (1.12) must not hide free spaces
+- [ ] Closing time over a booking is refused until the owner cancels it (#27), in
+      `saveHoursExceptions`, `copyHoursExceptions` (a `booked` outcome) and `saveHours` (a listing
+      sent back can change its week). Check the hours in effect, not just closures: dropping special
+      hours or adding a closed part strands bookings too. The booking transaction takes `FOR SHARE`
+      on the listing row before it reads hours, or both sides can pass their checks. Entries get new
+      ids on every save, so diff instead if a booking must point at the closure that cancelled it
 - [ ] Booking requires a signed-in account (no guest checkout)
 - [ ] Hold expiry worker, cancellations, booking history
 - [ ] Concurrency tests (named spot race, last pooled unit) and DST edge cases
@@ -520,7 +583,9 @@ always opens the first unfinished step. Decisions #20-#23 in memory.md.
 - [ ] Security + privacy review, GDPR retention and data-subject workflows (unconfirmed
       accounts are handled, 1.14; the adviser sets the periods, #18). Owner onboarding adds:
       Mapbox as a processor of owners' IP addresses, how long `email_outbox` keeps sent rows
-      (90 days today), and deleting an owner's account along with their tax values and proofs
+      (90 days today), and deleting an owner's account along with their tax values and proofs.
+      Closures add: the dates of a private owner's closures are public (their home may be the
+      address; #26 chose this), and owners' notes on them last until the entry ends (swept)
 - [ ] Owner onboarding in production: `OWNER_DATA_KEY`, `S3_BUCKET` and a role with
       `s3:ListBucket` (without it a missing photo is a 500 rather than a 404), `MAPBOX_PUBLIC_TOKEN`
       and a card on the account for permanent geocoding, `UV_THREADPOOL_SIZE=16`, a CDN in front of

@@ -34,6 +34,8 @@ import { Throttle } from '@nestjs/throttler';
 import type { AuthUser } from '@parkfairy/auth';
 import {
   ErrorResponseSchema,
+  ListingHoursExceptionsCopyInputSchema,
+  ListingHoursExceptionsInputSchema,
   ListingHoursInputSchema,
   ListingLocationPatchSchema,
   ListingPhotoOrderSchema,
@@ -42,6 +44,8 @@ import {
   ListingProofPatchSchema,
   ListingSpacesInputSchema,
   ListingSubmitInputSchema,
+  OwnerHoursExceptionsCopySchema,
+  OwnerHoursExceptionsSchema,
   OwnerListingCreatedSchema,
   OwnerListingProgressSchema,
   OwnerListingSchema,
@@ -57,6 +61,8 @@ import {
   PROOF_KINDS,
   PROOF_LIMITS,
   ProofUploadQuerySchema,
+  type OwnerHoursExceptions,
+  type OwnerHoursExceptionsCopy,
   type OwnerListing,
   type OwnerListingProgress,
   type OwnerOnboarding,
@@ -79,6 +85,8 @@ const MINUTE_MS = 60_000;
 const UPLOAD_LIMIT = { default: { limit: 30, ttl: MINUTE_MS } };
 /** Each try at a tax number costs an encryption and says whether the format passed. */
 const TAX_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
+/** A copy can write to fifty listings; the default allowance would be thousands of statements. */
+const COPY_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
 
 const BINARY = { schema: { type: 'string', format: 'binary' } } as const;
 
@@ -220,6 +228,44 @@ export class OwnerController {
     @Body() body: unknown,
   ): Promise<OwnerListingProgress> {
     return this.listings.saveHours(user.id, id, parseOrThrow(ListingHoursInputSchema, body));
+  }
+
+  /** Unlike the steps, open whatever the listing's status: see the service. */
+  @Put('listings/:id/hours-exceptions')
+  @ApiBody({ schema: schemaRef(ListingHoursExceptionsInputSchema) })
+  @ApiOkResponse({ schema: schemaRef(OwnerHoursExceptionsSchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  saveListingHoursExceptions(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<OwnerHoursExceptions> {
+    return this.listings.saveHoursExceptions(
+      user.id,
+      id,
+      parseOrThrow(ListingHoursExceptionsInputSchema, body),
+    );
+  }
+
+  /** Adds this listing's entries to the owner's other listings named; see the service. */
+  @Post('listings/:id/hours-exceptions/copy')
+  @HttpCode(200)
+  @Throttle(COPY_LIMIT)
+  @ApiBody({ schema: schemaRef(ListingHoursExceptionsCopyInputSchema) })
+  @ApiOkResponse({ schema: schemaRef(OwnerHoursExceptionsCopySchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  copyListingHoursExceptions(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<OwnerHoursExceptionsCopy> {
+    return this.listings.copyHoursExceptions(
+      user.id,
+      id,
+      parseOrThrow(ListingHoursExceptionsCopyInputSchema, body),
+    );
   }
 
   @Put('listings/:id/prices')

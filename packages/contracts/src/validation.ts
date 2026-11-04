@@ -59,6 +59,12 @@ export const VALIDATION_MESSAGES = [
   'policyRequired',
   'confirmRequired',
   'landRegistrationInvalid',
+  'dateInPast',
+  'dateTooFar',
+  'exceptionOverlap',
+  'closedTimeOrder',
+  'dateRequired',
+  'lastDayBeforeFirst',
 ] as const;
 export type ValidationMessage = (typeof VALIDATION_MESSAGES)[number];
 
@@ -73,6 +79,10 @@ export const NAME_MAX_LENGTH = 100;
 export const MAX_BOOKING_DAYS = 30;
 /** How far ahead a stay may start. Also keeps every date the API walks within year 9999. */
 export const MAX_START_AHEAD_DAYS = 365;
+/** Enough for every public holiday and a few closures of the owner's own, a year ahead. */
+export const HOURS_EXCEPTIONS_MAX = 30;
+/** Closures and special hours past this reach no stay: the latest starts and lasts its 30 days. */
+export const HOURS_EXCEPTION_AHEAD_DAYS = MAX_START_AHEAD_DAYS + MAX_BOOKING_DAYS;
 
 /** Typed helper so schemas can only reference keys that exist in the catalogs. */
 export const message = <K extends ValidationMessage>(key: K): K => key;

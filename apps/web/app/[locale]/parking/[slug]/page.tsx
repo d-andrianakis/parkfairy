@@ -1,4 +1,4 @@
-import { isValidationMessage } from '@parkfairy/contracts';
+import { isValidationMessage, zonedParts } from '@parkfairy/contracts';
 import { Alert, AlertDescription, AlertTitle } from '@parkfairy/ui/components/alert';
 import { Badge } from '@parkfairy/ui/components/badge';
 import { Button } from '@parkfairy/ui/components/button';
@@ -15,6 +15,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { FeatureBadges } from '@/components/parking/feature-badges';
+import { HoursExceptions } from '@/components/parking/hours-exceptions';
 import { ListingPhotoImage } from '@/components/parking/listing-photo';
 import { OpeningHours } from '@/components/parking/opening-hours';
 import { SpaceList } from '@/components/parking/space-list';
@@ -178,6 +179,20 @@ export default async function ListingPage(props: ListingPageProps) {
           <div className="mt-3 max-w-md">
             <OpeningHours periods={listing.openingHours} />
           </div>
+          {listing.hoursExceptions.length > 0 ? (
+            <>
+              <h3 id="exceptions-heading" className="mt-6 text-base font-semibold">
+                {t('exceptionsHeading')}
+              </h3>
+              <div className="mt-2 max-w-md">
+                <HoursExceptions
+                  exceptions={listing.hoursExceptions}
+                  today={zonedParts(new Date(), listing.timeZone).date}
+                  labelledBy="exceptions-heading"
+                />
+              </div>
+            </>
+          ) : null}
         </section>
 
         <section aria-labelledby="spaces-heading">

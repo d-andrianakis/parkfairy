@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  addDays,
   findArea,
   LISTING_SPACES_LIMIT,
   ParkingListingDetailSchema,
@@ -19,14 +20,21 @@ import {
   type ParkingSearchResult,
 } from '@parkfairy/contracts';
 import { schema, type Database, type GeoPoint } from '@parkfairy/database';
-import { and, asc, eq, exists, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, gte, inArray, lte, not, sql } from 'drizzle-orm';
 import { DB } from '../database/database.module.js';
-import { isOpenThroughout, wallTime, type OpeningPeriod } from './opening-hours.js';
+import {
+  hoursOf,
+  isOpenThroughout,
+  wallTime,
+  type DatedHours,
+  type OpeningPeriod,
+} from './opening-hours.js';
 import { NO_PRICE_RULES, quoteStayMinor, type PriceRules } from './pricing.js';
 
 const listing = schema.parkingLocations;
 const space = schema.parkingSpaces;
 const hours = schema.parkingOpeningHours;
+const exception = schema.parkingHoursExceptions;
 const rules = schema.parkingPriceRules;
 const discounts = schema.parkingStayDiscounts;
 const photo = schema.parkingPhotos;
@@ -99,6 +107,9 @@ function features(flags: FeatureFlags): ParkingFeature[] {
   return PARKING_FEATURES.filter((feature) => flags[feature]);
 }
 
+/** The UTC calendar day of an instant: within a day of the local one, whatever the zone. */
+const utcDay = (instant: Date) => instant.toISOString().slice(0, 10);
+
 function money(amountMinor: number, currency: string): Money {
   return { amountMinor, currency: currency as Money['currency'] };
 }
@@ -161,6 +172,22 @@ export class ParkingService {
     );
   }
 
+  /**
+   * Whether the listing is closed all day on any local day that `[start, end)` touches. Such a
+   * listing can't be open for the stay, so search drops it before it takes one of a batch's
+   * places: holidays close many listings at once (and copying spreads them across a chain), and
+   * the batches would otherwise fill with them. Other hours and closed parts stay with
+   * `isOpenThroughout`. The end is exclusive, so a stay ending at midnight touches no next day.
+   */
+  private closedAllDayDuring({ start, end }: Window) {
+    const from = start.toISOString();
+    const until = end.toISOString();
+    return sql`exists (select 1 from ${exception} e where e.location_id = ${listing.id}
+      and e.opens_minute is null and e.closed_from_minute is null
+      and e.ends_on >= (${from}::timestamptz at time zone ${listing.timeZone})::date
+      and e.starts_on <= ((${until}::timestamptz - interval '1 microsecond') at time zone ${listing.timeZone})::date)`;
+  }
+
   /** Published listings that have at least one space, for the home page. */
   async featured(): Promise<ParkingListingSummary[]> {
     // Pick the rows first, then add up spaces for just those (not every listing's spaces).
@@ -188,6 +215,9 @@ export class ParkingService {
     const longitude = area?.longitude ?? query.longitude ?? 0;
     const point = sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography`;
     const window = { start: new Date(query.start), end: new Date(query.end) };
+    // A day either side, so the window's local days are covered in any zone.
+    const firstDay = addDays(utcDay(window.start), -1);
+    const lastDay = addDays(utcDay(window.end), 1);
 
     const results: ParkingSearchResult[] = [];
     for (let batch = 0; batch < SEARCH_MAX_BATCHES && results.length < SEARCH_LIMIT; batch++) {
@@ -202,6 +232,7 @@ export class ParkingService {
             published,
             sql`ST_DWithin(${listing.location}, ${point}, ${SEARCH_RADIUS_METERS})`,
             this.hasActiveSpace(),
+            not(this.closedAllDayDuring(window)),
           ),
         )
         // Nearest first; slug breaks ties so batches never overlap. The planner narrows by the
@@ -212,17 +243,23 @@ export class ParkingService {
       if (rows.length === 0) break;
 
       const ids = rows.map((row) => row.id);
-      const [periods, stats, priceRules, covers] = await Promise.all([
+      const [periods, exceptions, stats, priceRules, covers] = await Promise.all([
         this.openingHours(ids),
+        this.hoursExceptions(ids, firstDay, lastDay),
         this.spaceStats(ids),
         this.priceRules(ids),
         this.coverPhotos(ids),
       ]);
       for (const row of rows) {
         if (results.length === SEARCH_LIMIT) break;
-        if (!isOpenThroughout(periods.get(row.id) ?? [], window.start, window.end, row.timeZone)) {
-          continue;
-        }
+        const open = isOpenThroughout(
+          periods.get(row.id) ?? [],
+          window.start,
+          window.end,
+          row.timeZone,
+          exceptions.get(row.id),
+        );
+        if (!open) continue;
         const spaceStats = stats.get(row.id) ?? NO_SPACES;
         const { lowest } = spaceRates(row, spaceStats);
         results.push(
@@ -257,7 +294,8 @@ export class ParkingService {
     })[];
     if (!row) return null;
 
-    const [spaces, periodsById, priceRulesById, photos] = await Promise.all([
+    const today = zonedParts(new Date(), row.timeZone).date;
+    const [spaces, periodsById, exceptionsById, priceRulesById, photos] = await Promise.all([
       this.db
         .select({
           label: space.label,
@@ -269,6 +307,8 @@ export class ParkingService {
         .from(space)
         .where(and(eq(space.locationId, row.id), sql`${space.isActive}`)),
       this.openingHours([row.id]),
+      // From yesterday: a window may start in the half hour that began before midnight.
+      this.hoursExceptions([row.id], addDays(today, -1)),
       this.priceRules([row.id]),
       this.db
         .select({
@@ -284,6 +324,7 @@ export class ParkingService {
     ]);
     spaces.sort((a, b) => labels.compare(a.label, b.label));
     const periods = periodsById.get(row.id) ?? [];
+    const exceptions = exceptionsById.get(row.id) ?? [];
     const priceRules = priceRulesById.get(row.id) ?? NO_PRICE_RULES;
     const ownRates = spaces.flatMap((s) => (s.ownRate === null ? [] : [s.ownRate]));
     const stats: SpaceStats = {
@@ -311,6 +352,14 @@ export class ParkingService {
         opens: wallTime(period.opensMinute),
         closes: wallTime(period.closesMinute),
       })),
+      // Dates and hours only: the owner's note is never public (decision #26).
+      hoursExceptions: exceptions
+        .filter(({ endsOn }) => endsOn >= today)
+        .map((dated) => ({
+          startsOn: dated.startsOn,
+          endsOn: dated.endsOn,
+          ...hoursOf(dated),
+        })),
       spaces: spaces.slice(0, LISTING_SPACES_LIMIT).map((s) => ({
         label: s.label,
         features: features(s),
@@ -321,7 +370,7 @@ export class ParkingService {
         ? {
             start: window.start.toISOString(),
             end: window.end.toISOString(),
-            open: isOpenThroughout(periods, window.start, window.end, row.timeZone),
+            open: isOpenThroughout(periods, window.start, window.end, row.timeZone, exceptions),
             freeSpaces: spaces.length,
             total: total(row, priceRules, lowest, window),
           }
@@ -440,6 +489,41 @@ export class ParkingService {
       .where(and(inArray(space.locationId, locationIds), sql`${space.isActive}`))
       .groupBy(space.locationId);
     return new Map(rows.map(({ locationId, ...stats }) => [locationId, stats]));
+  }
+
+  /** Closures and special hours that touch the days from `from` (to `to`), soonest first. */
+  private async hoursExceptions(
+    locationIds: string[],
+    from: string,
+    to?: string,
+  ): Promise<Map<string, DatedHours[]>> {
+    const byLocation = new Map<string, DatedHours[]>();
+    if (locationIds.length === 0) return byLocation;
+    const rows = await this.db
+      .select({
+        locationId: exception.locationId,
+        startsOn: exception.startsOn,
+        endsOn: exception.endsOn,
+        opensMinute: exception.opensMinute,
+        closesMinute: exception.closesMinute,
+        closedFromMinute: exception.closedFromMinute,
+        closedToMinute: exception.closedToMinute,
+      })
+      .from(exception)
+      .where(
+        and(
+          inArray(exception.locationId, locationIds),
+          gte(exception.endsOn, from),
+          to === undefined ? undefined : lte(exception.startsOn, to),
+        ),
+      )
+      .orderBy(asc(exception.startsOn));
+    for (const { locationId, ...dated } of rows) {
+      const list = byLocation.get(locationId);
+      if (list) list.push(dated);
+      else byLocation.set(locationId, [dated]);
+    }
+    return byLocation;
   }
 
   private async openingHours(locationIds: string[]): Promise<Map<string, OpeningPeriod[]>> {
