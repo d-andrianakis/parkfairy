@@ -24,6 +24,23 @@ const listing: DemoListing = {
     opensMinute: 0,
     closesMinute: 1440,
   })),
+  hoursExceptions: [
+    { label: 'Αργία', fromDay: 3, toDay: 3, hours: null, closedHours: null },
+    {
+      label: null,
+      fromDay: 5,
+      toDay: 6,
+      hours: { opens: '08:00', closes: '14:30' },
+      closedHours: null,
+    },
+    {
+      label: 'Έργα',
+      fromDay: 8,
+      toDay: 8,
+      hours: null,
+      closedHours: { from: '14:00', to: '16:00' },
+    },
+  ],
   spaces: [{ label: 'A1' }, { label: 'A2', hasEvCharging: true }],
   cancellationPolicy: 'oneDay',
 };
@@ -70,6 +87,60 @@ describe('demo seed', () => {
       .where(eq(schema.parkingOpeningHours.locationId, id));
     expect(spaces?.n).toBe(2);
     expect(periods?.n).toBe(7);
+  });
+
+  it('dates closures from the day it runs, replacing the last run’s', async () => {
+    const closures = () =>
+      db
+        .select({
+          startsOn: schema.parkingHoursExceptions.startsOn,
+          endsOn: schema.parkingHoursExceptions.endsOn,
+          opensMinute: schema.parkingHoursExceptions.opensMinute,
+          closesMinute: schema.parkingHoursExceptions.closesMinute,
+          closedFromMinute: schema.parkingHoursExceptions.closedFromMinute,
+          closedToMinute: schema.parkingHoursExceptions.closedToMinute,
+          label: schema.parkingHoursExceptions.label,
+        })
+        .from(schema.parkingHoursExceptions)
+        .innerJoin(
+          schema.parkingLocations,
+          eq(schema.parkingLocations.id, schema.parkingHoursExceptions.locationId),
+        )
+        .where(eq(schema.parkingLocations.slug, listing.slug))
+        .orderBy(schema.parkingHoursExceptions.startsOn);
+    await upsertListing(db, listing, '2030-03-01');
+    await upsertListing(db, listing, '2030-03-10');
+    expect(await closures()).toEqual([
+      {
+        startsOn: '2030-03-13',
+        endsOn: '2030-03-13',
+        opensMinute: null,
+        closesMinute: null,
+        closedFromMinute: null,
+        closedToMinute: null,
+        label: 'Αργία',
+      },
+      {
+        startsOn: '2030-03-15',
+        endsOn: '2030-03-16',
+        opensMinute: 480,
+        closesMinute: 870,
+        closedFromMinute: null,
+        closedToMinute: null,
+        label: null,
+      },
+      {
+        startsOn: '2030-03-18',
+        endsOn: '2030-03-18',
+        opensMinute: null,
+        closesMinute: null,
+        closedFromMinute: 840,
+        closedToMinute: 960,
+        label: 'Έργα',
+      },
+    ]);
+    await upsertListing(db, { ...listing, hoursExceptions: [] });
+    expect(await closures()).toEqual([]);
   });
 
   it('creates the demo account once, and its documented password signs in', async () => {

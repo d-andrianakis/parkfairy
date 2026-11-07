@@ -2,14 +2,13 @@ import {
   ACCOUNT_STEPS,
   type ListingStep,
   type OwnerListing,
-  type OwnerOnboarding,
+  type OwnerOtherListings,
 } from '@parkfairy/contracts';
 import { Alert, AlertDescription, AlertTitle } from '@parkfairy/ui/components/alert';
 import { CircleAlert, Clock } from 'lucide-react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { ClientMessages } from '@/components/client-messages';
 import { ClosuresLink } from '@/components/owner/closures-link';
 import { HoursForm } from '@/components/owner/hours-form';
 import { LocationForm } from '@/components/owner/location-form';
@@ -20,11 +19,10 @@ import { ReviewSummary } from '@/components/owner/review-summary';
 import { SpacesForm } from '@/components/owner/spaces-form';
 import { StepShell } from '@/components/owner/step-shell';
 import { SubmitListing } from '@/components/owner/submit-listing';
-import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { hasLocale } from 'next-intl';
 import { routing } from '@/i18n/routing';
 import { isListingStep } from '@/lib/owner';
-import { loadOwnerListing, loadOwnerOnboarding } from '@/lib/owner.server';
+import { loadOtherListings, loadOwnerListing } from '@/lib/owner.server';
 import { requireSession } from '@/lib/session';
 
 interface StepPageProps {
@@ -41,25 +39,23 @@ export async function generateMetadata({ params }: StepPageProps): Promise<Metad
   return { title: t(`stepNames.${step}`) };
 }
 
+type Others = OwnerOtherListings['listings'];
+
 /** The owner's other listings that can still take new weekly hours (decision #30). */
-function draftsBesides(listing: OwnerListing, onboarding: OwnerOnboarding | null) {
-  return (onboarding?.listings ?? [])
-    .filter(
-      (other) =>
-        other.id !== listing.id &&
-        (other.status === 'draft' || other.status === 'changes_requested'),
-    )
+function draftsAmong(others: Others) {
+  return others
+    .filter((other) => other.status === 'draft' || other.status === 'changes_requested')
     .map(({ id, name, contentLocale }) => ({ id, name, contentLocale }));
 }
 
 function StepForm({
   listing,
   step,
-  onboarding,
+  others,
 }: {
   listing: OwnerListing;
   step: Exclude<ListingStep, 'review'>;
-  onboarding: OwnerOnboarding | null;
+  others: Others;
 }) {
   switch (step) {
     case 'location':
@@ -72,7 +68,7 @@ function StepForm({
       return (
         <HoursForm
           listing={listing}
-          otherListings={draftsBesides(listing, onboarding)}
+          otherListings={draftsAmong(others)}
           after={
             <div className="border-t pt-6">
               <ClosuresLink id={listing.id} lead="hoursHint" />
@@ -95,9 +91,9 @@ export default async function ListingStepPage({ params }: StepPageProps) {
   await requireSession(`/owner/listings/${id}/${step}`);
 
   // Only the hours step needs the owner's other listings, to offer them its week.
-  const [listing, onboarding] = await Promise.all([
+  const [listing, others] = await Promise.all([
     loadOwnerListing(id),
-    step === 'hours' ? loadOwnerOnboarding() : Promise.resolve(null),
+    step === 'hours' ? loadOtherListings(id) : Promise.resolve([]),
   ]);
   if (listing === 'not-found') notFound();
   const t = await getTranslations({
@@ -138,16 +134,14 @@ export default async function ListingStepPage({ params }: StepPageProps) {
           <ReviewSummary listing={listing} doneAccountSteps={doneAccountSteps} />
         </>
       ) : step === 'review' ? (
-        <ClientMessages namespaces={CLIENT_NAMESPACES.owner}>
+        <>
           <ReviewSummary listing={listing} doneAccountSteps={doneAccountSteps} />
           {canSubmit ? (
             <SubmitListing id={listing.id} resubmitting={listing.status === 'changes_requested'} />
           ) : null}
-        </ClientMessages>
+        </>
       ) : (
-        <ClientMessages namespaces={CLIENT_NAMESPACES.owner}>
-          <StepForm listing={listing} step={step} onboarding={onboarding} />
-        </ClientMessages>
+        <StepForm listing={listing} step={step} others={others} />
       )}
     </StepShell>
   );

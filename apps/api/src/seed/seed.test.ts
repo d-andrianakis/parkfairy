@@ -1,4 +1,12 @@
-import { findArea, PASSWORD_POLICY, SEARCH_RADIUS_METERS } from '@parkfairy/contracts';
+import {
+  addDays,
+  DEFAULT_TIME_ZONE,
+  findArea,
+  ListingHoursExceptionsInputSchema,
+  PASSWORD_POLICY,
+  SEARCH_RADIUS_METERS,
+  zonedParts,
+} from '@parkfairy/contracts';
 import { describe, expect, it } from 'vitest';
 import { PHOTO_LIMITS } from '@parkfairy/contracts';
 import { existsSync, statSync } from 'node:fs';
@@ -93,6 +101,29 @@ describe('demo data', () => {
         }
       }
     }
+  });
+
+  it('has closures and special hours an owner could have saved', () => {
+    const today = zonedParts(new Date(), DEFAULT_TIME_ZONE).date;
+    for (const listing of DEMO_LISTINGS) {
+      const exceptions = (listing.hoursExceptions ?? []).map(({ fromDay, toDay, ...entry }) => ({
+        ...entry,
+        startsOn: addDays(today, fromDay),
+        endsOn: addDays(today, toDay),
+      }));
+      const parsed = ListingHoursExceptionsInputSchema.safeParse({ exceptions });
+      expect(parsed.error?.issues, listing.slug).toBeUndefined();
+    }
+  });
+
+  it('puts a closure inside the window the API latency budget searches', () => {
+    // tests/smoke/specs/performance.smoke.ts: Syntagma, two days after the seed in CI.
+    const met = DEMO_LISTINGS.filter(
+      (listing) =>
+        listing.areaId === 'syntagma' &&
+        listing.hoursExceptions?.some(({ fromDay, toDay }) => fromDay <= 2 && toDay >= 2),
+    );
+    expect(met.length).toBeGreaterThan(0);
   });
 
   it('uses a demo password that meets the password policy', () => {

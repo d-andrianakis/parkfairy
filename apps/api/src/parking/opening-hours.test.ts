@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isOpenThroughout,
   wallTime,
+  weekNeeded,
   type DatedHours,
   type OpeningPeriod,
 } from './opening-hours.js';
@@ -221,6 +222,47 @@ describe('isOpenThroughout with closures and special hours', () => {
     const night = [special('2026-10-25', h(1), h(6))];
     expect(openWith(night, '2026-10-24T22:00:00Z', '2026-10-25T04:00:00Z')).toBe(true);
     expect(openWith(night, '2026-10-25T04:00:00Z', '2026-10-25T05:00:00Z')).toBe(false);
+  });
+});
+
+describe('weekNeeded (Europe/Athens wall clock)', () => {
+  const needed = (start: string, end: string) => weekNeeded(new Date(start), new Date(end), ATHENS);
+  const TUESDAY = 1440;
+  const SUNDAY = 6 * 1440;
+
+  it('places a stay among the minutes of the week, Monday midnight first', () => {
+    // Tuesday 10:00 to 12:30, summer time.
+    expect(needed('2026-06-16T07:00:00Z', '2026-06-16T09:30:00Z')).toBe(
+      `{[${TUESDAY + h(10)},${TUESDAY + h(12, 30)})}`,
+    );
+  });
+
+  it('runs to the end of a day for a stay ending at midnight', () => {
+    expect(needed('2026-06-15T19:00:00Z', '2026-06-15T21:00:00Z')).toBe(`{[${h(22)},${h(24)})}`);
+  });
+
+  it('splits a night from Sunday into Monday where the week starts again', () => {
+    expect(needed('2026-06-21T19:00:00Z', '2026-06-21T23:00:00Z')).toBe(
+      `{[${SUNDAY + h(22)},10080),[0,${h(2)})}`,
+    );
+  });
+
+  it('needs the whole week for a stay of a week or more', () => {
+    expect(needed('2026-06-15T07:00:00Z', '2026-06-22T07:00:00Z')).toBe('{[0,10080)}');
+    expect(needed('2026-06-15T07:00:00Z', '2026-06-25T07:00:00Z')).toBe('{[0,10080)}');
+  });
+
+  it('reads the wall clock across the spring change, as isOpenThroughout does', () => {
+    // Sunday 28 March 2027: 02:00 winter time to 05:00 summer time, two real hours.
+    expect(needed('2027-03-28T00:00:00Z', '2027-03-28T02:00:00Z')).toBe(
+      `{[${SUNDAY + h(2)},${SUNDAY + h(5)})}`,
+    );
+  });
+
+  it('needs nothing for a stay inside the hour the clocks repeat', () => {
+    // Sunday 31 October 2027: 03:30 summer time to 03:00 winter time.
+    expect(needed('2027-10-31T00:30:00Z', '2027-10-31T01:00:00Z')).toBe('{}');
+    expect(open(everyDay(0, h(1)), '2027-10-31T00:30:00Z', '2027-10-31T01:00:00Z')).toBe(true);
   });
 });
 

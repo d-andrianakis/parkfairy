@@ -4,6 +4,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { createAuth, parseOrigins } from '@parkfairy/auth';
+import { addDays, DEFAULT_TIME_ZONE, wallMinutes, zonedParts } from '@parkfairy/contracts';
 import { schema, type Database } from '@parkfairy/database';
 import { eq, sql } from 'drizzle-orm';
 import { NO_PRICE_RULES } from '../parking/pricing.js';
@@ -52,8 +53,21 @@ export async function assertMarkedLocal(db: Database): Promise<void> {
   }
 }
 
-export async function upsertListing(db: Database, listing: DemoListing): Promise<void> {
-  const { openingHours, spaces, priceRules, latitude, longitude, ...columns } = listing;
+/** `today` is the Athens date the closures' days count from. */
+export async function upsertListing(
+  db: Database,
+  listing: DemoListing,
+  today = zonedParts(new Date(), DEFAULT_TIME_ZONE).date,
+): Promise<void> {
+  const {
+    openingHours,
+    hoursExceptions = [],
+    spaces,
+    priceRules,
+    latitude,
+    longitude,
+    ...columns
+  } = listing;
   const values = { ...columns, location: { latitude, longitude }, status: 'published' as const };
   const rules = { ...NO_PRICE_RULES, ...priceRules };
   await db.transaction(async (tx) => {
@@ -74,11 +88,28 @@ export async function upsertListing(db: Database, listing: DemoListing): Promise
       .delete(schema.parkingStayDiscounts)
       .where(eq(schema.parkingStayDiscounts.locationId, row.id));
     await tx
+      .delete(schema.parkingHoursExceptions)
+      .where(eq(schema.parkingHoursExceptions.locationId, row.id));
+    await tx
       .insert(schema.parkingSpaces)
       .values(spaces.map((space) => ({ ...space, locationId: row.id })));
     await tx
       .insert(schema.parkingOpeningHours)
       .values(openingHours.map((period) => ({ ...period, locationId: row.id })));
+    if (hoursExceptions.length > 0) {
+      await tx.insert(schema.parkingHoursExceptions).values(
+        hoursExceptions.map(({ label, fromDay, toDay, hours: open, closedHours: shut }) => ({
+          locationId: row.id,
+          label,
+          startsOn: addDays(today, fromDay),
+          endsOn: addDays(today, toDay),
+          opensMinute: open ? wallMinutes(open.opens) : null,
+          closesMinute: open ? wallMinutes(open.closes) : null,
+          closedFromMinute: shut ? wallMinutes(shut.from) : null,
+          closedToMinute: shut ? wallMinutes(shut.to) : null,
+        })),
+      );
+    }
     if (rules.weekendRateMinor !== null) {
       await tx.insert(schema.parkingPriceRules).values({
         locationId: row.id,

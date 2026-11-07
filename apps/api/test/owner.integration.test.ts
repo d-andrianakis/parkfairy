@@ -7,9 +7,11 @@ import {
   OwnerHoursCopySchema,
   OwnerHoursExceptionsCopySchema,
   OwnerHoursExceptionsSchema,
+  OwnerListingClosuresSchema,
   OwnerListingProgressSchema,
   OwnerListingSchema,
   OwnerOnboardingSchema,
+  OwnerOtherListingsSchema,
   OwnerPhotoSchema,
   OwnerProfileSchema,
   OwnerProofSchema,
@@ -208,6 +210,8 @@ describe('owner onboarding', () => {
       ['put', '/profile/tax'],
       ['post', '/listings'],
       ['get', `/listings/${randomUUID()}`],
+      ['get', `/listings/${randomUUID()}/hours-exceptions`],
+      ['get', `/listings/${randomUUID()}/others`],
     ] as const)('refuses %s %s without a session', async (method, path) => {
       await api(null, method, path).expect(401);
     });
@@ -539,6 +543,26 @@ describe('owner onboarding', () => {
       const { results } = ParkingSearchResponseSchema.parse(response.body);
       expect(results.map((r) => r.name)).not.toContain(location.name);
       expect((await progress(owner, id)).slug).toBeNull();
+    });
+
+    it('answers a save with the progress the listing reads back, cover photo and all', async () => {
+      const id = await newListing(owner);
+      await api(owner, 'patch', `/listings/${id}/location`).send(location).expect(200);
+      const first = OwnerPhotoSchema.parse(
+        (await upload(owner, id, await uniqueJpeg()).expect(201)).body,
+      );
+      const second = OwnerPhotoSchema.parse(
+        (await upload(owner, id, await uniqueJpeg()).expect(201)).body,
+      );
+      // The second goes first, so the cover is whichever sits first, not whichever came first.
+      await api(owner, 'put', `/listings/${id}/photos/order`)
+        .send({ ids: [second.id, first.id] })
+        .expect(204);
+      const saved = await api(owner, 'put', `/listings/${id}/spaces`).send(spaces).expect(200);
+      const answer = OwnerListingProgressSchema.parse(saved.body);
+      expect(answer).toEqual(await progress(owner, id));
+      expect(answer.doneSteps).toEqual(['location', 'spaces', 'photos']);
+      expect(answer.coverPhoto?.key).toBe(second.key);
     });
 
     it('moves Continue along as each step is saved, in any order', async () => {
@@ -991,6 +1015,21 @@ describe('owner onboarding', () => {
       });
     });
 
+    it('names only what is still missing, step by step', async () => {
+      const id = await newListing(submitter);
+      await api(submitter, 'patch', `/listings/${id}/location`).send(location).expect(200);
+      await api(submitter, 'put', `/listings/${id}/spaces`).send(spaces).expect(200);
+      await api(submitter, 'put', `/listings/${id}/hours`).send(hours).expect(200);
+      const response = await api(submitter, 'post', `/listings/${id}/submit`)
+        .send({ confirmed: true })
+        .expect(409);
+      expect((response.body as { missing: string[] }).missing).toEqual([
+        'prices',
+        'photos',
+        'proof',
+      ]);
+    });
+
     it('needs the account steps too', async () => {
       const id = await readyListing(owner); // this owner never finished the account steps
       const response = await api(owner, 'post', `/listings/${id}/submit`)
@@ -1285,6 +1324,57 @@ describe('owner onboarding', () => {
         (await api(keeper, 'get', `/listings/${id}`).expect(200)).body,
       );
       expect(listing.hoursExceptions).toHaveLength(1);
+    });
+
+    it('reads back for the closures page: the name, the language and the entries alone', async () => {
+      const id = await newListing(keeper);
+      await api(keeper, 'patch', `/listings/${id}/location`).send(location).expect(200);
+      await save(keeper, id, [closed(inDays(8), inDays(9), 'Πάσχα')]).expect(200);
+      const response = await api(keeper, 'get', `/listings/${id}/hours-exceptions`).expect(200);
+      expect(OwnerListingClosuresSchema.strict().parse(response.body)).toEqual({
+        id,
+        name: location.name,
+        contentLocale: location.contentLocale,
+        exceptions: [closed(inDays(8), inDays(9), 'Πάσχα')],
+      });
+      // Nobody else's, whatever the id.
+      const theirs = await api(stranger, 'get', `/listings/${id}/hours-exceptions`).expect(404);
+      expect((theirs.body as { code: string }).code).toBe('LISTING_NOT_FOUND');
+      await api(keeper, 'get', '/listings/not-a-uuid/hours-exceptions').expect(404);
+      await api(keeper, 'get', `/listings/${randomUUID()}/hours-exceptions`).expect(404);
+    });
+
+    it('names the owner’s other listings, last changed first, and nobody else’s', async () => {
+      const mine = await signUpUser(app);
+      const [first, second, third] = [
+        await newListing(mine),
+        await newListing(mine),
+        await newListing(mine),
+      ];
+      await newListing(stranger);
+      await api(mine, 'patch', `/listings/${first}/location`).send(location).expect(200);
+      // Fixed times, the first changed last: the database's clock and the app's can disagree.
+      for (const [id, at] of [
+        [first, '2026-01-03T00:00:00Z'],
+        [second, '2026-01-02T00:00:00Z'],
+        [third, '2026-01-01T00:00:00Z'],
+      ] as const) {
+        await db
+          .update(schema.parkingLocations)
+          .set({ updatedAt: new Date(at) })
+          .where(eq(schema.parkingLocations.id, id));
+      }
+      const others = async (id: string) =>
+        OwnerOtherListingsSchema.parse(
+          (await api(mine, 'get', `/listings/${id}/others`).expect(200)).body,
+        ).listings;
+      expect((await others(third)).map((other) => other.id)).toEqual([first, second]);
+      expect(await others(second)).toEqual([
+        { id: first, name: location.name, contentLocale: location.contentLocale, status: 'draft' },
+        { id: third, name: null, contentLocale: 'el', status: 'draft' },
+      ]);
+      const theirs = await api(stranger, 'get', `/listings/${first}/others`).expect(404);
+      expect((theirs.body as { code: string }).code).toBe('LISTING_NOT_FOUND');
     });
 
     it('refuses what can’t be meant, naming the entry and the field', async () => {

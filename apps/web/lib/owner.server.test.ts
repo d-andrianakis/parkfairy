@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadOwnerListing, loadOwnerOnboarding, loadOwnerProfile } from './owner.server';
+import {
+  loadOtherListings,
+  loadOwnerClosures,
+  loadOwnerListing,
+  loadOwnerOnboarding,
+  loadOwnerProfile,
+} from './owner.server';
 
 vi.mock('server-only', () => ({}));
 const request = vi.hoisted(() => ({ headers: new Headers() }));
@@ -10,6 +16,8 @@ vi.mock('react', async (importOriginal) => ({
 }));
 
 const api = vi.hoisted(() => ({
+  getListingHoursExceptions: vi.fn(),
+  getOtherOwnerListings: vi.fn(),
   getOwnerListing: vi.fn(),
   getOwnerOnboarding: vi.fn(),
   getOwnerProfile: vi.fn(),
@@ -30,16 +38,19 @@ beforeEach(() => {
   request.headers = new Headers({ cookie: 'session=1', 'x-forwarded-for': '203.0.113.7' });
 });
 
-describe('loadOwnerListing', () => {
+describe.each([
+  ['loadOwnerListing', loadOwnerListing, api.getOwnerListing],
+  ['loadOwnerClosures', loadOwnerClosures, api.getListingHoursExceptions],
+] as const)('%s', (_name, load, call) => {
   it('returns the listing', async () => {
-    api.getOwnerListing.mockResolvedValue({ data: LISTING, response: new Response() });
-    await expect(loadOwnerListing('a')).resolves.toBe(LISTING);
+    call.mockResolvedValue({ data: LISTING, response: new Response() });
+    await expect(load('a')).resolves.toBe(LISTING);
   });
 
   it('asks as the visitor, so the API decides what they may see', async () => {
-    api.getOwnerListing.mockResolvedValue({ data: LISTING, response: new Response() });
-    await loadOwnerListing('a');
-    expect(api.getOwnerListing).toHaveBeenCalledWith(
+    call.mockResolvedValue({ data: LISTING, response: new Response() });
+    await load('a');
+    expect(call).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: 'a' },
         headers: { cookie: 'session=1', 'x-forwarded-for': '203.0.113.7' },
@@ -48,15 +59,37 @@ describe('loadOwnerListing', () => {
   });
 
   it('calls a 404 not found: another owner’s listing looks the same', async () => {
-    api.getOwnerListing.mockResolvedValue(answered(404));
-    await expect(loadOwnerListing('a')).resolves.toBe('not-found');
+    call.mockResolvedValue(answered(404));
+    await expect(load('a')).resolves.toBe('not-found');
   });
 
   it('never calls an outage not found, which would look like a lost listing', async () => {
-    api.getOwnerListing.mockResolvedValue(answered(500));
-    await expect(loadOwnerListing('a')).resolves.toBe('unavailable');
-    api.getOwnerListing.mockRejectedValue(new Error('timed out'));
-    await expect(loadOwnerListing('a')).resolves.toBe('unavailable');
+    call.mockResolvedValue(answered(500));
+    await expect(load('a')).resolves.toBe('unavailable');
+    call.mockRejectedValue(new Error('timed out'));
+    await expect(load('a')).resolves.toBe('unavailable');
+  });
+});
+
+describe('loadOtherListings', () => {
+  const others = [{ id: 'b', name: 'Β', contentLocale: 'el', status: 'draft' }];
+
+  it('returns the owner’s other listings, asking as the visitor', async () => {
+    api.getOtherOwnerListings.mockResolvedValue({ data: { listings: others } });
+    await expect(loadOtherListings('a')).resolves.toBe(others);
+    expect(api.getOtherOwnerListings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { id: 'a' },
+        headers: expect.objectContaining({ cookie: 'session=1' }),
+      }),
+    );
+  });
+
+  it('offers none when the API has no answer, so the page still works', async () => {
+    api.getOtherOwnerListings.mockResolvedValue(answered(404));
+    await expect(loadOtherListings('a')).resolves.toEqual([]);
+    api.getOtherOwnerListings.mockRejectedValue(new Error('timed out'));
+    await expect(loadOtherListings('a')).resolves.toEqual([]);
   });
 });
 

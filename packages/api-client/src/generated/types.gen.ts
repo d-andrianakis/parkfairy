@@ -343,6 +343,22 @@ export type OwnerHoursException = {
     label: string | null;
 };
 
+export type OwnerListingClosures = {
+    id: string;
+    name: string | null;
+    contentLocale: Locale;
+    exceptions: Array<OwnerHoursException>;
+};
+
+export type OwnerOtherListings = {
+    listings: Array<{
+        id: string;
+        name: string | null;
+        contentLocale: Locale;
+        status: ListingStatus;
+    }>;
+};
+
 export type OwnerHoursExceptions = {
     exceptions: Array<OwnerHoursException>;
 };
@@ -757,6 +773,73 @@ export type GetOwnerListingResponses = {
 
 export type GetOwnerListingResponse = GetOwnerListingResponses[keyof GetOwnerListingResponses];
 
+export type GetListingHoursExceptionsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/hours-exceptions';
+};
+
+export type GetListingHoursExceptionsErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type GetListingHoursExceptionsError = GetListingHoursExceptionsErrors[keyof GetListingHoursExceptionsErrors];
+
+export type GetListingHoursExceptionsResponses = {
+    200: OwnerListingClosures;
+};
+
+export type GetListingHoursExceptionsResponse = GetListingHoursExceptionsResponses[keyof GetListingHoursExceptionsResponses];
+
+export type SaveListingHoursExceptionsData = {
+    body: ListingHoursExceptionsInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/hours-exceptions';
+};
+
+export type SaveListingHoursExceptionsErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type SaveListingHoursExceptionsError = SaveListingHoursExceptionsErrors[keyof SaveListingHoursExceptionsErrors];
+
+export type SaveListingHoursExceptionsResponses = {
+    200: OwnerHoursExceptions;
+};
+
+export type SaveListingHoursExceptionsResponse = SaveListingHoursExceptionsResponses[keyof SaveListingHoursExceptionsResponses];
+
+export type GetOtherOwnerListingsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/others';
+};
+
+export type GetOtherOwnerListingsErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type GetOtherOwnerListingsError = GetOtherOwnerListingsErrors[keyof GetOtherOwnerListingsErrors];
+
+export type GetOtherOwnerListingsResponses = {
+    200: OwnerOtherListings;
+};
+
+export type GetOtherOwnerListingsResponse = GetOtherOwnerListingsResponses[keyof GetOtherOwnerListingsResponses];
+
 export type SaveListingLocationData = {
     body: ListingLocationPatch;
     path: {
@@ -852,29 +935,6 @@ export type CopyListingHoursResponses = {
 };
 
 export type CopyListingHoursResponse = CopyListingHoursResponses[keyof CopyListingHoursResponses];
-
-export type SaveListingHoursExceptionsData = {
-    body: ListingHoursExceptionsInput;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/v1/owner/listings/{id}/hours-exceptions';
-};
-
-export type SaveListingHoursExceptionsErrors = {
-    400: ErrorResponse;
-    401: ErrorResponse;
-    404: ErrorResponse;
-};
-
-export type SaveListingHoursExceptionsError = SaveListingHoursExceptionsErrors[keyof SaveListingHoursExceptionsErrors];
-
-export type SaveListingHoursExceptionsResponses = {
-    200: OwnerHoursExceptions;
-};
-
-export type SaveListingHoursExceptionsResponse = SaveListingHoursExceptionsResponses[keyof SaveListingHoursExceptionsResponses];
 
 export type CopyListingHoursExceptionsData = {
     body: ListingHoursExceptionsCopyInput;

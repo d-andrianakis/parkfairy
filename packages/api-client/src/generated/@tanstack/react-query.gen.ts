@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { copyListingHours, copyListingHoursExceptions, createOwnerListing, deleteListingPhoto, deleteListingProof, deleteOwnerListing, downloadListingProof, getFeaturedParking, getListingPhoto, getLiveness, getMe, getOwnerListing, getOwnerOnboarding, getOwnerProfile, getParkingListing, getReadiness, type Options, reorderListingPhotos, saveListingHours, saveListingHoursExceptions, saveListingLocation, saveListingPrices, saveListingProofDetails, saveListingSpaces, saveOwnerTaxDetails, searchParking, submitOwnerListing, updateListingPhoto, updateOwnerProfile, uploadListingPhoto, uploadListingProof } from '../sdk.gen';
-import type { CopyListingHoursData, CopyListingHoursError, CopyListingHoursExceptionsData, CopyListingHoursExceptionsError, CopyListingHoursExceptionsResponse, CopyListingHoursResponse, CreateOwnerListingData, CreateOwnerListingError, CreateOwnerListingResponse, DeleteListingPhotoData, DeleteListingPhotoError, DeleteListingPhotoResponse, DeleteListingProofData, DeleteListingProofError, DeleteListingProofResponse, DeleteOwnerListingData, DeleteOwnerListingError, DeleteOwnerListingResponse, DownloadListingProofData, DownloadListingProofError, DownloadListingProofResponse, GetFeaturedParkingData, GetFeaturedParkingResponse, GetListingPhotoData, GetListingPhotoError, GetListingPhotoResponse, GetLivenessData, GetLivenessResponse, GetMeData, GetMeError, GetMeResponse, GetOwnerListingData, GetOwnerListingError, GetOwnerListingResponse, GetOwnerOnboardingData, GetOwnerOnboardingError, GetOwnerOnboardingResponse, GetOwnerProfileData, GetOwnerProfileError, GetOwnerProfileResponse, GetParkingListingData, GetParkingListingError, GetParkingListingResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, ReorderListingPhotosData, ReorderListingPhotosError, ReorderListingPhotosResponse, SaveListingHoursData, SaveListingHoursError, SaveListingHoursExceptionsData, SaveListingHoursExceptionsError, SaveListingHoursExceptionsResponse, SaveListingHoursResponse, SaveListingLocationData, SaveListingLocationError, SaveListingLocationResponse, SaveListingPricesData, SaveListingPricesError, SaveListingPricesResponse, SaveListingProofDetailsData, SaveListingProofDetailsError, SaveListingProofDetailsResponse, SaveListingSpacesData, SaveListingSpacesError, SaveListingSpacesResponse, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsError, SaveOwnerTaxDetailsResponse, SearchParkingData, SearchParkingError, SearchParkingResponse, SubmitOwnerListingData, SubmitOwnerListingError, SubmitOwnerListingResponse, UpdateListingPhotoData, UpdateListingPhotoError, UpdateListingPhotoResponse, UpdateOwnerProfileData, UpdateOwnerProfileError, UpdateOwnerProfileResponse, UploadListingPhotoData, UploadListingPhotoError, UploadListingPhotoResponse, UploadListingProofData, UploadListingProofError, UploadListingProofResponse } from '../types.gen';
+import { copyListingHours, copyListingHoursExceptions, createOwnerListing, deleteListingPhoto, deleteListingProof, deleteOwnerListing, downloadListingProof, getFeaturedParking, getListingHoursExceptions, getListingPhoto, getLiveness, getMe, getOtherOwnerListings, getOwnerListing, getOwnerOnboarding, getOwnerProfile, getParkingListing, getReadiness, type Options, reorderListingPhotos, saveListingHours, saveListingHoursExceptions, saveListingLocation, saveListingPrices, saveListingProofDetails, saveListingSpaces, saveOwnerTaxDetails, searchParking, submitOwnerListing, updateListingPhoto, updateOwnerProfile, uploadListingPhoto, uploadListingProof } from '../sdk.gen';
+import type { CopyListingHoursData, CopyListingHoursError, CopyListingHoursExceptionsData, CopyListingHoursExceptionsError, CopyListingHoursExceptionsResponse, CopyListingHoursResponse, CreateOwnerListingData, CreateOwnerListingError, CreateOwnerListingResponse, DeleteListingPhotoData, DeleteListingPhotoError, DeleteListingPhotoResponse, DeleteListingProofData, DeleteListingProofError, DeleteListingProofResponse, DeleteOwnerListingData, DeleteOwnerListingError, DeleteOwnerListingResponse, DownloadListingProofData, DownloadListingProofError, DownloadListingProofResponse, GetFeaturedParkingData, GetFeaturedParkingResponse, GetListingHoursExceptionsData, GetListingHoursExceptionsError, GetListingHoursExceptionsResponse, GetListingPhotoData, GetListingPhotoError, GetListingPhotoResponse, GetLivenessData, GetLivenessResponse, GetMeData, GetMeError, GetMeResponse, GetOtherOwnerListingsData, GetOtherOwnerListingsError, GetOtherOwnerListingsResponse, GetOwnerListingData, GetOwnerListingError, GetOwnerListingResponse, GetOwnerOnboardingData, GetOwnerOnboardingError, GetOwnerOnboardingResponse, GetOwnerProfileData, GetOwnerProfileError, GetOwnerProfileResponse, GetParkingListingData, GetParkingListingError, GetParkingListingResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, ReorderListingPhotosData, ReorderListingPhotosError, ReorderListingPhotosResponse, SaveListingHoursData, SaveListingHoursError, SaveListingHoursExceptionsData, SaveListingHoursExceptionsError, SaveListingHoursExceptionsResponse, SaveListingHoursResponse, SaveListingLocationData, SaveListingLocationError, SaveListingLocationResponse, SaveListingPricesData, SaveListingPricesError, SaveListingPricesResponse, SaveListingProofDetailsData, SaveListingProofDetailsError, SaveListingProofDetailsResponse, SaveListingSpacesData, SaveListingSpacesError, SaveListingSpacesResponse, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsError, SaveOwnerTaxDetailsResponse, SearchParkingData, SearchParkingError, SearchParkingResponse, SubmitOwnerListingData, SubmitOwnerListingError, SubmitOwnerListingResponse, UpdateListingPhotoData, UpdateListingPhotoError, UpdateListingPhotoResponse, UpdateOwnerProfileData, UpdateOwnerProfileError, UpdateOwnerProfileResponse, UploadListingPhotoData, UploadListingPhotoError, UploadListingPhotoResponse, UploadListingProofData, UploadListingProofError, UploadListingProofResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -328,6 +328,50 @@ export const getOwnerListingOptions = (options: Options<GetOwnerListingData>) =>
     queryKey: getOwnerListingQueryKey(options)
 });
 
+export const getListingHoursExceptionsQueryKey = (options: Options<GetListingHoursExceptionsData>) => createQueryKey('getListingHoursExceptions', options);
+
+export const getListingHoursExceptionsOptions = (options: Options<GetListingHoursExceptionsData>) => queryOptions<GetListingHoursExceptionsResponse, GetListingHoursExceptionsError, GetListingHoursExceptionsResponse, ReturnType<typeof getListingHoursExceptionsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getListingHoursExceptions({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getListingHoursExceptionsQueryKey(options)
+});
+
+export const saveListingHoursExceptionsMutation = (options?: Partial<Options<SaveListingHoursExceptionsData>>): UseMutationOptions<SaveListingHoursExceptionsResponse, SaveListingHoursExceptionsError, Options<SaveListingHoursExceptionsData>> => {
+    const mutationOptions: UseMutationOptions<SaveListingHoursExceptionsResponse, SaveListingHoursExceptionsError, Options<SaveListingHoursExceptionsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await saveListingHoursExceptions({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getOtherOwnerListingsQueryKey = (options: Options<GetOtherOwnerListingsData>) => createQueryKey('getOtherOwnerListings', options);
+
+export const getOtherOwnerListingsOptions = (options: Options<GetOtherOwnerListingsData>) => queryOptions<GetOtherOwnerListingsResponse, GetOtherOwnerListingsError, GetOtherOwnerListingsResponse, ReturnType<typeof getOtherOwnerListingsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getOtherOwnerListings({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getOtherOwnerListingsQueryKey(options)
+});
+
 export const saveListingLocationMutation = (options?: Partial<Options<SaveListingLocationData>>): UseMutationOptions<SaveListingLocationResponse, SaveListingLocationError, Options<SaveListingLocationData>> => {
     const mutationOptions: UseMutationOptions<SaveListingLocationResponse, SaveListingLocationError, Options<SaveListingLocationData>> = {
         mutationFn: async (fnOptions) => {
@@ -374,20 +418,6 @@ export const copyListingHoursMutation = (options?: Partial<Options<CopyListingHo
     const mutationOptions: UseMutationOptions<CopyListingHoursResponse, CopyListingHoursError, Options<CopyListingHoursData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await copyListingHours({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const saveListingHoursExceptionsMutation = (options?: Partial<Options<SaveListingHoursExceptionsData>>): UseMutationOptions<SaveListingHoursExceptionsResponse, SaveListingHoursExceptionsError, Options<SaveListingHoursExceptionsData>> => {
-    const mutationOptions: UseMutationOptions<SaveListingHoursExceptionsResponse, SaveListingHoursExceptionsError, Options<SaveListingHoursExceptionsData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await saveListingHoursExceptions({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

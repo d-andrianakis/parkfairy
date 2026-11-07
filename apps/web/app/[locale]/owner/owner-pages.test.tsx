@@ -1,21 +1,32 @@
-import { LISTING_STEPS, type OwnerListingProgress } from '@parkfairy/contracts';
+import { LISTING_STEPS, type OwnerOtherListings } from '@parkfairy/contracts';
 import { screen, within } from '@testing-library/react';
 import { notFound } from 'next/navigation';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadOwnerListing, loadOwnerOnboarding, loadOwnerProfile } from '@/lib/owner.server';
+import {
+  loadOtherListings,
+  loadOwnerClosures,
+  loadOwnerListing,
+  loadOwnerProfile,
+} from '@/lib/owner.server';
 import { requireSession } from '@/lib/session';
 import { LISTING_ID, listingFixture, profileFixture, progressFixture } from '@/test/owner-fixtures';
 import { renderWithProviders } from '@/test/render';
 import ListingStepPage from './listings/[id]/[step]/page';
-import ClosuresPage from './listings/[id]/closures/page';
+import ClosuresPage, { generateMetadata as closuresMetadata } from './listings/[id]/closures/page';
+import OwnerLayout from './layout';
 import OwnerTaxPage from './tax/page';
 
 vi.mock('@/lib/owner.server', () => ({
+  loadOwnerClosures: vi.fn(),
   loadOwnerListing: vi.fn(),
-  loadOwnerOnboarding: vi.fn(() => Promise.resolve(null)),
   loadOwnerProfile: vi.fn(),
+  loadOtherListings: vi.fn(() => Promise.resolve([])),
 }));
-vi.mock('@/lib/session', () => ({ requireSession: vi.fn(() => Promise.resolve()) }));
+vi.mock('@/lib/session', () => ({
+  requireSession: vi.fn(() => Promise.resolve()),
+  getLayoutSession: vi.fn(() => Promise.resolve({ user: { id: 'u' } })),
+}));
 vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
     throw new Error('not found');
@@ -32,11 +43,23 @@ vi.mock('next-intl/server', async () => {
   };
 });
 
+/** Inside the owner layout, as in the app: client components get only the owner namespaces. */
+const renderInOwnerArea = async (page: ReactElement) =>
+  renderWithProviders(<>{await OwnerLayout({ children: page })}</>);
+
 const stepPage = async (step: string, listing?: Awaited<ReturnType<typeof loadOwnerListing>>) => {
   if (listing !== undefined) vi.mocked(loadOwnerListing).mockResolvedValue(listing);
   const params = Promise.resolve({ locale: 'en', id: LISTING_ID, step });
-  return renderWithProviders(await ListingStepPage({ params }));
+  return await renderInOwnerArea(await ListingStepPage({ params }));
 };
+
+type Other = OwnerOtherListings['listings'][number];
+const other = (id: string, name: string, status: Other['status'] = 'draft'): Other => ({
+  id,
+  name,
+  contentLocale: 'el',
+  status,
+});
 
 const ready = progressFixture({ doneSteps: [...LISTING_STEPS], nextStep: 'review' });
 const sendButton = () => screen.queryByRole('button', { name: 'Send for review' });
@@ -113,21 +136,16 @@ describe('a listing’s step page', () => {
   });
 
   it('offers the week to the owner’s drafts and listings sent back, and to no other', async () => {
-    const other = (id: string, name: string, status: OwnerListingProgress['status']) =>
-      progressFixture({ id, name, status });
-    vi.mocked(loadOwnerOnboarding).mockResolvedValueOnce({
-      started: true,
-      doneAccountSteps: [],
-      listings: [
-        progressFixture({ name: 'Αυτό εδώ' }),
-        other('22222222-2222-4222-8222-222222222222', 'Πρόχειρο', 'draft'),
-        other('33333333-3333-4333-8333-333333333333', 'Επιστράφηκε', 'changes_requested'),
-        other('44444444-4444-4444-8444-444444444444', 'Σε έλεγχο', 'in_review'),
-        other('55555555-5555-4555-8555-555555555555', 'Δημοσιευμένο', 'published'),
-        other('66666666-6666-4666-8666-666666666666', 'Σε αναστολή', 'suspended'),
-      ],
-    });
+    vi.mocked(loadOtherListings).mockResolvedValueOnce([
+      other('22222222-2222-4222-8222-222222222222', 'Πρόχειρο', 'draft'),
+      other('33333333-3333-4333-8333-333333333333', 'Επιστράφηκε', 'changes_requested'),
+      other('44444444-4444-4444-8444-444444444444', 'Σε έλεγχο', 'in_review'),
+      other('55555555-5555-4555-8555-555555555555', 'Δημοσιευμένο', 'published'),
+      other('66666666-6666-4666-8666-666666666666', 'Σε αναστολή', 'suspended'),
+    ]);
     await stepPage('hours', listingFixture());
+    // The API leaves this listing out; the page asks about this one.
+    expect(loadOtherListings).toHaveBeenCalledWith(LISTING_ID);
     const offer = screen.getByRole('region', { name: 'Copy these hours to other listings' });
     expect(
       within(offer)
@@ -137,11 +155,9 @@ describe('a listing’s step page', () => {
   });
 
   it('puts the closures sentence before the offer, outside its section', async () => {
-    vi.mocked(loadOwnerOnboarding).mockResolvedValueOnce({
-      started: true,
-      doneAccountSteps: [],
-      listings: [progressFixture({ id: '22222222-2222-4222-8222-222222222222', name: 'Άλλο' })],
-    });
+    vi.mocked(loadOtherListings).mockResolvedValueOnce([
+      other('22222222-2222-4222-8222-222222222222', 'Άλλο'),
+    ]);
     await stepPage('hours', listingFixture());
     const offer = screen.getByRole('region', { name: 'Copy these hours to other listings' });
     const sentence = screen.getByText(/^Closed on holidays/);
@@ -150,9 +166,9 @@ describe('a listing’s step page', () => {
   });
 
   it('asks for the owner’s other listings only on the hours step', async () => {
-    vi.mocked(loadOwnerOnboarding).mockClear();
+    vi.mocked(loadOtherListings).mockClear();
     await stepPage('prices', listingFixture());
-    expect(loadOwnerOnboarding).not.toHaveBeenCalled();
+    expect(loadOtherListings).not.toHaveBeenCalled();
   });
 
   it('points from the weekly hours to closures and special hours', async () => {
@@ -166,28 +182,37 @@ describe('a listing’s step page', () => {
 });
 
 describe('the closures page', () => {
-  const page = async (listing?: Awaited<ReturnType<typeof loadOwnerListing>>) => {
-    if (listing !== undefined) vi.mocked(loadOwnerListing).mockResolvedValue(listing);
+  type Closures = Awaited<ReturnType<typeof loadOwnerClosures>>;
+  const closures = (overrides: Partial<Exclude<Closures, string>> = {}): Closures => ({
+    id: LISTING_ID,
+    name: 'Garage on Ermou',
+    contentLocale: 'en',
+    exceptions: [],
+    ...overrides,
+  });
+  const page = async (listing?: Closures) => {
+    if (listing !== undefined) vi.mocked(loadOwnerClosures).mockResolvedValue(listing);
     const params = Promise.resolve({ locale: 'en', id: LISTING_ID });
-    return renderWithProviders(await ClosuresPage({ params }));
+    return renderInOwnerArea(await ClosuresPage({ params }));
   };
 
   beforeEach(() => {
-    vi.mocked(loadOwnerListing).mockReset();
+    vi.mocked(loadOwnerClosures).mockReset();
+    vi.mocked(loadOtherListings).mockClear();
     vi.mocked(requireSession).mockClear();
   });
 
   it('sends a stranger to sign in and back here', async () => {
-    await page(listingFixture());
+    await page(closures());
     expect(requireSession).toHaveBeenCalledWith(`/owner/listings/${LISTING_ID}/closures`);
   });
 
   it('can be changed on a live listing, which the steps can’t', async () => {
-    const live = listingFixture({
-      status: 'published',
-      locked: true,
-      location: { ...listingFixture().location, name: 'Γκαράζ Ερμού', contentLocale: 'el' },
-      hoursExceptions: [
+    // The page reads no status: closures can be changed at any (decision #24).
+    const live = closures({
+      name: 'Γκαράζ Ερμού',
+      contentLocale: 'el',
+      exceptions: [
         {
           label: 'Χριστούγεννα',
           startsOn: '2099-12-25',
@@ -214,15 +239,26 @@ describe('the closures page', () => {
     await expect(page('not-found')).rejects.toThrow('not found');
   });
 
-  it('offers the owner’s other listings to copy to, never this one', async () => {
-    vi.mocked(loadOwnerOnboarding).mockResolvedValueOnce({
-      started: true,
-      doneAccountSteps: [],
-      listings: [
-        progressFixture({ name: 'Αυτό εδώ' }),
-        progressFixture({ id: '22222222-2222-4222-8222-222222222222', name: 'Γκαράζ Πειραιά' }),
-      ],
-    });
+  it('names the listing in the page title, and only the page otherwise', async () => {
+    const title = async (listing: Closures, locale = 'en') => {
+      vi.mocked(loadOwnerClosures).mockResolvedValue(listing);
+      const params = Promise.resolve({ locale, id: LISTING_ID });
+      return (await closuresMetadata({ params })).title;
+    };
+    expect(await title(closures({ name: 'Γκαράζ Ερμού' }))).toBe(
+      'Closures and special hours: Γκαράζ Ερμού',
+    );
+    expect(await title(closures({ name: null }))).toBe('Closures and special hours');
+    // Another owner's listing looks like a missing one, and its name never reaches the title.
+    expect(await title('not-found')).toBe('Closures and special hours');
+    expect(await title('unavailable')).toBe('Closures and special hours');
+  });
+
+  it('offers the owner’s other listings to copy to, whatever their status', async () => {
+    vi.mocked(loadOtherListings).mockResolvedValueOnce([
+      other('22222222-2222-4222-8222-222222222222', 'Γκαράζ Πειραιά', 'published'),
+      other('33333333-3333-4333-8333-333333333333', 'Γκαράζ Βόλου', 'draft'),
+    ]);
     const christmas = {
       label: null,
       startsOn: '2099-12-25',
@@ -230,16 +266,17 @@ describe('the closures page', () => {
       hours: null,
       closedHours: null,
     };
-    await page(listingFixture({ hoursExceptions: [christmas] }));
+    await page(closures({ exceptions: [christmas] }));
+    expect(loadOtherListings).toHaveBeenCalledWith(LISTING_ID);
     expect(
       screen.getByRole('heading', { name: 'Copy to your other listings' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Γκαράζ Πειραιά' })).toBeInTheDocument();
-    expect(screen.queryByRole('checkbox', { name: 'Αυτό εδώ' })).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Γκαράζ Βόλου' })).toBeInTheDocument();
   });
 
   it('still works without the list of other listings', async () => {
-    await page(listingFixture());
+    await page(closures());
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Copy to your other listings' }),
@@ -257,7 +294,7 @@ describe('the closures page', () => {
 
 describe('the tax page', () => {
   const params = Promise.resolve({ locale: 'en' });
-  const page = async () => renderWithProviders(await OwnerTaxPage({ params }));
+  const page = async () => renderInOwnerArea(await OwnerTaxPage({ params }));
 
   it('asks who the owner is first, since that decides what it needs', async () => {
     vi.mocked(loadOwnerProfile).mockResolvedValue(profileFixture({ kind: null }));

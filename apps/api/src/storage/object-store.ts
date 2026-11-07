@@ -95,7 +95,10 @@ export function s3ObjectStore({
       assertKey(key);
       try {
         const { Body } = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-        return Body ? Buffer.from(await Body.transformToByteArray()) : null;
+        if (!Body) return null;
+        // A Buffer over the same bytes: copying a photo again to serve it would double its memory.
+        const bytes = await Body.transformToByteArray();
+        return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
       } catch (error) {
         if (error instanceof NoSuchKey) return null;
         throw error;

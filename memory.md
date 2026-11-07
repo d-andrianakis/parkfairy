@@ -465,6 +465,40 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   listings closed all day on the stay's days in SQL, because a holiday closes many at once and they
   would fill the candidate batches. **Phase 3:** progress.md lists what must refuse closing time
   over a booking (#27).
+- **2026-11-07 · Owner messages come from `app/[locale]/owner/layout.tsx`,** not from each page:
+  a layout stays mounted across client navigation, so the catalogue travels once per visit to the
+  owner area instead of with every step (`performance.smoke.ts` checks a step change's payload).
+  Owner pages must not add their own `ClientMessages` for the owner namespaces again. Signed out,
+  the layout adds none: `/owner` is then a landing of server components, and the catalogue is
+  7–10 KB gzip of flight data no budget would notice. Page tests render inside `OwnerLayout`.
+- **2026-11-07 · The Mapbox worker's file name carries the library's version**
+  (`mapbox-gl-csp-worker-<version>.js`, from `mapboxgl.version` in `location-map.tsx` and the
+  package in `copy-mapbox-worker.mjs`), so `/vendor/` can be cached for a year with no risk of an
+  old worker beside a new library. The copy script deletes other versions.
+- **2026-11-07 · A save answers with `progressOne`:** the four counts and the cover photo in one
+  statement. `progressOf` (five queries at once) stays for the dashboard's many listings. Inside a
+  transaction use `progressOne`: queries run in parallel on one transaction's connection were what
+  `pg` warned about ("client is already executing a query").
+- **2026-11-07 · Search filters on weekly hours in SQL** (`weekCovers` in `parking.service.ts`):
+  the week as a minute-of-week `int4multirange` (`range_agg`, so touching periods merge and a night
+  across midnight is one range) must contain the stay's wall-clock span, split where it crosses
+  Sunday into Monday. The span is worked out in TypeScript once per supported time zone
+  (`weekNeeded` in `opening-hours.ts`) and bound, not per row in SQL: about 15 time-zone
+  conversions a candidate otherwise, and a negative wall-clock span (inside the hour the clocks
+  repeat) made `int4range` throw. Listings with any closure or special hours on a day of the stay skip it
+  (`exceptionDuring`) and are judged by `isOpenThroughout` alone, which stays the authority. Without
+  this, an area of listings shut at that hour used up all five batches before reaching an open one.
+  Any change to how weekly hours are read must change both.
+- **2026-11-07 · Owner pages read only what they show:** the closures page uses
+  `GET /owner/listings/:id/hours-exceptions` (name, language, entries) and, like the hours step,
+  `GET /owner/listings/:id/others` for where a copy can go. `others` leaves the listing itself out,
+  so pages don't filter it. Don't go back to `getOwnerOnboarding` for that list: it counts every step
+  of every listing.
+- **2026-11-07 · Demo closures are dated from the seed's run** (`fromDay`/`toDay` in
+  `demo-data.ts`), as the contract refuses past entries and the worker deletes ended ones. CI seeds
+  before every smoke run; a local seed ages, so run `pnpm db:seed` again if the search latency check
+  should keep meeting one. They are on Πάρκινγκ Ερμού because no smoke test names it at those hours.
+  The near-me test expects the Syntagma garage at whatever hour CI runs, so give it no closures.
 - **2026-11-04 · Copying to other listings is one component, `CopyToListings`,** given its texts
   and API call by `CopyHoursExceptions` (closures, #29) and `CopyWeeklyHours` (the week, #30). They
   differ on unsaved changes: the closures page's Save stays put, so it asks for a save first; the

@@ -1,4 +1,4 @@
-import type { AreaId, CancellationPolicy } from '@parkfairy/contracts';
+import type { AreaId, CancellationPolicy, ListingHoursExceptionsInput } from '@parkfairy/contracts';
 import type { PriceRules } from '../parking/pricing.js';
 
 /**
@@ -29,6 +29,12 @@ export interface DemoSpace {
   hourlyRateMinor?: number;
 }
 
+/** A closure or special hours as an owner enters them, its days counted from the seed's run. */
+export type DemoHoursException = Omit<
+  ListingHoursExceptionsInput['exceptions'][number],
+  'startsOn' | 'endsOn'
+> & { fromDay: number; toDay: number };
+
 export interface DemoListing {
   slug: string;
   name: string;
@@ -40,6 +46,7 @@ export interface DemoListing {
   hourlyRateMinor: number;
   dailyMaxMinor: number | null;
   openingHours: DemoPeriod[];
+  hoursExceptions?: DemoHoursException[];
   spaces: DemoSpace[];
   cancellationPolicy: CancellationPolicy;
   /** Only the kinds of price rule this listing shows off. */
@@ -101,6 +108,18 @@ export const DEMO_LISTINGS: DemoListing[] = [
     hourlyRateMinor: 300,
     dailyMaxMinor: 2200,
     openingHours: on(WEEK, h(7), h(24)),
+    // Searches here meet closures (the API latency budget among them): shut two hours a day while
+    // the street is dug up, then a whole day later on.
+    hoursExceptions: [
+      {
+        label: 'Έργα στην Ερμού',
+        fromDay: 0,
+        toDay: 120,
+        hours: null,
+        closedHours: { from: '14:00', to: '16:00' },
+      },
+      { label: 'Ετήσια συντήρηση', fromDay: 150, toDay: 150, hours: null, closedHours: null },
+    ],
     spaces: spaces('P', 8, () => ({ isCovered: true })),
   },
   {

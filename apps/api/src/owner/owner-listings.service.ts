@@ -4,6 +4,8 @@ import {
   HOURS_EXCEPTIONS_MAX,
   OWNER_LISTINGS_MAX,
   OwnerHoursCopySchema,
+  OwnerListingClosuresSchema,
+  OwnerOtherListingsSchema,
   OwnerHoursExceptionsCopySchema,
   OwnerHoursExceptionsSchema,
   OwnerListingProgressSchema,
@@ -24,6 +26,8 @@ import {
   type ListingProofPatch,
   type ListingSpacesInput,
   type OwnerHoursCopy,
+  type OwnerListingClosures,
+  type OwnerOtherListings,
   type OwnerHoursException,
   type OwnerHoursExceptions,
   type OwnerHoursExceptionsCopy,
@@ -37,7 +41,7 @@ import {
   type ProofKind,
 } from '@parkfairy/contracts';
 import { schema, type Database } from '@parkfairy/database';
-import { and, asc, count, desc, eq, gte, inArray, lt, ne } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
 import { DB } from '../database/database.module.js';
 import { hoursOf, wallTime } from '../parking/opening-hours.js';
 import { OBJECT_STORE, type ObjectStore } from '../storage/object-store.js';
@@ -269,6 +273,40 @@ export class OwnerListingsService {
       proofs,
       landRegistrationNumber: row.landRegistrationNumber,
     });
+  }
+
+  /** The closures page's read: the listing's name and its entries, in two queries. */
+  async closures(userId: string, id: string): Promise<OwnerListingClosures> {
+    const row = await this.owned(userId, id);
+    return OwnerListingClosuresSchema.parse({
+      id: row.id,
+      name: row.name,
+      contentLocale: row.contentLocale,
+      exceptions: await this.hoursExceptions(this.db, row),
+    });
+  }
+
+  /**
+   * The owner's other listings, last changed first, as a copy offers them: two queries, where the
+   * dashboard's overview would count every step of each.
+   */
+  async others(userId: string, id: string): Promise<OwnerOtherListings> {
+    const row = await this.owned(userId, id);
+    // `owned` joined the owner's profile, so the listing has an owner.
+    const rows = row.ownerId
+      ? await this.db
+          .select({
+            id: listing.id,
+            name: listing.name,
+            contentLocale: listing.contentLocale,
+            status: listing.status,
+          })
+          .from(listing)
+          .where(and(eq(listing.ownerId, row.ownerId), ne(listing.id, row.id)))
+          .orderBy(desc(listing.updatedAt))
+          .limit(OWNER_LISTINGS_MAX)
+      : [];
+    return OwnerOtherListingsSchema.parse({ listings: rows });
   }
 
   /** Throws unless this user may change the listing; uploads ask before reading a byte. */
@@ -775,11 +813,8 @@ export class OwnerListingsService {
     return this.edit(userId, id, async (tx, row) => {
       const [owner] = await tx.select().from(profile).where(eq(profile.userId, userId));
       if (!owner) throw listingNotFound();
-      const progress = (await this.progressOf([row], tx)).get(row.id);
-      const missing = missingForSubmit(
-        progress?.doneSteps ?? [],
-        doneAccountSteps(profileFacts(owner)),
-      );
+      const progress = await this.progressOne(row, tx);
+      const missing = missingForSubmit(progress.doneSteps, doneAccountSteps(profileFacts(owner)));
       if (missing.length > 0) throw conflict('LISTING_INCOMPLETE', { missing });
 
       await tx
@@ -812,10 +847,33 @@ export class OwnerListingsService {
   }
 
   private async progress(userId: string, id: string): Promise<OwnerListingProgress> {
-    const row = await this.owned(userId, id);
-    const progress = (await this.progressOf([row])).get(row.id);
-    if (!progress) throw listingNotFound();
-    return progress;
+    return this.progressOne(await this.owned(userId, id));
+  }
+
+  /**
+   * One listing's progress in one statement, as every save answers with it: the four counts and
+   * the cover photo as subqueries on their listing indexes, where `progressOf` runs five queries at
+   * once. One statement is also what a transaction can take: its single connection can't run
+   * several at a time.
+   */
+  private async progressOne(row: ListingRow, db: Reader = this.db): Promise<OwnerListingProgress> {
+    const counted = (table: typeof space | typeof hours | typeof photo | typeof proof) =>
+      sql<number>`(select count(*)::int from ${table} where ${table.locationId} = ${row.id})`;
+    const [facts] = await db
+      .select({
+        spaces: counted(space),
+        periods: counted(hours),
+        photos: counted(photo),
+        proofs: counted(proof),
+        cover: sql<Cover | null>`(select json_build_object('key', p.key, 'width', p.width,
+          'height', p.height, 'alt', p.alt, 'color', p.color) from ${photo} p
+          where p.location_id = ${row.id} order by p.position limit 1)`,
+      })
+      .from(listing)
+      .where(eq(listing.id, row.id));
+    if (!facts) throw listingNotFound();
+    const { cover, ...counts } = facts;
+    return this.progressFrom(row, counts, cover ?? undefined);
   }
 
   /** Counts per listing in one query per table, so the dashboard stays flat as listings grow. */

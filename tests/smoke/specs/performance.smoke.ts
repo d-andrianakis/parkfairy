@@ -82,6 +82,13 @@ for (const path of ['/en', ...ACCOUNT_PAGES, ...CATALOGUE]) {
   });
 }
 
+test('the signed-out owner landing carries no owner messages', async ({ request }) => {
+  // Owner-only text the landing never shows: if it travels, the catalogue travelled.
+  const landing = await request.get('/en/owner');
+  expect(landing.status()).toBe(200);
+  expect(await landing.text()).not.toContain('All your other listings');
+});
+
 // Header and catalogue pages render on the server; nothing may push the page down while they
 // load on a phone (Cumulative Layout Shift; "good" is < 0.1 for the whole page).
 for (const [path, accountNav] of [
@@ -161,6 +168,37 @@ test.describe('signed in', () => {
       });
       await expectWithinBudget(page, `/en/owner/listings/${id}/location`);
       expect(mapbox).toEqual([]);
+    } finally {
+      await page.request.delete(`/api/v1/owner/listings/${id}`, { headers });
+    }
+  });
+
+  test('moving between steps doesn’t download the owner messages again', async ({ page }) => {
+    const headers = { origin: WEB_URL };
+    const created = await page.request.post('/api/v1/owner/listings', { headers });
+    expect(created.status()).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    // Owner-only text the steps never show: if it travels, the catalogue travelled.
+    const marker = 'All your other listings';
+    // Every payload for the hours step, its prefetch too, read on the way through: the browser
+    // may already have let go of a prefetch's body by the time the navigation ends.
+    const payloads: string[] = [];
+    await page.route(
+      (url) => url.pathname === `/en/owner/listings/${id}/hours`,
+      async (route) => {
+        const response = await route.fetch();
+        if (route.request().headers()['rsc'] === '1') payloads.push(await response.text());
+        await route.fulfill({ response });
+      },
+    );
+    try {
+      await page.goto(`/en/owner/listings/${id}/spaces`);
+      expect(await page.content()).toContain(marker);
+      await page.getByRole('link', { name: /^Opening hours/ }).click();
+      await expect(page).toHaveURL(`/en/owner/listings/${id}/hours`);
+      // A client navigation, not a fresh page (which would carry the catalogue anyway).
+      expect(payloads.length).toBeGreaterThan(0);
+      for (const payload of payloads) expect(payload).not.toContain(marker);
     } finally {
       await page.request.delete(`/api/v1/owner/listings/${id}`, { headers });
     }

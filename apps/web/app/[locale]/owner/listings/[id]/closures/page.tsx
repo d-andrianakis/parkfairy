@@ -5,12 +5,10 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
-import { ClientMessages } from '@/components/client-messages';
 import { HoursExceptionsForm } from '@/components/owner/hours-exceptions-form';
-import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { Link } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';
-import { loadOwnerListing, loadOwnerOnboarding } from '@/lib/owner.server';
+import { loadOtherListings, loadOwnerClosures } from '@/lib/owner.server';
 import { requireSession } from '@/lib/session';
 
 interface ClosuresPageProps {
@@ -28,9 +26,9 @@ async function translations(locale: string) {
 export async function generateMetadata({ params }: ClosuresPageProps): Promise<Metadata> {
   const { locale, id } = await params;
   const t = await translations(locale);
-  // The same request as the page's: `loadOwnerListing` is cached for the render.
-  const listing = await loadOwnerListing(id);
-  const name = typeof listing === 'object' ? listing.location.name : null;
+  // The same request as the page's: `loadOwnerClosures` is cached for the render.
+  const listing = await loadOwnerClosures(id);
+  const name = typeof listing === 'object' ? listing.name : null;
   return { title: name ? t('closures.metaTitle', { name }) : t('closures.title') };
 }
 
@@ -42,8 +40,8 @@ export default async function ClosuresPage({ params }: ClosuresPageProps) {
   const { locale, id } = await params;
   await requireSession(`/owner/listings/${id}/closures`);
 
-  // The dashboard's list names the owner's other listings, which can be given these dates.
-  const [listing, onboarding] = await Promise.all([loadOwnerListing(id), loadOwnerOnboarding()]);
+  // Two small reads: this listing's closures, and the owner's others they can be given to.
+  const [listing, others] = await Promise.all([loadOwnerClosures(id), loadOtherListings(id)]);
   if (listing === 'not-found') notFound();
   const t = await translations(locale);
 
@@ -59,10 +57,12 @@ export default async function ClosuresPage({ params }: ClosuresPageProps) {
     );
   }
 
-  const { name, contentLocale } = listing.location;
-  const otherListings = (onboarding?.listings ?? [])
-    .filter((other) => other.id !== listing.id)
-    .map((other) => ({ id: other.id, name: other.name, contentLocale: other.contentLocale }));
+  const { name, contentLocale } = listing;
+  const otherListings = others.map((other) => ({
+    id: other.id,
+    name: other.name,
+    contentLocale: other.contentLocale,
+  }));
   return (
     <div className="mx-auto grid w-full max-w-3xl content-start gap-6 px-4 py-10">
       <Link
@@ -80,14 +80,12 @@ export default async function ClosuresPage({ params }: ClosuresPageProps) {
         <p className="text-muted-foreground">{t('closures.lead')}</p>
         <p className="text-muted-foreground">{t('closures.anyTime')}</p>
       </div>
-      <ClientMessages namespaces={CLIENT_NAMESPACES.owner}>
-        <HoursExceptionsForm
-          id={listing.id}
-          exceptions={listing.hoursExceptions}
-          today={zonedParts(new Date(), DEFAULT_TIME_ZONE).date}
-          otherListings={otherListings}
-        />
-      </ClientMessages>
+      <HoursExceptionsForm
+        id={listing.id}
+        exceptions={listing.exceptions}
+        today={zonedParts(new Date(), DEFAULT_TIME_ZONE).date}
+        otherListings={otherListings}
+      />
     </div>
   );
 }

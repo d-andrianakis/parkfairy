@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import type { NextConfig } from 'next';
 
@@ -8,6 +9,13 @@ const rootEnv = resolve(process.cwd(), '../../.env');
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const apiUrl = process.env.API_URL ?? 'http://localhost:4000';
+
+// The worker `scripts/copy-mapbox-worker.mjs` puts in public/vendor, named by this version.
+const mapboxVersion = (
+  createRequire(resolve(process.cwd(), 'package.json'))('mapbox-gl/package.json') as {
+    version: string;
+  }
+).version;
 
 // The Content-Security-Policy is per-request (nonce) and therefore set in proxy.ts.
 const securityHeaders = [
@@ -36,6 +44,13 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },
+      // The Mapbox worker, its version in the name: that URL never holds anything else, so a year
+      // is safe. Only that file: a pattern would also give the year to a 404 for a name not yet
+      // shipped, and a shared cache would keep it past the upgrade.
+      {
+        source: `/vendor/mapbox-gl-csp-worker-${mapboxVersion}.js`,
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
       // These URLs hold a live token, and even same-origin requests would repeat it in Referer,
       // which CDN logs record. A header, as a meta tag only applies once the parser reaches it.
       ...['/:locale/reset-password', '/:locale/verify-email'].map((source) => ({

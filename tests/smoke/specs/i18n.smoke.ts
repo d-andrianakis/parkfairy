@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { SIGNED_IN_STATE } from '../support/env';
+import { SIGNED_IN_STATE, WEB_URL } from '../support/env';
 
 // Feature: internationalization — Greek and English, negotiated, switchable, persisted.
 
@@ -65,5 +65,31 @@ test.describe('signed in', () => {
     await page.goto('/en/account');
     await expect(page.getByTestId('api-user-locale')).toHaveText('Ελληνικά');
     await expect(page.getByTestId('api-user-locale')).toHaveAttribute('lang', 'el');
+  });
+
+  test('switching language inside the owner area changes the forms’ words too', async ({
+    page,
+  }) => {
+    // The owner layout stays mounted between steps; its messages must still follow the language.
+    const headers = { origin: WEB_URL };
+    const created = await page.request.post('/api/v1/owner/listings', { headers });
+    expect(created.status()).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    try {
+      await page.goto(`/en/owner/listings/${id}/hours`);
+      // The hours form is a client component: its words come from the layout's messages.
+      await expect(page.getByRole('button', { name: 'Open all day, every day' })).toBeVisible();
+      await page
+        .getByRole('navigation', { name: 'Language' })
+        .getByRole('link', { name: 'Ελληνικά' })
+        .click();
+      await expect(page).toHaveURL(`/el/owner/listings/${id}/hours`);
+      await expect(page.locator('html')).toHaveAttribute('lang', 'el');
+      await expect(
+        page.getByRole('button', { name: 'Ανοιχτά όλο το 24ωρο, κάθε ημέρα' }),
+      ).toBeVisible();
+    } finally {
+      await page.request.delete(`/api/v1/owner/listings/${id}`, { headers });
+    }
   });
 });

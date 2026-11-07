@@ -7,6 +7,7 @@ import {
 } from '@parkfairy/contracts';
 
 const MINUTES_PER_DAY = 24 * 60;
+const MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY;
 
 /** `[opensMinute, closesMinute)` after local midnight on an ISO weekday (Monday = 1). */
 export interface OpeningPeriod {
@@ -91,6 +92,27 @@ export function isOpenThroughout(
     if (!covers(periodsOn(day, periods, exceptions), from, to)) return false;
   }
   return true;
+}
+
+/**
+ * The minutes of the week (Monday 00:00 is 0) a stay needs open on `timeZone`'s wall clock, as an
+ * `int4multirange` literal: what `isOpenThroughout` asks of the weekly hours, for search to ask in
+ * SQL. Split where it crosses from Sunday into Monday; a week or more needs all of it. A stay
+ * inside the hour the clocks repeat can end before it starts on the wall clock, and then needs
+ * nothing, as `isOpenThroughout` finds nothing there to check.
+ */
+export function weekNeeded(start: Date, end: Date, timeZone: string): string {
+  const first = zonedParts(start, timeZone);
+  const last = zonedParts(end, timeZone);
+  const minutes =
+    daysBetween(first.date, last.date) * MINUTES_PER_DAY + last.minuteOfDay - first.minuteOfDay;
+  if (minutes <= 0) return '{}';
+  if (minutes >= MINUTES_PER_WEEK) return `{[0,${MINUTES_PER_WEEK})}`;
+  const from = (first.isoWeekday - 1) * MINUTES_PER_DAY + first.minuteOfDay;
+  const to = from + minutes;
+  return to <= MINUTES_PER_WEEK
+    ? `{[${from},${to})}`
+    : `{[${from},${MINUTES_PER_WEEK}),[0,${to - MINUTES_PER_WEEK})}`;
 }
 
 /** `HH:MM` for a minute of the day; 1440 is `24:00`. */

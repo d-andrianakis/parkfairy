@@ -74,6 +74,18 @@ describe('s3ObjectStore', () => {
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(GetObjectCommand);
   });
 
+  it('serves the bytes S3 returned without copying them, and none beside them', async () => {
+    // The SDK may hand back a view into a larger, pooled buffer.
+    const pool = new TextEncoder().encode('xxhiyy');
+    const bytes = new Uint8Array(pool.buffer, 2, 2);
+    const body = { transformToByteArray: () => Promise.resolve(bytes) };
+    const { store } = setup(vi.fn().mockResolvedValue({ Body: body }));
+    const file = await store.get('photos/a/480.webp');
+    expect(file?.toString()).toBe('hi');
+    expect(file).toHaveLength(2);
+    expect(file?.buffer).toBe(pool.buffer);
+  });
+
   it('answers null for a missing file and rethrows anything else', async () => {
     const missing = new NoSuchKey({ message: 'gone', $metadata: {} });
     await expect(

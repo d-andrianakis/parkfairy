@@ -2,11 +2,15 @@ import 'server-only';
 import {
   createClient,
   createConfig,
+  getListingHoursExceptions,
+  getOtherOwnerListings,
   getOwnerListing,
   getOwnerOnboarding,
   getOwnerProfile,
   type OwnerListing,
+  type OwnerListingClosures,
   type OwnerOnboarding,
+  type OwnerOtherListings,
   type OwnerProfile,
 } from '@parkfairy/api-client';
 import { headers } from 'next/headers';
@@ -67,6 +71,34 @@ export const loadOwnerListing = cache(
       return response?.status === 404 ? 'not-found' : 'unavailable';
     } catch {
       return 'unavailable';
+    }
+  },
+);
+
+/** A listing's name and closures, or why not: the closures page's one read of the listing. */
+export const loadOwnerClosures = cache(
+  async (id: string): Promise<OwnerListingClosures | 'not-found' | 'unavailable'> => {
+    try {
+      const { data, response } = await getListingHoursExceptions({
+        ...(await request()),
+        path: { id },
+      });
+      if (data) return data;
+      return response?.status === 404 ? 'not-found' : 'unavailable';
+    } catch {
+      return 'unavailable';
+    }
+  },
+);
+
+/** The owner's other listings, for a copy to go to; none when the API can't say. */
+export const loadOtherListings = cache(
+  async (id: string): Promise<OwnerOtherListings['listings']> => {
+    try {
+      const { data } = await getOtherOwnerListings({ ...(await request()), path: { id } });
+      return data?.listings ?? [];
+    } catch {
+      return [];
     }
   },
 );

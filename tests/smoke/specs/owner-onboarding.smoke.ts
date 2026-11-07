@@ -1,4 +1,5 @@
-﻿import { fileURLToPath } from 'node:url';
+﻿import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { HAS_DATABASE, sendListingBack } from '../support/db';
 import { emailLink, emailsTo } from '../support/email';
@@ -364,9 +365,21 @@ test('the map’s origins are allowed in the owner area and nowhere else', async
 test('the map’s worker comes from this site, which is all the policy allows', async ({
   request,
 }) => {
-  const worker = await request.get('/vendor/mapbox-gl-csp-worker.js');
+  // Named for the library's version, as the web app installs it.
+  const { version } = createRequire(
+    fileURLToPath(new URL('../../../apps/web/package.json', import.meta.url)),
+  )('mapbox-gl/package.json') as { version: string };
+  const worker = await request.get(`/vendor/mapbox-gl-csp-worker-${version}.js`);
   expect(worker.status()).toBe(200);
   expect(worker.headers()['content-type']).toContain('javascript');
+  // The name changes with the version, so the file can be kept for a year.
+  expect(worker.headers()['cache-control']).toBe('public, max-age=31536000, immutable');
+  // No unversioned copy is left to go stale.
+  expect((await request.get('/vendor/mapbox-gl-csp-worker.js')).status()).toBe(404);
+  // A version not shipped yet is a 404 no cache may keep, or it would outlive the upgrade.
+  const next = await request.get('/vendor/mapbox-gl-csp-worker-99.0.0.js');
+  expect(next.status()).toBe(404);
+  expect(next.headers()['cache-control'] ?? '').not.toContain('immutable');
 });
 
 test('demo listings show their photos, with words for those who can’t see them', async ({

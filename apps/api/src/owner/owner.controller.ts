@@ -48,7 +48,9 @@ import {
   OwnerHoursCopySchema,
   OwnerHoursExceptionsCopySchema,
   OwnerHoursExceptionsSchema,
+  OwnerListingClosuresSchema,
   OwnerListingCreatedSchema,
+  OwnerOtherListingsSchema,
   OwnerListingProgressSchema,
   OwnerListingSchema,
   OwnerOnboardingSchema,
@@ -67,7 +69,9 @@ import {
   type OwnerHoursExceptions,
   type OwnerHoursExceptionsCopy,
   type OwnerListing,
+  type OwnerListingClosures,
   type OwnerListingProgress,
+  type OwnerOtherListings,
   type OwnerOnboarding,
   type OwnerPhoto,
   type OwnerProfile,
@@ -180,6 +184,26 @@ export class OwnerController {
   @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
   getOwnerListing(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<OwnerListing> {
     return this.listings.get(user.id, id);
+  }
+
+  @Get('listings/:id/hours-exceptions')
+  @ApiOkResponse({ schema: schemaRef(OwnerListingClosuresSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  getListingHoursExceptions(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ): Promise<OwnerListingClosures> {
+    return this.listings.closures(user.id, id);
+  }
+
+  @Get('listings/:id/others')
+  @ApiOkResponse({ schema: schemaRef(OwnerOtherListingsSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  getOtherOwnerListings(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ): Promise<OwnerOtherListings> {
+    return this.listings.others(user.id, id);
   }
 
   @Delete('listings/:id')

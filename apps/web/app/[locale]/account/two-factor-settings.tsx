@@ -3,9 +3,9 @@
 import { getMeOptions } from '@parkfairy/api-client/react-query';
 import { Button } from '@parkfairy/ui/components/button';
 import { useQueryClient } from '@tanstack/react-query';
-import { ShieldCheck, ShieldOff } from 'lucide-react';
+import { LoaderCircle, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
 
@@ -37,6 +37,8 @@ export function TwoFactorSettings({
   const [setup, setSetup] = useState<{ totpURI: string; backupCodes: string[] } | null>(null);
   const idleButton = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef(false);
+  /** A step's code still on its way: the overview stays, its button busy, until it arrives. */
+  const [loading, startLoading] = useTransition();
 
   // Back on the overview, focus the button that started (or ends) the change once React has
   // rendered it: after an awaited request that commit can come later than the next frame.
@@ -112,35 +114,50 @@ export function TwoFactorSettings({
       />
     );
   }
-  if (current) return <Suspense fallback={null}>{current}</Suspense>;
-
   const preload = () => void loadSteps();
+  // The boundary is always there, so a step that suspends inside the transition below leaves the
+  // overview showing (and the focus on its button) rather than nothing while its code loads.
   return (
-    <div className="grid gap-3">
-      <p
-        id="two-factor-status"
-        className="flex items-start gap-2 text-sm"
-        data-testid="two-factor-status"
-      >
-        {enabled ? (
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-status-available" aria-hidden />
-        ) : (
-          <ShieldOff className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-        )}
-        {enabled ? t('statusOn') : t('statusOff')}
-      </p>
-      {/* Focus returns here after a change, so the button also reads out the new state. */}
-      <Button
-        ref={idleButton}
-        aria-describedby="two-factor-status"
-        className="h-auto min-h-9 w-fit max-w-full whitespace-normal"
-        variant={enabled ? 'outline' : 'default'}
-        onPointerEnter={preload}
-        onFocus={preload}
-        onClick={() => setStep(enabled ? 'confirm-disable' : 'confirm-enable')}
-      >
-        {enabled ? t('turnOff') : t('setUp')}
-      </Button>
-    </div>
+    <Suspense fallback={null}>
+      {current ?? (
+        <div className="grid gap-3">
+          <p
+            id="two-factor-status"
+            className="flex items-start gap-2 text-sm"
+            data-testid="two-factor-status"
+          >
+            {enabled ? (
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-status-available" aria-hidden />
+            ) : (
+              <ShieldOff className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+            )}
+            {enabled ? t('statusOn') : t('statusOff')}
+          </p>
+          {/* Focus returns here after a change, so the button also reads out the new state. */}
+          <Button
+            ref={idleButton}
+            aria-describedby="two-factor-status"
+            className="h-auto min-h-9 w-fit max-w-full whitespace-normal"
+            variant={enabled ? 'outline' : 'default'}
+            aria-disabled={loading || undefined}
+            aria-busy={loading || undefined}
+            onPointerEnter={preload}
+            onFocus={preload}
+            onClick={() => {
+              if (loading) return;
+              startLoading(() => setStep(enabled ? 'confirm-disable' : 'confirm-enable'));
+            }}
+          >
+            {/* Seen only after a moment: code already loaded still suspends for a tick. */}
+            {loading ? (
+              <span aria-hidden className="animate-in fade-in fill-mode-backwards delay-300">
+                <LoaderCircle className="animate-spin" />
+              </span>
+            ) : null}
+            {enabled ? t('turnOff') : t('setUp')}
+          </Button>
+        </div>
+      )}
+    </Suspense>
   );
 }

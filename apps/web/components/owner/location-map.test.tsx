@@ -51,6 +51,7 @@ const fake = vi.hoisted(() => {
 vi.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}));
 vi.mock('mapbox-gl/dist/mapbox-gl-csp.js', () => {
   const library = {
+    version: '0.0.0-test',
     workerUrl: '',
     accessToken: '',
     get Map() {
@@ -117,7 +118,8 @@ describe('LocationMap', () => {
     const { default: library } = await import('mapbox-gl/dist/mapbox-gl-csp.js');
     render(<LocationMap {...props()} />);
     await started();
-    expect(library.workerUrl).toBe('/vendor/mapbox-gl-csp-worker.js');
+    // The library's own version names the worker, so the two never part.
+    expect(library.workerUrl).toBe('/vendor/mapbox-gl-csp-worker-0.0.0-test.js');
     expect(library.accessToken).toBe('pk.test');
     expect(theMarker().element.setAttribute).toHaveBeenCalledWith('aria-label', 'Πινέζα');
   });

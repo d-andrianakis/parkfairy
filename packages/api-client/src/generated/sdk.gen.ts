@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CopyListingHoursData, CopyListingHoursErrors, CopyListingHoursExceptionsData, CopyListingHoursExceptionsErrors, CopyListingHoursExceptionsResponses, CopyListingHoursResponses, CreateOwnerListingData, CreateOwnerListingErrors, CreateOwnerListingResponses, DeleteListingPhotoData, DeleteListingPhotoErrors, DeleteListingPhotoResponses, DeleteListingProofData, DeleteListingProofErrors, DeleteListingProofResponses, DeleteOwnerListingData, DeleteOwnerListingErrors, DeleteOwnerListingResponses, DownloadListingProofData, DownloadListingProofErrors, DownloadListingProofResponses, GetFeaturedParkingData, GetFeaturedParkingResponses, GetListingPhotoData, GetListingPhotoErrors, GetListingPhotoResponses, GetLivenessData, GetLivenessResponses, GetMeData, GetMeErrors, GetMeResponses, GetOwnerListingData, GetOwnerListingErrors, GetOwnerListingResponses, GetOwnerOnboardingData, GetOwnerOnboardingErrors, GetOwnerOnboardingResponses, GetOwnerProfileData, GetOwnerProfileErrors, GetOwnerProfileResponses, GetParkingListingData, GetParkingListingErrors, GetParkingListingResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, ReorderListingPhotosData, ReorderListingPhotosErrors, ReorderListingPhotosResponses, SaveListingHoursData, SaveListingHoursErrors, SaveListingHoursExceptionsData, SaveListingHoursExceptionsErrors, SaveListingHoursExceptionsResponses, SaveListingHoursResponses, SaveListingLocationData, SaveListingLocationErrors, SaveListingLocationResponses, SaveListingPricesData, SaveListingPricesErrors, SaveListingPricesResponses, SaveListingProofDetailsData, SaveListingProofDetailsErrors, SaveListingProofDetailsResponses, SaveListingSpacesData, SaveListingSpacesErrors, SaveListingSpacesResponses, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsErrors, SaveOwnerTaxDetailsResponses, SearchParkingData, SearchParkingErrors, SearchParkingResponses, SubmitOwnerListingData, SubmitOwnerListingErrors, SubmitOwnerListingResponses, UpdateListingPhotoData, UpdateListingPhotoErrors, UpdateListingPhotoResponses, UpdateOwnerProfileData, UpdateOwnerProfileErrors, UpdateOwnerProfileResponses, UploadListingPhotoData, UploadListingPhotoErrors, UploadListingPhotoResponses, UploadListingProofData, UploadListingProofErrors, UploadListingProofResponses } from './types.gen';
+import type { CopyListingHoursData, CopyListingHoursErrors, CopyListingHoursExceptionsData, CopyListingHoursExceptionsErrors, CopyListingHoursExceptionsResponses, CopyListingHoursResponses, CreateOwnerListingData, CreateOwnerListingErrors, CreateOwnerListingResponses, DeleteListingPhotoData, DeleteListingPhotoErrors, DeleteListingPhotoResponses, DeleteListingProofData, DeleteListingProofErrors, DeleteListingProofResponses, DeleteOwnerListingData, DeleteOwnerListingErrors, DeleteOwnerListingResponses, DownloadListingProofData, DownloadListingProofErrors, DownloadListingProofResponses, GetFeaturedParkingData, GetFeaturedParkingResponses, GetListingHoursExceptionsData, GetListingHoursExceptionsErrors, GetListingHoursExceptionsResponses, GetListingPhotoData, GetListingPhotoErrors, GetListingPhotoResponses, GetLivenessData, GetLivenessResponses, GetMeData, GetMeErrors, GetMeResponses, GetOtherOwnerListingsData, GetOtherOwnerListingsErrors, GetOtherOwnerListingsResponses, GetOwnerListingData, GetOwnerListingErrors, GetOwnerListingResponses, GetOwnerOnboardingData, GetOwnerOnboardingErrors, GetOwnerOnboardingResponses, GetOwnerProfileData, GetOwnerProfileErrors, GetOwnerProfileResponses, GetParkingListingData, GetParkingListingErrors, GetParkingListingResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, ReorderListingPhotosData, ReorderListingPhotosErrors, ReorderListingPhotosResponses, SaveListingHoursData, SaveListingHoursErrors, SaveListingHoursExceptionsData, SaveListingHoursExceptionsErrors, SaveListingHoursExceptionsResponses, SaveListingHoursResponses, SaveListingLocationData, SaveListingLocationErrors, SaveListingLocationResponses, SaveListingPricesData, SaveListingPricesErrors, SaveListingPricesResponses, SaveListingProofDetailsData, SaveListingProofDetailsErrors, SaveListingProofDetailsResponses, SaveListingSpacesData, SaveListingSpacesErrors, SaveListingSpacesResponses, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsErrors, SaveOwnerTaxDetailsResponses, SearchParkingData, SearchParkingErrors, SearchParkingResponses, SubmitOwnerListingData, SubmitOwnerListingErrors, SubmitOwnerListingResponses, UpdateListingPhotoData, UpdateListingPhotoErrors, UpdateListingPhotoResponses, UpdateOwnerProfileData, UpdateOwnerProfileErrors, UpdateOwnerProfileResponses, UploadListingPhotoData, UploadListingPhotoErrors, UploadListingPhotoResponses, UploadListingProofData, UploadListingProofErrors, UploadListingProofResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -118,6 +118,40 @@ export const getOwnerListing = <ThrowOnError extends boolean = false>(options: O
     ...options
 });
 
+export const getListingHoursExceptions = <ThrowOnError extends boolean = false>(options: Options<GetListingHoursExceptionsData, ThrowOnError>): RequestResult<GetListingHoursExceptionsResponses, GetListingHoursExceptionsErrors, ThrowOnError> => (options.client ?? client).get<GetListingHoursExceptionsResponses, GetListingHoursExceptionsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/hours-exceptions',
+    ...options
+});
+
+export const saveListingHoursExceptions = <ThrowOnError extends boolean = false>(options: Options<SaveListingHoursExceptionsData, ThrowOnError>): RequestResult<SaveListingHoursExceptionsResponses, SaveListingHoursExceptionsErrors, ThrowOnError> => (options.client ?? client).put<SaveListingHoursExceptionsResponses, SaveListingHoursExceptionsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/hours-exceptions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getOtherOwnerListings = <ThrowOnError extends boolean = false>(options: Options<GetOtherOwnerListingsData, ThrowOnError>): RequestResult<GetOtherOwnerListingsResponses, GetOtherOwnerListingsErrors, ThrowOnError> => (options.client ?? client).get<GetOtherOwnerListingsResponses, GetOtherOwnerListingsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/others',
+    ...options
+});
+
 export const saveListingLocation = <ThrowOnError extends boolean = false>(options: Options<SaveListingLocationData, ThrowOnError>): RequestResult<SaveListingLocationResponses, SaveListingLocationErrors, ThrowOnError> => (options.client ?? client).patch<SaveListingLocationResponses, SaveListingLocationErrors, ThrowOnError>({
     security: [{
             in: 'cookie',
@@ -167,20 +201,6 @@ export const copyListingHours = <ThrowOnError extends boolean = false>(options: 
             type: 'apiKey'
         }],
     url: '/v1/owner/listings/{id}/hours/copy',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const saveListingHoursExceptions = <ThrowOnError extends boolean = false>(options: Options<SaveListingHoursExceptionsData, ThrowOnError>): RequestResult<SaveListingHoursExceptionsResponses, SaveListingHoursExceptionsErrors, ThrowOnError> => (options.client ?? client).put<SaveListingHoursExceptionsResponses, SaveListingHoursExceptionsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
-    url: '/v1/owner/listings/{id}/hours-exceptions',
     ...options,
     headers: {
         'Content-Type': 'application/json',

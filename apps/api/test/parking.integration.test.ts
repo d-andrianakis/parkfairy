@@ -11,10 +11,15 @@ import {
   type AreaId,
 } from '@parkfairy/contracts';
 import { schema, type Database } from '@parkfairy/database';
-import { eq, like } from 'drizzle-orm';
+import { and, eq, like } from 'drizzle-orm';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { DB } from '../src/database/database.module.js';
+import {
+  ParkingService,
+  SEARCH_BATCH,
+  SEARCH_MAX_BATCHES,
+} from '../src/parking/parking.service.js';
 import { createTestApp, type TestApp } from './test-app.js';
 
 // Listings sit in Heraklion, far from every demo area, so seeded data never interferes.
@@ -152,6 +157,191 @@ describe('public parking catalogue', () => {
       .delete(schema.parkingLocations)
       .where(like(schema.parkingLocations.slug, `${PREFIX}%`));
     await app.close();
+  });
+
+  describe('opening hours checked in the query', () => {
+    // Corfu: nothing else in these tests or the demo data is near.
+    const CORFU = { latitude: 39.6243, longitude: 19.9217 };
+    const search = async (at: { latitude: number; longitude: number }, window: object) => {
+      const response = await request(app.getHttpServer())
+        .get('/v1/parking/search')
+        .query({ ...at, ...window })
+        .expect(200);
+      return ParkingSearchResponseSchema.parse(response.body).results.map((r) => r.slug);
+    };
+
+    /** The next night Athens goes back from 04:00 to 03:00, at 01:00 UTC on October's last Sunday. */
+    const nextFallBack = () => {
+      const lastSundayOfOctober = (year: number) => {
+        const day = new Date(Date.UTC(year, 9, 31));
+        day.setUTCDate(31 - day.getUTCDay());
+        return day;
+      };
+      const thisYear = new Date().getUTCFullYear();
+      const night = [thisYear, thisYear + 1]
+        .map(lastSundayOfOctober)
+        .find((day) => day.getTime() > Date.now() + 86_400_000);
+      // Minutes from that Sunday's 00:00 UTC.
+      return (minutes: number) => new Date((night?.getTime() ?? 0) + minutes * 60_000);
+    };
+
+    // Gone after each test, so the rest of the file never meets them in a search or the featured list.
+    afterEach(async () => {
+      await db
+        .delete(schema.parkingLocations)
+        .where(like(schema.parkingLocations.slug, `${PREFIX}${tag}-scale-%`));
+    });
+
+    it('finds an open listing behind as many shut at that hour as search has batch places', async () => {
+      // Every place of every batch: shut ones must not fill them.
+      const shut = Array.from({ length: SEARCH_BATCH * SEARCH_MAX_BATCHES }, (_, index) => ({
+        slug: slug(`scale-shut-${index}`),
+        name: `Κλειστό ${index}`,
+        address: 'Οδός Δοκιμής 1, Κέρκυρα',
+        areaId: 'syntagma' as const,
+        location: { latitude: CORFU.latitude + index * 0.00001, longitude: CORFU.longitude },
+        hourlyRateMinor: 300,
+        status: 'published' as const,
+      }));
+      const rows = await db
+        .insert(schema.parkingLocations)
+        .values(shut)
+        .returning({ id: schema.parkingLocations.id });
+      await db
+        .insert(schema.parkingSpaces)
+        .values(rows.map(({ id }) => ({ locationId: id, label: 'K1' })));
+      // Open from midnight to one in the morning only: shut for the stay.
+      await db
+        .insert(schema.parkingOpeningHours)
+        .values(
+          rows.flatMap(({ id }) =>
+            WEEK.map((weekday) => ({ locationId: id, weekday, opensMinute: 0, closesMinute: 60 })),
+          ),
+        );
+      await addListing(db, 'scale-open-behind', {
+        at: { latitude: CORFU.latitude + 0.01, longitude: CORFU.longitude },
+        hours: [0, 1440],
+        spaces: [{ label: 'O1' }],
+      });
+      expect(await search(CORFU, { start, end })).toEqual([slug('scale-open-behind')]);
+    });
+
+    it('keeps a listing opened by special hours on a day the week has it shut', async () => {
+      const id = await addListing(db, 'scale-special-opening', {
+        at: { latitude: CORFU.latitude + 0.03, longitude: CORFU.longitude },
+        hours: [0, 60],
+        spaces: [{ label: 'P1' }],
+      });
+      await db.insert(schema.parkingHoursExceptions).values({
+        locationId: id,
+        startsOn: tomorrow,
+        endsOn: tomorrow,
+        opensMinute: 8 * 60,
+        closesMinute: 14 * 60,
+      });
+      const around = { latitude: CORFU.latitude + 0.03, longitude: CORFU.longitude };
+      expect(await search(around, { start, end })).toContain(slug('scale-special-opening'));
+    });
+
+    it('follows a night from Sunday into Monday, where the week starts again', async () => {
+      const id = await addListing(db, 'scale-sunday-night', {
+        at: { latitude: CORFU.latitude - 0.02, longitude: CORFU.longitude },
+        hours: [0, 6 * 60],
+        spaces: [{ label: 'S1' }],
+      });
+      await db.insert(schema.parkingOpeningHours).values(
+        WEEK.map((weekday) => ({
+          locationId: id,
+          weekday,
+          opensMinute: 20 * 60,
+          closesMinute: 1440,
+        })),
+      );
+      const today = zonedParts(new Date(), DEFAULT_TIME_ZONE);
+      const sunday = addDays(today.date, 7 - today.isoWeekday || 7);
+      const monday = addDays(sunday, 1);
+      const night = {
+        start: zonedTimeToUtc(sunday, '22:00', DEFAULT_TIME_ZONE)?.toISOString(),
+        end: zonedTimeToUtc(monday, '02:00', DEFAULT_TIME_ZONE)?.toISOString(),
+      };
+      const around = { latitude: CORFU.latitude - 0.02, longitude: CORFU.longitude };
+      expect(await search(around, night)).toContain(slug('scale-sunday-night'));
+      // Past six on Monday morning it has closed.
+      const late = {
+        start: night.start,
+        end: zonedTimeToUtc(monday, '07:00', DEFAULT_TIME_ZONE)?.toISOString(),
+      };
+      expect(await search(around, late)).not.toContain(slug('scale-sunday-night'));
+      // A weeknight is one range of the week: 20:00–24:00 and 00:00–06:00 join at midnight.
+      const tuesday = addDays(today.date, (2 - today.isoWeekday + 7) % 7 || 7);
+      const weeknight = {
+        start: zonedTimeToUtc(tuesday, '22:00', DEFAULT_TIME_ZONE)?.toISOString(),
+        end: zonedTimeToUtc(addDays(tuesday, 1), '02:00', DEFAULT_TIME_ZONE)?.toISOString(),
+      };
+      expect(await search(around, weeknight)).toContain(slug('scale-sunday-night'));
+    });
+
+    it('needs the whole week open for a stay of thirty days, the longest a search allows', async () => {
+      const at = { latitude: CORFU.latitude + 0.04, longitude: CORFU.longitude };
+      await addListing(db, 'scale-all-week', { at, hours: [0, 1440], spaces: [{ label: 'W1' }] });
+      const breakId = await addListing(db, 'scale-wednesday-break', {
+        at: { latitude: at.latitude + 0.0005, longitude: at.longitude },
+        hours: [0, 1440],
+        spaces: [{ label: 'W2' }],
+      });
+      // Shut 10:00–11:00 on Wednesdays.
+      await db
+        .delete(schema.parkingOpeningHours)
+        .where(
+          and(
+            eq(schema.parkingOpeningHours.locationId, breakId),
+            eq(schema.parkingOpeningHours.weekday, 3),
+          ),
+        );
+      await db.insert(schema.parkingOpeningHours).values([
+        { locationId: breakId, weekday: 3, opensMinute: 0, closesMinute: 600 },
+        { locationId: breakId, weekday: 3, opensMinute: 660, closesMinute: 1440 },
+      ]);
+      const month = {
+        start,
+        end: zonedTimeToUtc(addDays(tomorrow, 30), '10:00', DEFAULT_TIME_ZONE)?.toISOString(),
+      };
+      const found = await search(at, month);
+      expect(found).toContain(slug('scale-all-week'));
+      expect(found).not.toContain(slug('scale-wednesday-break'));
+    });
+
+    it('reads the night the clocks go back on the wall clock, not by the hours that pass', async () => {
+      // Open 00:00–04:00 only. 01:00 summer time to 04:00 winter time is four hours, but on the
+      // wall clock it ends at four, when the listing closes.
+      const at = { latitude: CORFU.latitude - 0.04, longitude: CORFU.longitude };
+      await addListing(db, 'scale-small-hours', { at, hours: [0, 240], spaces: [{ label: 'H1' }] });
+      const sunday = nextFallBack();
+      const found = await app.get(ParkingService).search({
+        ...at,
+        start: sunday(-120).toISOString(),
+        end: sunday(120).toISOString(),
+      });
+      expect(found.map((result) => result.slug)).toContain(slug('scale-small-hours'));
+    });
+
+    it('answers a stay inside the hour the clocks repeat, which ends before it starts', async () => {
+      await addListing(db, 'scale-fall-back', {
+        at: { latitude: CORFU.latitude - 0.03, longitude: CORFU.longitude },
+        hours: [0, 1440],
+        spaces: [{ label: 'R1' }],
+      });
+      // Straight to the service: the next such night can be further ahead than a search may look.
+      const at = nextFallBack();
+      // 03:30 summer time to 03:00 winter time: half an hour, though the wall clock goes back.
+      const found = await app.get(ParkingService).search({
+        latitude: CORFU.latitude - 0.03,
+        longitude: CORFU.longitude,
+        start: at(30).toISOString(),
+        end: at(60).toISOString(),
+      });
+      expect(found.map((result) => result.slug)).toContain(slug('scale-fall-back'));
+    });
   });
 
   it('lets anonymous visitors search near a position: open, published, with spaces, nearest first', async () => {

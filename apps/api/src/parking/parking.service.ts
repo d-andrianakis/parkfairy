@@ -8,6 +8,7 @@ import {
   ParkingSearchResultSchema,
   PARKING_FEATURES,
   SEARCH_RADIUS_METERS,
+  SUPPORTED_TIME_ZONES,
   zonedParts,
   type AreaId,
   type ListingPhoto,
@@ -20,12 +21,13 @@ import {
   type ParkingSearchResult,
 } from '@parkfairy/contracts';
 import { schema, type Database, type GeoPoint } from '@parkfairy/database';
-import { and, asc, eq, exists, gte, inArray, lte, not, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, gte, inArray, lte, not, or, sql } from 'drizzle-orm';
 import { DB } from '../database/database.module.js';
 import {
   hoursOf,
   isOpenThroughout,
   wallTime,
+  weekNeeded,
   type DatedHours,
   type OpeningPeriod,
 } from './opening-hours.js';
@@ -42,8 +44,8 @@ const photo = schema.parkingPhotos;
 const FEATURED_LIMIT = 6;
 const SEARCH_LIMIT = 50;
 /** Search reads nearest-first candidates in batches until SEARCH_LIMIT are open (or none left). */
-const SEARCH_BATCH = 100;
-const SEARCH_MAX_BATCHES = 5;
+export const SEARCH_BATCH = 100;
+export const SEARCH_MAX_BATCHES = 5;
 
 const labels = new Intl.Collator('en', { numeric: true });
 
@@ -179,13 +181,38 @@ export class ParkingService {
    * the batches would otherwise fill with them. Other hours and closed parts stay with
    * `isOpenThroughout`. The end is exclusive, so a stay ending at midnight touches no next day.
    */
-  private closedAllDayDuring({ start, end }: Window) {
+  private closedAllDayDuring(window: Window) {
+    return this.exceptionDuring(
+      window,
+      sql`and e.opens_minute is null and e.closed_from_minute is null`,
+    );
+  }
+
+  /** Whether any closure or special hours (`kind` narrows it) fall on a local day of the stay. */
+  private exceptionDuring({ start, end }: Window, kind = sql``) {
     const from = start.toISOString();
     const until = end.toISOString();
-    return sql`exists (select 1 from ${exception} e where e.location_id = ${listing.id}
-      and e.opens_minute is null and e.closed_from_minute is null
+    return sql`exists (select 1 from ${exception} e where e.location_id = ${listing.id} ${kind}
       and e.ends_on >= (${from}::timestamptz at time zone ${listing.timeZone})::date
       and e.starts_on <= ((${until}::timestamptz - interval '1 microsecond') at time zone ${listing.timeZone})::date)`;
+  }
+
+  /**
+   * Whether the listing's weekly hours cover `[start, end)` on its wall clock: the minute-of-week
+   * multirange of its periods (touching ones merge, so a night across midnight is one range) must
+   * contain the minutes `weekNeeded` works out, once per time zone rather than per row. The same
+   * reading as `isOpenThroughout`, done before a candidate takes a batch's place: an area where
+   * most are shut at that hour would otherwise use up the batches. Days with closures or special
+   * hours replace the week's hours, so those listings are left to `isOpenThroughout`.
+   */
+  private weekCovers({ start, end }: Window) {
+    const needed = SUPPORTED_TIME_ZONES.map(
+      (zone) => sql`when ${zone} then ${weekNeeded(start, end, zone)}::int4multirange`,
+    );
+    return sql`coalesce((select range_agg(int4range((h.weekday - 1) * 1440 + h.opens_minute,
+        (h.weekday - 1) * 1440 + h.closes_minute)) from ${hours} h where h.location_id = ${listing.id}),
+        '{}'::int4multirange) @> (case ${listing.timeZone} ${sql.join(needed, sql` `)}
+        else '{}'::int4multirange end)`;
   }
 
   /** Published listings that have at least one space, for the home page. */
@@ -233,6 +260,7 @@ export class ParkingService {
             sql`ST_DWithin(${listing.location}, ${point}, ${SEARCH_RADIUS_METERS})`,
             this.hasActiveSpace(),
             not(this.closedAllDayDuring(window)),
+            or(this.exceptionDuring(window), this.weekCovers(window)),
           ),
         )
         // Nearest first; slug breaks ties so batches never overlap. The planner narrows by the

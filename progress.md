@@ -205,8 +205,20 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
       without query strings (confirmation tokens hold the address), a stop grace of at least
       20 s (`after()` work), and check the real limit (`ratelimit-limit`) against the 2 sends
       a second assumed in `transport.ts`
-- [ ] At scale: opening-hours filter in SQL (minute-of-week multirange) and short-TTL search
-      caching (perf review findings 2/6, deferred until real inventory)
+- [x] At scale: opening-hours filter in SQL (2026-11-07). A candidate's weekly hours, as a
+      minute-of-week multirange, must cover the stay before it takes a batch's place; listings with
+      closures or special hours that day are left to `isOpenThroughout`. Tested with 500 shut
+      listings ahead of an open one (`parking.integration.test.ts`)
+- [ ] At scale: short-TTL search caching (perf review finding 6, deferred until real inventory)
+- [ ] At scale, deferred until measured on about 10,000 listings (perf review 2026-11-07): the
+      weekly hours read per candidate (a covering index on `parking_opening_hours`, or the week
+      stored as a multirange on the listing, written with the hours); one probe of the closures
+      index per candidate, not two; special hours and closed parts in SQL too, so a holiday copied
+      across a chain doesn't fill the batches; keyset batches instead of OFFSET. The stay's minutes
+      of the week are already worked out once per time zone (`weekNeeded`), not per row
+- [ ] Known: a stay inside the hour the clocks repeat (03:30 summer time to 03:00 winter time) is
+      taken as open whatever the hours: `isOpenThroughout` finds no wall-clock minutes to check.
+      Half an hour a year; search no longer fails on it (2026-11-07)
 - [x] Contracts & docs: OpenAPI + client regenerated, migrations 0003/0004 reviewed, memory.md
 
 ### 1.12 Second review round (2026-10-29)
@@ -239,8 +251,9 @@ Anonymous browsing and search of parking, ahead of owner onboarding (Phase 2) an
       `spaceCount` carries the total. The query still reads every row, fine to about 2,000 spaces
 - [x] Rate-limit scripts run by EVALSHA, falling back to the full text on NOSCRIPT (tested
       against real Redis after `SCRIPT FLUSH`)
-- [ ] Deferred: opening-hours check in SQL; top-48 spaces in SQL (needs an ICU numeric
-      collation; worth it above about 10,000 spaces in one listing)
+- [x] Opening-hours check in SQL (done 2026-11-07, see 1.11)
+- [ ] Deferred: top-48 spaces in SQL (needs an ICU numeric collation; worth it above about 10,000
+      spaces in one listing)
 - [x] Decided 2026-10-31: a stay that crosses a DST change is priced on real elapsed time, as it
       is today, so the spring-forward night stays an hour cheaper than the wall clock suggests
 - [x] Re-review of this round by the five review agents (findings fixed in 1.13)
@@ -344,9 +357,14 @@ The answers are in memory.md (Open product decisions, Translation notes).
       so someone who moved on during a slow request or load keeps their place, and a status
       message tells them instead. Unit tests, and smoke tests of a slow load and a slow request.
       All five reviews run: security and performance found nothing
-- [ ] Minor: while a two-factor step's code loads, `fallback={null}` shows nothing and the button
-      is already gone (`two-factor-settings.tsx`). Only reachable on a slow network, because it
-      preloads on hover and focus. Fix: keep the button until the step is ready
+- [x] Minor: while a two-factor step's code loads, `fallback={null}` showed nothing and the button
+      was already gone (`two-factor-settings.tsx`). Fixed 2026-11-07: the step opens in a
+      transition inside a boundary that is always there, so the overview stays, its button busy
+      and focused, until the step arrives (`two-factor-settings.load.test.tsx`). A spinner shows
+      after 300 ms, so code that is already loaded doesn't flash it
+- [ ] Known (accessibility review 2026-11-07): if the steps' code fails to load (offline), the
+      error page replaces the whole account page, and `lazy` keeps the failure until a reload.
+      DateTimeField's fallback to native fields is the gentler model
 - [ ] Manual: `FocusHeading`'s status with NVDA and VoiceOver: tab off during a slow sign-up, an
       email confirmation and a two-factor step, and check whether it doubles up with the page
       title Next.js announces
@@ -412,9 +430,14 @@ always opens the first unfinished step. Decisions #20-#23 in memory.md.
 - [x] **Smoke test** `tests/smoke/specs/owner-onboarding.smoke.ts` covering the critical path,
       including a listing sent back and sent again
 - [x] **Security** review (`security-reviewer` agent): authz, input validation, CSRF, secrets, logging of PII
-- [~] **Performance** review (`performance-reviewer` agent): both High findings fixed and owner pages
-  in the budget. Left open: owner messages sent again on every step, versioning the Mapbox worker
-  file, a `Buffer.from` copy in the media route, and the query count of an autosave
+- [x] **Performance** review (`performance-reviewer` agent): both High findings fixed and owner pages
+      in the budget. The four left open were done on 2026-11-07: owner messages come from one owner
+      layout, so moving between steps doesn't send them again (`performance.smoke.ts`); the Mapbox
+      worker's name carries its version and only that file is cached for a year (a 404 for a name
+      not shipped yet isn't); S3 reads no longer copy the file (`object-store.test.ts`); a save
+      answers with its progress in one statement instead of five at once, checked against what the
+      listing reads back. Signed out, `/owner` carries no owner messages. Re-reviewed by all five
+      agents on 2026-11-07; their findings fixed or listed in 1.11, 1.15 and here
 - [~] **Accessibility** (`accessibility-reviewer` agent): axe clean in both languages, keyboard path
   and focus tested. Left open: the manual screen reader checks below
 - [~] **i18n** (`i18n-reviewer` agent): catalogs complete in both languages. Left open: the
@@ -517,10 +540,12 @@ drivers see dates and hours but never the note, and Phase 3 refuses closing time
 
 Left open:
 
-- [ ] Performance, deferred as low: a search batch fans out 6 queries against a pool of 10; the
-      closures page makes two API reads where one lean endpoint would do; every row re-renders on
-      each keystroke (not measured at 30 rows); the demo seed has no closures, so the search latency
-      budget never meets one
+- [x] Performance (2026-11-07): the closures page reads only its listing's name and entries
+      (`GET /owner/listings/:id/hours-exceptions`), and it and the hours step ask for the owner's
+      other listings alone (`GET /owner/listings/:id/others`), not the dashboard's overview; the
+      demo seed gives Πάρκινγκ Ερμού dated closures, so the search latency budget meets them
+- [ ] Performance, deferred as low: a search batch fans out 6 queries against a pool of 10; every
+      row re-renders on each keystroke (not measured at 30 rows)
 - [ ] Known: a week open all day with a daily break reads back as "17:00 to 14:00" each night. The
       same hours, saved again unchanged, but not as entered (memory.md)
 - [ ] Manual NVDA and VoiceOver: removing a period (the announcement, then the focus on Add), an

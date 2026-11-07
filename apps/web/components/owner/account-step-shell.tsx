@@ -3,8 +3,6 @@ import { Alert, AlertDescription } from '@parkfairy/ui/components/alert';
 import { ArrowLeft, CircleAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
-import { ClientMessages } from '@/components/client-messages';
-import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { Link } from '@/i18n/navigation';
 
 /** A page for one of the account's steps, or the "try again" state if the API didn't answer. */
@@ -32,7 +30,7 @@ export function AccountStepShell({
         <p className="text-muted-foreground">{t(`stepLeads.${step}`)}</p>
       </div>
       {available ? (
-        <ClientMessages namespaces={CLIENT_NAMESPACES.owner}>{children}</ClientMessages>
+        children
       ) : (
         <Alert variant="destructive">
           <CircleAlert aria-hidden />

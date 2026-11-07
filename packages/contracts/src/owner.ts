@@ -616,6 +616,32 @@ export const OwnerHoursExceptionSchema = HoursExceptionSchema.extend({
 }).register(contractsRegistry, { id: 'OwnerHoursException' });
 export type OwnerHoursException = z.infer<typeof OwnerHoursExceptionSchema>;
 
+/** What the closures page needs, and no more of the listing: its name and its entries. */
+export const OwnerListingClosuresSchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string().nullable(),
+    contentLocale: LocaleSchema,
+    exceptions: z.array(OwnerHoursExceptionSchema),
+  })
+  .register(contractsRegistry, { id: 'OwnerListingClosures' });
+export type OwnerListingClosures = z.infer<typeof OwnerListingClosuresSchema>;
+
+/** The owner's other listings, last changed first: where a copy can go. */
+export const OwnerOtherListingsSchema = z
+  .object({
+    listings: z.array(
+      z.object({
+        id: z.uuid(),
+        name: z.string().nullable(),
+        contentLocale: LocaleSchema,
+        status: ListingStatusSchema,
+      }),
+    ),
+  })
+  .register(contractsRegistry, { id: 'OwnerOtherListings' });
+export type OwnerOtherListings = z.infer<typeof OwnerOtherListingsSchema>;
+
 export const OwnerHoursExceptionsSchema = z
   .object({ exceptions: z.array(OwnerHoursExceptionSchema) })
   .register(contractsRegistry, { id: 'OwnerHoursExceptions' });

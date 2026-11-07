@@ -3,13 +3,11 @@ import { Button } from '@parkfairy/ui/components/button';
 import { CircleAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { ClientMessages } from '@/components/client-messages';
 import { AccountChecklist } from '@/components/owner/account-checklist';
 import { ContinueCard } from '@/components/owner/continue-card';
 import { NewListingButton } from '@/components/owner/listing-actions';
 import { ListingMilestones } from '@/components/owner/listing-milestones';
 import { OwnerLanding, SignedOutActions } from '@/components/owner/owner-landing';
-import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { nextOwnerAction, setupProgress } from '@/lib/owner';
@@ -63,31 +61,26 @@ export default async function OwnerPage({ params }: LocaleParams) {
   const focus = action.kind === 'listing' ? action.listing : onboarding.listings[0];
 
   return (
-    <ClientMessages namespaces={CLIENT_NAMESPACES.owner}>
-      <div className="mx-auto grid w-full max-w-3xl gap-6 px-4 py-10">
-        <div className="grid gap-2">
-          {/* Focusable, for after a draft is deleted and the focus has nowhere else to go. */}
-          <h1
-            id="owner-heading"
-            tabIndex={-1}
-            className="text-3xl font-semibold tracking-tight outline-none"
-          >
-            {t('dashboard.title')}
-          </h1>
-          <p className="text-muted-foreground">{t('dashboard.lead')}</p>
-        </div>
-        <ContinueCard
-          action={action}
-          progress={setupProgress(onboarding.doneAccountSteps, focus)}
-        />
-        <AccountChecklist done={onboarding.doneAccountSteps} />
-        {onboarding.listings.map((listing) => (
-          <ListingMilestones key={listing.id} listing={listing} />
-        ))}
-        {onboarding.listings.length > 0 ? (
-          <NewListingButton label={t('dashboard.addAnother')} />
-        ) : null}
+    <div className="mx-auto grid w-full max-w-3xl gap-6 px-4 py-10">
+      <div className="grid gap-2">
+        {/* Focusable, for after a draft is deleted and the focus has nowhere else to go. */}
+        <h1
+          id="owner-heading"
+          tabIndex={-1}
+          className="text-3xl font-semibold tracking-tight outline-none"
+        >
+          {t('dashboard.title')}
+        </h1>
+        <p className="text-muted-foreground">{t('dashboard.lead')}</p>
       </div>
-    </ClientMessages>
+      <ContinueCard action={action} progress={setupProgress(onboarding.doneAccountSteps, focus)} />
+      <AccountChecklist done={onboarding.doneAccountSteps} />
+      {onboarding.listings.map((listing) => (
+        <ListingMilestones key={listing.id} listing={listing} />
+      ))}
+      {onboarding.listings.length > 0 ? (
+        <NewListingButton label={t('dashboard.addAnother')} />
+      ) : null}
+    </div>
   );
 }
