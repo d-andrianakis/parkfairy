@@ -489,7 +489,8 @@
       "deleteDraftUnnamed": "Delete this draft",
       "deleteQuestionUnnamed": "Delete this draft and everything in it? This can’t be undone.",
       "deleted": "Draft deleted",
-      "closures": "Closures and special hours for “<listing>{name}</listing>”"
+      "closures": "Closures and special hours for “<listing>{name}</listing>”",
+      "untitledNumber": "Unnamed listing {number}"
     },
     "state": {
       "done": "Done",
@@ -647,7 +648,20 @@
       "closedFromOn": "Closed from, {day}",
       "closedTo": "Closed until",
       "closedToOn": "Closed until, {day}",
-      "closedPartInvalid": "Choose a closed time inside the opening hours, before midnight"
+      "closedPartInvalid": "Choose a closed time inside the opening hours, before midnight",
+      "copyHeading": "Copy these hours to other listings",
+      "copyLead": "Each listing you choose gets these weekly hours in place of its own. Only listings you haven’t sent us yet, or that we sent back for a change, can take them. Changes not yet saved here are saved first.",
+      "copyLegend": "Listings to copy these hours to",
+      "copyAll": "All of these listings",
+      "copyButton": "Copy hours",
+      "copying": "Copying…",
+      "copyNone": "Choose at least one listing",
+      "copyDone": "{count, plural, one {Hours copied to # listing} other {Hours copied to # listings}}",
+      "copyLocked": "Hours not copied to “<listing>{name}</listing>”: we’re checking it or it’s live, so it keeps its own.",
+      "copySaving": "Saving…",
+      "copyNotSaved": "Nothing was copied: the hours above couldn’t be saved.",
+      "copySavedDone": "{count, plural, one {Hours saved and copied to # listing} other {Hours saved and copied to # listings}}",
+      "copySavedRefused": "Your hours were saved, but not copied. {reason}"
     },
     "closures": {
       "title": "Closures and special hours",
@@ -682,7 +696,7 @@
       "copying": "Copying…",
       "copyNone": "Choose at least one listing",
       "copyUnsaved": "Save your changes first: only saved dates are copied.",
-      "copyDone": "{count, plural, one {Copied to # listing} other {Copied to # listings}}",
+      "copyDone": "{count, plural, one {Dates copied to # listing} other {Dates copied to # listings}}",
       "copyClash": "Not copied to “<listing>{name}</listing>”: it already has its own closures or special hours on one of these days.",
       "copyFull": "Not copied to “<listing>{name}</listing>”: it would go over the limit of {max} periods.",
       "metaTitle": "Closures and special hours: {name}",
@@ -818,7 +832,8 @@
       "TOO_MANY_LISTINGS": "You’ve reached the number of listings one account can have.",
       "TOO_MANY_PHOTOS": "A listing can have up to 10 photos.",
       "TOO_MANY_PROOFS": "A listing can have up to 5 documents.",
-      "UPLOADS_BUSY": "We’re handling a lot of uploads. Try again in a minute."
+      "UPLOADS_BUSY": "We’re handling a lot of uploads. Try again in a minute.",
+      "NOTHING_TO_COPY": "There are no hours to copy yet. First choose at least one day you’re open, above."
     }
   }
 }

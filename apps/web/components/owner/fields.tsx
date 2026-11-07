@@ -109,7 +109,8 @@ export function CheckboxField({
         aria-describedby={error ? `${id}-error` : undefined}
         className="mt-0.5"
       />
-      <div className="grid gap-1">
+      {/* min-w-0: a long name in the label wraps rather than pushing past the screen. */}
+      <div className="grid min-w-0 gap-1">
         <Label htmlFor={id} className="leading-snug font-normal">
           {label}
         </Label>

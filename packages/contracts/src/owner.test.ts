@@ -3,6 +3,7 @@ import {
   HOURS_EXCEPTION_LABEL_MAX,
   isAdult,
   isValidAfm,
+  ListingHoursCopyInputSchema,
   ListingHoursExceptionsCopyInputSchema,
   ListingHoursExceptionsInputSchema,
   ListingHoursInputSchema,
@@ -551,5 +552,14 @@ describe('copying closures to other listings', () => {
   it('takes nothing else, so no other field can steer it', () => {
     expect(copy({ to: ids(1), from: ids(1)[0] }).success).toBe(false);
     expect(copy({}).success).toBe(false);
+  });
+
+  it('holds copying the weekly hours to the same rules', () => {
+    const hours = (body: unknown) => ListingHoursCopyInputSchema.safeParse(body);
+    expect(hours({ to: ids(OWNER_LISTINGS_MAX) }).success).toBe(true);
+    expect(hours({ to: ids(OWNER_LISTINGS_MAX + 1) }).success).toBe(false);
+    expect(hours({ to: [] }).success).toBe(false);
+    expect(hours({ to: [...ids(1), ...ids(1)] }).success).toBe(false);
+    expect(hours({ to: ids(1), status: 'published' }).success).toBe(false);
   });
 });

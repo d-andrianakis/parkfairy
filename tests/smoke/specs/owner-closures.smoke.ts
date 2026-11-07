@@ -144,6 +144,8 @@ test('an owner closes a live listing for a day, and drivers find it closed', asy
   await publishListing(id);
   const otherName = `Δεύτερο γκαράζ ${randomUUID().slice(0, 6)}`;
   const otherId = await draftListing(page, otherName);
+  const thirdName = `Τρίτο γκαράζ ${randomUUID().slice(0, 6)}`;
+  const thirdId = await draftListing(page, thirdName);
   const shut = athensDay(20);
   const short = athensDay(21);
   const cleaning = athensDay(22);
@@ -210,7 +212,9 @@ test('an owner closes a live listing for a day, and drivers find it closed', asy
     // Copied to the owner's other listing, which then has them too.
     await page.getByRole('checkbox', { name: otherName }).check();
     await page.getByRole('button', { name: 'Copy dates' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Copied to 1 listing' })).toBeVisible();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Dates copied to 1 listing' }),
+    ).toBeVisible();
     await expectAccessible(page);
     await page.goto(`/en/owner/listings/${otherId}/closures`);
     await expect(page.getByRole('group', { name: /^Period \d+$/ })).toHaveCount(3);
@@ -224,15 +228,43 @@ test('an owner closes a live listing for a day, and drivers find it closed', asy
     await page.getByRole('checkbox', { name: 'Closed for part of the day, Monday' }).check();
     await page.getByLabel('Closed until, Monday').selectOption('16:00');
     await expectAccessible(page);
-    await page.getByRole('button', { name: 'Save and continue' }).click();
-    await expect(page).toHaveURL(/\/(location|prices)$/);
-    const saved = (await (await page.request.get(`/api/v1/owner/listings/${otherId}`)).json()) as {
-      openingHours: { weekday: number; opens: string; closes: string }[];
+
+    // And the week goes to another draft, saved here first. The live listing isn't offered.
+    const copyHours = page.getByRole('region', { name: 'Copy these hours to other listings' });
+    await expect(copyHours.getByRole('checkbox', { name: name })).toHaveCount(0);
+    await copyHours.getByRole('checkbox', { name: thirdName }).check();
+    await copyHours.getByRole('button', { name: 'Copy hours' }).click();
+    await expect(copyHours.getByText('Hours saved and copied to 1 listing')).toBeVisible();
+    await expect(page).toHaveURL(`/en/owner/listings/${otherId}/hours`);
+    await expectAccessible(page);
+    const mondayOf = async (listingId: string) => {
+      const listing = (await (
+        await page.request.get(`/api/v1/owner/listings/${listingId}`)
+      ).json()) as {
+        openingHours: { weekday: number; opens: string; closes: string }[];
+      };
+      return listing.openingHours.filter((period) => period.weekday === 1);
     };
-    expect(saved.openingHours.filter((period) => period.weekday === 1)).toEqual([
+    const monday = [
       { weekday: 1, opens: '08:00', closes: '14:00' },
       { weekday: 1, opens: '16:00', closes: '20:00' },
-    ]);
+    ];
+    expect(await mondayOf(otherId)).toEqual(monday);
+    expect(await mondayOf(thirdId)).toEqual(monday);
+    await page.getByRole('button', { name: 'Save and continue' }).click();
+    await expect(page).toHaveURL(/\/(location|prices)$/);
+
+    // The offer in Greek, on a phone: it reads and fits.
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto(`/el/owner/listings/${otherId}/hours`);
+    await expect(
+      page.getByRole('region', { name: 'Ίδιο ωράριο και σε άλλους χώρους σας' }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      320,
+    );
+    await expectAccessible(page);
+    await page.setViewportSize({ width: 1280, height: 800 });
 
     // No new review: the listing is still live.
     await page.goto('/en/owner');
@@ -322,6 +354,14 @@ test('an owner closes a live listing for a day, and drivers find it closed', asy
       data: { to: [otherId] },
     });
     expect(copy.status()).toBe(404);
+    const copyHoursAway = await stranger.request.post(
+      `/api/v1/owner/listings/${otherId}/hours/copy`,
+      {
+        headers: { origin: WEB_URL },
+        data: { to: [thirdId] },
+      },
+    );
+    expect(copyHoursAway.status()).toBe(404);
     await context.close();
 
     expect(await csp()).toEqual([]);

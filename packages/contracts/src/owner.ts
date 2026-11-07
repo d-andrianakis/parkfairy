@@ -563,17 +563,22 @@ export type ListingHoursExceptionsInput = z.infer<typeof ListingHoursExceptionsI
 /** Enough for a chain of garages, and a ceiling on what one account can make us store. */
 export const OWNER_LISTINGS_MAX = 50;
 
+/** Other listings of the owner's, each named once: where a copy goes. */
+const copyTargets = () =>
+  z
+    .object({
+      to: z
+        .array(z.uuid(message('invalid')))
+        .min(1, message('invalid'))
+        .max(OWNER_LISTINGS_MAX, message('invalid'))
+        .refine((ids) => new Set(ids).size === ids.length, message('invalid')),
+    })
+    .strict();
+
 /** The owner's other listings that get this one's closures and special hours (decision #29). */
-export const ListingHoursExceptionsCopyInputSchema = z
-  .object({
-    to: z
-      .array(z.uuid(message('invalid')))
-      .min(1, message('invalid'))
-      .max(OWNER_LISTINGS_MAX, message('invalid'))
-      .refine((ids) => new Set(ids).size === ids.length, message('invalid')),
-  })
-  .strict()
-  .register(contractsRegistry, { id: 'ListingHoursExceptionsCopyInput' });
+export const ListingHoursExceptionsCopyInputSchema = copyTargets().register(contractsRegistry, {
+  id: 'ListingHoursExceptionsCopyInput',
+});
 export type ListingHoursExceptionsCopyInput = z.infer<typeof ListingHoursExceptionsCopyInputSchema>;
 
 /**
@@ -587,6 +592,24 @@ export const OwnerHoursExceptionsCopySchema = z
   })
   .register(contractsRegistry, { id: 'OwnerHoursExceptionsCopy' });
 export type OwnerHoursExceptionsCopy = z.infer<typeof OwnerHoursExceptionsCopySchema>;
+
+/** The owner's drafts and listings sent back that get this one's weekly hours (decision #30). */
+export const ListingHoursCopyInputSchema = copyTargets().register(contractsRegistry, {
+  id: 'ListingHoursCopyInput',
+});
+export type ListingHoursCopyInput = z.infer<typeof ListingHoursCopyInputSchema>;
+
+/**
+ * What became of each listing: `copied` (its week replaced by this one's) or `locked` (staff
+ * have it or it is live, so its hours stay as they were checked).
+ */
+export const HOURS_COPY_OUTCOMES = ['copied', 'locked'] as const;
+export const OwnerHoursCopySchema = z
+  .object({
+    results: z.array(z.object({ id: z.uuid(), outcome: z.enum(HOURS_COPY_OUTCOMES) })),
+  })
+  .register(contractsRegistry, { id: 'OwnerHoursCopy' });
+export type OwnerHoursCopy = z.infer<typeof OwnerHoursCopySchema>;
 
 export const OwnerHoursExceptionSchema = HoursExceptionSchema.extend({
   label: z.string().nullable(),

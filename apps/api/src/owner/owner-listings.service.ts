@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   HOURS_EXCEPTIONS_MAX,
   OWNER_LISTINGS_MAX,
+  OwnerHoursCopySchema,
   OwnerHoursExceptionsCopySchema,
   OwnerHoursExceptionsSchema,
   OwnerListingProgressSchema,
@@ -12,6 +13,7 @@ import {
   PROOF_LIMITS,
   wallMinutes,
   zonedParts,
+  type ListingHoursCopyInput,
   type ListingHoursExceptionsCopyInput,
   type ListingHoursExceptionsInput,
   type ListingHoursInput,
@@ -21,6 +23,7 @@ import {
   type ListingPricesInput,
   type ListingProofPatch,
   type ListingSpacesInput,
+  type OwnerHoursCopy,
   type OwnerHoursException,
   type OwnerHoursExceptions,
   type OwnerHoursExceptionsCopy,
@@ -137,6 +140,14 @@ const sameEntry = (a: ExceptionRow, b: ExceptionRow) =>
 
 const shareADay = (a: ExceptionRow, b: ExceptionRow) =>
   a.startsOn <= b.endsOn && b.startsOn <= a.endsOn;
+
+/**
+ * Where a copy goes: each listing once and never the one copied from. Postgres reads a uuid
+ * whatever its case, so the comparisons here must too, or two spellings of one listing would
+ * count twice and fail the ownership check as a stranger's.
+ */
+const copyTargetsOf = (to: string[], source: string) =>
+  [...new Set(to.map((target) => target.toLowerCase()))].filter((target) => target !== source);
 
 const isUniqueViolation = (error: unknown, constraint: string) => {
   const cause = (error as { cause?: { code?: string; constraint?: string } }).cause ?? error;
@@ -392,10 +403,7 @@ export class OwnerListingsService {
     { to }: ListingHoursExceptionsCopyInput,
   ): Promise<OwnerHoursExceptionsCopy> {
     const source = await this.owned(userId, id);
-    // Postgres reads a uuid whatever its case; the comparisons here must too.
-    const targets = to
-      .map((target) => target.toLowerCase())
-      .filter((target) => target !== source.id);
+    const targets = copyTargetsOf(to, source.id);
     if (targets.length === 0) return OwnerHoursExceptionsCopySchema.parse({ results: [] });
     // One reading of the clock for every date below. All listings share one zone (its CHECK).
     const today = zonedParts(new Date(), source.timeZone).date;
@@ -461,6 +469,59 @@ export class OwnerListingsService {
       return result;
     });
     return OwnerHoursExceptionsCopySchema.parse({
+      results: targets.map((target) => ({ id: target, outcome: outcomes.get(target) })),
+    });
+  }
+
+  /**
+   * Gives other listings of the owner's this one's weekly hours, replacing theirs (decision #30).
+   * Only drafts and listings sent back take them: staff have checked the others' hours. One
+   * transaction, the targets locked in id order, as copying closures does.
+   */
+  async copyHours(
+    userId: string,
+    id: string,
+    { to }: ListingHoursCopyInput,
+  ): Promise<OwnerHoursCopy> {
+    const source = await this.owned(userId, id);
+    const targets = copyTargetsOf(to, source.id);
+    if (targets.length === 0) return OwnerHoursCopySchema.parse({ results: [] });
+    // Read before any lock is taken: the source isn't locked, and a refusal then locks nothing.
+    const week = await this.db
+      .select({
+        weekday: hours.weekday,
+        opensMinute: hours.opensMinute,
+        closesMinute: hours.closesMinute,
+      })
+      .from(hours)
+      .where(eq(hours.locationId, source.id));
+    // An empty week would close the targets; nobody means that by copying.
+    if (week.length === 0) throw conflict('NOTHING_TO_COPY');
+
+    const outcomes = await this.db.transaction(async (tx) => {
+      const locked = await tx
+        .select({ id: listing.id, status: listing.status })
+        .from(listing)
+        .innerJoin(profile, eq(profile.id, listing.ownerId))
+        .where(and(inArray(listing.id, targets), eq(profile.userId, userId)))
+        .orderBy(asc(listing.id))
+        .for('no key update', { of: listing });
+      // A listing that isn't theirs refuses the lot, with the same 404 as one that doesn't exist.
+      if (locked.length !== targets.length) throw listingNotFound();
+
+      const open = locked.filter((row) => isEditable(row.status)).map((row) => row.id);
+      if (open.length > 0) {
+        await tx.delete(hours).where(inArray(hours.locationId, open));
+        await tx
+          .insert(hours)
+          .values(open.flatMap((locationId) => week.map((period) => ({ ...period, locationId }))));
+        await tx.update(listing).set({ updatedAt: new Date() }).where(inArray(listing.id, open));
+      }
+      return new Map(
+        locked.map((row) => [row.id, isEditable(row.status) ? 'copied' : 'locked'] as const),
+      );
+    });
+    return OwnerHoursCopySchema.parse({
       results: targets.map((target) => ({ id: target, outcome: outcomes.get(target) })),
     });
   }

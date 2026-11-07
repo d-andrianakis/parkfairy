@@ -137,6 +137,12 @@ test.describe('signed in', () => {
     );
     expect(copied.status()).toBe(403);
     expect(await copied.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
+    const hoursCopied = await page.request.post(`/api/v1/owner/listings/${listing}/hours/copy`, {
+      headers,
+      data: { to: [listing] },
+    });
+    expect(hoursCopied.status()).toBe(403);
+    expect(await hoursCopied.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
   });
 
   test('sign-in ignores off-site return URLs', async ({ page }) => {

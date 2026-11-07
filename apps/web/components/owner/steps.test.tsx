@@ -258,6 +258,35 @@ describe('HoursForm', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
+  it('goes to the step the server says is next', async () => {
+    renderInSubtree(<HoursForm listing={listingFixture()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open all day, every day' }));
+    await userEvent.click(continueButton());
+    await waitFor(() =>
+      expect(routerMock.push).toHaveBeenCalledWith(`/owner/listings/${LISTING_ID}/photos`),
+    );
+  });
+
+  it('saves and returns to the dashboard when finishing later', async () => {
+    renderInSubtree(<HoursForm listing={listingFixture()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open all day, every day' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save and finish later' }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(routerMock.push).toHaveBeenCalledWith('/owner');
+  });
+
+  it('reports a refusal and stays, ready to save again', async () => {
+    save.mockResolvedValueOnce(refusal('LISTING_LOCKED') as never);
+    renderInSubtree(<HoursForm listing={listingFixture()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open all day, every day' }));
+    await userEvent.click(continueButton());
+    expect(await screen.findByText('This listing can’t be changed right now.')).toBeInTheDocument();
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(continueButton()).not.toHaveAttribute('aria-disabled');
+    await userEvent.click(continueButton());
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+  });
+
   it('says which of a closed part’s times is wrong, and why', async () => {
     renderInSubtree(<HoursForm listing={listingFixture()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Monday to Friday, 08:00–20:00' }));

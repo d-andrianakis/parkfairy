@@ -1,4 +1,9 @@
-import { ACCOUNT_STEPS, type ListingStep, type OwnerListing } from '@parkfairy/contracts';
+import {
+  ACCOUNT_STEPS,
+  type ListingStep,
+  type OwnerListing,
+  type OwnerOnboarding,
+} from '@parkfairy/contracts';
 import { Alert, AlertDescription, AlertTitle } from '@parkfairy/ui/components/alert';
 import { CircleAlert, Clock } from 'lucide-react';
 import type { Metadata } from 'next';
@@ -19,7 +24,7 @@ import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { hasLocale } from 'next-intl';
 import { routing } from '@/i18n/routing';
 import { isListingStep } from '@/lib/owner';
-import { loadOwnerListing } from '@/lib/owner.server';
+import { loadOwnerListing, loadOwnerOnboarding } from '@/lib/owner.server';
 import { requireSession } from '@/lib/session';
 
 interface StepPageProps {
@@ -36,12 +41,25 @@ export async function generateMetadata({ params }: StepPageProps): Promise<Metad
   return { title: t(`stepNames.${step}`) };
 }
 
+/** The owner's other listings that can still take new weekly hours (decision #30). */
+function draftsBesides(listing: OwnerListing, onboarding: OwnerOnboarding | null) {
+  return (onboarding?.listings ?? [])
+    .filter(
+      (other) =>
+        other.id !== listing.id &&
+        (other.status === 'draft' || other.status === 'changes_requested'),
+    )
+    .map(({ id, name, contentLocale }) => ({ id, name, contentLocale }));
+}
+
 function StepForm({
   listing,
   step,
+  onboarding,
 }: {
   listing: OwnerListing;
   step: Exclude<ListingStep, 'review'>;
+  onboarding: OwnerOnboarding | null;
 }) {
   switch (step) {
     case 'location':
@@ -52,12 +70,15 @@ function StepForm({
       return <SpacesForm listing={listing} />;
     case 'hours':
       return (
-        <>
-          <HoursForm listing={listing} />
-          <div className="border-t pt-6">
-            <ClosuresLink id={listing.id} lead="hoursHint" />
-          </div>
-        </>
+        <HoursForm
+          listing={listing}
+          otherListings={draftsBesides(listing, onboarding)}
+          after={
+            <div className="border-t pt-6">
+              <ClosuresLink id={listing.id} lead="hoursHint" />
+            </div>
+          }
+        />
       );
     case 'prices':
       return <PricesForm listing={listing} />;
@@ -73,7 +94,11 @@ export default async function ListingStepPage({ params }: StepPageProps) {
   if (!isListingStep(step)) notFound();
   await requireSession(`/owner/listings/${id}/${step}`);
 
-  const listing = await loadOwnerListing(id);
+  // Only the hours step needs the owner's other listings, to offer them its week.
+  const [listing, onboarding] = await Promise.all([
+    loadOwnerListing(id),
+    step === 'hours' ? loadOwnerOnboarding() : Promise.resolve(null),
+  ]);
   if (listing === 'not-found') notFound();
   const t = await getTranslations({
     locale: hasLocale(routing.locales, locale) ? locale : routing.defaultLocale,
@@ -121,7 +146,7 @@ export default async function ListingStepPage({ params }: StepPageProps) {
         </ClientMessages>
       ) : (
         <ClientMessages namespaces={CLIENT_NAMESPACES.owner}>
-          <StepForm listing={listing} step={step} />
+          <StepForm listing={listing} step={step} onboarding={onboarding} />
         </ClientMessages>
       )}
     </StepShell>

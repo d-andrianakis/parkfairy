@@ -34,6 +34,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { AuthUser } from '@parkfairy/auth';
 import {
   ErrorResponseSchema,
+  ListingHoursCopyInputSchema,
   ListingHoursExceptionsCopyInputSchema,
   ListingHoursExceptionsInputSchema,
   ListingHoursInputSchema,
@@ -44,6 +45,7 @@ import {
   ListingProofPatchSchema,
   ListingSpacesInputSchema,
   ListingSubmitInputSchema,
+  OwnerHoursCopySchema,
   OwnerHoursExceptionsCopySchema,
   OwnerHoursExceptionsSchema,
   OwnerListingCreatedSchema,
@@ -61,6 +63,7 @@ import {
   PROOF_KINDS,
   PROOF_LIMITS,
   ProofUploadQuerySchema,
+  type OwnerHoursCopy,
   type OwnerHoursExceptions,
   type OwnerHoursExceptionsCopy,
   type OwnerListing,
@@ -228,6 +231,23 @@ export class OwnerController {
     @Body() body: unknown,
   ): Promise<OwnerListingProgress> {
     return this.listings.saveHours(user.id, id, parseOrThrow(ListingHoursInputSchema, body));
+  }
+
+  /** Replaces the weekly hours of the owner's drafts and listings sent back; see the service. */
+  @Post('listings/:id/hours/copy')
+  @HttpCode(200)
+  @Throttle(COPY_LIMIT)
+  @ApiBody({ schema: schemaRef(ListingHoursCopyInputSchema) })
+  @ApiOkResponse({ schema: schemaRef(OwnerHoursCopySchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })
+  copyListingHours(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<OwnerHoursCopy> {
+    return this.listings.copyHours(user.id, id, parseOrThrow(ListingHoursCopyInputSchema, body));
   }
 
   /** Unlike the steps, open whatever the listing's status: see the service. */

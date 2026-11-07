@@ -1,5 +1,5 @@
-import { LISTING_STEPS } from '@parkfairy/contracts';
-import { screen } from '@testing-library/react';
+import { LISTING_STEPS, type OwnerListingProgress } from '@parkfairy/contracts';
+import { screen, within } from '@testing-library/react';
 import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadOwnerListing, loadOwnerOnboarding, loadOwnerProfile } from '@/lib/owner.server';
@@ -110,6 +110,49 @@ describe('a listing’s step page', () => {
       'href',
       `/en/owner/listings/${LISTING_ID}/closures`,
     );
+  });
+
+  it('offers the week to the owner’s drafts and listings sent back, and to no other', async () => {
+    const other = (id: string, name: string, status: OwnerListingProgress['status']) =>
+      progressFixture({ id, name, status });
+    vi.mocked(loadOwnerOnboarding).mockResolvedValueOnce({
+      started: true,
+      doneAccountSteps: [],
+      listings: [
+        progressFixture({ name: 'Αυτό εδώ' }),
+        other('22222222-2222-4222-8222-222222222222', 'Πρόχειρο', 'draft'),
+        other('33333333-3333-4333-8333-333333333333', 'Επιστράφηκε', 'changes_requested'),
+        other('44444444-4444-4444-8444-444444444444', 'Σε έλεγχο', 'in_review'),
+        other('55555555-5555-4555-8555-555555555555', 'Δημοσιευμένο', 'published'),
+        other('66666666-6666-4666-8666-666666666666', 'Σε αναστολή', 'suspended'),
+      ],
+    });
+    await stepPage('hours', listingFixture());
+    const offer = screen.getByRole('region', { name: 'Copy these hours to other listings' });
+    expect(
+      within(offer)
+        .getAllByRole('checkbox')
+        .map((box) => box.closest('div')?.textContent),
+    ).toEqual(['All of these listings', 'Πρόχειρο', 'Επιστράφηκε']);
+  });
+
+  it('puts the closures sentence before the offer, outside its section', async () => {
+    vi.mocked(loadOwnerOnboarding).mockResolvedValueOnce({
+      started: true,
+      doneAccountSteps: [],
+      listings: [progressFixture({ id: '22222222-2222-4222-8222-222222222222', name: 'Άλλο' })],
+    });
+    await stepPage('hours', listingFixture());
+    const offer = screen.getByRole('region', { name: 'Copy these hours to other listings' });
+    const sentence = screen.getByText(/^Closed on holidays/);
+    expect(offer).not.toContainElement(sentence);
+    expect(sentence.compareDocumentPosition(offer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('asks for the owner’s other listings only on the hours step', async () => {
+    vi.mocked(loadOwnerOnboarding).mockClear();
+    await stepPage('prices', listingFixture());
+    expect(loadOwnerOnboarding).not.toHaveBeenCalled();
   });
 
   it('points from the weekly hours to closures and special hours', async () => {

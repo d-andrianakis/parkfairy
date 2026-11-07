@@ -390,8 +390,8 @@ One field for each end of a stay: day on the left, hour and half hour on the rig
       Round two: click-away, zero-length stays, a mangled From, half hours, both clock changes,
       far time zones, the form's wiring and `PRIMARY` against the token
 - [x] **Contracts & docs:** no contract or schema change; memory.md updated
-- [ ] Spring-forward night: a From of 03:00 or 03:30 with a stay of an hour or less is refused
-      with the usual error (memory.md). Decide whether those times should be offered at all
+- [x] Spring-forward night: a From of 03:00 or 03:30 with a stay of an hour or less is refused
+      with the usual error (memory.md). Decided 2026-11-04: they stay on offer (#32)
 - [ ] Manual: NVDA and VoiceOver on the field (how the combobox reads, short Greek dates included)
       and in the calendar, and how `SearchForm.untilMoved` sounds, including that the focus doesn't
       cut it off; closing the picker with TalkBack, which has no Escape and no close button; 400%
@@ -534,6 +534,47 @@ Left open:
       Δευτέρα" heard alone suggest "from Monday on"; `copyDone` "σε 1 χώρο" or "σε έναν χώρο";
       "για «{name}»" or "για τον χώρο «{name}»"
 
+### 2.3 Weekly hours copied to other listings (2026-11-04)
+
+The hours step offers its week to the owner's drafts and listings sent back, replacing theirs
+(decision #30). Changes not yet saved are saved first, since saving the step otherwise moves on.
+
+- [x] **Implemented** behind the API's authorization rules: `POST …/hours/copy` (one transaction,
+      targets locked in id order, 10 a minute, `locked` for a listing with staff, live or
+      suspended, `NOTHING_TO_COPY` for an empty week); the closures copy section became
+      `CopyToListings`, shared by both
+- [x] **Unit tests**: contracts; `copy-weekly-hours.test.tsx` through the real hours form (saved
+      first, refused saves and copies, the busy label, focus, Greek, unnamed drafts); the hours
+      form's own save paths; owner pages (who is offered, the closures sentence outside the offer).
+      Integration: every status, route validation, `updated_at`, races with a save and with a
+      submission (both fail without the row lock), opposite orders without a deadlock
+- [x] **Smoke test**: `owner-closures.smoke.ts` copies a week with a break to a third draft, saved
+      first, the live listing not offered, then the offer in Greek at 320 px; strangers' and
+      cross-site copies refused (`security.smoke.ts`)
+- [x] **Security** review: nothing above low. Fixed: one listing named in two cases counted twice
+      (one 404 for the owner's own); `copyHours` added to the Phase 3 list. Each copy route counts its
+      own ten a minute (memory.md)
+- [x] **Performance** review: nothing above low; worst case 50 targets locked for about 30 ms. Fixed:
+      the source week read before the lock. Accepted: the hours step's second API read (as on the
+      closures page), owner messages growing
+- [x] **Accessibility** review: fixed the "choose a listing" error arriving after the focus (also on
+      the closures page), a failed save now said in the copy section, "saved and copied", "Saving…"
+      while it saves, numbered unnamed drafts, the closures sentence before the offer, the step list
+      refreshed after saving, long names wrapping at 320 px
+- [x] **i18n** review: "these weekly hours" (it read as this calendar week), status lines with their
+      subject in both copies, a clearer empty-week message, Greek wording
+- [x] **Contracts & docs**: OpenAPI and client regenerated, no migration, memory.md
+
+Left open:
+
+- [ ] Native speaker: `Owner.hours.copy*`, `Owner.errors.NOTHING_TO_COPY`,
+      `Owner.dashboard.untitledNumber`, `Owner.closures.copyDone`. Questions: "παίρνει" or
+      "αντικαθιστά"; "σας επιστρέψαμε για αλλαγές" beside the badge "Χρειάζεται αλλαγή"; "κρατά το
+      δικό του"; "σε 1 χώρο" or "σε έναν χώρο"
+- [ ] Manual NVDA and VoiceOver: copying with nothing ticked, save-then-copy (whether the "Saving…"
+      and "Copying…" button names cut off the report), a failed save from Copy (the form's alert and
+      the section's line together), Greek names in English status lines and the reverse
+
 ## Phase 3: Search and booking engine
 
 - [~] Geospatial search + listing pages: done with curated areas + browser location (1.11);
@@ -544,8 +585,8 @@ Left open:
       the space from a list, 10-minute hold, the owner's gap counts as overlap, a "just taken"
       state, and the listing's 48-space cap (1.12) must not hide free spaces
 - [ ] Closing time over a booking is refused until the owner cancels it (#27), in
-      `saveHoursExceptions`, `copyHoursExceptions` (a `booked` outcome) and `saveHours` (a listing
-      sent back can change its week). Check the hours in effect, not just closures: dropping special
+      `saveHoursExceptions`, `copyHoursExceptions` (a `booked` outcome), `saveHours` and `copyHours`
+      (a listing sent back can change its week; `copyHours` needs a `booked` outcome too). Check the hours in effect, not just closures: dropping special
       hours or adding a closed part strands bookings too. The booking transaction takes `FOR SHARE`
       on the listing row before it reads hours, or both sides can pass their checks. Entries get new
       ids on every save, so diff instead if a booking must point at the closure that cancelled it
@@ -585,7 +626,8 @@ Left open:
       Mapbox as a processor of owners' IP addresses, how long `email_outbox` keeps sent rows
       (90 days today), and deleting an owner's account along with their tax values and proofs.
       Closures add: the dates of a private owner's closures are public (their home may be the
-      address; #26 chose this), and owners' notes on them last until the entry ends (swept)
+      address; #26, confirmed as #31 after the security review), and owners' notes on them last
+      until the entry ends (swept)
 - [ ] Owner onboarding in production: `OWNER_DATA_KEY`, `S3_BUCKET` and a role with
       `s3:ListBucket` (without it a missing photo is a 500 rather than a 404), `MAPBOX_PUBLIC_TOKEN`
       and a card on the account for permanent geocoding, `UV_THREADPOOL_SIZE=16`, a CDN in front of

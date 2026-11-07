@@ -52,7 +52,7 @@ describe('CopyHoursExceptions', () => {
       path: { id: LISTING_ID },
       body: { to: [HARBOUR] },
     });
-    expect(await screen.findByRole('status')).toHaveTextContent('Copied to 1 listing');
+    expect(await screen.findByText('Dates copied to 1 listing')).toBeInTheDocument();
     await expectNoAxeViolations(container);
   });
 
@@ -144,8 +144,10 @@ describe('CopyHoursExceptions', () => {
     show();
     await userEvent.click(screen.getByRole('checkbox', { name: 'All your other listings' }));
     await userEvent.click(copyButton());
-    const status = await screen.findByRole('status');
-    await waitFor(() => expect(status).toHaveTextContent('Copied to 1 listing'));
+    // The report, not the count of fields that need attention beside it.
+    const status = (await screen.findByText('Dates copied to 1 listing')).closest(
+      '[role="status"]',
+    ) as HTMLElement;
     expect(status).toHaveTextContent(
       'Not copied to “Γκαράζ Πειραιά”: it already has its own closures or special hours on one of these days.',
     );

@@ -86,6 +86,15 @@ Answered by the product owner on 2026-11-03, for closures and special hours:
 29. Several listings: **the owner chooses which of their listings get a listing's closures, all of
     them included.** Built as copying: the entries are added to each chosen listing.
 
+Answered by the product owner on 2026-11-04:
+
+30. Weekly hours can be copied too: **to the owner's drafts and listings sent back only**, since a
+    listing with staff or live has hours staff have checked. The copy replaces the target's week.
+31. The listing page keeps showing **every upcoming closure**, after the security review pointed out
+    that a private owner's closed dates may say when their home is empty. #26 stands as it was.
+32. The spring-forward night's 03:00 and 03:30 arrivals stay on offer, refused with the usual error
+    for a short stay (1.16): one night a year, and the error explains it.
+
 Still open, both waiting on people outside the project:
 
 18. For the accountant and lawyer, before Phase 4: VAT on parking and on commission; who issues
@@ -456,6 +465,13 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   listings closed all day on the stay's days in SQL, because a holiday closes many at once and they
   would fill the candidate batches. **Phase 3:** progress.md lists what must refuse closing time
   over a booking (#27).
+- **2026-11-04 · Copying to other listings is one component, `CopyToListings`,** given its texts
+  and API call by `CopyHoursExceptions` (closures, #29) and `CopyWeeklyHours` (the week, #30). They
+  differ on unsaved changes: the closures page's Save stays put, so it asks for a save first; the
+  hours step's Save moves on, so its `prepare` saves the week through the form's own checks and
+  copies after. The week replaces the target's (an addition would mean nothing), only drafts and
+  listings sent back take it (`locked` otherwise), and an empty week is refused rather than closing
+  every listing it reaches (`NOTHING_TO_COPY`).
 - **2026-11-03 · A break in the weekly hours is two periods on the day** (#28), read back by
   `periodsToDays` as the first and last of the day's own periods. The form allows one break a day,
   before midnight, so a night that runs past midnight with a break is three periods on one weekday
@@ -520,7 +536,8 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   interleave: the closures race test passed with the row lock removed until it ran three listings'
   pairs per round (2026-11-03).
 - **Routes with their own `@Throttle` meet it in integration tests,** where each test user is one
-  visitor: copying allows 10 a minute, so its tests use an owner each.
+  visitor: copying allows 10 a minute, so its tests use an owner each. Each route keeps its own
+  count (the throttler keys by handler): the two copies allow 10 a minute each, not 10 between them.
 - **Python fed by a bash heredoc on this machine mangles non-ASCII** such as ’ (Windows code page),
   so a replacement silently fails to match or writes mojibake. Put such scripts in a file written
   with the editor tool, or edit directly (2026-11-03).
@@ -758,6 +775,8 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
 - 2026-11-03 (closures, estimated from the build by the performance review): the closures page
   about 227 KiB (zod 31 KiB of it), a listing step about 237 KiB (13 KiB under the budget), the
   public listing page unchanged at 167 KiB: its closures table renders on the server only.
+- 2026-11-04 (weekly hours copy, the same method): a listing step about 238.5 KiB, the closures
+  page about 227.6 KiB, `/en/owner` 175 KiB. The shared copy section added about 1.5 KiB.
 
 ## Translation notes
 
@@ -780,4 +799,7 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   labels. English errors say arrival and departure
   and the reset email is impersonal, but "Choose a new password", "we’ve sent it a link" and the
   existing-account "Someone tried…" stay.
+- **2026-11-04 · The copy status lines name their subject,** "Το ωράριο αντιγράφηκε…" (the week,
+  singular) and "Οι ημερομηνίες αντιγράφηκαν…" (the dates, plural). The difference in number is
+  deliberate: don't make them agree. They sit in one shared component and are read alone.
 - Language names are always shown in their own language (`LOCALE_ENDONYMS`).

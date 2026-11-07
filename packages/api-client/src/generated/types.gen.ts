@@ -318,6 +318,17 @@ export type OwnerHoursExceptionsCopy = {
     }>;
 };
 
+export type ListingHoursCopyInput = {
+    to: Array<string>;
+};
+
+export type OwnerHoursCopy = {
+    results: Array<{
+        id: string;
+        outcome: 'copied' | 'locked';
+    }>;
+};
+
 export type OwnerHoursException = {
     startsOn: string;
     endsOn: string;
@@ -817,6 +828,30 @@ export type SaveListingHoursResponses = {
 };
 
 export type SaveListingHoursResponse = SaveListingHoursResponses[keyof SaveListingHoursResponses];
+
+export type CopyListingHoursData = {
+    body: ListingHoursCopyInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/hours/copy';
+};
+
+export type CopyListingHoursErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type CopyListingHoursError = CopyListingHoursErrors[keyof CopyListingHoursErrors];
+
+export type CopyListingHoursResponses = {
+    200: OwnerHoursCopy;
+};
+
+export type CopyListingHoursResponse = CopyListingHoursResponses[keyof CopyListingHoursResponses];
 
 export type SaveListingHoursExceptionsData = {
     body: ListingHoursExceptionsInput;

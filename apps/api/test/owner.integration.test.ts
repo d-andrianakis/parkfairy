@@ -4,6 +4,7 @@ import {
   addDays,
   DEFAULT_TIME_ZONE,
   HOURS_EXCEPTIONS_MAX,
+  OwnerHoursCopySchema,
   OwnerHoursExceptionsCopySchema,
   OwnerHoursExceptionsSchema,
   OwnerListingProgressSchema,
@@ -34,7 +35,7 @@ import {
   type ClaimedEmail,
   type Database,
 } from '@parkfairy/database';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import sharp from 'sharp';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -1825,6 +1826,274 @@ describe('owner onboarding', () => {
         expect(await refusedBy(insert({ locationId: id, label: 'x'.repeat(81) }))).toBe(
           'parking_hours_exceptions_label_check',
         );
+      });
+    });
+  });
+
+  describe('weekly hours copied to other listings', () => {
+    let copier: TestUser;
+    const lunch = {
+      periods: WEEK.flatMap((weekday) => [
+        { weekday, opens: '08:00', closes: '14:00' },
+        { weekday, opens: '17:00', closes: '20:00' },
+      ]),
+    };
+    const copy = (user: TestUser, id: string, to: string[]) =>
+      api(user, 'post', `/listings/${id}/hours/copy`).send({ to });
+    const weekOf = async (user: TestUser, id: string) =>
+      OwnerListingSchema.parse((await api(user, 'get', `/listings/${id}`).expect(200)).body)
+        .openingHours;
+    const setStatus = (id: string, status: 'changes_requested' | 'published' | 'suspended') =>
+      db.update(schema.parkingLocations).set({ status }).where(eq(schema.parkingLocations.id, id));
+    /** Out of the public catalogue again, so other tests' searches never meet it. */
+    const backToDraft = (id: string) =>
+      db
+        .update(schema.parkingLocations)
+        .set({ status: 'draft', slug: `draft-${id}` })
+        .where(eq(schema.parkingLocations.id, id));
+    /** An owner who can send listings in. Copying has a limit per visitor: one each keeps clear. */
+    async function submitter(): Promise<TestUser> {
+      const user = await signUpUser(app);
+      await api(user, 'patch', '/profile').send(profile).expect(200);
+      await api(user, 'put', '/profile/tax').send(tax).expect(200);
+      return user;
+    }
+
+    beforeAll(async () => {
+      copier = await submitter();
+    });
+
+    it('gives drafts and listings sent back the same week, and leaves checked ones alone', async () => {
+      const source = await newListing(copier);
+      await api(copier, 'put', `/listings/${source}/hours`).send(lunch).expect(200);
+      const draft = await newListing(copier);
+      const sentBack = await readyListing(copier);
+      const withStaff = await readyListing(copier);
+      for (const id of [sentBack, withStaff]) {
+        await api(copier, 'post', `/listings/${id}/submit`).send({ confirmed: true }).expect(200);
+      }
+      await setStatus(sentBack, 'changes_requested');
+      const theirOwn = await weekOf(copier, withStaff);
+
+      const response = await copy(copier, source, [draft, sentBack, withStaff]).expect(200);
+      expect(OwnerHoursCopySchema.parse(response.body).results).toEqual([
+        { id: draft, outcome: 'copied' },
+        { id: sentBack, outcome: 'copied' },
+        { id: withStaff, outcome: 'locked' },
+      ]);
+      const expected = await weekOf(copier, source);
+      expect(await weekOf(copier, draft)).toEqual(expected);
+      // The week replaces what was there, not adds to it.
+      expect(await weekOf(copier, sentBack)).toEqual(expected);
+      expect(await weekOf(copier, withStaff)).toEqual(theirOwn);
+      expect((await progress(copier, draft)).doneSteps).toEqual(['hours']);
+    });
+
+    it('copies from a live listing to a draft, the week staff checked', async () => {
+      const live = await readyListing(copier);
+      await api(copier, 'post', `/listings/${live}/submit`).send({ confirmed: true }).expect(200);
+      await setStatus(live, 'published');
+      try {
+        const draft = await newListing(copier);
+        await copy(copier, live, [draft]).expect(200);
+        expect(await weekOf(copier, draft)).toEqual(await weekOf(copier, live));
+      } finally {
+        await backToDraft(live);
+      }
+    });
+
+    it.each(['published', 'suspended'] as const)(
+      'leaves a %s listing’s week as staff checked it',
+      async (status) => {
+        const owner = await submitter();
+        const source = await newListing(owner);
+        await api(owner, 'put', `/listings/${source}/hours`).send(lunch).expect(200);
+        const checked = await readyListing(owner);
+        await api(owner, 'post', `/listings/${checked}/submit`)
+          .send({ confirmed: true })
+          .expect(200);
+        await setStatus(checked, status);
+        try {
+          const own = await weekOf(owner, checked);
+          const response = await copy(owner, source, [checked]).expect(200);
+          expect(OwnerHoursCopySchema.parse(response.body).results).toEqual([
+            { id: checked, outcome: 'locked' },
+          ]);
+          expect(await weekOf(owner, checked)).toEqual(own);
+        } finally {
+          await backToDraft(checked);
+        }
+      },
+    );
+
+    it('moves a draft’s row for its reminder, and leaves a checked one’s alone', async () => {
+      const owner = await submitter();
+      const source = await newListing(owner);
+      await api(owner, 'put', `/listings/${source}/hours`).send(lunch).expect(200);
+      const draft = await newListing(owner);
+      const checked = await readyListing(owner);
+      await api(owner, 'post', `/listings/${checked}/submit`).send({ confirmed: true }).expect(200);
+      const touched = async (id: string) =>
+        (
+          await db
+            .select({ updatedAt: schema.parkingLocations.updatedAt })
+            .from(schema.parkingLocations)
+            .where(eq(schema.parkingLocations.id, id))
+        )[0]?.updatedAt.getTime() ?? 0;
+      const [draftBefore, checkedBefore] = [await touched(draft), await touched(checked)];
+      await copy(owner, source, [draft, checked]).expect(200);
+      expect(await touched(draft)).toBeGreaterThan(draftBefore);
+      expect(await touched(checked)).toBe(checkedBefore);
+    });
+
+    it('refuses to copy an empty week, which would close every listing it reached', async () => {
+      const owner = await signUpUser(app);
+      const source = await newListing(owner);
+      const target = await newListing(owner);
+      await api(owner, 'put', `/listings/${target}/hours`).send(hours).expect(200);
+      const response = await copy(owner, source, [target]).expect(409);
+      expect((response.body as { code: string }).code).toBe('NOTHING_TO_COPY');
+      expect(await weekOf(owner, target)).toHaveLength(7);
+    });
+
+    it('copies nothing anywhere when one listing named is not the owner’s', async () => {
+      const owner = await signUpUser(app);
+      const source = await newListing(owner);
+      const mine = await newListing(owner);
+      const theirs = await newListing(stranger);
+      await api(owner, 'put', `/listings/${source}/hours`).send(lunch).expect(200);
+      const response = await copy(owner, source, [mine, theirs]).expect(404);
+      expect((response.body as { code: string }).code).toBe('LISTING_NOT_FOUND');
+      expect(await weekOf(owner, mine)).toEqual([]);
+      // Nor from a listing that isn't theirs.
+      await copy(stranger, source, [theirs]).expect(404);
+    });
+
+    it('passes over the listing copied from, and refuses a list that makes no sense', async () => {
+      const owner = await signUpUser(app);
+      const source = await newListing(owner);
+      const other = await newListing(owner);
+      await api(owner, 'put', `/listings/${source}/hours`).send(lunch).expect(200);
+      const itself = await copy(owner, source, [source, source.toUpperCase()]).expect(200);
+      expect(OwnerHoursCopySchema.parse(itself.body).results).toEqual([]);
+      // One listing in two spellings is still that one listing, not a stranger's.
+      const twice = await copy(owner, source, [other, other.toUpperCase()]).expect(200);
+      expect(OwnerHoursCopySchema.parse(twice.body).results).toEqual([
+        { id: other, outcome: 'copied' },
+      ]);
+      await copy(owner, source, []).expect(400);
+      await copy(owner, source, ['not-a-uuid']).expect(400);
+      await copy(owner, source, [other, other]).expect(400);
+      await api(owner, 'post', `/listings/${source}/hours/copy`)
+        .send({ to: [other], status: 'published' })
+        .expect(400);
+      await copy(owner, source, [randomUUID()]).expect(404);
+    });
+
+    it('has a limit of its own, ten a minute, apart from the closures copy’s', async () => {
+      const owner = await signUpUser(app);
+      const source = await newListing(owner);
+      const other = await newListing(owner);
+      await api(owner, 'put', `/listings/${source}/hours`).send(lunch).expect(200);
+      // The closures copy counts separately: these don't touch the hours copy's ten.
+      for (let call = 0; call < 3; call++) {
+        await api(owner, 'post', `/listings/${source}/hours-exceptions/copy`)
+          .send({ to: [other] })
+          .expect(200);
+      }
+      const answers = [];
+      for (let call = 0; call < 11; call++) {
+        answers.push((await copy(owner, source, [other])).status);
+      }
+      expect(answers.slice(0, 10).every((status) => status === 200)).toBe(true);
+      expect(answers[10]).toBe(429);
+    });
+
+    describe('at the same moment', () => {
+      it('takes a copy and a save of the same listings one after the other, never both', async () => {
+        const owner = await signUpUser(app);
+        const source = await newListing(owner);
+        await api(owner, 'put', `/listings/${source}/hours`).send(lunch).expect(200);
+        // Several rounds of three: one pair alone rarely interleaves locally.
+        for (let round = 0; round < 4; round++) {
+          const targets = [
+            await newListing(owner),
+            await newListing(owner),
+            await newListing(owner),
+          ];
+          const answers = await Promise.all([
+            copy(owner, source, targets),
+            ...targets.map((id) => api(owner, 'put', `/listings/${id}/hours`).send(hours)),
+          ]);
+          expect(answers.map((answer) => answer.status)).toEqual(answers.map(() => 200));
+          for (const id of targets) {
+            // 14 periods from the copy or 7 from the save; 21 would be the two merged.
+            expect([7, 14]).toContain((await weekOf(owner, id)).length);
+          }
+        }
+      });
+
+      it('copies two listings the other way round into the same ones without a deadlock', async () => {
+        const owner = await signUpUser(app);
+        const [first, second] = [await newListing(owner), await newListing(owner)];
+        await api(owner, 'put', `/listings/${first}/hours`).send(lunch).expect(200);
+        await api(owner, 'put', `/listings/${second}/hours`).send(hours).expect(200);
+        const [b, c] = [await newListing(owner), await newListing(owner)];
+        const answers = await Promise.all([
+          copy(owner, first, [b, c]),
+          copy(owner, second, [c, b]),
+        ]);
+        expect(answers.map((answer) => answer.status)).toEqual([200, 200]);
+        // Each target got one whole week, whichever copy came last.
+        for (const id of [b, c]) {
+          expect([7, 14]).toContain((await weekOf(owner, id)).length);
+        }
+      });
+
+      it('waits for a submission under way, then leaves the week it handed over alone', async () => {
+        const owner = await submitter();
+        const source = await newListing(owner);
+        await api(owner, 'put', `/listings/${source}/hours`).send(lunch).expect(200);
+        const target = await readyListing(owner);
+        const own = await weekOf(owner, target);
+
+        // A submission holding the row, as `handOver` does, until the copy is seen waiting on it.
+        let release: () => void = () => undefined;
+        const held = new Promise<void>((resolve) => (release = resolve));
+        const submitting = db.transaction(async (tx) => {
+          await tx
+            .select({ id: schema.parkingLocations.id })
+            .from(schema.parkingLocations)
+            .where(eq(schema.parkingLocations.id, target))
+            .for('update');
+          await tx
+            .update(schema.parkingLocations)
+            .set({ status: 'in_review' })
+            .where(eq(schema.parkingLocations.id, target));
+          await held;
+        });
+        const copying = copy(owner, source, [target]).then((response) => response);
+        await expect
+          .poll(
+            async () =>
+              (
+                await db.execute(
+                  sql`select count(*)::int as waiting from pg_stat_activity
+                      where wait_event_type = 'Lock' and query ilike '%for no key update%'`,
+                )
+              ).rows[0]?.waiting,
+            { timeout: 5000, interval: 25 },
+          )
+          .toBeGreaterThan(0);
+        release();
+        await submitting;
+
+        const response = await copying;
+        expect(response.status).toBe(200);
+        expect(OwnerHoursCopySchema.parse(response.body).results).toEqual([
+          { id: target, outcome: 'locked' },
+        ]);
+        expect(await weekOf(owner, target)).toEqual(own);
       });
     });
   });
