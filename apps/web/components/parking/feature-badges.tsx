@@ -9,12 +9,22 @@ const ICONS: Record<ParkingFeature, LucideIcon> = {
   accessible: Accessibility,
 };
 
-/** Feature labels with icons (the text carries the meaning; icons are decoration). */
-export function FeatureBadges({ features }: { features: ParkingFeature[] }) {
+/**
+ * Feature labels with icons (the text carries the meaning; icons are decoration). `named={false}`
+ * inside a description (`aria-describedby`): a list's own name would replace its items there, and
+ * "Features" would be read instead of "Accessible space".
+ */
+export function FeatureBadges({
+  features,
+  named = true,
+}: {
+  features: ParkingFeature[];
+  named?: boolean;
+}) {
   const t = useTranslations('Features');
   if (features.length === 0) return null;
   return (
-    <ul aria-label={t('label')} className="flex flex-wrap gap-1.5">
+    <ul aria-label={named ? t('label') : undefined} className="flex flex-wrap gap-1.5">
       {features.map((feature) => {
         const Icon = ICONS[feature];
         return (

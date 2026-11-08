@@ -180,6 +180,13 @@ describe('ListingMilestones', () => {
     },
   );
 
+  it.each(LISTING_STATUSES)('links a listing that is %s to its bookings once sent in', (status) => {
+    renderInSubtree(<ListingMilestones listing={progressFixture({ status })} />);
+    const link = screen.queryByRole('link', { name: 'Bookings for “Γκαράζ Ερμού”' });
+    if (status === 'draft') expect(link).not.toBeInTheDocument();
+    else expect(link).toHaveAttribute('href', `/en/owner/listings/${LISTING_ID}/bookings`);
+  });
+
   it('reads the listing’s name in its own language inside the link', () => {
     renderInSubtree(<ListingMilestones listing={progressFixture()} />, { locale: 'el' });
     const link = screen.getByRole('link', {

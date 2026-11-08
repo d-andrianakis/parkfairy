@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { API_URL, DEMO_DATA, SIGNED_IN_STATE, WEB_URL } from '../support/env';
+import { API_URL, DEMO_DATA, EMAIL_OUTBOX, SIGNED_IN_STATE, WEB_URL } from '../support/env';
+import { ownDriver } from '../support/fixtures';
 
 // Feature: performance budgets — catch regressions in what the browser must download
 // and in API latency. Budgets are deliberately tight; raise them only with a reason
@@ -29,6 +30,30 @@ async function measureFirstVisit(page: Page, path: string) {
   const javascriptBytes = (await Promise.all(scripts)).reduce((sum, size) => sum + size, 0);
   return { javascriptBytes, requests };
 }
+
+/**
+ * A hold of the shared account's on a demo listing, far ahead, for a page to show; let go after.
+ * Null where bookings aren't taken (only a local run takes them without payment, decision #33).
+ */
+async function demoHold(page: Page, daysAhead: number): Promise<string | null> {
+  const slug = 'syntagma-square-garage';
+  // On the half hour, in UTC, inside the demo garage's hours.
+  const day = new Date(Date.now() + daysAhead * 86_400_000).toISOString().slice(0, 10);
+  const stay = { start: `${day}T08:00:00.000Z`, end: `${day}T10:00:00.000Z` };
+  const listing = (await (
+    await page.request.get(`/api/v1/parking/${slug}`, { params: stay })
+  ).json()) as { bookingOpen: boolean; spaces: { id: string }[] };
+  if (!listing.bookingOpen) return null;
+  const held = await page.request.post('/api/v1/bookings', {
+    headers: { origin: WEB_URL },
+    data: { listing: slug, spaceId: listing.spaces[0]?.id, ...stay },
+  });
+  expect(held.status()).toBe(201);
+  return ((await held.json()) as { id: string }).id;
+}
+
+const letGo = (page: Page, id: string) =>
+  page.request.post(`/api/v1/bookings/${id}/cancel`, { headers: { origin: WEB_URL } });
 
 const CATALOGUE = DEMO_DATA
   ? ['/en/search?area=syntagma', '/en/parking/syntagma-square-garage']
@@ -214,6 +239,43 @@ test.describe('signed in', () => {
     } finally {
       await page.request.delete(`/api/v1/owner/listings/${id}`, { headers });
     }
+  });
+
+  test('a listing page with its space picker stays within the first-visit budget', async ({
+    page,
+  }) => {
+    test.skip(!DEMO_DATA, 'needs the demo listings (pnpm db:seed)');
+    // Signed in, with a stay: the picker is the page's one client component more.
+    const day = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+    await expectWithinBudget(
+      page,
+      `/en/parking/syntagma-square-garage?startDate=${day}&startTime=11:00&endDate=${day}&endTime=13:00`,
+    );
+  });
+
+  test('a booking’s page stays within the first-visit budget', async ({ browser }) => {
+    test.skip(!DEMO_DATA, 'needs the demo listings (pnpm db:seed)');
+    test.skip(!EMAIL_OUTBOX, 'A driver of its own needs a confirmation email');
+    // Signing up, through the emailed link, takes longer than a page check.
+    test.setTimeout(120_000);
+    // Not the shared account: its other tests' holds would let this one go, and a released
+    // booking's page loads none of the confirming code this is meant to weigh.
+    const driver = await ownDriver(browser, 'perf-booking');
+    const id = await demoHold(driver.page, 201);
+    test.skip(!id, 'Bookings are taken without payment on a local run only');
+    // A first visit: a context that has downloaded nothing yet, signed in as that driver.
+    const fresh = await browser.newContext({ storageState: await driver.context.storageState() });
+    try {
+      await expectWithinBudget(await fresh.newPage(), `/en/bookings/${id}`);
+    } finally {
+      if (id) await letGo(driver.page, id);
+      await fresh.close();
+      await driver.context.close();
+    }
+  });
+
+  test('/en/bookings stays within the first-visit budget', async ({ page }) => {
+    await expectWithinBudget(page, '/en/bookings');
   });
 
   test('/en/account does not shift while the API answers, on a phone', async ({ page }) => {

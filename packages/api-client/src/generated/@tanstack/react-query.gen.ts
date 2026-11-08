@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { copyListingHours, copyListingHoursExceptions, createOwnerListing, deleteListingPhoto, deleteListingProof, deleteOwnerListing, downloadListingProof, getFeaturedParking, getListingHoursExceptions, getListingPhoto, getLiveness, getMe, getOtherOwnerListings, getOwnerListing, getOwnerOnboarding, getOwnerProfile, getParkingListing, getReadiness, type Options, reorderListingPhotos, saveListingHours, saveListingHoursExceptions, saveListingLocation, saveListingPrices, saveListingProofDetails, saveListingSpaces, saveOwnerTaxDetails, searchParking, submitOwnerListing, updateListingPhoto, updateOwnerProfile, uploadListingPhoto, uploadListingProof } from '../sdk.gen';
-import type { CopyListingHoursData, CopyListingHoursError, CopyListingHoursExceptionsData, CopyListingHoursExceptionsError, CopyListingHoursExceptionsResponse, CopyListingHoursResponse, CreateOwnerListingData, CreateOwnerListingError, CreateOwnerListingResponse, DeleteListingPhotoData, DeleteListingPhotoError, DeleteListingPhotoResponse, DeleteListingProofData, DeleteListingProofError, DeleteListingProofResponse, DeleteOwnerListingData, DeleteOwnerListingError, DeleteOwnerListingResponse, DownloadListingProofData, DownloadListingProofError, DownloadListingProofResponse, GetFeaturedParkingData, GetFeaturedParkingResponse, GetListingHoursExceptionsData, GetListingHoursExceptionsError, GetListingHoursExceptionsResponse, GetListingPhotoData, GetListingPhotoError, GetListingPhotoResponse, GetLivenessData, GetLivenessResponse, GetMeData, GetMeError, GetMeResponse, GetOtherOwnerListingsData, GetOtherOwnerListingsError, GetOtherOwnerListingsResponse, GetOwnerListingData, GetOwnerListingError, GetOwnerListingResponse, GetOwnerOnboardingData, GetOwnerOnboardingError, GetOwnerOnboardingResponse, GetOwnerProfileData, GetOwnerProfileError, GetOwnerProfileResponse, GetParkingListingData, GetParkingListingError, GetParkingListingResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, ReorderListingPhotosData, ReorderListingPhotosError, ReorderListingPhotosResponse, SaveListingHoursData, SaveListingHoursError, SaveListingHoursExceptionsData, SaveListingHoursExceptionsError, SaveListingHoursExceptionsResponse, SaveListingHoursResponse, SaveListingLocationData, SaveListingLocationError, SaveListingLocationResponse, SaveListingPricesData, SaveListingPricesError, SaveListingPricesResponse, SaveListingProofDetailsData, SaveListingProofDetailsError, SaveListingProofDetailsResponse, SaveListingSpacesData, SaveListingSpacesError, SaveListingSpacesResponse, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsError, SaveOwnerTaxDetailsResponse, SearchParkingData, SearchParkingError, SearchParkingResponse, SubmitOwnerListingData, SubmitOwnerListingError, SubmitOwnerListingResponse, UpdateListingPhotoData, UpdateListingPhotoError, UpdateListingPhotoResponse, UpdateOwnerProfileData, UpdateOwnerProfileError, UpdateOwnerProfileResponse, UploadListingPhotoData, UploadListingPhotoError, UploadListingPhotoResponse, UploadListingProofData, UploadListingProofError, UploadListingProofResponse } from '../types.gen';
+import { cancelListingBooking, cancelMyBooking, confirmMyBooking, copyListingHours, copyListingHoursExceptions, createOwnerListing, deleteListingPhoto, deleteListingProof, deleteOwnerListing, downloadListingProof, extendMyHold, getFeaturedParking, getListingBookings, getListingHoursExceptions, getListingPhoto, getLiveness, getMe, getMyBooking, getMyBookings, getOtherOwnerListings, getOwnerListing, getOwnerOnboarding, getOwnerProfile, getParkingListing, getReadiness, holdParkingSpace, type Options, reorderListingPhotos, saveListingHours, saveListingHoursExceptions, saveListingLocation, saveListingPrices, saveListingProofDetails, saveListingSpaces, saveOwnerTaxDetails, searchParking, submitOwnerListing, updateListingPhoto, updateOwnerProfile, uploadListingPhoto, uploadListingProof } from '../sdk.gen';
+import type { CancelListingBookingData, CancelListingBookingError, CancelListingBookingResponse, CancelMyBookingData, CancelMyBookingError, CancelMyBookingResponse, ConfirmMyBookingData, ConfirmMyBookingError, ConfirmMyBookingResponse, CopyListingHoursData, CopyListingHoursError, CopyListingHoursExceptionsData, CopyListingHoursExceptionsError, CopyListingHoursExceptionsResponse, CopyListingHoursResponse, CreateOwnerListingData, CreateOwnerListingError, CreateOwnerListingResponse, DeleteListingPhotoData, DeleteListingPhotoError, DeleteListingPhotoResponse, DeleteListingProofData, DeleteListingProofError, DeleteListingProofResponse, DeleteOwnerListingData, DeleteOwnerListingError, DeleteOwnerListingResponse, DownloadListingProofData, DownloadListingProofError, DownloadListingProofResponse, ExtendMyHoldData, ExtendMyHoldError, ExtendMyHoldResponse, GetFeaturedParkingData, GetFeaturedParkingResponse, GetListingBookingsData, GetListingBookingsError, GetListingBookingsResponse, GetListingHoursExceptionsData, GetListingHoursExceptionsError, GetListingHoursExceptionsResponse, GetListingPhotoData, GetListingPhotoError, GetListingPhotoResponse, GetLivenessData, GetLivenessResponse, GetMeData, GetMeError, GetMeResponse, GetMyBookingData, GetMyBookingError, GetMyBookingResponse, GetMyBookingsData, GetMyBookingsError, GetMyBookingsResponse, GetOtherOwnerListingsData, GetOtherOwnerListingsError, GetOtherOwnerListingsResponse, GetOwnerListingData, GetOwnerListingError, GetOwnerListingResponse, GetOwnerOnboardingData, GetOwnerOnboardingError, GetOwnerOnboardingResponse, GetOwnerProfileData, GetOwnerProfileError, GetOwnerProfileResponse, GetParkingListingData, GetParkingListingError, GetParkingListingResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, HoldParkingSpaceData, HoldParkingSpaceError, HoldParkingSpaceResponse, ReorderListingPhotosData, ReorderListingPhotosError, ReorderListingPhotosResponse, SaveListingHoursData, SaveListingHoursError, SaveListingHoursExceptionsData, SaveListingHoursExceptionsError, SaveListingHoursExceptionsResponse, SaveListingHoursResponse, SaveListingLocationData, SaveListingLocationError, SaveListingLocationResponse, SaveListingPricesData, SaveListingPricesError, SaveListingPricesResponse, SaveListingProofDetailsData, SaveListingProofDetailsError, SaveListingProofDetailsResponse, SaveListingSpacesData, SaveListingSpacesError, SaveListingSpacesResponse, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsError, SaveOwnerTaxDetailsResponse, SearchParkingData, SearchParkingError, SearchParkingResponse, SubmitOwnerListingData, SubmitOwnerListingError, SubmitOwnerListingResponse, UpdateListingPhotoData, UpdateListingPhotoError, UpdateListingPhotoResponse, UpdateOwnerProfileData, UpdateOwnerProfileError, UpdateOwnerProfileResponse, UploadListingPhotoData, UploadListingPhotoError, UploadListingPhotoResponse, UploadListingProofData, UploadListingProofError, UploadListingProofResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -573,6 +573,175 @@ export const submitOwnerListingMutation = (options?: Partial<Options<SubmitOwner
     const mutationOptions: UseMutationOptions<SubmitOwnerListingResponse, SubmitOwnerListingError, Options<SubmitOwnerListingData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await submitOwnerListing({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getMyBookingsQueryKey = (options?: Options<GetMyBookingsData>) => createQueryKey('getMyBookings', options);
+
+export const getMyBookingsOptions = (options?: Options<GetMyBookingsData>) => queryOptions<GetMyBookingsResponse, GetMyBookingsError, GetMyBookingsResponse, ReturnType<typeof getMyBookingsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getMyBookings({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getMyBookingsQueryKey(options)
+});
+
+export const getMyBookingsInfiniteQueryKey = (options?: Options<GetMyBookingsData>): QueryKey<Options<GetMyBookingsData>> => createQueryKey('getMyBookings', options, true);
+
+export const getMyBookingsInfiniteOptions = (options?: Options<GetMyBookingsData>) => {
+    const opts = infiniteQueryOptions<GetMyBookingsResponse, GetMyBookingsError, InfiniteData<GetMyBookingsResponse>, QueryKey<Options<GetMyBookingsData>>, number | Pick<QueryKey<Options<GetMyBookingsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<GetMyBookingsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await getMyBookings({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: getMyBookingsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const holdParkingSpaceMutation = (options?: Partial<Options<HoldParkingSpaceData>>): UseMutationOptions<HoldParkingSpaceResponse, HoldParkingSpaceError, Options<HoldParkingSpaceData>> => {
+    const mutationOptions: UseMutationOptions<HoldParkingSpaceResponse, HoldParkingSpaceError, Options<HoldParkingSpaceData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await holdParkingSpace({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getMyBookingQueryKey = (options: Options<GetMyBookingData>) => createQueryKey('getMyBooking', options);
+
+export const getMyBookingOptions = (options: Options<GetMyBookingData>) => queryOptions<GetMyBookingResponse, GetMyBookingError, GetMyBookingResponse, ReturnType<typeof getMyBookingQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getMyBooking({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getMyBookingQueryKey(options)
+});
+
+export const confirmMyBookingMutation = (options?: Partial<Options<ConfirmMyBookingData>>): UseMutationOptions<ConfirmMyBookingResponse, ConfirmMyBookingError, Options<ConfirmMyBookingData>> => {
+    const mutationOptions: UseMutationOptions<ConfirmMyBookingResponse, ConfirmMyBookingError, Options<ConfirmMyBookingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await confirmMyBooking({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const extendMyHoldMutation = (options?: Partial<Options<ExtendMyHoldData>>): UseMutationOptions<ExtendMyHoldResponse, ExtendMyHoldError, Options<ExtendMyHoldData>> => {
+    const mutationOptions: UseMutationOptions<ExtendMyHoldResponse, ExtendMyHoldError, Options<ExtendMyHoldData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await extendMyHold({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const cancelMyBookingMutation = (options?: Partial<Options<CancelMyBookingData>>): UseMutationOptions<CancelMyBookingResponse, CancelMyBookingError, Options<CancelMyBookingData>> => {
+    const mutationOptions: UseMutationOptions<CancelMyBookingResponse, CancelMyBookingError, Options<CancelMyBookingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await cancelMyBooking({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getListingBookingsQueryKey = (options: Options<GetListingBookingsData>) => createQueryKey('getListingBookings', options);
+
+export const getListingBookingsOptions = (options: Options<GetListingBookingsData>) => queryOptions<GetListingBookingsResponse, GetListingBookingsError, GetListingBookingsResponse, ReturnType<typeof getListingBookingsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getListingBookings({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getListingBookingsQueryKey(options)
+});
+
+export const getListingBookingsInfiniteQueryKey = (options: Options<GetListingBookingsData>): QueryKey<Options<GetListingBookingsData>> => createQueryKey('getListingBookings', options, true);
+
+export const getListingBookingsInfiniteOptions = (options: Options<GetListingBookingsData>) => {
+    const opts = infiniteQueryOptions<GetListingBookingsResponse, GetListingBookingsError, InfiniteData<GetListingBookingsResponse>, QueryKey<Options<GetListingBookingsData>>, number | Pick<QueryKey<Options<GetListingBookingsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<GetListingBookingsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await getListingBookings({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: getListingBookingsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const cancelListingBookingMutation = (options?: Partial<Options<CancelListingBookingData>>): UseMutationOptions<CancelListingBookingResponse, CancelListingBookingError, Options<CancelListingBookingData>> => {
+    const mutationOptions: UseMutationOptions<CancelListingBookingResponse, CancelListingBookingError, Options<CancelListingBookingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await cancelListingBooking({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

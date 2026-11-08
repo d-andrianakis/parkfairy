@@ -95,6 +95,55 @@ Answered by the product owner on 2026-11-04:
 32. The spring-forward night's 03:00 and 03:30 arrivals stay on offer, refused with the usual error
     for a short stay (1.16): one night a year, and the error explains it.
 
+Answered by the product owner on 2026-11-08, for booking (Phase 3):
+
+33. Before payments exist, a hold becomes a booking through **a stand-in Confirm that charges
+    nothing, on a local run only** (`bookingWithoutPayment`: `BETTER_AUTH_URL` is loopback, as for
+    files instead of S3). Elsewhere the API refuses holds (`BOOKING_UNAVAILABLE`) and the listing
+    page still says booking is coming (`ParkingListingDetail.bookingOpen`). Phase 4 swaps the
+    press for Stripe.
+34. Owners cancel bookings **on a bookings page per listing** (`/owner/listings/:id/bookings`); the
+    refusal on the closures and hours pages links there. Calendar and earnings stay in Phase 5.
+35. The owner sees **the driver's account name and number plate**. The plate is asked for when
+    confirming; it is personal data, on the Phase 6 retention list.
+36. Booking emails: **all four**: to the driver when confirmed and when cancelled (by either side),
+    to the owner for a new booking and when a driver cancels.
+
+Answered by the product owner on 2026-11-08, after the reviews:
+
+37. Confirming works **only while the 10-minute hold runs.** After it the driver chooses the space
+    again. Since running over now costs the hold, the time limit must be adjustable (WCAG 2.2.1): the
+    booking page offers "Keep it for 10 more minutes" (`POST /bookings/:id/extend`, from now, at most
+    `HOLD_MAX_EXTENSIONS` = 10 times) and warns two minutes before the end, without moving the
+    focus. One hold per driver still holds, so keeping one ties up one space at most. Decision #3's
+    late payment is Phase 4's, settled where the payment arrives, not by the driver's press.
+38. A stay **already under way can't be cancelled by the owner;** support handles it. So closing the
+    rest of today over a driver already parked is refused, and nobody's car is shut in.
+39. Owners see the driver's name and plate **from the moment of booking**, not only near arrival.
+    How long they stay is the Phase 6 retention review's.
+
+Our readings (2026-11-08), not asked; change any that are wrong:
+
+- **One hold per driver.** A new hold lets the driver's earlier ones go, so one account can't sit
+  on many spaces; pressing Book twice takes the same space again. Holds are 10 a minute per visitor.
+  The release before the insert can't see a press made at the same instant, so a partial unique
+  index (`bookings_one_hold_per_user_idx`, 0016) refuses the second and the service retries it,
+  which then lets the first go (the race test runs three drivers' pairs at once).
+- **A cancel never gives back less than the driver was shown:** the page sends the refund it
+  quoted, and if the start has come nearer and less comes back now, the API refuses
+  (`REFUND_CHANGED`, with the new amount) and the question asks again with it.
+- **A driver cancels until arrival**, refunded by the policy stored on the booking. "Until 24 hours
+  before" includes the 24th hour; half of an odd amount rounds up, for the driver. Under way, it's
+  support's (Phase 5). **The owner cancels only before arrival** (#38), always in full.
+- **No changes to a booking:** cancel and book again. **Owners can't book their own listings**
+  (`OWN_LISTING`): it would be a payout to oneself in Phase 4.
+- **Plates are read as the car shows them:** Greek capitals that look Latin become Latin
+  (ΙΚΒ-1234 = IKB1234), accents, spaces, dots and hyphens go, 2–10 letters and digits remain.
+- **The price is the one quoted at the hold,** however often it is kept longer.
+- **The gap is stored on each booking**, so an owner raising it changes only later bookings.
+- A listing with no cancellation policy (none that was sent in) books under `oneHour`, the most
+  generous.
+
 Still open, both waiting on people outside the project:
 
 18. For the accountant and lawyer, before Phase 4: VAT on parking and on commission; who issues
@@ -515,6 +564,74 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   daily break is equally "17:00 to 14:00 every night", and reads back that way. The hours are the
   same.
 
+- **2026-11-08 · Holds and bookings are one table, kept apart by one exclusion constraint**
+  (`bookings_space_no_overlap`, migration 0015): no two rows `held` or `confirmed` on a space may
+  overlap on `[starts_at, blocked_until)`, where `blocked_until` is the end plus the owner's gap
+  (#10). That, never a read, is what makes the second of two drivers fail (`SPACE_TAKEN`, #9): their
+  insert waits for the first and then hits it. `blocked_until` is a stored column with a CHECK,
+  because `timestamptz + interval` isn't immutable and an index expression must be. A hold past its
+  time still counts to the constraint until marked `expired`: the hold transaction marks the
+  space's lapsed holds first (`skip locked`, since waiting there could deadlock two drivers
+  releasing each other's spaces), and the worker sweeps every minute. Availability (search, the
+  listing page) ignores lapsed holds by time instead (`spaceTakenDuring` in
+  `parking/availability.ts`, which repeats the constraint's `status in (…)` so its index serves).
+- **2026-11-08 · Locks go listing first, then booking.** A hold and a confirmation take `FOR SHARE`
+  on the listing before reading its hours; the owner's hours saves hold it `FOR UPDATE` (`edit`) or
+  `FOR NO KEY UPDATE` (copies), so a closure and a confirmation can't both pass their checks. The
+  race test (`bookings.integration.test.ts`, "never lets a closure and a confirmation both
+  through") failed 3 of 3 with the lock removed. The closing-time guard (#27, `strandedBookings` in
+  `bookings/stranded.ts`) works in memory on the hours as they would be after the save, before
+  anything is written, under that lock; the copies report it per listing as `booked`. Only
+  confirmed bookings count: a hold isn't a booking, and its confirmation re-reads the hours.
+- **2026-11-08 · Saving spaces upserts by label** (it used to delete and re-insert): a booking points
+  at its space's row, and a listing staff sent back after it was live can have bookings. Removing a
+  space a booking or running hold takes is refused (`LISTING_BOOKED`); one with only past bookings
+  goes, and they keep `space_label` with `space_id` null. The demo seed still replaces spaces, so a
+  local demo booking loses its space on a reseed.
+- **2026-11-08 · The listing page's space picker** (`BookSpaceForm`) gets its labels rendered by the
+  server, so it ships only `BookSpace` and `BookingErrors` and no zod; `lib/booking-client.ts`
+  mirrors `BOOKING_ERROR_CODES` for that reason, and a test holds the two together. It stays mounted
+  while the listing is open for the stay, even with nothing free, because a "just taken" refusal
+  refreshes the page, and an unmounted form would take the message with it. With a stay, the API
+  sends only the free spaces, so a garage whose first 48 are booked still offers the rest; search's
+  "from" price and free count are the free spaces' (#17).
+- **2026-11-08 · A booking's page says what was just done through `?done=`** (`confirmed`,
+  `cancelled`): the client `router.replace`s to it, `RouteFocus` puts the focus on main, and the
+  notice's `FocusHeading` takes it from there. A `done` that doesn't match the booking's status says
+  nothing. The 10-minute hold shows the time it ends, with no countdown (a ticking clock either
+  speaks all the time or never): `HoldTimer` warns once, two minutes before, offers to keep it for
+  longer, and reads the page again when it ends, whose heading then takes the focus (#37).
+- **2026-11-08 · Which spaces a stay meets is one probe per listing,** not one per space:
+  `takenSpaceIds` (`parking/availability.ts`) on `bookings_taken_by_listing_idx`, a GiST on
+  `(location_id, tstzrange(starts_at, blocked_until))` over held and confirmed rows (0017). Search's
+  `hasFreeSpace` compares active spaces with active spaces taken, and `spaceStats` joins the taken
+  set once. The first version probed each space, and as a column of a subquery Postgres ran that
+  probe once per aggregate: 0.7 s for one batch of 100 garages (performance review, on 1.5M
+  synthetic bookings). Keep new availability reads on that index.
+- **2026-11-08 · The closing-time guard reads only what can matter,** under listing locks that
+  block holds: confirmed bookings meeting the days whose entries change (`HoursChange.days`: a
+  closures save diffs against what is stored, a copy names the entries it adds), never further back
+  than a stay can last, each distinct stay worked out once. A new week (`saveHours`, `copyHours`,
+  editable listings only) still reads them all.
+- **2026-11-08 · Account names are checked when changed, not only at sign-up** (`withValidName` in
+  `packages/auth`'s update hook): owners now see them (#35), and `/update-user` takes any body.
+  The owner's list also caps them (`left(name, 100)`) and isolates them (`<bdi>`).
+- **2026-11-08 · Answers that need a session are `Cache-Control: private, no-store`**
+  (`NoStoreInterceptor`, global): plates and names must never sit in a shared cache. Public routes
+  and a route's own `@Header` keep theirs.
+- **2026-11-08 · The space picker loads in a bundle of its own** (`BookSpacePicker`, `next/dynamic`
+  in a `'use client'` wrapper, still rendered on the server): a server page importing it directly
+  shipped it on every listing view, where booking is off outside this machine. `attempt` lives in
+  `lib/api-call.ts` so it brings no owner texts; the API client is `sideEffects: false`. The booking
+  page checks the plate with `@parkfairy/contracts/plates`, without zod (30 KiB).
+- **2026-11-08 · An owner's cancel comes back as `?cancelled=<reference>`,** whose notice takes the
+  focus and names the booking: a status region inside the card went with the card, and the focus
+  moving cut it off (accessibility review).
+- **2026-11-08 · Booking emails go through the outbox in the booking's own transaction**, one row per
+  booking, event and reader (`booking:<id>:<event>:<driver|owner>`). The payload holds what the email
+  shows and nothing about people: no names, no plate. `packages/email/src/booking-emails.ts` writes
+  the stay in the listing's zone, 24-hour in Greek; the layout gained label/value `details`.
+
 ## Conventions
 
 - **Data:** UUID PKs, `timestamptz` (UTC instants), snake_case SQL, money as integer minor
@@ -764,6 +881,22 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   checked on UTC instants.
 - **Stopping a backgrounded `next start` on Windows** leaves the node process listening on
   :3000 (the smoke suite then reuses that stale build). Kill it by port before re-running.
+- **Each integration suite needs a map point of its own** (2026-11-08). The owner suite leaves live
+  listings at Heraklion run after run (48 by then), and once more than search's 50 results sat on
+  the catalogue suite's point, its own listings fell off the end. Catalogue: Rethymno; bookings:
+  Agios Nikolaos; search batches: Chania; owner: Heraklion.
+- **Supertest closes its ephemeral server after each request** (2026-11-08): requests built ahead in
+  an array fail with "Cannot read properties of null (reading 'address')". Build each as it runs
+  (`() => api(...)`).
+- **Testing Library's `rerender` drops `renderWithProviders`' providers** (they wrap the element,
+  not the `wrapper` option): "context from NextIntlClientProvider was not found". Change props from
+  a stateful harness instead.
+- **Zod 4 runs `.refine` after a failed `.min`**, so an empty field reported "required" and "invalid"
+  together. `.min(1, { message, abort: true })` stops there (2026-11-08).
+- **The React lint calls `Date.now()` impure during render**, server components included;
+  `new Date().getTime()` reads the same clock and passes. Read it once per render.
+- **A bash heredoc with nested quotes can break the shell** ("unexpected EOF while looking for
+  matching"), besides mangling non-ASCII: put such scripts in a file.
 
 ## Performance baselines
 
@@ -811,6 +944,14 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   public listing page unchanged at 167 KiB: its closures table renders on the server only.
 - 2026-11-04 (weekly hours copy, the same method): a listing step about 238.5 KiB, the closures
   page about 227.6 KiB, `/en/owner` 175 KiB. The shared copy section added about 1.5 KiB.
+- 2026-11-08 (booking, `performance.smoke.ts` on production builds): the public listing page 185
+  KiB at first, signed in with the picker or not, because the server page imported it; 169 KiB once
+  it loaded through `BookSpacePicker`, 185 KiB where it shows. A booking's page 210 KiB with zod for
+  the plate, 176 KiB with `contracts/plates`. `/en/bookings` 167 KiB, `/en/search` 172 KiB.
+- **Smoke tests that hold sign up a driver of their own** (`ownDriver`), never the shared account:
+  one hold per driver, and the suite runs in parallel. Inside `test.use({ storageState })`, a context
+  from `browser.newContext()` starts signed in too, so `ownDriver` passes an empty `storageState`;
+  without it the sign-up form never showed and the test timed out (2026-11-08).
 
 ## Translation notes
 
@@ -837,3 +978,6 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   singular) and "Οι ημερομηνίες αντιγράφηκαν…" (the dates, plural). The difference in number is
   deliberate: don't make them agree. They sit in one shared component and are read alone.
 - Language names are always shown in their own language (`LOCALE_ENDONYMS`).
+- **2026-11-08 · A stay is «στάθμευση» in Greek, not «παραμονή»** (which reads as a hotel stay), as
+  the catalogue already had it (`Listing.yourStay`, `spaceTotal`). The booking copy follows; a native
+  speaker may still prefer otherwise (progress.md).

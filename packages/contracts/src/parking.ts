@@ -77,8 +77,11 @@ interface Window {
   end?: string | undefined;
 }
 
-/** Shared rules for a parking window [start, end). Issue messages are catalog keys. */
-function checkWindow(window: Window, ctx: z.RefinementCtx) {
+/**
+ * Shared rules for a parking window [start, end), for search, the listing page and a booking.
+ * Issue messages are catalog keys.
+ */
+export function checkStayWindow(window: Window, ctx: z.RefinementCtx) {
   if (!window.start || !window.end) return;
   const start = Date.parse(window.start);
   const end = Date.parse(window.end);
@@ -131,7 +134,7 @@ export const ParkingSearchQuerySchema = z
     if (!query.area && !hasPosition) {
       ctx.addIssue({ code: 'custom', path: ['area'], message: message('locationRequired') });
     }
-    checkWindow(query, ctx);
+    checkStayWindow(query, ctx);
   });
 export type ParkingSearchQuery = z.infer<typeof ParkingSearchQuerySchema>;
 
@@ -142,7 +145,7 @@ export const ParkingListingQuerySchema = z
     if (Boolean(query.start) !== Boolean(query.end)) {
       ctx.addIssue({ code: 'custom', path: ['end'], message: message('invalid') });
     }
-    checkWindow(query, ctx);
+    checkStayWindow(query, ctx);
   });
 export type ParkingListingQuery = z.infer<typeof ParkingListingQuerySchema>;
 
@@ -248,6 +251,8 @@ export type HoursException = z.infer<typeof HoursExceptionSchema>;
 
 export const ParkingSpaceSchema = z
   .object({
+    /** What a booking names: the driver picks the space (decision #9). */
+    id: z.uuid(),
     label: z.string(),
     features: z.array(ParkingFeatureSchema),
     hourlyRate: MoneySchema,
@@ -263,8 +268,9 @@ export const ParkingAvailabilitySchema = z
     end: z.iso.datetime(),
     /** Open for the whole window. */
     open: z.boolean(),
+    /** Spaces no booking or hold takes during the window, nor the owner's gap after one. */
     freeSpaces: z.int().nonnegative(),
-    /** For the cheapest free space. */
+    /** For the cheapest free space; the cheapest space when none is free. */
     total: MoneySchema,
   })
   .register(contractsRegistry, { id: 'ParkingAvailability' });
@@ -302,12 +308,20 @@ export const ParkingListingDetailSchema = ParkingListingSummarySchema.extend({
   openingHours: z.array(OpeningPeriodSchema),
   /** Closures and special hours that have not ended, soonest first. The owner's notes stay out. */
   hoursExceptions: z.array(HoursExceptionSchema),
-  /** The first spaces in label order; `spaceCount` says how many there are in all. */
+  /**
+   * The first spaces in label order; `spaceCount` says how many there are in all. With a window,
+   * only the spaces free for it, so a garage whose first spaces are booked still offers the rest.
+   */
   spaces: z.array(ParkingSpaceSchema).max(LISTING_SPACES_LIMIT),
   photos: z.array(ListingPhotoSchema),
   priceRules: ListingPriceRulesSchema,
   cancellationPolicy: CancellationPolicySchema.nullable(),
   /** Present when the request named a window. */
   availability: ParkingAvailabilitySchema.nullable(),
+  /**
+   * Whether a driver can book here now. Until payments exist (Phase 4) only on a local run,
+   * where a booking is confirmed without one (decision #33).
+   */
+  bookingOpen: z.boolean(),
 }).register(contractsRegistry, { id: 'ParkingListingDetail' });
 export type ParkingListingDetail = z.infer<typeof ParkingListingDetailSchema>;

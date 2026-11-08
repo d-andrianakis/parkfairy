@@ -99,6 +99,41 @@
       "when": 1793723498851,
       "tag": "0013_hours_exceptions_closed_part",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794127492470,
+      "tag": "0014_bookings",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1794127503809,
+      "tag": "0015_bookings_no_overlap",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794147156292,
+      "tag": "0016_bookings_one_hold_per_user",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794147686777,
+      "tag": "0017_bookings_taken_by_listing",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794165783406,
+      "tag": "0018_bookings_hold_extensions",
+      "breakpoints": true
     }
   ]
 }

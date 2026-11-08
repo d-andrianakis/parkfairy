@@ -1,34 +1,14 @@
-import { client } from '@parkfairy/api-client';
 import { isValidationMessage } from '@parkfairy/contracts/validation';
 import { useTranslations } from 'next-intl';
+import type { ApiFailure, Outcome } from './api-call';
 import { useValidationMessage } from './use-validation-message';
 
-// Same-origin: Next.js proxies /api/v1/* to the API, so the session cookie travels with requests.
-client.setConfig({ baseUrl: '/api' });
-
-export interface OwnerFailure {
-  code?: string;
-  message?: string | string[];
-  /** Steps a submission still needs. */
-  missing?: string[];
-}
-
-export type Outcome<T> = { ok: true; data: T } | { ok: false; failure: OwnerFailure };
-
-/** Runs an API call; a network failure becomes the same kind of answer as a refusal. */
-export async function attempt<T>(
-  call: () => Promise<{ data?: T; error?: unknown; response?: Response }>,
-): Promise<Outcome<T>> {
-  try {
-    const { data, error, response } = await call();
-    if (error || !response?.ok) return { ok: false, failure: (error ?? {}) as OwnerFailure };
-    return { ok: true, data: data as T };
-  } catch {
-    return { ok: false, failure: {} };
-  }
-}
+export { attempt, type Outcome } from './api-call';
+export type OwnerFailure = ApiFailure;
 
 const KNOWN_CODES = [
+  'BOOKING_NOT_FOUND',
+  'BOOKING_STARTED',
   'FILE_TOO_LARGE',
   'FILE_TYPE_NOT_ALLOWED',
   'LISTING_INCOMPLETE',
@@ -58,6 +38,9 @@ export function useOwnerError() {
     const first = Array.isArray(failure.message) ? failure.message[0] : failure.message;
     if (failure.code === 'VALIDATION_FAILED' && isValidationMessage(first)) {
       return validation(first) ?? t('generic');
+    }
+    if (failure.code === 'LISTING_BOOKED' || failure.code === 'SPACES_BOOKED') {
+      return t(failure.code, { count: failure.bookings ?? 1 });
     }
     return isKnownCode(failure.code) ? t(failure.code) : t('generic');
   };

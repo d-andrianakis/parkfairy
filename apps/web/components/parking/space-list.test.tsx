@@ -7,6 +7,7 @@ import { SpaceList } from './space-list';
 
 const spaces = (count: number) =>
   Array.from({ length: count }, (_, i) => ({
+    id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
     label: `P${i + 1}`,
     features: [],
     hourlyRate: { amountMinor: 300, currency: 'EUR' as const },
@@ -32,6 +33,34 @@ function renderList(spaceCount: number, locale: 'el' | 'en' = 'en') {
 }
 
 describe('SpaceList', () => {
+  it('counts only free spaces past those shown when a stay was asked about', () => {
+    renderWithProviders(
+      <SpaceList
+        labelledBy="x"
+        freeSpaces={LISTING_SPACES_LIMIT + 2}
+        listing={{
+          spaces: spaces(LISTING_SPACES_LIMIT),
+          spaceCount: 300,
+          contentLocale: 'el',
+          spacePricesVary: false,
+        }}
+      />,
+    );
+    expect(screen.getByText('and 2 more free spaces')).toBeInTheDocument();
+  });
+
+  it('shows no empty list when nothing is free', () => {
+    renderWithProviders(
+      <SpaceList
+        labelledBy="x"
+        freeSpaces={0}
+        listing={{ spaces: [], spaceCount: 3, contentLocale: 'el', spacePricesVary: false }}
+      />,
+    );
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    expect(screen.queryByText(/more/)).not.toBeInTheDocument();
+  });
+
   it('shows each space’s price and total only where they differ', () => {
     const total = { amountMinor: 700, currency: 'EUR' as const };
     const priced = spaces(1).map((space) => ({ ...space, total }));

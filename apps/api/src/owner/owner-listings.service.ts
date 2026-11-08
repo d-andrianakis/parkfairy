@@ -41,9 +41,10 @@ import {
   type ProofKind,
 } from '@parkfairy/contracts';
 import { schema, type Database } from '@parkfairy/database';
-import { and, asc, count, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, inArray, lt, ne, not, or, sql } from 'drizzle-orm';
+import { strandedBookings, type HoursChange } from '../bookings/stranded.js';
 import { DB } from '../database/database.module.js';
-import { hoursOf, wallTime } from '../parking/opening-hours.js';
+import { hoursOf, wallTime, type DatedHours } from '../parking/opening-hours.js';
 import { OBJECT_STORE, type ObjectStore } from '../storage/object-store.js';
 import {
   cleanScan,
@@ -72,6 +73,7 @@ const rules = schema.parkingPriceRules;
 const discounts = schema.parkingStayDiscounts;
 const photo = schema.parkingPhotos;
 const proof = schema.parkingProofDocuments;
+const booking = schema.bookings;
 
 type ListingRow = typeof listing.$inferSelect;
 type ExceptionRow = typeof exception.$inferSelect;
@@ -134,7 +136,7 @@ export function safeFileName(name: string, contentType: OwnerProof['contentType'
 }
 
 /** The same days and the same hours; the owner's note doesn't matter. */
-const sameEntry = (a: ExceptionRow, b: ExceptionRow) =>
+const sameEntry = (a: DatedHours, b: DatedHours) =>
   a.startsOn === b.startsOn &&
   a.endsOn === b.endsOn &&
   a.opensMinute === b.opensMinute &&
@@ -318,6 +320,13 @@ export class OwnerListingsService {
   async remove(userId: string, id: string): Promise<void> {
     const { keys, storageKeys } = await this.edit(userId, id, async (tx, row) => {
       if (row.status !== 'draft') throw conflict('LISTING_LOCKED');
+      // Only a listing staff took back from live can have them; bookings are records to keep.
+      const [booked] = await tx
+        .select({ id: booking.id })
+        .from(booking)
+        .where(eq(booking.locationId, row.id))
+        .limit(1);
+      if (booked) throw conflict('LISTING_LOCKED');
       const [photos, proofs] = await Promise.all([
         this.photos(tx, row.id),
         tx.select({ key: proof.storageKey }).from(proof).where(eq(proof.locationId, row.id)),
@@ -349,24 +358,64 @@ export class OwnerListingsService {
     return this.progress(userId, id);
   }
 
-  /** Editable listings have no bookings yet, so the list can simply be replaced. */
+  /**
+   * The list replaces what is stored, matched by label: a space kept keeps its row, so a booking
+   * on it still points at it. A listing staff sent back after it was live can have bookings, so
+   * removing a space a booking or a running hold still takes is refused (`SPACES_BOOKED`); one with
+   * only past bookings goes, and they keep its label.
+   */
   async saveSpaces(
     userId: string,
     id: string,
     { spaces }: ListingSpacesInput,
   ): Promise<OwnerListingProgress> {
     await this.edit(userId, id, async (tx, row) => {
-      await tx.delete(space).where(eq(space.locationId, row.id));
-      await tx.insert(space).values(
-        spaces.map(({ label, features, hourlyRateMinor }) => ({
-          locationId: row.id,
-          label,
-          hourlyRateMinor,
-          isCovered: features.includes('covered'),
-          hasEvCharging: features.includes('evCharging'),
-          isAccessible: features.includes('accessible'),
-        })),
-      );
+      const kept = spaces.map(({ label }) => label);
+      const removed = (
+        await tx
+          .select({ id: space.id })
+          .from(space)
+          .where(and(eq(space.locationId, row.id), not(inArray(space.label, kept))))
+      ).map((gone) => gone.id);
+      if (removed.length > 0) {
+        const [taken] = await tx
+          .select({ value: count() })
+          .from(booking)
+          .where(
+            and(
+              inArray(booking.spaceId, removed),
+              or(
+                and(eq(booking.status, 'confirmed'), gt(booking.endsAt, sql`now()`)),
+                and(eq(booking.status, 'held'), gt(booking.holdExpiresAt, sql`now()`)),
+              ),
+            ),
+          );
+        if (taken && taken.value > 0) throw conflict('SPACES_BOOKED', { bookings: taken.value });
+        await tx.delete(space).where(inArray(space.id, removed));
+      }
+      await tx
+        .insert(space)
+        .values(
+          spaces.map(({ label, features, hourlyRateMinor }) => ({
+            locationId: row.id,
+            label,
+            hourlyRateMinor,
+            isCovered: features.includes('covered'),
+            hasEvCharging: features.includes('evCharging'),
+            isAccessible: features.includes('accessible'),
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [space.locationId, space.label],
+          set: {
+            hourlyRateMinor: sql`excluded.hourly_rate_minor`,
+            isCovered: sql`excluded.is_covered`,
+            hasEvCharging: sql`excluded.has_ev_charging`,
+            isAccessible: sql`excluded.is_accessible`,
+            isActive: true,
+            updatedAt: new Date(),
+          },
+        });
     });
     return this.progress(userId, id);
   }
@@ -377,15 +426,15 @@ export class OwnerListingsService {
     { periods }: ListingHoursInput,
   ): Promise<OwnerListingProgress> {
     await this.edit(userId, id, async (tx, row) => {
+      const week = periods.map(({ weekday, opens, closes }) => ({
+        weekday,
+        opensMinute: wallMinutes(opens),
+        closesMinute: wallMinutes(closes),
+      }));
+      // A listing sent back after it was live may have bookings its new week must keep open.
+      await this.refuseStranding(tx, { locationId: row.id, periods: week });
       await tx.delete(hours).where(eq(hours.locationId, row.id));
-      await tx.insert(hours).values(
-        periods.map(({ weekday, opens, closes }) => ({
-          locationId: row.id,
-          weekday,
-          opensMinute: wallMinutes(opens),
-          closesMinute: wallMinutes(closes),
-        })),
-      );
+      await tx.insert(hours).values(week.map((period) => ({ ...period, locationId: row.id })));
     });
     return this.progress(userId, id);
   }
@@ -393,8 +442,8 @@ export class OwnerListingsService {
   /**
    * Closures and special hours, whatever the status and with no new review (decision #24): they
    * only change when drivers can come. What is sent replaces what is stored, so entries that have
-   * ended go too; nobody sees them again. Phase 3 refuses this over a booking (decision #27), here,
-   * under the same lock.
+   * ended go too; nobody sees them again. Refused while it would close the listing over a booking
+   * (decision #27), checked under the same lock.
    */
   async saveHoursExceptions(
     userId: string,
@@ -405,21 +454,35 @@ export class OwnerListingsService {
       userId,
       id,
       async (tx, row) => {
+        const entries = exceptions.map(
+          ({ label, startsOn, endsOn, hours: open, closedHours: shut }) => ({
+            locationId: row.id,
+            label,
+            startsOn,
+            endsOn,
+            opensMinute: open ? wallMinutes(open.opens) : null,
+            closesMinute: open ? wallMinutes(open.closes) : null,
+            closedFromMinute: shut ? wallMinutes(shut.from) : null,
+            closedToMinute: shut ? wallMinutes(shut.to) : null,
+          }),
+        );
+        // Only the days whose entries change can strand a booking: those are all that is read.
+        const stored = await this.exceptionRows(
+          tx,
+          row.id,
+          zonedParts(new Date(), row.timeZone).date,
+        );
+        const changed = [
+          ...entries.filter((entry) => !stored.some((own) => sameEntry(own, entry))),
+          ...stored.filter((own) => !entries.some((entry) => sameEntry(own, entry))),
+        ];
+        await this.refuseStranding(tx, {
+          locationId: row.id,
+          exceptions: entries,
+          days: changed,
+        });
         await tx.delete(exception).where(eq(exception.locationId, row.id));
-        if (exceptions.length > 0) {
-          await tx.insert(exception).values(
-            exceptions.map(({ label, startsOn, endsOn, hours: open, closedHours: shut }) => ({
-              locationId: row.id,
-              label,
-              startsOn,
-              endsOn,
-              opensMinute: open ? wallMinutes(open.opens) : null,
-              closesMinute: open ? wallMinutes(open.closes) : null,
-              closedFromMinute: shut ? wallMinutes(shut.from) : null,
-              closedToMinute: shut ? wallMinutes(shut.to) : null,
-            })),
-          );
-        }
+        if (entries.length > 0) await tx.insert(exception).values(entries);
         return OwnerHoursExceptionsSchema.parse({
           exceptions: await this.hoursExceptions(tx, row),
         });
@@ -433,7 +496,8 @@ export class OwnerListingsService {
    * #29). One transaction, a handful of statements, each listing all or nothing: an entry a
    * listing already has, the same days and hours, counts as copied. Any other entry on one of those
    * days is a clash, and that listing is left as it was: which of the two the owner meant is
-   * theirs to say. The targets are locked in id order, so two copies at once can't deadlock.
+   * theirs to say. So is a listing they would close over a booking (`booked`, decision #27). The
+   * targets are locked in id order, so two copies at once can't deadlock.
    */
   async copyHoursExceptions(
     userId: string,
@@ -471,7 +535,7 @@ export class OwnerListingsService {
       }
 
       const result = new Map<string, CopyOutcome>();
-      const added: ExceptionRow[] = [];
+      const freshFor = new Map<string, ExceptionRow[]>();
       for (const target of targets) {
         const held = heldBy.get(target) ?? [];
         const fresh = entries.filter((entry) => !held.some((own) => sameEntry(own, entry)));
@@ -481,9 +545,26 @@ export class OwnerListingsService {
           result.set(target, 'full');
         } else {
           result.set(target, 'copied');
-          added.push(...fresh.map((entry) => ({ ...entry, locationId: target })));
+          freshFor.set(
+            target,
+            fresh.map((entry) => ({ ...entry, locationId: target })),
+          );
         }
       }
+      const stranded = await strandedBookings(
+        tx,
+        [...freshFor].map(([locationId, fresh]) => ({
+          locationId,
+          exceptions: [...(heldBy.get(locationId) ?? []), ...fresh],
+          // Entries are only added: their days are the ones that change.
+          days: fresh,
+        })),
+      );
+      for (const target of stranded.keys()) {
+        result.set(target, 'booked');
+        freshFor.delete(target);
+      }
+      const added = [...freshFor.values()].flat();
       if (added.length > 0) {
         await tx
           .insert(exception)
@@ -547,7 +628,13 @@ export class OwnerListingsService {
       // A listing that isn't theirs refuses the lot, with the same 404 as one that doesn't exist.
       if (locked.length !== targets.length) throw listingNotFound();
 
-      const open = locked.filter((row) => isEditable(row.status)).map((row) => row.id);
+      const editable = locked.filter((row) => isEditable(row.status)).map((row) => row.id);
+      // A listing sent back after it was live may have bookings the new week must keep open.
+      const stranded = await strandedBookings(
+        tx,
+        editable.map((locationId) => ({ locationId, periods: week })),
+      );
+      const open = editable.filter((locationId) => !stranded.has(locationId));
       if (open.length > 0) {
         await tx.delete(hours).where(inArray(hours.locationId, open));
         await tx
@@ -556,7 +643,13 @@ export class OwnerListingsService {
         await tx.update(listing).set({ updatedAt: new Date() }).where(inArray(listing.id, open));
       }
       return new Map(
-        locked.map((row) => [row.id, isEditable(row.status) ? 'copied' : 'locked'] as const),
+        locked.map(
+          (row) =>
+            [
+              row.id,
+              !isEditable(row.status) ? 'locked' : stranded.has(row.id) ? 'booked' : 'copied',
+            ] as const,
+        ),
       );
     });
     return OwnerHoursCopySchema.parse({
@@ -1088,6 +1181,12 @@ export class OwnerListingsService {
       const { name } = error as { name?: string };
       this.logger.error({ name, files: keys.length }, 'stored files not deleted');
     }
+  }
+
+  /** Refuses hours that would close the listing over a booking that hasn't ended (#27). */
+  private async refuseStranding(tx: Transaction, change: HoursChange): Promise<void> {
+    const stranded = (await strandedBookings(tx, [change])).get(change.locationId);
+    if (stranded) throw conflict('LISTING_BOOKED', { bookings: stranded });
   }
 
   /** The listing, if this user owns it. Anything else is the same 404. */

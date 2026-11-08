@@ -38,9 +38,14 @@ export function SiteHeader({ theme, signedIn }: { theme: Theme; signedIn: boolea
             <Link href="/owner">{t('listParking')}</Link>
           </Button>
           {signedIn ? (
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/account">{t('account')}</Link>
-            </Button>
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/bookings">{t('bookings')}</Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/account">{t('account')}</Link>
+              </Button>
+            </>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm">

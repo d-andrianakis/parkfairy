@@ -22,9 +22,11 @@ import {
 } from '../src/parking/parking.service.js';
 import { createTestApp, type TestApp } from './test-app.js';
 
-// Listings sit in Heraklion, far from every demo area, so seeded data never interferes.
-// The 000- prefix sorts them first, so the featured list (top 6 by slug) includes them.
-const HERE = { latitude: 35.3387, longitude: 25.1442 };
+// Listings sit in Rethymno, far from every demo area, so seeded data never interferes, and from
+// the owner suite's Heraklion, whose live listings pile up there run after run and, past search's
+// 50 results, would crowd these out. The 000- prefix sorts them first, so the featured list (top 6
+// by slug) includes them.
+const HERE = { latitude: 35.3655, longitude: 24.4823 };
 const PREFIX = '000-it-';
 const tag = randomUUID().slice(0, 8);
 const slug = (name: string) => `${PREFIX}${tag}-${name}`;

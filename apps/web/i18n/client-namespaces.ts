@@ -26,4 +26,8 @@ export const CLIENT_NAMESPACES = {
   owner: ['Owner', 'Validation', 'Forms', 'Features', 'Areas'],
   /** The search form's "use my location" button. */
   searchForm: ['SearchForm'],
+  /** The listing page's space picker: its button and refusals, no zod and no Validation. */
+  bookSpace: ['BookSpace', 'BookingErrors'],
+  /** A booking's page: the plate, confirming, letting go and cancelling. */
+  booking: ['Booking', 'BookingErrors', 'Validation', 'Forms'],
 } as const satisfies Record<string, readonly Namespace[]>;

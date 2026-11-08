@@ -9,7 +9,9 @@ import { CopyToListings, type OtherListing } from './copy-to-listings';
 export type { OtherListing };
 
 /** What a listing that kept its own dates is told, by why it kept them. */
-const KEPT_MESSAGE = { clash: 'copyClash', full: 'copyFull' } as const;
+const KEPT_MESSAGE = { clash: 'copyClash', full: 'copyFull', booked: 'copyBooked' } as const;
+type Kept = keyof typeof KEPT_MESSAGE;
+const isKept = (outcome: string): outcome is Kept => outcome in KEPT_MESSAGE;
 
 /**
  * Adds a listing's saved closures and special hours to the owner's other listings, any or all of
@@ -43,7 +45,7 @@ export function CopyHoursExceptions({
         unsaved: t('copyUnsaved'),
         done: (count) => t('copyDone', { count }),
         kept: (outcome, name, listing) =>
-          t.rich(KEPT_MESSAGE[outcome === 'clash' ? 'clash' : 'full'], {
+          t.rich(KEPT_MESSAGE[isKept(outcome) ? outcome : 'full'], {
             name,
             max: HOURS_EXCEPTIONS_MAX,
             listing,

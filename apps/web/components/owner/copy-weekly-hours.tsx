@@ -38,7 +38,8 @@ export function CopyWeeklyHours({
         copying: t('copying'),
         none: t('copyNone'),
         done: (count) => t('copyDone', { count }),
-        kept: (_outcome, name, listing) => t.rich('copyLocked', { name, listing }),
+        kept: (outcome, name, listing) =>
+          t.rich(outcome === 'booked' ? 'copyBooked' : 'copyLocked', { name, listing }),
         saving: t('copySaving'),
         notSaved: t('copyNotSaved'),
         savedDone: (count) => t('copySavedDone', { count }),

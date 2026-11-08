@@ -18,6 +18,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { FormError } from '@/components/form-error';
+import { BookingsLink } from './bookings-link';
 import { FormField } from '@/components/form-field';
 import { useAnnouncer } from '@/components/use-announcer';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
@@ -113,6 +114,8 @@ export function HoursExceptionsForm({
   const [rows, setRows] = useState<Row[]>(() => exceptions.map(toRow));
   const [errors, setErrors] = useState<Errors>({});
   const [failure, setFailure] = useState<string | null>(null);
+  // The refusal over bookings (#27), whose message gets the way to them while it shows.
+  const [bookedFailure, setBookedFailure] = useState<string | null>(null);
   const [state, setState] = useState<SaveState>('idle');
   /** How many entries are stored, and whether the page has changed since: what copying copies. */
   const [stored, setStored] = useState(exceptions.length);
@@ -194,7 +197,9 @@ export function HoursExceptionsForm({
     setState('saving');
     const outcome = await attempt(() => saveListingHoursExceptions({ path: { id }, body }));
     if (!outcome.ok) {
-      setFailure(ownerError(outcome.failure));
+      const text = ownerError(outcome.failure);
+      setFailure(text);
+      setBookedFailure(outcome.failure.code === 'LISTING_BOOKED' ? text : null);
       setState('idle');
       return;
     }
@@ -399,7 +404,9 @@ export function HoursExceptionsForm({
               {t('limit', { max: HOURS_EXCEPTIONS_MAX })}
             </p>
           )}
-          <FormError message={failure} />
+          <FormError message={failure}>
+            {failure && failure === bookedFailure ? <BookingsLink id={id} /> : null}
+          </FormError>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <SaveStatus state={state} />
             <Button

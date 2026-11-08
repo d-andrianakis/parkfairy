@@ -1,0 +1,2 @@
+ALTER TABLE "bookings" ADD COLUMN "hold_extensions" smallint DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_hold_extensions_check" CHECK ("bookings"."hold_extensions" between 0 and 10);

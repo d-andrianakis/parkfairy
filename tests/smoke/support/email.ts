@@ -24,14 +24,24 @@ export async function emailsTo(address: string): Promise<SentEmail[]> {
   return emails.filter((email) => email.to === address);
 }
 
-/** The newest email with this subject, waiting for it: emails go out after the response. */
-export async function waitForEmail(address: string, subject: string): Promise<SentEmail> {
+/**
+ * The newest email with this subject, waiting for it: emails go out after the response. The
+ * worker's go out on its next send, every 30 seconds, so those need a longer `timeout`.
+ */
+export async function waitForEmail(
+  address: string,
+  subject: string,
+  { timeout }: { timeout?: number } = {},
+): Promise<SentEmail> {
   let found: SentEmail | undefined;
   await expect
-    .poll(async () => {
-      found = (await emailsTo(address)).findLast((email) => email.subject === subject);
-      return found?.subject;
-    })
+    .poll(
+      async () => {
+        found = (await emailsTo(address)).findLast((email) => email.subject === subject);
+        return found?.subject;
+      },
+      { timeout },
+    )
     .toBe(subject);
   return found as SentEmail;
 }

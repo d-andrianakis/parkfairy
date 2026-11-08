@@ -17,6 +17,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRef, useState, type FormEvent } from 'react';
 import { FormError } from '@/components/form-error';
+import { BookingsLink } from './bookings-link';
 import { FormField } from '@/components/form-field';
 import { useAnnouncer } from '@/components/use-announcer';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
@@ -71,6 +72,8 @@ export function SpacesForm({ listing }: { listing: OwnerListing }) {
   const [groupErrors, setGroupErrors] = useState<{ from?: string; count?: string }>({});
   const [rowErrors, setRowErrors] = useState<RowErrors>({});
   const [failure, setFailure] = useState<string | null>(null);
+  // The refusal over bookings (#27), whose message gets the way to them while it shows.
+  const [bookedFailure, setBookedFailure] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   function addGroup() {
@@ -149,7 +152,9 @@ export function SpacesForm({ listing }: { listing: OwnerListing }) {
       saveListingSpaces({ path: { id: listing.id }, body: { spaces } }),
     );
     if (!outcome.ok) {
-      setFailure(ownerError(outcome.failure));
+      const text = ownerError(outcome.failure);
+      setFailure(text);
+      setBookedFailure(outcome.failure.code === 'SPACES_BOOKED' ? text : null);
       setSaving(false);
       return;
     }
@@ -282,7 +287,9 @@ export function SpacesForm({ listing }: { listing: OwnerListing }) {
             ))}
           </ul>
         </section>
-        <FormError message={failure} />
+        <FormError message={failure}>
+          {failure && failure === bookedFailure ? <BookingsLink id={listing.id} /> : null}
+        </FormError>
         <StepActions saving={saving} onLater={() => void save('later')} />
       </FieldGroup>
     </form>

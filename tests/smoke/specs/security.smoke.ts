@@ -145,6 +145,23 @@ test.describe('signed in', () => {
     expect(await hoursCopied.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
   });
 
+  test('bookings cannot be made or changed from another site', async ({ page }) => {
+    await page.goto('/en');
+    const headers = { origin: 'https://evil.example' };
+    const id = '11111111-1111-4111-8111-111111111111';
+    const writes: [string, unknown][] = [
+      ['/api/v1/bookings', { listing: 'syntagma-square-garage', spaceId: id, start: '', end: '' }],
+      [`/api/v1/bookings/${id}/confirm`, { vehiclePlate: 'IKB1234' }],
+      [`/api/v1/bookings/${id}/cancel`, {}],
+      [`/api/v1/owner/listings/${id}/bookings/${id}/cancel`, {}],
+    ];
+    for (const [path, data] of writes) {
+      const response = await page.request.post(path, { headers, data });
+      expect(response.status(), path).toBe(403);
+      expect(await response.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
+    }
+  });
+
   test('sign-in ignores off-site return URLs', async ({ page }) => {
     await page.goto('/en/sign-in?next=//evil.example/phish');
     await expect(page).toHaveURL('/en/account');

@@ -159,6 +159,26 @@ describe('CopyHoursExceptions', () => {
     expect(within(status).getByText('Unnamed listing')).not.toHaveAttribute('lang');
   });
 
+  it('names a listing it would close over bookings (decision #27)', async () => {
+    copy.mockResolvedValue(
+      answer({
+        results: [
+          { id: PIRAEUS, outcome: 'booked' },
+          { id: HARBOUR, outcome: 'copied' },
+        ],
+      }) as never,
+    );
+    show();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'All your other listings' }));
+    await userEvent.click(copyButton());
+    const status = (await screen.findByText('Dates copied to 1 listing')).closest(
+      '[role="status"]',
+    ) as HTMLElement;
+    expect(status).toHaveTextContent(
+      'Not copied to “Γκαράζ Πειραιά”: drivers are booked on those days. Cancel their bookings first.',
+    );
+  });
+
   it('translates a refusal from the server', async () => {
     copy.mockResolvedValue(refusal('LISTING_NOT_FOUND', 404) as never);
     show();

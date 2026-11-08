@@ -21,24 +21,19 @@ import {
   type ParkingSearchResult,
 } from '@parkfairy/contracts';
 import { schema, type Database, type GeoPoint } from '@parkfairy/database';
-import { and, asc, eq, exists, gte, inArray, lte, not, or, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, inArray, not, or, sql } from 'drizzle-orm';
+import { ENV } from '../config/config.module.js';
+import type { Env } from '../config/env.js';
 import { DB } from '../database/database.module.js';
-import {
-  hoursOf,
-  isOpenThroughout,
-  wallTime,
-  weekNeeded,
-  type DatedHours,
-  type OpeningPeriod,
-} from './opening-hours.js';
+import { takenSpaceIds } from './availability.js';
+import { hoursExceptionsOf, openingHoursOf, priceRulesOf, utcDay } from './listing-data.js';
+import { hoursOf, isOpenThroughout, wallTime, weekNeeded } from './opening-hours.js';
 import { NO_PRICE_RULES, quoteStayMinor, type PriceRules } from './pricing.js';
 
 const listing = schema.parkingLocations;
 const space = schema.parkingSpaces;
 const hours = schema.parkingOpeningHours;
 const exception = schema.parkingHoursExceptions;
-const rules = schema.parkingPriceRules;
-const discounts = schema.parkingStayDiscounts;
 const photo = schema.parkingPhotos;
 
 const FEATURED_LIMIT = 6;
@@ -70,11 +65,14 @@ const listingColumns = {
 type FeatureFlags = Record<ParkingFeature, boolean>;
 
 interface SpaceStats extends FeatureFlags {
+  /** Active spaces, free or not. */
   spaceCount: number;
-  /** Lowest and highest of the spaces' own rates; null when none has one. */
+  /** Of those, the ones free for the window asked about (all of them without one). */
+  freeCount: number;
+  /** Lowest and highest of the free spaces' own rates; null when none has one. */
   minOwnRate: number | null;
   maxOwnRate: number | null;
-  /** Spaces on the listing's rate. */
+  /** Free spaces on the listing's rate. */
   atListingRate: number;
 }
 
@@ -97,6 +95,7 @@ interface ListingRow {
 
 const NO_SPACES: SpaceStats = {
   spaceCount: 0,
+  freeCount: 0,
   covered: false,
   evCharging: false,
   accessible: false,
@@ -109,14 +108,11 @@ function features(flags: FeatureFlags): ParkingFeature[] {
   return PARKING_FEATURES.filter((feature) => flags[feature]);
 }
 
-/** The UTC calendar day of an instant: within a day of the local one, whatever the zone. */
-const utcDay = (instant: Date) => instant.toISOString().slice(0, 10);
-
 function money(amountMinor: number, currency: string): Money {
   return { amountMinor, currency: currency as Money['currency'] };
 }
 
-/** The cheapest rate among the spaces, and whether any two differ. */
+/** The cheapest rate among the (free) spaces, and whether any two differ. */
 function spaceRates(row: ListingRow, stats: SpaceStats) {
   const own = [stats.minOwnRate, stats.maxOwnRate].filter((rate) => rate !== null);
   const all = stats.atListingRate > 0 ? [...own, row.hourlyRateMinor] : own;
@@ -141,6 +137,18 @@ function summary(
   });
 }
 
+/** Rate statistics of some spaces, as `spaceRates` reads them. */
+function rateStats(
+  spaces: { ownRate: number | null }[],
+): Pick<SpaceStats, 'minOwnRate' | 'maxOwnRate' | 'atListingRate'> {
+  const own = spaces.flatMap((s) => (s.ownRate === null ? [] : [s.ownRate]));
+  return {
+    minOwnRate: own.length > 0 ? Math.min(...own) : null,
+    maxOwnRate: own.length > 0 ? Math.max(...own) : null,
+    atListingRate: spaces.length - own.length,
+  };
+}
+
 function total(
   row: ListingRow,
   priceRules: PriceRules,
@@ -163,7 +171,10 @@ const published = sql`${listing.status} = 'published'`;
 
 @Injectable()
 export class ParkingService {
-  constructor(@Inject(DB) private readonly db: Database) {}
+  constructor(
+    @Inject(DB) private readonly db: Database,
+    @Inject(ENV) private readonly env: Pick<Env, 'bookingWithoutPayment'>,
+  ) {}
 
   private hasActiveSpace() {
     return exists(
@@ -172,6 +183,17 @@ export class ParkingService {
         .from(space)
         .where(and(eq(space.locationId, listing.id), sql`${space.isActive}`)),
     );
+  }
+
+  /**
+   * Whether some active space has no booking or running hold in the window (gap included): more
+   * active spaces than active spaces taken, in one probe of the listing's bookings. Probing each
+   * space instead made a full garage, the very thing at peak hours, cost hundreds of them.
+   */
+  private hasFreeSpace(window: Window) {
+    return sql`(select count(*) from ${space} s where s.location_id = ${listing.id} and s.is_active)
+      > (select count(distinct t.space_id) from (${takenSpaceIds(listing.id, window, listing.bookingGapMinutes)}) t
+        join ${space} taken on taken.id = t.space_id and taken.is_active)`;
   }
 
   /**
@@ -258,7 +280,7 @@ export class ParkingService {
           and(
             published,
             sql`ST_DWithin(${listing.location}, ${point}, ${SEARCH_RADIUS_METERS})`,
-            this.hasActiveSpace(),
+            this.hasFreeSpace(window),
             not(this.closedAllDayDuring(window)),
             or(this.exceptionDuring(window), this.weekCovers(window)),
           ),
@@ -272,10 +294,10 @@ export class ParkingService {
 
       const ids = rows.map((row) => row.id);
       const [periods, exceptions, stats, priceRules, covers] = await Promise.all([
-        this.openingHours(ids),
-        this.hoursExceptions(ids, firstDay, lastDay),
-        this.spaceStats(ids),
-        this.priceRules(ids),
+        openingHoursOf(this.db, ids),
+        hoursExceptionsOf(this.db, ids, firstDay, lastDay),
+        this.spaceStats(ids, window),
+        priceRulesOf(this.db, ids, { parallel: true }),
         this.coverPhotos(ids),
       ]);
       for (const row of rows) {
@@ -289,13 +311,14 @@ export class ParkingService {
         );
         if (!open) continue;
         const spaceStats = stats.get(row.id) ?? NO_SPACES;
+        // A booking made between the two reads; the next search won't show it.
+        if (spaceStats.freeCount === 0) continue;
         const { lowest } = spaceRates(row, spaceStats);
         results.push(
           ParkingSearchResultSchema.parse({
             ...summary(row, spaceStats, covers.get(row.id) ?? null),
             distanceMeters: row.distanceMeters,
-            // Every active space is free until bookings exist (Phase 3 subtracts overlapping ones).
-            freeSpaces: spaceStats.spaceCount,
+            freeSpaces: spaceStats.freeCount,
             total: total(row, priceRules.get(row.id) ?? NO_PRICE_RULES, lowest, window),
           }),
         );
@@ -313,19 +336,22 @@ export class ParkingService {
         description: listing.description,
         location: listing.location,
         cancellationPolicy: listing.cancellationPolicy,
+        bookingGapMinutes: listing.bookingGapMinutes,
       })
       .from(listing)
       .where(and(published, eq(listing.slug, slug)))) as (ListingRow & {
       description: string | null;
       location: GeoPoint;
       cancellationPolicy: string | null;
+      bookingGapMinutes: number;
     })[];
     if (!row) return null;
 
     const today = zonedParts(new Date(), row.timeZone).date;
-    const [spaces, periodsById, exceptionsById, priceRulesById, photos] = await Promise.all([
+    const [spaces, taken, periodsById, exceptionsById, priceRulesById, photos] = await Promise.all([
       this.db
         .select({
+          id: space.id,
           label: space.label,
           covered: space.isCovered,
           evCharging: space.hasEvCharging,
@@ -334,10 +360,15 @@ export class ParkingService {
         })
         .from(space)
         .where(and(eq(space.locationId, row.id), sql`${space.isActive}`)),
-      this.openingHours([row.id]),
+      window
+        ? this.db.execute<{ space_id: string }>(
+            takenSpaceIds(sql`${row.id}`, window, sql`${row.bookingGapMinutes}`),
+          )
+        : Promise.resolve({ rows: [] }),
+      openingHoursOf(this.db, [row.id]),
       // From yesterday: a window may start in the half hour that began before midnight.
-      this.hoursExceptions([row.id], addDays(today, -1)),
-      this.priceRules([row.id]),
+      hoursExceptionsOf(this.db, [row.id], addDays(today, -1)),
+      priceRulesOf(this.db, [row.id], { parallel: true }),
       this.db
         .select({
           key: photo.key,
@@ -351,20 +382,24 @@ export class ParkingService {
         .orderBy(asc(photo.position), asc(photo.createdAt)),
     ]);
     spaces.sort((a, b) => labels.compare(a.label, b.label));
+    const takenIds = new Set(taken.rows.map((t) => t.space_id));
+    const freeSpaces = spaces.filter((s) => !takenIds.has(s.id));
     const periods = periodsById.get(row.id) ?? [];
     const exceptions = exceptionsById.get(row.id) ?? [];
     const priceRules = priceRulesById.get(row.id) ?? NO_PRICE_RULES;
-    const ownRates = spaces.flatMap((s) => (s.ownRate === null ? [] : [s.ownRate]));
     const stats: SpaceStats = {
       spaceCount: spaces.length,
+      freeCount: freeSpaces.length,
       covered: spaces.some((s) => s.covered),
       evCharging: spaces.some((s) => s.evCharging),
       accessible: spaces.some((s) => s.accessible),
-      minOwnRate: ownRates.length > 0 ? Math.min(...ownRates) : null,
-      maxOwnRate: ownRates.length > 0 ? Math.max(...ownRates) : null,
-      atListingRate: spaces.length - ownRates.length,
+      ...rateStats(spaces),
     };
-    const { lowest } = spaceRates(row, stats);
+    // The total quoted is the cheapest free space's; with none free, the cheapest space's.
+    const { lowest } = spaceRates(
+      row,
+      freeSpaces.length > 0 ? { ...stats, ...rateStats(freeSpaces) } : stats,
+    );
 
     return ParkingListingDetailSchema.parse({
       ...summary(row, stats, photos[0] ?? null),
@@ -388,7 +423,9 @@ export class ParkingService {
           endsOn: dated.endsOn,
           ...hoursOf(dated),
         })),
-      spaces: spaces.slice(0, LISTING_SPACES_LIMIT).map((s) => ({
+      // With a window, the free ones: a garage whose first 48 are booked still offers the rest.
+      spaces: (window ? freeSpaces : spaces).slice(0, LISTING_SPACES_LIMIT).map((s) => ({
+        id: s.id,
         label: s.label,
         features: features(s),
         hourlyRate: money(s.ownRate ?? row.hourlyRateMinor, row.currency),
@@ -399,10 +436,11 @@ export class ParkingService {
             start: window.start.toISOString(),
             end: window.end.toISOString(),
             open: isOpenThroughout(periods, window.start, window.end, row.timeZone, exceptions),
-            freeSpaces: spaces.length,
+            freeSpaces: freeSpaces.length,
             total: total(row, priceRules, lowest, window),
           }
         : null,
+      bookingOpen: this.env.bookingWithoutPayment,
     });
   }
 
@@ -448,130 +486,39 @@ export class ParkingService {
     return new Map(rows.map(({ locationId, ...cover }) => [locationId, cover]));
   }
 
-  /** Each listing's price rules, for the quote and the listing page. */
-  private async priceRules(locationIds: string[]): Promise<Map<string, PriceRules>> {
-    const byLocation = new Map<string, PriceRules>();
-    if (locationIds.length === 0) return byLocation;
-    const entry = (locationId: string) => {
-      let found = byLocation.get(locationId);
-      if (!found) {
-        found = { weekendRateMinor: null, night: null, dated: [], discounts: [] };
-        byLocation.set(locationId, found);
-      }
-      return found;
-    };
-    const [ruleRows, discountRows] = await Promise.all([
-      this.db
-        .select()
-        .from(rules)
-        .where(inArray(rules.locationId, locationIds))
-        .orderBy(asc(rules.startsOn)),
-      this.db
-        .select({
-          locationId: discounts.locationId,
-          minDays: discounts.minDays,
-          percent: discounts.percent,
-        })
-        .from(discounts)
-        .where(inArray(discounts.locationId, locationIds))
-        .orderBy(asc(discounts.minDays)),
-    ]);
-    for (const rule of ruleRows) {
-      const target = entry(rule.locationId);
-      if (rule.kind === 'weekend') target.weekendRateMinor = rule.hourlyRateMinor;
-      else if (rule.kind === 'night' && rule.fromMinute !== null && rule.toMinute !== null) {
-        target.night = {
-          rateMinor: rule.hourlyRateMinor,
-          fromMinute: rule.fromMinute,
-          toMinute: rule.toMinute,
-        };
-      } else if (rule.kind === 'dated' && rule.startsOn && rule.endsOn) {
-        target.dated.push({
-          startsOn: rule.startsOn,
-          endsOn: rule.endsOn,
-          rateMinor: rule.hourlyRateMinor,
-        });
-      }
-    }
-    for (const { locationId, minDays, percent } of discountRows) {
-      entry(locationId).discounts.push({ minDays, percent });
-    }
-    return byLocation;
-  }
-
-  /** Active-space count and features per listing, for the given listings only. */
-  private async spaceStats(locationIds: string[]): Promise<Map<string, SpaceStats>> {
-    if (locationIds.length === 0) return new Map();
-    const rows = await this.db
-      .select({
-        locationId: space.locationId,
-        spaceCount: sql<number>`count(*)::int`,
-        covered: sql<boolean>`bool_or(${space.isCovered})`,
-        evCharging: sql<boolean>`bool_or(${space.hasEvCharging})`,
-        accessible: sql<boolean>`bool_or(${space.isAccessible})`,
-        minOwnRate: sql<number | null>`min(${space.hourlyRateMinor})::int`,
-        maxOwnRate: sql<number | null>`max(${space.hourlyRateMinor})::int`,
-        atListingRate: sql<number>`(count(*) - count(${space.hourlyRateMinor}))::int`,
-      })
-      .from(space)
-      .where(and(inArray(space.locationId, locationIds), sql`${space.isActive}`))
-      .groupBy(space.locationId);
-    return new Map(rows.map(({ locationId, ...stats }) => [locationId, stats]));
-  }
-
-  /** Closures and special hours that touch the days from `from` (to `to`), soonest first. */
-  private async hoursExceptions(
+  /**
+   * Active-space count and features per listing, and with a window which of them are free: the
+   * rates come from the free ones, since search quotes "from" the cheapest free space (#17). The
+   * taken spaces come from one probe per listing, joined once, never a lookup per space per
+   * aggregate.
+   */
+  private async spaceStats(
     locationIds: string[],
-    from: string,
-    to?: string,
-  ): Promise<Map<string, DatedHours[]>> {
-    const byLocation = new Map<string, DatedHours[]>();
-    if (locationIds.length === 0) return byLocation;
-    const rows = await this.db
-      .select({
-        locationId: exception.locationId,
-        startsOn: exception.startsOn,
-        endsOn: exception.endsOn,
-        opensMinute: exception.opensMinute,
-        closesMinute: exception.closesMinute,
-        closedFromMinute: exception.closedFromMinute,
-        closedToMinute: exception.closedToMinute,
-      })
-      .from(exception)
-      .where(
-        and(
-          inArray(exception.locationId, locationIds),
-          gte(exception.endsOn, from),
-          to === undefined ? undefined : lte(exception.startsOn, to),
-        ),
-      )
-      .orderBy(asc(exception.startsOn));
-    for (const { locationId, ...dated } of rows) {
-      const list = byLocation.get(locationId);
-      if (list) list.push(dated);
-      else byLocation.set(locationId, [dated]);
-    }
-    return byLocation;
-  }
-
-  private async openingHours(locationIds: string[]): Promise<Map<string, OpeningPeriod[]>> {
-    const byLocation = new Map<string, OpeningPeriod[]>();
-    if (locationIds.length === 0) return byLocation;
-    const rows = await this.db
-      .select({
-        locationId: hours.locationId,
-        weekday: hours.weekday,
-        opensMinute: hours.opensMinute,
-        closesMinute: hours.closesMinute,
-      })
-      .from(hours)
-      .where(inArray(hours.locationId, locationIds))
-      .orderBy(asc(hours.weekday), asc(hours.opensMinute));
-    for (const { locationId, ...period } of rows) {
-      const list = byLocation.get(locationId);
-      if (list) list.push(period);
-      else byLocation.set(locationId, [period]);
-    }
-    return byLocation;
+    window?: Window,
+  ): Promise<Map<string, SpaceStats>> {
+    if (locationIds.length === 0) return new Map();
+    const taken = window
+      ? sql`select distinct t.space_id from ${listing} l
+          cross join lateral (${takenSpaceIds(sql`l.id`, window, sql`l.booking_gap_minutes`)}) t
+          where l.id in ${locationIds}`
+      : sql`select null::uuid as space_id where false`;
+    const { rows } = await this.db.execute<
+      SpaceStats & { locationId: string } & Record<string, unknown>
+    >(sql`
+      select s.location_id as "locationId",
+        count(*)::int as "spaceCount",
+        (count(*) filter (where t.space_id is null))::int as "freeCount",
+        bool_or(s.is_covered) as "covered",
+        bool_or(s.has_ev_charging) as "evCharging",
+        bool_or(s.is_accessible) as "accessible",
+        (min(s.hourly_rate_minor) filter (where t.space_id is null))::int as "minOwnRate",
+        (max(s.hourly_rate_minor) filter (where t.space_id is null))::int as "maxOwnRate",
+        (count(*) filter (where t.space_id is null and s.hourly_rate_minor is null))::int
+          as "atListingRate"
+      from ${space} s
+      left join (${taken}) t on t.space_id = s.id
+      where s.location_id in ${locationIds} and s.is_active
+      group by s.location_id`);
+    return new Map(rows.map(({ locationId, ...stats }) => [locationId, stats]));
   }
 }

@@ -15,6 +15,12 @@ export const OUTBOX_EMAIL_KINDS = [
   'listing-approved',
   'listing-changes-requested',
   'onboarding-reminder',
+  // To the driver.
+  'booking-confirmed',
+  'booking-cancelled',
+  // To the listing's owner.
+  'booking-received',
+  'booking-cancelled-by-driver',
 ] as const;
 export type OutboxEmailKind = (typeof OUTBOX_EMAIL_KINDS)[number];
 
@@ -24,9 +30,30 @@ export type OutboxStatus = (typeof OUTBOX_STATUSES)[number];
 /** `'a', 'b'` list for CHECK constraints built from trusted constants (never user input). */
 const sqlList = (values: readonly string[]) => sql.raw(values.map((v) => `'${v}'`).join(', '));
 
+/** A booking as its emails show it: no names of people, no plate, nothing the reader didn't see. */
+export interface OutboxBooking {
+  id: string;
+  listingId: string;
+  reference: string;
+  /** The listing's address, public on its page. */
+  address: string | null;
+  contentLocale: string;
+  spaceLabel: string;
+  /** ISO instants, written out in the reader's language when sending. */
+  start: string;
+  end: string;
+  timeZone: string;
+  totalMinor: number;
+  currency: string;
+  /** Cancellations only. */
+  refundMinor?: number;
+  cancelledBy?: 'driver' | 'owner';
+}
+
 /** What the templates may show. `listingName` is the owner's own text, about their own listing. */
 export interface OutboxPayload {
   listingName?: string;
+  booking?: OutboxBooking;
 }
 
 export const emailOutbox = pgTable(

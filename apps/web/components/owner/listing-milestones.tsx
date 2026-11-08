@@ -14,11 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@parkfairy/ui/components/card';
-import { CalendarX, CircleAlert, ImageOff } from 'lucide-react';
+import { CalendarCheck, CalendarX, CircleAlert, ImageOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
-import { closuresHref } from '@/lib/owner-href';
+import { closuresHref, ownerBookingsHref } from '@/lib/owner-href';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 import { DeleteDraftButton } from './listing-actions';
 import { StepLink } from './navigation';
@@ -138,6 +138,20 @@ export function ListingMilestones({ listing }: { listing: OwnerListingProgress }
             {listing.status === 'published' && listing.slug ? (
               <Button asChild variant="outline" size="sm" className={WRAPPING_BUTTON}>
                 <Link href={`/parking/${listing.slug}`}>{t('dashboard.viewLive', { name })}</Link>
+              </Button>
+            ) : null}
+            {/* Once sent in: a listing staff sent back may have bookings from when it was live. */}
+            {listing.status !== 'draft' ? (
+              <Button asChild variant="outline" size="sm" className={WRAPPING_BUTTON}>
+                <Link href={ownerBookingsHref(listing.id)}>
+                  <CalendarCheck aria-hidden />
+                  <span>
+                    {t.rich('dashboard.bookings', {
+                      name,
+                      listing: (chunks) => <span lang={nameLang}>{chunks}</span>,
+                    })}
+                  </span>
+                </Link>
               </Button>
             ) : null}
             {/* Whatever the status: closures need no review (decision #24). */}

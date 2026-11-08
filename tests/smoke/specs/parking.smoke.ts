@@ -108,7 +108,9 @@ test.describe('with demo listings', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveAttribute('lang', 'el');
     await expect(page.getByText('Σύνολο 8,75 €')).toBeVisible();
     await expect(page.getByRole('table', { name: 'Ωράριο λειτουργίας' })).toBeVisible();
-    await expect(page.getByRole('list', { name: 'Θέσεις' }).locator(':scope > li')).toHaveCount(12);
+    // Named by the section's heading: "Choose your space" where booking is taken (a local run).
+    const spaces = page.getByRole('list', { name: /^(Θέσεις|Επιλέξτε θέση)$/ });
+    await expect(spaces.locator(':scope > li')).toHaveCount(12);
     // Focus moved to the new page's content (client-side navigation).
     await expect(page.locator('#main-content')).toBeFocused();
     await expectAccessible(page); // listing with an open stay

@@ -65,6 +65,8 @@ export const VALIDATION_MESSAGES = [
   'closedTimeOrder',
   'dateRequired',
   'lastDayBeforeFirst',
+  'plateRequired',
+  'plateInvalid',
 ] as const;
 export type ValidationMessage = (typeof VALIDATION_MESSAGES)[number];
 
@@ -83,6 +85,15 @@ export const MAX_START_AHEAD_DAYS = 365;
 export const HOURS_EXCEPTIONS_MAX = 30;
 /** Closures and special hours past this reach no stay: the latest starts and lasts its 30 days. */
 export const HOURS_EXCEPTION_AHEAD_DAYS = MAX_START_AHEAD_DAYS + MAX_BOOKING_DAYS;
+
+/** How long a space is kept for a driver while they confirm (decision #3). */
+export const HOLD_MINUTES = 10;
+/**
+ * How often a driver may keep a hold for another HOLD_MINUTES. Confirming works only while the hold
+ * runs (decision #37), so the time limit must be extendable (WCAG 2.2.1), at least ten times; and
+ * no more, so a space isn't kept from others for long.
+ */
+export const HOLD_MAX_EXTENSIONS = 10;
 
 /** Typed helper so schemas can only reference keys that exist in the catalogs. */
 export const message = <K extends ValidationMessage>(key: K): K => key;

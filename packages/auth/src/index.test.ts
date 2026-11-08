@@ -11,6 +11,7 @@ import {
   AUTH_COOKIE_PREFIX,
   createAuth,
   INVALID_LOCALE,
+  INVALID_NAME,
   memoryRateLimitStorage,
   parseOrigins,
   type AuthEmail,
@@ -325,6 +326,29 @@ describe('createAuth', () => {
       await expect(userHooks?.update?.before?.({ locale: 42 })).rejects.toMatchObject({
         body: { code: INVALID_LOCALE },
       });
+    });
+
+    it('holds a changed name to the sign-up rules, since owners see it', async () => {
+      const bad = [
+        'x'.repeat(101),
+        'Support' + String.fromCharCode(10) + 'call us',
+        ' padded ',
+        '',
+        'NUL' + String.fromCharCode(0),
+      ];
+      for (const name of bad) {
+        await expect(
+          userHooks?.update?.before?.({ name }),
+          JSON.stringify(name),
+        ).rejects.toMatchObject({
+          body: { code: INVALID_NAME },
+        });
+      }
+      await expect(userHooks?.update?.before?.({ name: 'Δήμητρα Οδηγού' })).resolves.toEqual({
+        data: { name: 'Δήμητρα Οδηγού' },
+      });
+      // Updates that don't touch the name pass as before.
+      await expect(userHooks?.update?.before?.({ emailVerified: true })).resolves.toBeTruthy();
     });
   });
 });

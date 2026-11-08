@@ -583,9 +583,10 @@ export type ListingHoursExceptionsCopyInput = z.infer<typeof ListingHoursExcepti
 
 /**
  * What became of each listing: `copied` (entries it already had count as copied), `clash` (it has
- * other hours on one of those days, so nothing was added) or `full` (no room for them all).
+ * other hours on one of those days, so nothing was added), `full` (no room for them all) or
+ * `booked` (they would close it while a driver is booked, decision #27).
  */
-export const HOURS_EXCEPTIONS_COPY_OUTCOMES = ['copied', 'clash', 'full'] as const;
+export const HOURS_EXCEPTIONS_COPY_OUTCOMES = ['copied', 'clash', 'full', 'booked'] as const;
 export const OwnerHoursExceptionsCopySchema = z
   .object({
     results: z.array(z.object({ id: z.uuid(), outcome: z.enum(HOURS_EXCEPTIONS_COPY_OUTCOMES) })),
@@ -600,10 +601,11 @@ export const ListingHoursCopyInputSchema = copyTargets().register(contractsRegis
 export type ListingHoursCopyInput = z.infer<typeof ListingHoursCopyInputSchema>;
 
 /**
- * What became of each listing: `copied` (its week replaced by this one's) or `locked` (staff
- * have it or it is live, so its hours stay as they were checked).
+ * What became of each listing: `copied` (its week replaced by this one's), `locked` (staff
+ * have it or it is live, so its hours stay as they were checked) or `booked` (the week would
+ * close it while a driver is booked; a listing sent back may have bookings from when it was live).
  */
-export const HOURS_COPY_OUTCOMES = ['copied', 'locked'] as const;
+export const HOURS_COPY_OUTCOMES = ['copied', 'locked', 'booked'] as const;
 export const OwnerHoursCopySchema = z
   .object({
     results: z.array(z.object({ id: z.uuid(), outcome: z.enum(HOURS_COPY_OUTCOMES) })),

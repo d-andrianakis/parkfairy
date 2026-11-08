@@ -1,5 +1,6 @@
 import {
   claimDueEmails,
+  type ClaimedEmail,
   countOverdueEmails,
   enqueueListingStatusEmails,
   enqueueOnboardingReminders,
@@ -7,7 +8,16 @@ import {
   markEmailSent,
   purgeSentEmails,
 } from '@parkfairy/database';
-import { OWNER_EMAIL_KINDS, renderOwnerEmail, type OwnerEmailLocale } from '@parkfairy/email';
+import {
+  BOOKING_EMAIL_KINDS,
+  OWNER_EMAIL_KINDS,
+  renderBookingEmail,
+  renderOwnerEmail,
+  type BookingEmailKind,
+  type OutgoingEmail,
+  type OwnerEmailKind,
+  type OwnerEmailLocale,
+} from '@parkfairy/email';
 import { QUEUES, type QueueProcessor } from '../queues.js';
 
 const MINUTE_MS = 60_000;
@@ -20,10 +30,40 @@ export const SENT_EMAIL_DAYS = 90;
 /** Each run; Resend's limit paces the sends inside the transport. */
 const SEND_BATCH = 20;
 
-const KINDS = new Set<string>(OWNER_EMAIL_KINDS);
+const OWNER_KINDS = new Set<string>(OWNER_EMAIL_KINDS);
+const BOOKING_KINDS = new Set<string>(BOOKING_EMAIL_KINDS);
+
+/** The message for an outbox row. A kind nobody knows, or a booking email without its booking, throws. */
+function render(row: ClaimedEmail, webUrl: string): OutgoingEmail {
+  const locale = row.locale as OwnerEmailLocale;
+  const { listingName, booking } = row.payload;
+  if (OWNER_KINDS.has(row.kind)) {
+    return renderOwnerEmail({
+      kind: row.kind as OwnerEmailKind,
+      to: row.to,
+      locale,
+      webUrl,
+      listingName,
+    });
+  }
+  if (BOOKING_KINDS.has(row.kind)) {
+    if (!booking) throw new Error(`Email "${row.kind}" has no booking`);
+    return renderBookingEmail({
+      kind: row.kind as BookingEmailKind,
+      to: row.to,
+      locale,
+      webUrl,
+      listingName,
+      booking,
+    });
+  }
+  throw new Error(`Unknown email kind "${row.kind}"`);
+}
 
 /**
- * Owner emails. The sweeps turn what happened into outbox rows, and the sender drains them.
+ * Emails owed to people: owners' about their listings, and both sides' about bookings (written to
+ * the outbox by the API in the booking's own transaction). The sweeps turn what happened to
+ * listings into outbox rows, and the sender drains them all.
  * Every job is safe to repeat: rows carry a dedupe key, and the outbox id is the idempotency key.
  */
 export const ownerEmailsProcessor: QueueProcessor = {
@@ -53,17 +93,7 @@ export const ownerEmailsProcessor: QueueProcessor = {
         let sent = 0;
         for (const row of due) {
           try {
-            if (!KINDS.has(row.kind)) throw new Error(`Unknown email kind "${row.kind}"`);
-            await email.transport.send({
-              ...renderOwnerEmail({
-                kind: row.kind,
-                to: row.to,
-                locale: row.locale as OwnerEmailLocale,
-                webUrl: email.webUrl,
-                listingName: row.payload.listingName,
-              }),
-              idempotencyKey: row.id,
-            });
+            await email.transport.send({ ...render(row, email.webUrl), idempotencyKey: row.id });
             await markEmailSent(db, row.id);
             sent++;
           } catch (error) {

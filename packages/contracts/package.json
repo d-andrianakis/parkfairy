@@ -16,6 +16,10 @@
     "./validation": {
       "types": "./dist/validation.d.ts",
       "default": "./dist/validation.js"
+    },
+    "./plates": {
+      "types": "./dist/plates.d.ts",
+      "default": "./dist/plates.js"
     }
   },
   "files": [

@@ -135,6 +135,19 @@ describe('copying the weekly hours', () => {
     expect(within(status).getByText('Γκαράζ Πειραιά')).toHaveAttribute('lang', 'el');
   });
 
+  it('names a listing sent back whose bookings the week would strand', async () => {
+    copy.mockResolvedValueOnce(
+      answer({ results: [{ id: PIRAEUS, outcome: 'booked' as const }] }) as never,
+    );
+    show();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Γκαράζ Πειραιά' }));
+    await userEvent.click(copyButton());
+    const status = await screen.findByText(/^Hours not copied to/);
+    expect(status).toHaveTextContent(
+      'Hours not copied to “Γκαράζ Πειραιά”: drivers are booked in hours it would close.',
+    );
+  });
+
   it('explains a listing with no hours to copy', async () => {
     copy.mockResolvedValueOnce(refusal('NOTHING_TO_COPY') as never);
     show();

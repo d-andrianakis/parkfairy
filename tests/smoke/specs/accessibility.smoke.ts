@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { DEMO_DATA, SIGNED_IN_STATE, WEB_URL } from '../support/env';
-import { expectAccessible } from '../support/fixtures';
+import { DEMO_DATA, EMAIL_OUTBOX, SIGNED_IN_STATE, WEB_URL } from '../support/env';
+import { expectAccessible, ownDriver } from '../support/fixtures';
 
 // Feature: accessibility — every page passes WCAG 2.2 AA automated checks in both
 // languages (including colour contrast, which jsdom unit tests cannot measure).
@@ -23,6 +23,30 @@ const publicPages = [
 ];
 const locales = ['el', 'en'] as const;
 const accountNav = { el: 'Λογαριασμός', en: 'Account' } as const;
+
+/**
+ * A hold of the shared account's on a demo listing, far ahead, for a page to show; let go after.
+ * Null where bookings aren't taken (only a local run takes them without payment, decision #33).
+ */
+async function demoHold(page: Page, daysAhead: number): Promise<string | null> {
+  const slug = 'syntagma-square-garage';
+  // On the half hour, in UTC, inside the demo garage's hours.
+  const day = new Date(Date.now() + daysAhead * 86_400_000).toISOString().slice(0, 10);
+  const stay = { start: `${day}T08:00:00.000Z`, end: `${day}T10:00:00.000Z` };
+  const listing = (await (
+    await page.request.get(`/api/v1/parking/${slug}`, { params: stay })
+  ).json()) as { bookingOpen: boolean; spaces: { id: string }[] };
+  if (!listing.bookingOpen) return null;
+  const held = await page.request.post('/api/v1/bookings', {
+    headers: { origin: WEB_URL },
+    data: { listing: slug, spaceId: listing.spaces[0]?.id, ...stay },
+  });
+  expect(held.status()).toBe(201);
+  return ((await held.json()) as { id: string }).id;
+}
+
+const letGo = (page: Page, id: string) =>
+  page.request.post(`/api/v1/bookings/${id}/cancel`, { headers: { origin: WEB_URL } });
 
 /**
  * WCAG 1.4.10 Reflow. Measured once the header is complete: its account links arrive after a
@@ -119,7 +143,13 @@ test.describe('signed in', () => {
 
   // Every step, with its forms filled in, is checked along the way in owner-onboarding.smoke.ts.
   for (const locale of locales) {
-    for (const path of ['/owner', '/owner/profile', '/owner/tax']) {
+    for (const path of [
+      '/owner',
+      '/owner/profile',
+      '/owner/tax',
+      '/bookings',
+      '/bookings?when=past',
+    ]) {
       test(`/${locale}${path} has no WCAG 2.2 AA violations, signed in`, async ({ page }) => {
         await page.goto(`/${locale}${path}`);
         await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
@@ -127,6 +157,36 @@ test.describe('signed in', () => {
       });
     }
   }
+
+  test('a booking’s page has no WCAG 2.2 AA violations, both languages, with its errors, dark', async ({
+    browser,
+  }) => {
+    test.skip(!DEMO_DATA, 'needs the demo listings (pnpm db:seed)');
+    test.skip(!EMAIL_OUTBOX, 'A driver of its own needs a confirmation email');
+    // Signing up, through the emailed link, takes longer than a page check.
+    test.setTimeout(120_000);
+    // Not the shared account: its other tests' holds would let this one go.
+    const { context, page } = await ownDriver(browser, 'a11y-booking');
+    const id = await demoHold(page, 200);
+    test.skip(!id, 'Bookings are taken without payment on a local run only');
+    try {
+      for (const locale of locales) {
+        await page.goto(`/${locale}/bookings/${id}`);
+        await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+        await expectAccessible(page);
+      }
+      // No plate, from the keyboard: the error state, in dark mode.
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.goto(`/en/bookings/${id}`);
+      await page.getByRole('button', { name: 'Confirm booking' }).focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('textbox', { name: 'Number plate' })).toBeFocused();
+      await expectAccessible(page);
+    } finally {
+      if (id) await letGo(page, id);
+      await context.close();
+    }
+  });
 
   // On a draft of the shared account's own, so it runs anywhere: no database or outbox needed.
   test('closures and special hours have no WCAG 2.2 AA violations, by keyboard, both languages, dark', async ({
@@ -169,14 +229,14 @@ test.describe('signed in', () => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('/el/owner');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expectNoSidewaysScroll(page, 'el', 2);
+    await expectNoSidewaysScroll(page, 'el', 3);
   });
 
   test('/el/account reflows at 320px', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('/el/account');
     await expect(page.getByTestId('api-user-id')).toHaveText(/^[0-9a-f-]{36}$/); // long UUID and email
-    await expectNoSidewaysScroll(page, 'el', 2);
+    await expectNoSidewaysScroll(page, 'el', 3);
   });
 
   test('/en/account has no WCAG 2.2 AA violations in dark mode', async ({ page }) => {

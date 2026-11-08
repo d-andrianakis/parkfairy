@@ -154,6 +154,17 @@ where slug = '...';
 Proof documents are in `.uploads/proofs/<listing id>/`. They have no file extension; the type is in
 `parking_proof_documents`.
 
+## Booking on your machine
+
+Pick dates on a listing, sign in, choose a space and press "Book this space". The space is kept for
+you for 10 minutes while you give the car's number plate and confirm. Payments come in Phase 4, so
+for now Confirm charges nothing, and it works only on this machine: anywhere else (an origin that
+isn't `localhost`) the listing page still says booking is coming soon and the API refuses holds.
+Booking emails go out from the worker within about 30 seconds, into `.emails/` like the others.
+Your bookings are under "Bookings" in the header; an owner finds a listing's bookings on its card
+in the owner area, where they can cancel one (the driver gets everything back). You can't book
+your own listing, so use a second account, or the demo account on the demo listings.
+
 ## Browser automation for Claude Code (Playwright MCP)
 
 `.mcp.json` registers a Playwright MCP server, so Claude Code can drive a real Chrome window

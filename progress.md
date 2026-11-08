@@ -604,21 +604,108 @@ Left open:
 
 - [~] Geospatial search + listing pages: done with curated areas + browser location (1.11);
   map (Mapbox, CSP updated deliberately) and address search missing
-- [~] Availability + quote endpoints: opening hours + quote done; free spaces ignore bookings
-  until booking exists
-- [ ] Transactional allocation + holds (exclusion constraints, `[start, end)`): the driver picks
-      the space from a list, 10-minute hold, the owner's gap counts as overlap, a "just taken"
-      state, and the listing's 48-space cap (1.12) must not hide free spaces
-- [ ] Closing time over a booking is refused until the owner cancels it (#27), in
-      `saveHoursExceptions`, `copyHoursExceptions` (a `booked` outcome), `saveHours` and `copyHours`
-      (a listing sent back can change its week; `copyHours` needs a `booked` outcome too). Check the hours in effect, not just closures: dropping special
-      hours or adding a closed part strands bookings too. The booking transaction takes `FOR SHARE`
-      on the listing row before it reads hours, or both sides can pass their checks. Entries get new
-      ids on every save, so diff instead if a booking must point at the closure that cancelled it
-- [ ] Booking requires a signed-in account (no guest checkout)
-- [ ] Hold expiry worker, cancellations, booking history
-- [ ] Concurrency tests (named spot race, last pooled unit) and DST edge cases
-- [ ] Transactional outbox
+- [x] Availability + quote endpoints: free spaces subtract bookings and running holds, the owner's
+      gap included, in search and on the listing page; "from" is the cheapest free space (3.1)
+- [x] Transactional allocation + holds (exclusion constraint on `[starts_at, blocked_until)`): the
+      driver picks the space from a list, a 10-minute hold, the gap counts as overlap, "just taken",
+      and with a stay the listing sends only free spaces, so the 48 cap hides none (3.1)
+- [x] Closing time over a booking is refused until the owner cancels it (#27): `saveHoursExceptions`
+      and `saveHours` refuse (`LISTING_BOOKED`), both copies report `booked`, removing a booked
+      space is refused (`SPACES_BOOKED`); the hours in effect are checked, and holds and
+      confirmations take `FOR SHARE` on the listing (3.1). Entries still get new ids on every save:
+      diff instead if a booking must ever point at the closure that cancelled it
+- [x] Booking requires a signed-in account (no guest checkout)
+- [x] Hold expiry worker, cancellations, booking history (3.1)
+- [x] Concurrency tests (one space, one hold per driver, a closure against a confirmation) and DST
+      edge cases. "Last pooled unit" doesn't apply: spaces are named (#1)
+- [x] Transactional outbox: booking emails are written in the booking's own transaction (3.1)
+
+### 3.1 Booking (2026-11-08)
+
+A driver picks a free space for a stay, holds it for ten minutes, gives the car's plate and
+confirms; until payments exist that confirms without one, on a local run only (#33). Their bookings
+are listed, and one can be cancelled by its policy until arrival. The owner sees each listing's
+bookings, who is coming in which car (#35), and cancels one with a full refund; closing time over a
+booking waits for that (#27). Four emails through the outbox (#36). Decisions #33–#36 and the
+readings taken without asking are in memory.md.
+
+- [x] **Implemented** behind the API's authorization rules: `POST /bookings` (hold), `GET /bookings`
+      and `/bookings/:id`, `POST /bookings/:id/confirm` and `/cancel`, `GET` and `POST …/cancel` of
+      `/owner/listings/:id/bookings`, `POST /bookings/:id/extend`; migrations 0014–0018 (table,
+      exclusion constraint, one hold per driver, the listing-wide index, extensions counted); the guard in the owner's hours, closures, copies and
+      spaces; the worker's expiry sweep (every minute) and stale-hold deletion (hourly, after 7 days);
+      the listing page's picker, the booking page, the bookings list, the owner's bookings page;
+      names checked when changed; `no-store` on every answer that needs a session
+- [x] **Unit tests**: contracts (plates, inputs, lists), refunds, references, the service's refusals,
+      env, the interceptor, auth's name check, worker jobs, both email kinds in both languages, and
+      the web's picker, confirm, cancel, owner cancel, pages, loaders, links and refusals.
+      Integration (`bookings.integration.test.ts`, 48 tests): authorization, holds, the gap, races
+      (pairs on one space, one driver's two presses, a closure against a confirmation; the last
+      fails without the listing lock), lapsed holds booking nothing, keeping a hold and its limit, refunds
+      and `REFUND_CHANGED`, lists, paging, the owner's page, the guard on every route, the 48 cap,
+      the cheapest free space, both clock changes
+- [x] **Smoke test** `booking.smoke.ts`: signed out to signed in on the same stay, hold, plate,
+      confirm, both sides' emails, the list, the owner's page, a closure refused then saved after the
+      owner cancels, the driver told; a space taken meanwhile; a cancel by the terms; Greek at
+      320 px. Also the booking pages in `accessibility.smoke.ts`, cross-site writes in
+      `security.smoke.ts`, budgets in `performance.smoke.ts`
+- [x] **Security** review: no IDOR, nothing above medium. Fixed: one hold per driver under
+      concurrency (M1), account names unchecked after sign-up now reaching owners (M2), late
+      confirmations without limit (L1: none at all since #37), a refund lower than shown (L4), `no-store` (L5), stale holds
+      (L7, in part). Open below
+- [x] **Performance** review: fixed both highs (the per-space probe repeated per aggregate, the
+      guard reading whole histories under locks) and the mediums (full garages in search, the picker
+      on every listing view, the stale-hold sweep, the owner list's history scan). Open below
+- [x] **Accessibility** review: nothing serious. The static hold time was judged enough for 2.2.1
+      while a late confirmation worked; since #37 ends that, the hold can be kept for 10 more
+      minutes up to ten times, with a warning two minutes before. Fixed: focus and the alert when the last
+      space goes, features read as "Features", the plate typed twice (3.3.7), the owner's cancel
+      announcement, a silent change of space, "below", the doubled group, the notice before the h1,
+      `lang` in the hold sentence, the zone of the hold's time, the hint on Book, focus rings, link
+      names in the list, a way back to closures. Manual checks below
+- [x] **i18n** review: fixed "out of 1", "and 3 more" counting booked spaces, "€0.00 comes back",
+      the closing message on the spaces step, παραμονή for στάθμευση, and the minors (wording, Greek
+      agreement, Latin plate examples in English, `lang` in emails, the email's gender). Native
+      speaker below
+- [x] **Contracts & docs**: OpenAPI and client regenerated, migrations 0014–0018 reviewed,
+      GETTING_STARTED.md (booking on this machine), memory.md
+
+Left open:
+
+- [ ] Security, for Phase 4 before booking goes beyond this machine: the hold and confirm limits per
+      account as well as per address (L2); a cap on booking emails to one owner (L3, a confirm and
+      cancel loop mails them twice); owner text changed on a listing sent back reaches drivers'
+      booking pages and emails unreviewed (L6: snapshot name and address, or refuse changes while
+      bookings are upcoming); Stripe Radar or review against self-dealing (`OWN_LISTING` stops only
+      the same account)
+- [ ] Performance, deferred as low: keyset pages for the owner list (50 pages of 20 cap it at 1,000
+      upcoming bookings); the email sender's pace (40 a minute) in a rush; the hold's 11 round trips
+      under `FOR SHARE`; future indexes on a full `bookings` built `CONCURRENTLY`, and new email kinds
+      added `NOT VALID` then validated
+- [ ] Tests still missing: a booking already under way is checked only from now on (time-of-day
+      dependent as written); two confirmations at once; the reference-collision retry
+- [ ] The sign-in page's link to sign up drops `?next=`, so a driver who creates an account there
+      loses the stay they chose
+- [ ] Accessibility, advisory and not done: "Let this space go" acts on one press and the listing
+      says nothing on arrival; a `booked` line in a copy report could link to that listing's
+      bookings; following "See the bookings" from the closures page loses the rows not yet saved
+- [ ] Manual NVDA and VoiceOver: the hold's warning (read once, two minutes before, without
+      moving the focus) and "Kept for you until"; the ended heading taking the focus when the form
+      goes; the last space taken (focus, the alert once); radios with features
+      read with them; the owner's cancel notice; the confirm and cancel notices read once, and
+      reading on reaches the h1; the cancel question in full; a link inside an alert; Greek labels
+      inside an English hold sentence; `aria-current` on the bookings tabs; the Greek booking page
+      at 200% text
+- [ ] Native speaker: `Header.bookings`; `Listing.chooseSpaceHeading`, `freeOfTotal`,
+      `moreFreeSpaces`, `signInToBook`, `accountToBook`, `bookBelow`; `Validation.plateRequired`,
+      `plateInvalid`; `BookSpace.*`, `BookingErrors.*`, `Booking.*`, `Bookings.*`,
+      `Owner.bookings.*`, `Owner.dashboard.bookings`, `Owner.errors.LISTING_BOOKED`, `SPACES_BOOKED`,
+      `BOOKING_STARTED`, `BOOKING_NOT_FOUND`, `Owner.hours.copyBooked`, `Owner.closures.copyBooked`
+      (`Booking.keep`, `holdWarning`, `holdLimit`, `heldEnded*` especially, and the «·» in `heldUntil`),
+      and the `el` block of `packages/email/src/booking-emails.ts`. Questions: στάθμευση or
+      παραμονή; «ιδιοκτήτης» for a host who may rent the space or be a business; Επερχόμενες or
+      Προσεχείς, Παλαιότερες or Προηγούμενες; Κωδικός or Αριθμός κράτησης; «έως τις 01:05» or
+      «έως τη 01:05»; «Κρατημένη για εσάς» as a badge; Εισαγάγετε or Συμπληρώστε, now for the plate
 
 ## Phase 4: Payments and payouts
 
@@ -652,7 +739,10 @@ Left open:
       (90 days today), and deleting an owner's account along with their tax values and proofs.
       Closures add: the dates of a private owner's closures are public (their home may be the
       address; #26, confirmed as #31 after the security review), and owners' notes on them last
-      until the entry ends (swept)
+      until the entry ends (swept). Booking adds: how long plates and drivers' names stay on
+      bookings (#35), whether owners should see them only from some days before arrival, failed
+      outbox rows (never purged; they hold a place and time), and deleting an account with bookings
+      (`bookings.user_id` restricts it)
 - [ ] Owner onboarding in production: `OWNER_DATA_KEY`, `S3_BUCKET` and a role with
       `s3:ListBucket` (without it a missing photo is a 500 rather than a 404), `MAPBOX_PUBLIC_TOKEN`
       and a card on the account for permanent geocoding, `UV_THREADPOOL_SIZE=16`, a CDN in front of

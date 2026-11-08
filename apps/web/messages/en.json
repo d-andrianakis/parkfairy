@@ -13,7 +13,8 @@
     "account": "Account",
     "signIn": "Sign in",
     "signUp": "Create account",
-    "listParking": "List parking"
+    "listParking": "List parking",
+    "bookings": "Bookings"
   },
   "LocaleSwitcher": {
     "label": "Language"
@@ -139,7 +140,13 @@
       "oneDayThenHalf": "Full refund until 24 hours before arrival, then 50% until arrival."
     },
     "exceptionsHeading": "Closures and special hours",
-    "closedBetween": "Closed from {from} to {to}"
+    "closedBetween": "Closed from {from} to {to}",
+    "chooseSpaceHeading": "Choose your space",
+    "freeOfTotal": "{total, plural, one {{free, plural, =0 {The space isn’t free for your stay.} other {The space is free for your stay.}}} other {{free, plural, =0 {None of the {total} spaces is free for your stay.} one {# of the {total} spaces is free for your stay.} other {# of the {total} spaces are free for your stay.}}}}",
+    "signInToBook": "Sign in to book",
+    "accountToBook": "You need an account to book. It’s free to create one.",
+    "bookBelow": "Choose your space to book it.",
+    "moreFreeSpaces": "{count, plural, one {and # more free space} other {and # more free spaces}}"
   },
   "Features": {
     "label": "Features",
@@ -310,7 +317,9 @@
     "exceptionOverlap": "These dates overlap another period",
     "closedTimeOrder": "The closed time must end after it starts",
     "dateRequired": "Choose a date",
-    "lastDayBeforeFirst": "The last day must be the same as the first or after it"
+    "lastDayBeforeFirst": "The last day must be the same as the first or after it",
+    "plateRequired": "Enter the number plate",
+    "plateInvalid": "Enter the plate as it is on the car, for example IKB-1234"
   },
   "Forms": {
     "invalidSummary": "{count, plural, one {# field needs your attention} other {# fields need your attention}}",
@@ -490,7 +499,8 @@
       "deleteQuestionUnnamed": "Delete this draft and everything in it? This can’t be undone.",
       "deleted": "Draft deleted",
       "closures": "Closures and special hours for “<listing>{name}</listing>”",
-      "untitledNumber": "Unnamed listing {number}"
+      "untitledNumber": "Unnamed listing {number}",
+      "bookings": "Bookings for “<listing>{name}</listing>”"
     },
     "state": {
       "done": "Done",
@@ -661,7 +671,8 @@
       "copySaving": "Saving…",
       "copyNotSaved": "Nothing was copied: the hours above couldn’t be saved.",
       "copySavedDone": "{count, plural, one {Hours saved and copied to # listing} other {Hours saved and copied to # listings}}",
-      "copySavedRefused": "Your hours were saved, but not copied. {reason}"
+      "copySavedRefused": "Your hours were saved, but not copied. {reason}",
+      "copyBooked": "Hours not copied to “<listing>{name}</listing>”: drivers are booked in hours it would close. Cancel their bookings first."
     },
     "closures": {
       "title": "Closures and special hours",
@@ -702,7 +713,8 @@
       "metaTitle": "Closures and special hours: {name}",
       "fromHint": "Any day from today to {latest}.",
       "overlapWith": "These dates overlap period {number}",
-      "limit": "You’ve reached {max} periods, the most one listing can have. Remove one to add another."
+      "limit": "You’ve reached {max} periods, the most one listing can have. Remove one to add another.",
+      "copyBooked": "Not copied to “<listing>{name}</listing>”: drivers are booked on those days. Cancel their bookings first."
     },
     "prices": {
       "hourly": "Hourly rate (€)",
@@ -833,7 +845,134 @@
       "TOO_MANY_PHOTOS": "A listing can have up to 10 photos.",
       "TOO_MANY_PROOFS": "A listing can have up to 5 documents.",
       "UPLOADS_BUSY": "We’re handling a lot of uploads. Try again in a minute.",
-      "NOTHING_TO_COPY": "There are no hours to copy yet. First choose at least one day you’re open, above."
+      "NOTHING_TO_COPY": "There are no hours to copy yet. First choose at least one day you’re open, above.",
+      "LISTING_BOOKED": "{count, plural, one {A booking falls} other {# bookings fall}} in the time you’re closing. Cancel {count, plural, one {it} other {them}} first, so nobody arrives at a closed gate.",
+      "BOOKING_STARTED": "This stay has already begun, so it can’t be cancelled.",
+      "BOOKING_NOT_FOUND": "We can’t find that booking.",
+      "SPACES_BOOKED": "{count, plural, one {A driver has booked a space you’re removing} other {Drivers have # bookings on spaces you’re removing}}. Cancel {count, plural, one {it} other {them}} first, or keep those spaces."
+    },
+    "bookings": {
+      "metaTitle": "Bookings for “{name}”",
+      "title": "Bookings",
+      "lead": "Confirmed bookings that haven’t ended yet, soonest first.",
+      "empty": "There are no bookings yet.",
+      "reference": "Booking reference",
+      "space": "Space",
+      "stay": "Arrival and departure",
+      "driver": "Driver",
+      "plate": "Number plate",
+      "total": "Total",
+      "cardTitle": "Booking {reference}",
+      "underWay": "Under way: it can’t be cancelled now.",
+      "cancel": "Cancel booking {reference}",
+      "cancelQuestion": "Cancel booking {reference}? The driver gets the full amount back and an email from us.",
+      "cancelConfirm": "Yes, cancel it",
+      "cancelKeep": "Keep it",
+      "cancelling": "Cancelling…",
+      "cancelled": "Booking {reference} cancelled",
+      "pagesLabel": "Pages",
+      "previous": "Previous page",
+      "next": "Next page",
+      "seeBookings": "See the bookings",
+      "unavailable": "The bookings can’t be shown right now. Please try again in a moment.",
+      "closuresLink": "Closures and special hours"
     }
+  },
+  "BookSpace": {
+    "book": "Book this space",
+    "booking": "Holding the space…",
+    "holdHint": "We keep the space for you for {minutes, plural, one {# minute} other {# minutes}} while you confirm.",
+    "noneLeft": "Someone else has just booked the last free space for those times. Choose other times.",
+    "pickOne": "Choose a space first."
+  },
+  "BookingErrors": {
+    "generic": "Something went wrong. Check your connection and try again.",
+    "BOOKING_UNAVAILABLE": "Online booking is coming soon.",
+    "LISTING_NOT_FOUND": "This parking can no longer be booked.",
+    "SPACE_NOT_FOUND": "That space can no longer be booked. Choose another one.",
+    "SPACE_TAKEN": "Someone else has just booked this space for those times. Choose another space.",
+    "LISTING_CLOSED": "This parking can’t be booked for your stay any more. Choose other times or another place.",
+    "OWN_LISTING": "This is your own parking, so you can’t book it.",
+    "BOOKING_NOT_FOUND": "We can’t find this booking.",
+    "BOOKING_NOT_ACTIVE": "This hold has ended. Choose the space again to book it.",
+    "BOOKING_STARTED": "This stay has already begun, so it can’t be cancelled here.",
+    "REFUND_CHANGED": "The refund has changed, because your arrival is nearer now. Check it and cancel again.",
+    "HOLD_LIMIT_REACHED": "This space can’t be kept any longer. Confirm now, or let it go."
+  },
+  "Booking": {
+    "metaTitle": "Your booking",
+    "title": {
+      "held": "Confirm your booking",
+      "expired": "Confirm your booking",
+      "confirmed": "Your booking",
+      "cancelled": "Cancelled booking",
+      "released": "Space released"
+    },
+    "status": {
+      "held": "Held for you",
+      "expired": "Hold ended",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "released": "Released"
+    },
+    "parking": "Parking",
+    "address": "Address",
+    "space": "Space",
+    "stay": "Arrival and departure",
+    "total": "Total",
+    "reference": "Booking reference",
+    "plate": "Number plate",
+    "cancellation": "Cancellation",
+    "heldUntil": "We’re keeping space <space>{space}</space> for you until {time} (Greek time). Confirm by then; if you need longer, keep it for another {minutes, plural, one {# minute} other {# minutes}}.",
+    "plateLabel": "Number plate",
+    "plateHint": "The car’s registration, for example IKB-1234. The owner sees it, so they know your car.",
+    "confirm": "Confirm booking",
+    "confirming": "Confirming…",
+    "noPayment": "This test site takes no payment: the booking is confirmed without one.",
+    "release": "Let this space go",
+    "releasing": "Letting it go…",
+    "confirmed": "Booking confirmed",
+    "confirmedLead": "We’ve emailed you the details. Show the booking reference if you’re asked.",
+    "chooseAnother": "Choose another space",
+    "cancel": "Cancel booking",
+    "cancelQuestion": "Cancel this booking? You’ll get {refund} back.",
+    "cancelQuestionNoRefund": "Cancel this booking? Under the cancellation terms, nothing comes back to you.",
+    "cancelConfirm": "Yes, cancel it",
+    "cancelKeep": "Keep it",
+    "cancelling": "Cancelling…",
+    "cancelledNotice": "Booking cancelled",
+    "cancelledByDriver": "You cancelled this booking. {refund} comes back to you.",
+    "cancelledByOwner": "The owner had to cancel this booking. You get the full {refund} back.",
+    "started": "This stay has begun, so it can’t be cancelled here.",
+    "ended": "This stay is over.",
+    "releasedLead": "You let this space go, so it isn’t kept for you any more.",
+    "allBookings": "All your bookings",
+    "unnamed": "Unnamed parking",
+    "unavailable": "Your booking can’t be shown right now. Please try again in a moment.",
+    "heldEnded": "The space may be someone else’s now. Choose it again to book it.",
+    "cancelledByDriverNoRefund": "You cancelled this booking. Under the cancellation terms, nothing comes back to you.",
+    "refundChanged": "Less comes back now that your arrival is nearer: {refund}. Press “Yes, cancel it” again to cancel anyway.",
+    "heldEndedTitle": "Your hold has ended",
+    "keep": "Keep it for {minutes, plural, one {# more minute} other {# more minutes}}",
+    "keeping": "Keeping it…",
+    "kept": "Kept for you until {time} (Greek time).",
+    "holdWarning": "Your hold on this space ends at {time} (Greek time). Need more time? Keep it for longer below.",
+    "holdLimit": "This space has been kept as long as it can be. Confirm before {time} (Greek time), or let it go."
+  },
+  "Bookings": {
+    "metaTitle": "Your bookings",
+    "heading": "Your bookings",
+    "tabsLabel": "Which bookings",
+    "upcoming": "Upcoming",
+    "past": "Past and cancelled",
+    "emptyUpcoming": "You have no upcoming bookings.",
+    "emptyPast": "You have no past bookings yet.",
+    "findParking": "Find parking",
+    "reference": "Booking {reference}",
+    "pagesLabel": "Pages",
+    "previous": "Previous page",
+    "next": "Next page",
+    "unavailable": "Your bookings can’t be shown right now. Please try again in a moment.",
+    "space": "Space: <space>{label}</space>"
   }
 }

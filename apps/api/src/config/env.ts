@@ -91,6 +91,12 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env) {
     corsOrigins: parseOrigins(env.API_CORS_ORIGINS),
     trustProxy: parseTrustProxy(env.TRUST_PROXY ?? 'loopback'),
     objectStoreDir: env.OBJECT_STORE_DIR ?? DEFAULT_OBJECT_STORE_DIR,
+    /**
+     * Until payments exist (Phase 4), a hold is confirmed without paying, and only on this machine
+     * (decision #33): keyed on the origin, as files for uploads are, so staging and production
+     * offer no booking until Stripe takes the money.
+     */
+    bookingWithoutPayment: isLoopback(env.BETTER_AUTH_URL),
   };
 }
 

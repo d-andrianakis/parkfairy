@@ -14,6 +14,7 @@ import { FieldGroup } from '@parkfairy/ui/components/field';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { FormError } from '@/components/form-error';
+import { BookingsLink } from './bookings-link';
 import { useAnnouncer } from '@/components/use-announcer';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { useRouter } from '@/i18n/navigation';
@@ -77,6 +78,8 @@ export function HoursForm({
   /** Keyed by the time's id (`closed-to-1`), shown on whichever of a closed part's times is wrong. */
   const [partErrors, setPartErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
+  // The refusal over bookings (#27), whose message gets the way to them while it shows.
+  const [bookedFailure, setBookedFailure] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   /** What the server holds, so copying knows whether the page has changed since. */
   const [savedPeriods, setSavedPeriods] = useState<OpeningPeriod[]>(listing.openingHours);
@@ -137,7 +140,9 @@ export function HoursForm({
       saveListingHours({ path: { id: listing.id }, body: parsed.data }),
     );
     if (!outcome.ok || !outcome.data) {
-      setFailure(outcome.ok ? ownerError({}) : ownerError(outcome.failure));
+      const text = outcome.ok ? ownerError({}) : ownerError(outcome.failure);
+      setFailure(text);
+      setBookedFailure(!outcome.ok && outcome.failure.code === 'LISTING_BOOKED' ? text : null);
       setSaving(false);
       return null;
     }
@@ -314,7 +319,9 @@ export function HoursForm({
               );
             })}
           </ul>
-          <FormError message={failure} />
+          <FormError message={failure}>
+            {failure && failure === bookedFailure ? <BookingsLink id={listing.id} /> : null}
+          </FormError>
           <StepActions saving={saving} onLater={() => void save('later')} />
         </FieldGroup>
       </form>

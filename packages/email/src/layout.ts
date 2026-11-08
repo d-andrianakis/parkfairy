@@ -17,6 +17,8 @@ export interface EmailContent {
   heading: string;
   /** The text before the button. */
   body: string;
+  /** Facts set out after the body, label beside value: a booking's place and times. */
+  details?: { label: string; value: string; lang?: string | undefined }[];
   action: string;
   url: string;
   /** The text after the button's link, in the plain-text version. */
@@ -33,21 +35,35 @@ export function renderEmail({
   subject,
   heading,
   body,
+  details = [],
   action,
   url,
   note,
   linkFallback,
   footer,
 }: EmailContent): OutgoingEmail {
-  const text = [heading, body, `${action}: ${url}`, note, '--', footer].join('\n\n');
+  const facts = details.map(({ label, value }) => `${label}: ${value}`).join('\n');
+  const text = [heading, body, facts, `${action}: ${url}`, note, '--', footer]
+    .filter(Boolean)
+    .join('\n\n');
 
   const link = escapeHtml(url);
-  const paragraphs = [body, note]
-    .map(
-      (paragraph) =>
-        `<p style="margin:0 0 16px;font-size:16px;line-height:1.5;color:#0f172a">${escapeHtml(paragraph)}</p>`,
-    )
-    .join('');
+  // Label beside value, which a screen reader reads as pairs; a table is what every client keeps.
+  const table =
+    details.length === 0
+      ? ''
+      : `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;font-size:16px;line-height:1.5;color:#0f172a">${details
+          .map(
+            ({ label, value, lang }) =>
+              `<tr><td style="padding:2px 16px 2px 0;vertical-align:top;font-weight:bold;color:#0f172a">${escapeHtml(label)}</td><td${lang ? ` lang="${escapeHtml(lang)}"` : ''} style="padding:2px 0;vertical-align:top;color:#0f172a">${escapeHtml(value)}</td></tr>`,
+          )
+          .join('')}</table>\n`;
+  const paragraph = (content: string) =>
+    content
+      ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.5;color:#0f172a">${escapeHtml(content)}</p>`
+      : '';
+  // The facts belong to the body, before the note that follows them.
+  const paragraphs = `${paragraph(body)}\n${table}${paragraph(note)}`;
   // Inline styles and a presentation table: what mail clients render consistently. Every text
   // has its own colour (slate-900 on white, white on the primary), because clients drop the styles
   // on <body>. The colour-scheme tags ask for no automatic dark mode, but some clients recolour

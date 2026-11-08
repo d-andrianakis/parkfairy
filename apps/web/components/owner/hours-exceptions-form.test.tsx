@@ -223,6 +223,26 @@ describe('HoursExceptionsForm', () => {
     expect(screen.queryByText('Saved')).not.toBeInTheDocument();
   });
 
+  it('refuses closing time over bookings, with the way to them (decision #27)', async () => {
+    save.mockResolvedValueOnce({
+      error: { code: 'LISTING_BOOKED', statusCode: 409, message: 'LISTING_BOOKED', bookings: 2 },
+      response: new Response(null, { status: 409 }),
+    } as never);
+    show([closedOn(day(3))]);
+    await userEvent.click(saveButton());
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('2 bookings fall in the time you’re closing');
+    expect(within(alert).getByRole('link', { name: 'See the bookings' })).toHaveAttribute(
+      'href',
+      `/en/owner/listings/${LISTING_ID}/bookings`,
+    );
+    // Another refusal has no such way out.
+    save.mockResolvedValueOnce(refusal('LISTING_NOT_FOUND', 404) as never);
+    await userEvent.click(saveButton());
+    expect(await screen.findByText('We can’t find that listing.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'See the bookings' })).not.toBeInTheDocument();
+  });
+
   it('ignores a second press while the first is saving', async () => {
     let finish: (value: never) => void = () => undefined;
     save.mockImplementationOnce(

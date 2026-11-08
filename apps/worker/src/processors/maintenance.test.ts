@@ -1,17 +1,21 @@
 import {
   deleteEndedHoursExceptions,
+  deleteStaleHolds,
   deleteUnconfirmedAccounts,
+  expireLapsedHolds,
   type Database,
 } from '@parkfairy/database';
 import type { Job } from 'bullmq';
 import { pino } from 'pino';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QUEUES } from '../queues.js';
-import { maintenanceProcessor, UNCONFIRMED_ACCOUNT_DAYS } from './maintenance.js';
+import { maintenanceProcessor, STALE_HOLD_DAYS, UNCONFIRMED_ACCOUNT_DAYS } from './maintenance.js';
 
 vi.mock('@parkfairy/database', () => ({
   deleteEndedHoursExceptions: vi.fn(),
   deleteUnconfirmedAccounts: vi.fn(),
+  expireLapsedHolds: vi.fn(),
+  deleteStaleHolds: vi.fn(),
 }));
 
 const logger = pino({ level: 'silent' });
@@ -93,6 +97,45 @@ describe('maintenance processor', () => {
       ).resolves.toEqual({ deleted: 4 });
       expect(remove).toHaveBeenCalledWith(db, new Date('2026-12-26T09:00:00Z'));
     });
+  });
+
+  describe('expiring lapsed holds', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('runs every minute, so a hold lets go of its space soon after its ten minutes', () => {
+      expect(maintenanceProcessor.schedules).toContainEqual({
+        id: 'expire-lapsed-holds',
+        everyMs: 60_000,
+      });
+    });
+
+    it('expires holds that ran out by now, and reports how many', async () => {
+      vi.useFakeTimers({ now: new Date('2026-12-26T09:00:00Z'), toFake: ['Date'] });
+      vi.mocked(expireLapsedHolds).mockResolvedValue(2);
+      const db = {} as Database;
+      await expect(
+        maintenanceProcessor.process(jobNamed('expire-lapsed-holds'), { db, logger, email }),
+      ).resolves.toEqual({ expired: 2 });
+      expect(expireLapsedHolds).toHaveBeenCalledWith(db, new Date('2026-12-26T09:00:00Z'));
+    });
+  });
+
+  it('deletes holds that never became bookings, a week after they settled, hourly', async () => {
+    vi.useFakeTimers({ now: new Date('2026-12-26T09:00:00Z'), toFake: ['Date'] });
+    vi.mocked(deleteStaleHolds).mockResolvedValue(5);
+    const db = {} as Database;
+    expect(maintenanceProcessor.schedules).toContainEqual({
+      id: 'delete-stale-holds',
+      everyMs: 60 * 60 * 1000,
+    });
+    await expect(
+      maintenanceProcessor.process(jobNamed('delete-stale-holds'), { db, logger, email }),
+    ).resolves.toEqual({ deleted: 5 });
+    expect(STALE_HOLD_DAYS).toBe(7);
+    expect(deleteStaleHolds).toHaveBeenCalledWith(db, new Date('2026-12-19T09:00:00Z'));
+    vi.useRealTimers();
   });
 
   it('fails loudly on unknown job names instead of silently dropping work', async () => {

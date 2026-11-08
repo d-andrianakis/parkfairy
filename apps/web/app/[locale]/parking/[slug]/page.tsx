@@ -14,17 +14,21 @@ import { CircleAlert, CircleCheck, MapPin } from 'lucide-react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import { ClientMessages } from '@/components/client-messages';
+import { BookSpacePicker } from '@/components/parking/book-space-picker';
 import { FeatureBadges } from '@/components/parking/feature-badges';
 import { HoursExceptions } from '@/components/parking/hours-exceptions';
 import { ListingPhotoImage } from '@/components/parking/listing-photo';
 import { OpeningHours } from '@/components/parking/opening-hours';
 import { SpaceList } from '@/components/parking/space-list';
 import { StayRange } from '@/components/parking/stay-range';
+import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { timeOptions } from '@/i18n/formats';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { loadListing } from '@/lib/api.server';
 import { parseListingWindow, windowQuery, type SearchParams } from '@/lib/search';
+import { getLayoutSession } from '@/lib/session';
 import { validationArgs } from '@/lib/validation-args';
 
 interface ListingPageProps {
@@ -78,6 +82,19 @@ export default async function ListingPage(props: ListingPageProps) {
     format.number(amount.amountMinor / 100, { style: 'currency', currency: amount.currency });
   const availability = listing.availability;
   const available = availability ? availability.open && availability.freeSpaces > 0 : false;
+  // Open for the stay where booking is taken: the picker stays, even once the last space goes,
+  // so a "just taken" refusal stays on the page that the refresh brings back.
+  const offered = Boolean(listing.bookingOpen && availability?.open);
+  const bookable = offered && available;
+  // Booking needs an account (decision #8); the layout has read the session already.
+  const signedIn = offered ? Boolean(await getLayoutSession()) : false;
+  const windowParams = parsed.window ? windowQuery(parsed.values) : {};
+  const here = `/parking/${listing.slug}?${new URLSearchParams(windowParams).toString()}`;
+  const cheapest = listing.spaces.reduce<(typeof listing.spaces)[number] | undefined>(
+    (best, space) =>
+      !best || (space.total?.amountMinor ?? 0) < (best.total?.amountMinor ?? 0) ? space : best,
+    undefined,
+  );
   const [firstPhoto, ...otherPhotos] = listing.photos;
   const photoAlt = (alt: string | null, number: number) =>
     alt || t('photoAlt', { name: listing.name, number });
@@ -195,14 +212,64 @@ export default async function ListingPage(props: ListingPageProps) {
           ) : null}
         </section>
 
-        <section aria-labelledby="spaces-heading">
-          <h2 id="spaces-heading" className="text-xl font-semibold">
-            {t('spacesHeading')}
+        <section id="spaces" aria-labelledby="spaces-heading" className="scroll-mt-4">
+          {/* Focusable: where the picker puts the focus when the last space goes under it. */}
+          <h2
+            id="spaces-heading"
+            tabIndex={-1}
+            className="rounded-sm text-xl font-semibold outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            {t(offered ? 'chooseSpaceHeading' : 'spacesHeading')}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t('spaceCount', { count: listing.spaceCount })}
+            {offered && availability
+              ? t('freeOfTotal', { free: availability.freeSpaces, total: listing.spaceCount })
+              : t('spaceCount', { count: listing.spaceCount })}
           </p>
-          <SpaceList listing={listing} labelledBy="spaces-heading" />
+          {offered && signedIn && parsed.window ? (
+            <ClientMessages namespaces={CLIENT_NAMESPACES.bookSpace}>
+              <BookSpacePicker
+                listing={listing.slug}
+                start={parsed.window.start}
+                end={parsed.window.end}
+                initial={cheapest?.id ?? ''}
+                labelledBy="spaces-heading"
+                spaces={listing.spaces.map((space) => ({
+                  id: space.id,
+                  // Owner content: Greek "Α1" looks like Latin "A1" but is read differently.
+                  label: <span lang={listing.contentLocale}>{space.label}</span>,
+                  details: (
+                    <>
+                      <FeatureBadges features={space.features} named={false} />
+                      {space.total ? (
+                        <span className="text-muted-foreground">
+                          {t('spaceTotal', { price: money(space.total) })}
+                        </span>
+                      ) : null}
+                    </>
+                  ),
+                }))}
+              />
+            </ClientMessages>
+          ) : (
+            <SpaceList
+              listing={listing}
+              labelledBy="spaces-heading"
+              freeSpaces={availability?.freeSpaces}
+            />
+          )}
+          {bookable && !signedIn ? (
+            <div className="mt-4 grid gap-2">
+              <p className="text-sm">{t('accountToBook')}</p>
+              <div>
+                <Button asChild>
+                  <Link href={{ pathname: '/sign-in', query: { next: here } }}>
+                    {t('signInToBook')}
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
 
@@ -300,10 +367,22 @@ export default async function ListingPage(props: ListingPageProps) {
             ) : (
               <p className="text-sm text-muted-foreground">{t('noWindow')}</p>
             )}
+            {bookable ? (
+              <p className="text-sm">
+                <a
+                  href="#spaces"
+                  className="text-primary underline underline-offset-4 hover:decoration-2"
+                >
+                  {t('bookBelow')}
+                </a>
+              </p>
+            ) : null}
             <Button asChild variant={availability ? 'outline' : 'default'}>
               <Link href={searchHere}>{t(availability ? 'changeDates' : 'chooseDates')}</Link>
             </Button>
-            <p className="text-sm text-muted-foreground">{t('bookingSoon')}</p>
+            {listing.bookingOpen ? null : (
+              <p className="text-sm text-muted-foreground">{t('bookingSoon')}</p>
+            )}
           </CardContent>
         </Card>
       </aside>

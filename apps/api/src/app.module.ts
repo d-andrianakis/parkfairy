@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AuthGuard } from './auth/auth.guard.js';
 import { redactUrl } from './common/log-redaction.js';
+import { NoStoreInterceptor } from './common/no-store.interceptor.js';
 import { SafeExceptionFilter } from './common/safe-exception.filter.js';
 import { AuthModule } from './auth/auth.module.js';
+import { BookingsModule } from './bookings/bookings.module.js';
 import { OriginGuard } from './auth/origin.guard.js';
 import { ConfigModule, ENV } from './config/config.module.js';
 import type { Env } from './config/env.js';
@@ -62,9 +64,11 @@ const REQUEST_ID_PATTERN = /^[\w-]{1,128}$/;
     StorageModule,
     ParkingModule,
     OwnerModule,
+    BookingsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: SafeExceptionFilter },
+    { provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor },
     // Guards run in this order: rate limit → CSRF origin check → session/roles.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useExisting: OriginGuard },

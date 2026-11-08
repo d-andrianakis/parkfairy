@@ -48,8 +48,32 @@ beforeEach(() => {
   ok(vi.mocked(saveListingLocation));
 });
 
+const booked = (code: string, bookings: number) => ({
+  error: { code, statusCode: 409, message: code, bookings },
+  response: new Response(null, { status: 409 }),
+});
+
 describe('SpacesForm', () => {
   const save = vi.mocked(saveListingSpaces);
+
+  it('refuses removing booked spaces, with the way to the bookings; another refusal has none', async () => {
+    save.mockResolvedValueOnce(booked('SPACES_BOOKED', 2) as never);
+    const listing = listingFixture({
+      spaces: [{ id: 'a', label: 'A1', features: [], hourlyRateMinor: null }],
+    });
+    renderInSubtree(<SpacesForm listing={listing} />);
+    await userEvent.click(continueButton());
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Drivers have 2 bookings on spaces you’re removing');
+    expect(within(alert).getByRole('link', { name: 'See the bookings' })).toHaveAttribute(
+      'href',
+      `/en/owner/listings/${LISTING_ID}/bookings`,
+    );
+    save.mockResolvedValueOnce(refusal('LISTING_LOCKED') as never);
+    await userEvent.click(continueButton());
+    expect(await screen.findByText('This listing can’t be changed right now.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'See the bookings' })).not.toBeInTheDocument();
+  });
 
   async function addThree() {
     await userEvent.type(screen.getByLabelText('Prefix (optional)'), 'A');
@@ -273,6 +297,20 @@ describe('HoursForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save and finish later' }));
     await waitFor(() => expect(save).toHaveBeenCalledOnce());
     expect(routerMock.push).toHaveBeenCalledWith('/owner');
+  });
+
+  it('refuses a week that would strand bookings, with the way to them, in Greek', async () => {
+    save.mockResolvedValueOnce(booked('LISTING_BOOKED', 1) as never);
+    renderInSubtree(<HoursForm listing={listingFixture()} />, { locale: 'el' });
+    await userEvent.click(screen.getByRole('button', { name: 'Ανοιχτά όλο το 24ωρο, κάθε ημέρα' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Αποθήκευση και συνέχεια' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Υπάρχει μία κράτηση στις ώρες που κλείνετε');
+    expect(within(alert).getByRole('link', { name: 'Δείτε τις κρατήσεις' })).toHaveAttribute(
+      'href',
+      // The navigation mock writes every link in English.
+      `/en/owner/listings/${LISTING_ID}/bookings`,
+    );
   });
 
   it('reports a refusal and stays, ready to save again', async () => {

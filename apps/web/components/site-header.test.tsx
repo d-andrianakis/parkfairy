@@ -32,14 +32,23 @@ describe('SiteHeader', () => {
     );
   });
 
-  it('links signed-in readers to their account', () => {
+  it('links signed-in readers to their bookings and their account', () => {
     renderWithProviders(<SiteHeader theme="system" signedIn />);
 
     const account = screen.getByRole('navigation', { name: 'Account' });
-    expect(within(account).getAllByRole('link')).toHaveLength(2);
+    expect(within(account).getAllByRole('link')).toHaveLength(3);
+    expect(within(account).getByRole('link', { name: 'Bookings' })).toHaveAttribute(
+      'href',
+      '/en/bookings',
+    );
     expect(within(account).getByRole('link', { name: 'Account' })).toHaveAttribute(
       'href',
       '/en/account',
     );
+  });
+
+  it('keeps bookings out of a signed-out header', () => {
+    renderWithProviders(<SiteHeader theme="system" signedIn={false} />);
+    expect(screen.queryByRole('link', { name: 'Bookings' })).not.toBeInTheDocument();
   });
 });

@@ -18,6 +18,16 @@ describe('loadEnv', () => {
     expect(env.trustedOrigins).toEqual(['https://app.example.gr', 'https://admin.example.gr']);
   });
 
+  it('confirms bookings without payment on this machine only (decision #33)', () => {
+    expect(loadEnv({ ...base }).bookingWithoutPayment).toBe(false);
+    expect(
+      loadEnv({ ...base, BETTER_AUTH_URL: 'http://localhost:3000' }).bookingWithoutPayment,
+    ).toBe(true);
+    expect(
+      loadEnv({ ...base, BETTER_AUTH_URL: 'https://localhost.example.gr' }).bookingWithoutPayment,
+    ).toBe(false);
+  });
+
   it('parses TRUST_PROXY into the forms Express accepts', () => {
     expect(loadEnv({ ...base, TRUST_PROXY: '2' }).trustProxy).toBe(2);
     expect(loadEnv({ ...base, TRUST_PROXY: 'true' }).trustProxy).toBe(true);

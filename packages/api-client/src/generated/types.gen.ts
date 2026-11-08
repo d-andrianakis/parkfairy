@@ -115,6 +115,7 @@ export type HoursException = {
 };
 
 export type ParkingSpace = {
+    id: string;
     label: string;
     features: Array<ParkingFeature>;
     hourlyRate: Money;
@@ -172,6 +173,7 @@ export type ParkingListingDetail = {
     priceRules: ListingPriceRules;
     cancellationPolicy: CancellationPolicy | null;
     availability: ParkingAvailability | null;
+    bookingOpen: boolean;
 };
 
 export type OwnerKind = 'individual' | 'business';
@@ -314,7 +316,7 @@ export type ListingHoursExceptionsCopyInput = {
 export type OwnerHoursExceptionsCopy = {
     results: Array<{
         id: string;
-        outcome: 'copied' | 'clash' | 'full';
+        outcome: 'copied' | 'clash' | 'full' | 'booked';
     }>;
 };
 
@@ -325,7 +327,7 @@ export type ListingHoursCopyInput = {
 export type OwnerHoursCopy = {
     results: Array<{
         id: string;
-        outcome: 'copied' | 'locked';
+        outcome: 'copied' | 'locked' | 'booked';
     }>;
 };
 
@@ -479,6 +481,89 @@ export type OwnerListing = {
 
 export type OwnerListingCreated = {
     id: string;
+};
+
+export type BookingStatus = 'held' | 'confirmed' | 'cancelled' | 'expired' | 'released';
+
+export type BookingCanceller = 'driver' | 'owner';
+
+export type BookingHoldInput = {
+    listing: string;
+    spaceId: string;
+    start: string;
+    end: string;
+};
+
+export type BookingConfirmInput = {
+    vehiclePlate: string;
+};
+
+export type BookingCancelInput = {
+    expectedRefundMinor?: number;
+};
+
+export type BookingListing = {
+    slug: string;
+    name: string | null;
+    address: string | null;
+    contentLocale: Locale;
+    timeZone: string;
+};
+
+export type Booking = {
+    id: string;
+    reference: string;
+    status: BookingStatus;
+    listing: BookingListing;
+    spaceLabel: string;
+    start: string;
+    end: string;
+    total: Money;
+    cancellationPolicy: CancellationPolicy;
+    holdExpiresAt: string;
+    holdExtensionsLeft: number;
+    vehiclePlate: string | null;
+    confirmedAt: string | null;
+    cancelledAt: string | null;
+    cancelledBy: BookingCanceller | null;
+    refund: Money | null;
+    refundIfCancelled: Money | null;
+};
+
+export type BookingListQuery = {
+    when: 'upcoming' | 'past';
+    page: number;
+};
+
+export type BookingList = {
+    bookings: Array<Booking>;
+    page: number;
+    hasMore: boolean;
+};
+
+export type OwnerBooking = {
+    id: string;
+    reference: string;
+    spaceLabel: string;
+    start: string;
+    end: string;
+    driverName: string;
+    vehiclePlate: string;
+    total: Money;
+    cancellable: boolean;
+};
+
+export type OwnerBookingsQuery = {
+    page: number;
+};
+
+export type OwnerListingBookings = {
+    id: string;
+    name: string | null;
+    contentLocale: Locale;
+    bookings: Array<OwnerBooking>;
+    page: number;
+    hasMore: boolean;
 };
 
 export type GetLivenessData = {
@@ -1204,3 +1289,190 @@ export type SubmitOwnerListingResponses = {
 };
 
 export type SubmitOwnerListingResponse = SubmitOwnerListingResponses[keyof SubmitOwnerListingResponses];
+
+export type GetMyBookingsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        when?: 'upcoming' | 'past';
+    };
+    url: '/v1/bookings';
+};
+
+export type GetMyBookingsErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+};
+
+export type GetMyBookingsError = GetMyBookingsErrors[keyof GetMyBookingsErrors];
+
+export type GetMyBookingsResponses = {
+    200: BookingList;
+};
+
+export type GetMyBookingsResponse = GetMyBookingsResponses[keyof GetMyBookingsResponses];
+
+export type HoldParkingSpaceData = {
+    body: BookingHoldInput;
+    path?: never;
+    query?: never;
+    url: '/v1/bookings';
+};
+
+export type HoldParkingSpaceErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type HoldParkingSpaceError = HoldParkingSpaceErrors[keyof HoldParkingSpaceErrors];
+
+export type HoldParkingSpaceResponses = {
+    201: Booking;
+};
+
+export type HoldParkingSpaceResponse = HoldParkingSpaceResponses[keyof HoldParkingSpaceResponses];
+
+export type GetMyBookingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/bookings/{id}';
+};
+
+export type GetMyBookingErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type GetMyBookingError = GetMyBookingErrors[keyof GetMyBookingErrors];
+
+export type GetMyBookingResponses = {
+    200: Booking;
+};
+
+export type GetMyBookingResponse = GetMyBookingResponses[keyof GetMyBookingResponses];
+
+export type ConfirmMyBookingData = {
+    body: BookingConfirmInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/bookings/{id}/confirm';
+};
+
+export type ConfirmMyBookingErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type ConfirmMyBookingError = ConfirmMyBookingErrors[keyof ConfirmMyBookingErrors];
+
+export type ConfirmMyBookingResponses = {
+    200: Booking;
+};
+
+export type ConfirmMyBookingResponse = ConfirmMyBookingResponses[keyof ConfirmMyBookingResponses];
+
+export type ExtendMyHoldData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/bookings/{id}/extend';
+};
+
+export type ExtendMyHoldErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type ExtendMyHoldError = ExtendMyHoldErrors[keyof ExtendMyHoldErrors];
+
+export type ExtendMyHoldResponses = {
+    200: Booking;
+};
+
+export type ExtendMyHoldResponse = ExtendMyHoldResponses[keyof ExtendMyHoldResponses];
+
+export type CancelMyBookingData = {
+    body?: BookingCancelInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/bookings/{id}/cancel';
+};
+
+export type CancelMyBookingErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type CancelMyBookingError = CancelMyBookingErrors[keyof CancelMyBookingErrors];
+
+export type CancelMyBookingResponses = {
+    200: Booking;
+};
+
+export type CancelMyBookingResponse = CancelMyBookingResponses[keyof CancelMyBookingResponses];
+
+export type GetListingBookingsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        page?: number;
+    };
+    url: '/v1/owner/listings/{id}/bookings';
+};
+
+export type GetListingBookingsErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type GetListingBookingsError = GetListingBookingsErrors[keyof GetListingBookingsErrors];
+
+export type GetListingBookingsResponses = {
+    200: OwnerListingBookings;
+};
+
+export type GetListingBookingsResponse = GetListingBookingsResponses[keyof GetListingBookingsResponses];
+
+export type CancelListingBookingData = {
+    body?: never;
+    path: {
+        id: string;
+        bookingId: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/bookings/{bookingId}/cancel';
+};
+
+export type CancelListingBookingErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type CancelListingBookingError = CancelListingBookingErrors[keyof CancelListingBookingErrors];
+
+export type CancelListingBookingResponses = {
+    204: void;
+};
+
+export type CancelListingBookingResponse = CancelListingBookingResponses[keyof CancelListingBookingResponses];

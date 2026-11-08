@@ -216,7 +216,11 @@ export function createAuth({
             return checked;
           },
         },
-        update: { before: (user) => withSupportedLocale(user) },
+        // A name changed later meets the sign-up rules too: owners see it on their bookings
+        // page (decision #35), and `/update-user` takes any body Better Auth doesn't know.
+        update: {
+          before: (user) => withValidName(user).then(({ data }) => withSupportedLocale(data)),
+        },
       },
     },
     session: {
@@ -328,6 +332,7 @@ export type AuthUser = AuthSession['user'];
 
 export const INVALID_LOCALE = 'INVALID_LOCALE';
 export const INVALID_SIGN_UP = 'INVALID_SIGN_UP';
+export const INVALID_NAME = 'INVALID_NAME';
 
 /** The account fields an email needs; Better Auth types `user` without our additional fields. */
 type AccountRef = { email: string; locale?: unknown };
@@ -347,6 +352,19 @@ function withCallback(url: string, callbackURL: string): string {
 function withSupportedLocale<T extends Record<string, unknown>>(data: T): Promise<{ data: T }> {
   if (data.locale !== undefined && !isLocale(data.locale)) {
     return Promise.reject(unsupportedLocale());
+  }
+  return Promise.resolve({ data });
+}
+
+/** Database hook: passes the write through, or rejects a name sign-up would have refused. */
+function withValidName<T extends Record<string, unknown>>(data: T): Promise<{ data: T }> {
+  if (data.name === undefined) return Promise.resolve({ data });
+  const parsed = SignUpInputSchema.shape.name.safeParse(data.name);
+  // As at sign-up: the stored name is the raw one, so it must already be what parsing makes it.
+  if (!parsed.success || parsed.data !== data.name) {
+    return Promise.reject(
+      new APIError('BAD_REQUEST', { message: 'Invalid name', code: INVALID_NAME }),
+    );
   }
   return Promise.resolve({ data });
 }

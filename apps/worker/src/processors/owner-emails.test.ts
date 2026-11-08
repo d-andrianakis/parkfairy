@@ -110,6 +110,47 @@ describe('owner emails processor', () => {
     expect(markEmailSent).toHaveBeenCalledOnce();
   });
 
+  it('sends booking emails with the booking set out, to the page they are about', async () => {
+    const booking = {
+      id: 'b0b0b0b0-0000-4000-8000-000000000001',
+      listingId: 'l0l0l0l0-0000-4000-8000-000000000001',
+      reference: 'K7M4-Q2ZD',
+      address: 'Ερμού 1',
+      contentLocale: 'el',
+      spaceLabel: 'A1',
+      start: '2026-12-10T08:00:00.000Z',
+      end: '2026-12-10T10:00:00.000Z',
+      timeZone: 'Europe/Athens',
+      totalMinor: 400,
+      currency: 'EUR',
+    };
+    vi.mocked(claimDueEmails).mockResolvedValue([
+      row({ kind: 'booking-confirmed', locale: 'en', payload: { listingName: 'Γκαράζ', booking } }),
+      row({ id: 'email-2', kind: 'booking-received', payload: { listingName: 'Γκαράζ', booking } }),
+    ]);
+    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 2, failed: 0 });
+    const [driver, owner] = send.mock.calls.map(([email]) => email);
+    expect(driver?.subject).toBe('Your parking is booked (K7M4-Q2ZD)');
+    expect(driver?.text).toContain(`https://parkfairy.example/en/bookings/${booking.id}`);
+    expect(owner?.text).toContain(
+      `https://parkfairy.example/el/owner/listings/${booking.listingId}/bookings`,
+    );
+    expect(owner?.idempotencyKey).toBe('email-2');
+  });
+
+  it('refuses a booking email that lost its booking, without losing the rest', async () => {
+    vi.mocked(claimDueEmails).mockResolvedValue([
+      row({ kind: 'booking-confirmed', payload: {} }),
+      row({ id: 'email-2' }),
+    ]);
+    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 1, failed: 1 });
+    expect(markEmailFailed).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({ id: 'email-1' }),
+      'Email "booking-confirmed" has no booking',
+    );
+  });
+
   it('refuses a kind it has no template for, without losing the rest', async () => {
     const unknown = row({ kind: 'nonsense' as ClaimedEmail['kind'] });
     vi.mocked(claimDueEmails).mockResolvedValue([unknown, row({ id: 'email-2' })]);

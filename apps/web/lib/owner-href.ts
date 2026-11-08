@@ -5,3 +5,6 @@ export const listingStepHref = (id: string, step: ListingStep) => `/owner/listin
 
 /** Closures and special hours: a page of its own, not a step. */
 export const closuresHref = (id: string) => `/owner/listings/${id}/closures`;
+
+/** A listing's bookings (decision #34), where the owner calls one off. */
+export const ownerBookingsHref = (id: string) => `/owner/listings/${id}/bookings`;

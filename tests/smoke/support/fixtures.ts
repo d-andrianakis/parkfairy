@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Browser, type Page } from '@playwright/test';
 import { emailLink, waitForEmail } from './email';
 import { TEST_PASSWORD, visitorAddress } from './env';
 
@@ -82,4 +82,21 @@ export async function trackCspViolations(page: Page): Promise<() => Promise<stri
     await page.evaluate(() => undefined); // a round trip, for anything still on its way
     return seen;
   };
+}
+
+/**
+ * A driver of the test's own, signed in, in a browser context of their own at an address of their
+ * own. Holds need it: a driver has one hold at a time, so tests holding as the shared account at
+ * once would let go of each other's. Needs the local outbox, for the confirmation email.
+ */
+export async function ownDriver(browser: Browser, prefix = 'driver') {
+  const context = await browser.newContext({
+    extraHTTPHeaders: { 'x-forwarded-for': visitorAddress() },
+    // Signed out to begin with: inside `test.use({ storageState })` a new context would otherwise
+    // start as the shared account, and the sign-up page would never show its form.
+    storageState: { cookies: [], origins: [] },
+  });
+  const page = await context.newPage();
+  await registerAndSignIn(page, uniqueEmail(prefix), 'Smoke Driver');
+  return { context, page };
 }
