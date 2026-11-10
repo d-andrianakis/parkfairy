@@ -86,6 +86,55 @@ describe('AddressField', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('marks a Greek name Mapbox had no English for as Greek', async () => {
+    suggest.mockResolvedValue(
+      answer({
+        suggestions: [
+          { id: 'dXJuOm1ieGFkcg', name: 'Οδός Ερμού 10', detail: '105 63 Athens' },
+          { id: 'dXJuOm1ieHBsYw', name: 'Ermou Street', detail: 'Αθήνα 105 63' },
+        ],
+      }) as never,
+    );
+    const { container } = show();
+    await userEvent.type(field(), 'Ermou');
+    const list = await screen.findByRole('listbox', { name: 'Address suggestions' });
+    const [option] = within(list).getAllByRole('option');
+    expect(option?.querySelector('[lang="el"]')).toHaveTextContent(/^Οδός Ερμού$/);
+    // The number and "105 63 Athens" stay with the page.
+    expect(option?.querySelectorAll('[lang]')).toHaveLength(1);
+    // The detail too.
+    const second = within(list).getAllByRole('option')[1];
+    expect(second?.querySelector('[lang="el"]')).toHaveTextContent(/^Αθήνα$/);
+    await expectNoAxeViolations(container);
+  });
+
+  it('marks nothing on a Greek page, where Greek words are the page’s own', async () => {
+    suggest.mockResolvedValue(
+      answer({
+        suggestions: [{ id: 'dXJuOm1ieGFkcg', name: 'Οδός Ερμού 10', detail: 'Αθήνα' }],
+      }) as never,
+    );
+    show({}, 'el');
+    await userEvent.type(field(), 'Ερμού');
+    const list = await screen.findByRole('listbox', { name: 'Προτάσεις διευθύνσεων' });
+    expect(list.querySelectorAll('[lang]')).toHaveLength(0);
+  });
+
+  it('marks the field with the language its place was named in, until the words change', async () => {
+    show(
+      {
+        defaultValue: 'Syntagma Square',
+        latitude: '37.9755',
+        longitude: '23.7348',
+        placeLocale: 'en',
+      },
+      'el',
+    );
+    expect(field()).toHaveAttribute('lang', 'en');
+    await userEvent.type(field(), 'x');
+    expect(field()).not.toHaveAttribute('lang');
+  });
+
   it('waits for a few letters before asking', () => {
     vi.useFakeTimers();
     try {

@@ -556,7 +556,8 @@ export type OwnerBooking = {
 };
 
 export type OwnerBookingsQuery = {
-    page: number;
+    after?: string;
+    before?: string;
 };
 
 export type OwnerListingBookings = {
@@ -564,8 +565,8 @@ export type OwnerListingBookings = {
     name: string | null;
     contentLocale: Locale;
     bookings: Array<OwnerBooking>;
-    page: number;
-    hasMore: boolean;
+    previous: string | null;
+    next: string | null;
 };
 
 export type PlaceSuggestion = {
@@ -1456,7 +1457,8 @@ export type GetListingBookingsData = {
         id: string;
     };
     query?: {
-        page?: number;
+        before?: string;
+        after?: string;
     };
     url: '/v1/owner/listings/{id}/bookings';
 };

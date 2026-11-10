@@ -714,14 +714,14 @@ export const getListingBookingsOptions = (options: Options<GetListingBookingsDat
 export const getListingBookingsInfiniteQueryKey = (options: Options<GetListingBookingsData>): QueryKey<Options<GetListingBookingsData>> => createQueryKey('getListingBookings', options, true);
 
 export const getListingBookingsInfiniteOptions = (options: Options<GetListingBookingsData>) => {
-    const opts = infiniteQueryOptions<GetListingBookingsResponse, GetListingBookingsError, InfiniteData<GetListingBookingsResponse>, QueryKey<Options<GetListingBookingsData>>, number | Pick<QueryKey<Options<GetListingBookingsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    const opts = infiniteQueryOptions<GetListingBookingsResponse, GetListingBookingsError, InfiniteData<GetListingBookingsResponse>, QueryKey<Options<GetListingBookingsData>>, string | Pick<QueryKey<Options<GetListingBookingsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
     {
         queryFn: async ({ pageParam, queryKey, signal }) => {
             // @ts-ignore
             const page: Pick<QueryKey<Options<GetListingBookingsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
                 query: {
-                    page: pageParam
+                    before: pageParam
                 }
             };
             const params = createInfiniteParams(queryKey, page);

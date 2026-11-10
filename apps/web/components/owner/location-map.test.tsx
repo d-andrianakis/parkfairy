@@ -38,6 +38,11 @@ const fake = vi.hoisted(() => {
     getZoom = () => 10;
     constructor(readonly options: Record<string, unknown>) {
       created.maps.push(this);
+      // As Mapbox's attribution control, added by the constructor, writes it.
+      const attribution = document.createElement('div');
+      attribution.className = 'mapboxgl-ctrl-attrib-inner';
+      attribution.textContent = '© Mapbox © OpenStreetMap Improve this map';
+      (options.container as HTMLElement).appendChild(attribution);
     }
     on = (name: string, handler: Handler) => {
       this.handlers.set(name, handler);
@@ -112,6 +117,12 @@ describe('LocationMap', () => {
     expect(options.language).toBe('el');
     expect(options.style).toBe('mapbox://styles/mapbox/streets-v12');
     expect(options.locale).toMatchObject({ 'NavigationControl.ZoomIn': 'Μεγέθυνση' });
+  });
+
+  it('marks Mapbox’s attribution as the English it is written in', async () => {
+    const { container } = render(<LocationMap {...props()} />);
+    await started();
+    expect(container.querySelector('.mapboxgl-ctrl-attrib-inner')).toHaveAttribute('lang', 'en');
   });
 
   it('takes the worker from our own origin and names the pin', async () => {

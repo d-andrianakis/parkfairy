@@ -10,6 +10,7 @@ import { CircleAlert } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { OpeningHours, useWallTime } from '@/components/parking/opening-hours';
+import { PlaceWords } from '@/components/parking/place-words';
 import { ACCOUNT_STEP_HREF, listingStepHref } from '@/lib/owner';
 import { StepLink } from './navigation';
 
@@ -96,13 +97,21 @@ export function ReviewSummary({
         editLabel={editLabel('location')}
       >
         <p lang={location.name ? location.contentLocale : undefined} className="font-medium">
-          {location.name ?? t('review.notSet')}
+          {location.name ? (
+            <PlaceWords text={location.name} lang={location.contentLocale} />
+          ) : (
+            t('review.notSet')
+          )}
         </p>
         <p
           lang={location.address ? location.contentLocale : undefined}
           className="text-sm text-muted-foreground"
         >
-          {location.address ?? t('review.notSet')}
+          {location.address ? (
+            <PlaceWords text={location.address} lang={location.contentLocale} />
+          ) : (
+            t('review.notSet')
+          )}
         </p>
         {location.areaId ? (
           <p className="text-sm text-muted-foreground">{tAreas(location.areaId)}</p>

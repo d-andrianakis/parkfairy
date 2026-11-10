@@ -5,9 +5,11 @@ import {
   BookingHoldInputSchema,
   BookingListQuerySchema,
   BOOKINGS_MAX_PAGE,
+  bookingsCursor,
   isVehiclePlate,
   normalizeVehiclePlate,
   OwnerBookingsQuerySchema,
+  parseBookingsCursor,
   VEHICLE_PLATE_LIMITS,
 } from './bookings.js';
 import { isValidationMessage } from './validation.js';
@@ -133,8 +135,45 @@ describe('booking lists', () => {
 
   it('stop at a page nobody reads', () => {
     expect(BookingListQuerySchema.safeParse({ page: BOOKINGS_MAX_PAGE + 1 }).success).toBe(false);
-    expect(OwnerBookingsQuerySchema.safeParse({ page: '0' }).success).toBe(false);
-    expect(OwnerBookingsQuerySchema.safeParse({ page: '1.5' }).success).toBe(false);
+    expect(BookingListQuerySchema.safeParse({ page: '0' }).success).toBe(false);
+    expect(BookingListQuerySchema.safeParse({ page: '1.5' }).success).toBe(false);
+  });
+});
+
+describe("an owner's list of bookings", () => {
+  const id = '0b1e7a52-3f4c-4d2a-9e8b-5c6d7e8f9a0b';
+  const start = new Date('2026-11-12T08:30:00.000Z');
+
+  it('goes from a place a page gave out, either way', () => {
+    const place = bookingsCursor({ start, id });
+    expect(place).toBe(`${start.getTime()}_${id}`);
+    expect(parseBookingsCursor(place)).toEqual({ start, id });
+    expect(OwnerBookingsQuerySchema.parse({})).toEqual({});
+    expect(OwnerBookingsQuerySchema.parse({ after: place })).toEqual({ after: place });
+    expect(OwnerBookingsQuerySchema.parse({ before: place })).toEqual({ before: place });
+  });
+
+  it('refuses anything else, and both ways at once', () => {
+    const place = bookingsCursor({ start, id });
+    const tooLate = `253402300800000_${id}`; // year 10000
+    expect(parseBookingsCursor(`253402300799999_${id}`)).not.toBeNull();
+    for (const after of [
+      '1',
+      `${start.getTime()}_${id.toUpperCase()}`,
+      `-1_${id}`,
+      `${place}x`,
+      tooLate,
+      `999999999999999_${id}`,
+    ]) {
+      expect(OwnerBookingsQuerySchema.safeParse({ after }).success, after).toBe(false);
+      expect(parseBookingsCursor(after), after).toBeNull();
+    }
+    expect(OwnerBookingsQuerySchema.safeParse({ after: [place, place] }).success).toBe(false);
+    const both = OwnerBookingsQuerySchema.safeParse({ after: place, before: place });
+    expect(both.success).toBe(false);
+    for (const issue of both.error?.issues ?? []) {
+      expect(isValidationMessage(issue.message), issue.message).toBe(true);
+    }
   });
 });
 

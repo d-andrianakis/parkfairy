@@ -737,6 +737,56 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   the account as the tracker; its keys never meet the per-address ones. Each guard instance builds
   its own `commonOptions`, so a subclass's `getTracker`/`generateKey` stay its own.
 
+- **2026-11-10 · The owner's bookings page goes by place, not page number.**
+  - **Cursors:** `?after=`/`?before=` hold `<start in ms>_<booking id>` (`bookingsCursor`,
+    `parseBookingsCursor` in contracts), and the answer carries `previous`/`next`. A deep page in a
+    busy garage's year costs what the first does, and a booking called off on an earlier page
+    shifts nothing.
+  - **The query:** it compares `(starts_at, id)` as a pair. Don't add a plain bound on `starts_at`
+    by hand: Postgres derives it for the index, and with both the planner multiplied their
+    selectivities and read and sorted every booking left. The probe for "is there a page on the
+    side we came from" is ordered outward from the place: an unordered `limit 1` was planned as a
+    scan of the whole table once that side held ~1% of it. Both were measured on 1.68M bookings.
+    `bookings_location_starts_id_idx` (0020) has the id last, so the pair is an exact index
+    condition and the order comes from the index.
+  - **The page:** a place with nothing left goes to the first page, keeping the cancel notice. A
+    cancel returns to the page it was made on. Old `?page=` links are simply the first page.
+- **2026-11-10 · A hold reads under the listing's lock in one statement:** `listingRulesIn`
+  (`parking/listing-data.ts`) returns hours, closures and, if asked, prices as `json_agg`
+  subqueries. Each read under the lock was another round trip, so the hold went from 11 to 6 and
+  the confirmation from 11 to 8.
+  - It must give what `openingHoursOf`, `hoursExceptionsOf` and `priceRulesOf` give: an integration
+    test compares them, and any change to how hours or prices are read changes both.
+  - `clearForHold` lets the driver's own holds go and expires other drivers' lapsed ones (`skip
+locked`) in one statement. The two sets are kept apart (`user_id <> $user`) because both parts
+    of a statement see one snapshot, and a row updated by both would get either status.
+- **2026-11-10 · Resend's limit is the account's, shared by two senders.** The web app (account
+  emails) and the worker (everything else) each go at one a second by default (the transport's
+  `SEND_INTERVAL_MS`; the worker's `EMAIL_SENDS_PER_SECOND`), which keeps the two within
+  Resend's 2.
+  - The worker drains a backlog while claims come back full, for 25 s of each 30 s run. Each claim
+    holds only what its pace sends in the time left, because the queue's other jobs wait behind
+    it.
+  - A claim whose sends all fail ends the run, so an outage spends one try of 20 emails, not of the
+    whole backlog.
+  - Raising the pace means raising Resend's limit first, and the web's with it.
+- **2026-11-10 · Greek words inside English text are marked `lang="el"`** (`greekRuns` in
+  `lib/greek-runs.ts`, `PlaceWords`). Mapbox falls back to Greek names, and owners type Greek into
+  English listings; an English voice spells Greek letters out (WCAG 3.1.2).
+  - **A run** goes from the first Greek letter to the last. It takes the punctuation and spaces
+    between them, digits glued on («28ης Οκτωβρίου», «Α1») and the numeral sign («Γʹ»). A number
+    after a space stays with the page.
+  - **Nothing is marked on a Greek page:** Latin script there may be a brand or another language,
+    and marking it `en` would be a guess.
+  - **Where it applies:** the outer element keeps the listing's or the place's `lang`, and runs nest
+    inside it. Inside a `Button`, wrap it in a `<span>`: the button is `inline-flex`, and loose runs
+    would become separate flex items.
+  - **Mapbox's attribution** is English on every page and marked so (`markAttributionEnglish`).
+    mapbox-gl creates `.mapboxgl-ctrl-attrib-inner` in the `Map` constructor and later only
+    replaces its `innerHTML`. A Greek `customAttribution` would need another look.
+  - **The owner's address search** asks Mapbox in the listing's language, not the page's, since
+    that is the language the address is saved and shown in.
+
 ## Conventions
 
 - **Data:** UUID PKs, `timestamptz` (UTC instants), snake_case SQL, money as integer minor
@@ -780,6 +830,21 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   `tests/smoke/specs/<feature>.smoke.ts`.
 
 ## Gotchas and environment quirks
+
+- **Next keeps a page's client components when only the query changes** (the page segment's key
+  ignores search params). A notice whose `FocusHeading` took the focus once keeps its instance when
+  `?cancelled=A` becomes `?cancelled=B`: its effect doesn't run again, and the new text is neither
+  focused nor read. Key such notices by what they announce. `renderWithProviders` passes its
+  providers as a wrapper, so `rerender` reuses components the same way and a test can catch it
+  (2026-11-10).
+- **Axe right after a client navigation can find no `<title>`:** Next swaps it after the content
+  has rendered, so a check that waits only for the content races it ("document-title", 1 run in 3
+  on the owner's pager). Wait for `toHaveTitle` before `expectAccessible` after a click that
+  navigates without a page load (2026-11-10).
+- **Postgres refuses JavaScript's ISO dates past 9999** (`+010000-01-01T…Z`: "time zone
+  displacement out of range"), Drizzle's own comparisons included. Anything turning a user's number
+  into a date for SQL caps it (`parseBookingsCursor`), or a made-up value is a 500 (2026-11-10, the
+  same class as the year-9999 loop in 1.11).
 
 - **The web app's tests and typecheck read `@parkfairy/contracts` from its `dist`.** After changing
   the contracts, run `pnpm --filter @parkfairy/contracts build` (the same for database and

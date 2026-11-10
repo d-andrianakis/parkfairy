@@ -1,4 +1,4 @@
-import { BOOKING_REFERENCE_PATTERN, BOOKINGS_MAX_PAGE } from '@parkfairy/contracts';
+import { BOOKING_REFERENCE_PATTERN, parseBookingsCursor } from '@parkfairy/contracts';
 import { Alert, AlertDescription } from '@parkfairy/ui/components/alert';
 import { Button } from '@parkfairy/ui/components/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@parkfairy/ui/components/card';
@@ -9,8 +9,9 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { FocusHeading } from '@/components/focus-heading';
 import { CancelListingBooking } from '@/components/owner/cancel-listing-booking';
+import { PlaceWords } from '@/components/parking/place-words';
 import { StayRange } from '@/components/parking/stay-range';
-import { Link } from '@/i18n/navigation';
+import { Link, redirect } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { loadOwnerBookings } from '@/lib/bookings.server';
 import { closuresHref, ownerBookingsHref } from '@/lib/owner-href';
@@ -18,13 +19,25 @@ import { requireSession } from '@/lib/session';
 
 interface OwnerBookingsPageProps {
   params: Promise<{ locale: string; id: string }>;
-  searchParams: Promise<{ page?: string | string[]; cancelled?: string | string[] }>;
+  searchParams: Promise<{
+    after?: string | string[];
+    before?: string | string[];
+    cancelled?: string | string[];
+  }>;
 }
 
-async function pageOf(searchParams: OwnerBookingsPageProps['searchParams']) {
-  const { page } = await searchParams;
-  const asked = Number(typeof page === 'string' ? page : 1);
-  return Number.isInteger(asked) ? Math.min(Math.max(asked, 1), BOOKINGS_MAX_PAGE) : 1;
+/**
+ * Where in the list the page starts: `after` or `before` a place a page gave out (keyset paging),
+ * or the first page for anything else, an old `?page=` link included.
+ */
+async function placeOf(
+  searchParams: OwnerBookingsPageProps['searchParams'],
+): Promise<{ after: string; before: string }> {
+  const { after, before } = await searchParams;
+  const valid = (place: string | string[] | undefined) =>
+    typeof place === 'string' && parseBookingsCursor(place) !== null ? place : '';
+  const [from, to] = [valid(after), valid(before)];
+  return from && to ? { after: '', before: '' } : { after: from, before: to };
 }
 
 /** Named for the listing, so an owner with several open in tabs can tell them apart. */
@@ -34,7 +47,8 @@ export async function generateMetadata({
 }: OwnerBookingsPageProps): Promise<Metadata> {
   const t = await getTranslations({ locale: await localeFromParams(params), namespace: 'Owner' });
   // The same request as the page's: `loadOwnerBookings` is cached for the render.
-  const listing = await loadOwnerBookings((await params).id, await pageOf(searchParams));
+  const { after, before } = await placeOf(searchParams);
+  const listing = await loadOwnerBookings((await params).id, after, before);
   const name = typeof listing === 'object' ? listing.name : null;
   return { title: name ? t('bookings.metaTitle', { name }) : t('bookings.title') };
 }
@@ -47,13 +61,27 @@ export default async function OwnerBookingsPage({ params, searchParams }: OwnerB
   const locale = await localeFromParams(params);
   const { id } = await params;
   await requireSession(ownerBookingsHref(id));
-  const page = await pageOf(searchParams);
-  const listing = await loadOwnerBookings(id, page);
+  const place = await placeOf(searchParams);
+  const listing = await loadOwnerBookings(id, place.after, place.before);
   if (listing === 'not-found') notFound();
   // A booking just called off here: said once the page comes back without it.
   const { cancelled } = await searchParams;
   const justCancelled =
     typeof cancelled === 'string' && BOOKING_REFERENCE_PATTERN.test(cancelled) ? cancelled : null;
+  // Nothing left from this place (the last one here called off, or ended): the first page instead.
+  if (
+    typeof listing === 'object' &&
+    listing.bookings.length === 0 &&
+    (place.after || place.before)
+  ) {
+    redirect({
+      href: {
+        pathname: ownerBookingsHref(id),
+        query: justCancelled ? { cancelled: justCancelled } : {},
+      },
+      locale,
+    });
+  }
   const t = await getTranslations({ locale, namespace: 'Owner' });
 
   if (listing === 'unavailable') {
@@ -71,10 +99,12 @@ export default async function OwnerBookingsPage({ params, searchParams }: OwnerB
   const format = await getFormatter({ locale });
   const money = ({ amountMinor, currency }: { amountMinor: number; currency: string }) =>
     format.number(amountMinor / 100, { style: 'currency', currency });
-  const pageHref = (to: number) => ({
+  const pageHref = (query: { after: string } | { before: string }) => ({
     pathname: ownerBookingsHref(id),
-    query: to > 1 ? { page: String(to) } : {},
+    query,
   });
+  // A cancel comes back to this same page: places don't move when a booking goes.
+  const here = place.after ? { after: place.after } : place.before ? { before: place.before } : {};
   const nameLang = listing.name ? listing.contentLocale : undefined;
 
   return (
@@ -88,7 +118,11 @@ export default async function OwnerBookingsPage({ params, searchParams }: OwnerB
       </Link>
       <div className="grid gap-2">
         <p className="text-sm text-muted-foreground" lang={nameLang}>
-          {listing.name ?? t('dashboard.untitled')}
+          {listing.name ? (
+            <PlaceWords text={listing.name} lang={listing.contentLocale} />
+          ) : (
+            t('dashboard.untitled')
+          )}
         </p>
         <h1 className="text-3xl font-semibold tracking-tight">{t('bookings.title')}</h1>
         <p className="text-muted-foreground">{t('bookings.lead')}</p>
@@ -102,8 +136,10 @@ export default async function OwnerBookingsPage({ params, searchParams }: OwnerB
         </p>
       </div>
       {justCancelled ? (
-        // What replaced the card the owner pressed in: it takes the focus, and says it.
-        <Alert role={undefined}>
+        // What replaced the card the owner pressed in: it takes the focus, and says it. Keyed by
+        // the booking: a second cancel changes only the query, which keeps the page's components,
+        // and a reused heading would neither take the focus nor be read.
+        <Alert key={justCancelled} role={undefined}>
           <CircleCheck aria-hidden />
           <div className="col-start-2">
             <FocusHeading>{t('bookings.cancelled', { reference: justCancelled })}</FocusHeading>
@@ -165,6 +201,7 @@ export default async function OwnerBookingsPage({ params, searchParams }: OwnerB
                         listingId={listing.id}
                         bookingId={booking.id}
                         reference={booking.reference}
+                        place={here}
                       />
                     ) : (
                       <p className="text-sm text-muted-foreground">{t('bookings.underWay')}</p>
@@ -177,18 +214,18 @@ export default async function OwnerBookingsPage({ params, searchParams }: OwnerB
         </ul>
       )}
 
-      {page > 1 || listing.hasMore ? (
+      {listing.previous || listing.next ? (
         <nav aria-label={t('bookings.pagesLabel')} className="flex flex-wrap justify-between gap-2">
-          {page > 1 ? (
+          {listing.previous ? (
             <Button asChild variant="outline" size="sm">
-              <Link href={pageHref(page - 1)}>{t('bookings.previous')}</Link>
+              <Link href={pageHref({ before: listing.previous })}>{t('bookings.previous')}</Link>
             </Button>
           ) : (
             <span />
           )}
-          {listing.hasMore ? (
+          {listing.next ? (
             <Button asChild variant="outline" size="sm">
-              <Link href={pageHref(page + 1)}>{t('bookings.next')}</Link>
+              <Link href={pageHref({ after: listing.next })}>{t('bookings.next')}</Link>
             </Button>
           ) : null}
         </nav>

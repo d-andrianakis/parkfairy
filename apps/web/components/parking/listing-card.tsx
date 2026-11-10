@@ -12,6 +12,7 @@ import { useFormatter, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { FeatureBadges } from './feature-badges';
 import { ListingPhotoImage } from './listing-photo';
+import { PlaceWords } from './place-words';
 
 export function useMoney() {
   const format = useFormatter();
@@ -86,11 +87,13 @@ export function ListingCard({
               href={{ pathname: `/parking/${listing.slug}`, query }}
               className="outline-none after:absolute after:inset-0 after:rounded-xl"
             >
-              {listing.name}
+              <PlaceWords text={listing.name} lang={listing.contentLocale} />
             </Link>
           </Heading>
         </CardTitle>
-        <CardDescription lang={listing.contentLocale}>{listing.address}</CardDescription>
+        <CardDescription lang={listing.contentLocale}>
+          <PlaceWords text={listing.address} lang={listing.contentLocale} />
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 px-5">
         <div className="flex flex-wrap items-center gap-1.5">

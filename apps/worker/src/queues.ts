@@ -15,7 +15,12 @@ export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 export interface ProcessorContext {
   db: Database;
   logger: Logger;
-  email: { transport: EmailTransport; webUrl: string };
+  email: {
+    transport: EmailTransport;
+    webUrl: string;
+    /** The transport's pace, which sizes the sender's claims to the time it has. */
+    sendsPerSecond: number;
+  };
 }
 
 export interface ScheduledJob {

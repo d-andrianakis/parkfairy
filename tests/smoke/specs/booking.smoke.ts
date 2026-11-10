@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { HAS_DATABASE, publishListing, unpublishListing } from '../support/db';
+import { addBookings, HAS_DATABASE, publishListing, unpublishListing } from '../support/db';
 import { waitForEmail } from '../support/email';
 import { EMAIL_OUTBOX, SIGNED_IN_STATE, visitorAddress, WEB_URL } from '../support/env';
 import {
@@ -159,6 +159,17 @@ test('a driver books a space, the owner sees who is coming, and closing that day
     ).toBeFocused();
     await expect(page.getByText('There are no bookings yet.')).toBeVisible();
     await expectAccessible(page);
+    // A place in the list with nothing after it any more, or a page number from before places,
+    // comes to the first page (keyset paging, 3.4), the notice of the cancel kept and focused.
+    await page.goto(
+      `/en/owner/listings/${id}/bookings?after=4102444800000_00000000-0000-4000-8000-000000000000&cancelled=${reference}`,
+    );
+    await expect(page).toHaveURL(`/en/owner/listings/${id}/bookings?cancelled=${reference}`);
+    await expect(
+      page.getByRole('heading', { level: 2, name: `Booking ${reference} cancelled` }),
+    ).toBeFocused();
+    await page.goto(`/en/owner/listings/${id}/bookings?page=3`);
+    await expect(page.getByText('There are no bookings yet.')).toBeVisible();
     // The same page in Greek, on a phone.
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto(`/el/owner/listings/${id}/bookings`);
@@ -317,6 +328,67 @@ test('a space taken meanwhile is said so, a driver cancels by the terms, and Gre
   } finally {
     await slowContext.close();
     await fast.context.close();
+    await unpublishListing(id);
+  }
+});
+
+test('an owner pages through a busy listing, and a cancel on a later page comes back to it', async ({
+  page,
+}) => {
+  test.skip(!EMAIL_OUTBOX, 'A new account needs its confirmation email');
+  test.skip(!HAS_DATABASE, 'Putting a listing live, and its bookings, are done in the database');
+  test.setTimeout(120_000);
+
+  await registerAndSignIn(page, uniqueEmail('busy-owner'), 'Owner Busy');
+  const { id } = await listingWithStaff(
+    page,
+    `Γκαράζ πολλών κρατήσεων ${randomUUID().slice(0, 6)}`,
+  );
+  await publishListing(id);
+  await addBookings(id, 25);
+  const cards = page.getByRole('heading', { level: 2, name: /^Booking [0-9A-Z]{4}-[0-9A-Z]{4}$/ });
+  const pages = page.getByRole('navigation', { name: 'Pages' });
+
+  try {
+    await page.goto(`/en/owner/listings/${id}/bookings`);
+    await expect(cards).toHaveCount(20);
+    await expect(pages.getByRole('link', { name: 'Previous page' })).toHaveCount(0);
+    await pages.getByRole('link', { name: 'Next page' }).click();
+    await expect(page).toHaveURL(/\?after=\d+_[0-9a-f-]{36}$/);
+    const second = new URL(page.url()).search;
+    await expect(cards).toHaveCount(5);
+    await expect(pages.getByRole('link', { name: 'Next page' })).toHaveCount(0);
+    // A client navigation swaps the <title> after the content: axe would otherwise catch none.
+    await expect(page).toHaveTitle(/^Bookings for /);
+    await expectAccessible(page);
+
+    // A cancel here comes back here, its notice focused, the page as it was less that booking.
+    const reference = ((await cards.first().textContent()) ?? '').replace('Booking ', '');
+    await page.getByRole('button', { name: `Cancel booking ${reference}` }).click();
+    await page.getByRole('button', { name: 'Yes, cancel it' }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: `Booking ${reference} cancelled` }),
+    ).toBeFocused();
+    await expect(page).toHaveURL(
+      `/en/owner/listings/${id}/bookings${second}&cancelled=${reference}`,
+    );
+    await expect(cards).toHaveCount(4);
+    await expect(page).toHaveTitle(/^Bookings for /);
+    await expectAccessible(page);
+
+    await pages.getByRole('link', { name: 'Previous page' }).click();
+    await expect(page).toHaveURL(/\?before=\d+_[0-9a-f-]{36}$/);
+    await expect(cards).toHaveCount(20);
+    await expect(pages.getByRole('link', { name: 'Previous page' })).toHaveCount(0);
+
+    // In Greek, a place with nothing after it lands on the first page, still in Greek.
+    await page.goto(
+      `/el/owner/listings/${id}/bookings?after=4102444800000_00000000-0000-4000-8000-000000000000`,
+    );
+    await expect(page).toHaveURL(`/el/owner/listings/${id}/bookings`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Κρατήσεις');
+    await expect(page.getByRole('navigation', { name: 'Σελίδες' })).toBeVisible();
+  } finally {
     await unpublishListing(id);
   }
 });

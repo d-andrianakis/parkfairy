@@ -61,7 +61,7 @@ describe('BookingsService with ids that cannot exist', () => {
   });
 
   it("answers an owner's malformed listing id the same way as another owner's", async () => {
-    expect(await refusal(service.listingBookings('user', 'x', { page: 1 }))).toMatchObject({
+    expect(await refusal(service.listingBookings('user', 'x', {}))).toMatchObject({
       status: 404,
       code: 'LISTING_NOT_FOUND',
     });

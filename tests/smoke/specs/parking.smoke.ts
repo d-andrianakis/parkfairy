@@ -440,6 +440,14 @@ test.describe('address search and the results map (decisions #40–#42)', () => 
     await expect(heading).toHaveText('Στάθμευση κοντά στο σημείο «Syntagma Square»');
     await expect(heading.locator('[lang="en"]')).toHaveText('Syntagma Square');
     await expectAccessible(page);
+
+    // A Greek name Mapbox had no English for, on the English page: its words are marked Greek.
+    place.set('place', 'Πλατεία Συντάγματος, Athens');
+    await page.goto(`/en/search?${place.toString()}&placeLocale=en`);
+    await expect(
+      page.getByRole('heading', { level: 1 }).locator('[lang="en"] [lang="el"]'),
+    ).toHaveText('Πλατεία Συντάγματος');
+    await expectAccessible(page);
   });
 
   test('with a token: an address picked from the suggestions searches there, and the map pins the results', async ({
@@ -465,6 +473,8 @@ test.describe('address search and the results map (decisions #40–#42)', () => 
     const map = page.getByRole('region', { name: 'Map of the results' });
     await expect(map.getByRole('link').first()).toBeVisible();
     await expect(map.getByRole('link').first()).toHaveAccessibleName(/^Result 1: /);
+    // Mapbox's attribution is English on every page, and marked so (3.4).
+    await expect(map.locator('.mapboxgl-ctrl-attrib-inner')).toHaveAttribute('lang', 'en');
     await expectAccessible(page);
     expect(await csp()).toEqual([]);
   });

@@ -67,6 +67,21 @@ describe('ListingCard', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('marks the Greek words of an English listing as Greek', async () => {
+    const english = {
+      ...listing,
+      name: 'Syntagma Garage',
+      address: 'Οδός Ερμού 10, Athens 105 63',
+      contentLocale: 'en' as const,
+    };
+    const { container } = renderWithProviders(<ListingCard listing={english} />);
+    const address = screen.getByText(/Athens 105 63/);
+    expect(address).toHaveAttribute('lang', 'en');
+    expect(address.querySelector('[lang="el"]')).toHaveTextContent(/^Οδός Ερμού$/);
+    expect(screen.getByRole('heading', { level: 3 }).querySelector('[lang="el"]')).toBeNull();
+    await expectNoAxeViolations(container);
+  });
+
   it('summarises area, features, spaces and the hourly price', () => {
     renderWithProviders(<ListingCard listing={listing} />);
     expect(screen.getByText('Syntagma')).toBeInTheDocument();

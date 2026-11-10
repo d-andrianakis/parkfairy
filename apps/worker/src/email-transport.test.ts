@@ -7,18 +7,31 @@ vi.mock('@parkfairy/email', () => ({
   resendTransport: vi.fn(() => 'resend'),
 }));
 
-const unset = { RESEND_API_KEY: undefined, EMAIL_FROM: undefined, EMAIL_OUTBOX_DIR: undefined };
+const unset = {
+  RESEND_API_KEY: undefined,
+  EMAIL_FROM: undefined,
+  EMAIL_OUTBOX_DIR: undefined,
+  EMAIL_SENDS_PER_SECOND: 1,
+};
 
 describe('chooseEmailTransport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('really sends when it has a key and a sender', () => {
+  it('really sends when it has a key and a sender, at the pace it is given', () => {
     const env = { ...unset, RESEND_API_KEY: 'k', EMAIL_FROM: 'hello@parkfairy.gr' };
     expect(chooseEmailTransport(env)).toBe('resend');
-    expect(resendTransport).toHaveBeenCalledWith({ apiKey: 'k', from: 'hello@parkfairy.gr' });
+    expect(resendTransport).toHaveBeenCalledWith({
+      apiKey: 'k',
+      from: 'hello@parkfairy.gr',
+      intervalMs: 1000,
+    });
     expect(outboxTransport).not.toHaveBeenCalled();
+    chooseEmailTransport({ ...env, EMAIL_SENDS_PER_SECOND: 3 });
+    expect(resendTransport).toHaveBeenLastCalledWith(expect.objectContaining({ intervalMs: 334 }));
+    chooseEmailTransport({ ...env, EMAIL_SENDS_PER_SECOND: 0.5 });
+    expect(resendTransport).toHaveBeenLastCalledWith(expect.objectContaining({ intervalMs: 2000 }));
   });
 
   it('writes files to the directory it is told', () => {

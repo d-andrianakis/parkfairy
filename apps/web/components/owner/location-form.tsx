@@ -20,6 +20,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
+import { PlaceWords } from '@/components/parking/place-words';
 import { useAnnouncer } from '@/components/use-announcer';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { LOCALE_ENDONYMS } from '@/i18n/locales';
@@ -185,7 +186,8 @@ export function LocationForm({
       return;
     }
     setSearching(true);
-    const found = await findAddress(address, mapboxToken, locale);
+    // In the listing's language, which the address is saved and shown in, not the page's.
+    const found = await findAddress(address, mapboxToken, contentLocale);
     setSearching(false);
     setMatches(found);
     notice.announce(found ? t('searchResults', { count: found.length }) : t('searchFailed'));
@@ -306,7 +308,9 @@ export function LocationForm({
                     className={`${WRAPPING_BUTTON} w-full justify-start text-left`}
                     onClick={() => chooseMatch(match)}
                   >
-                    {match.address}
+                    <span lang={contentLocale}>
+                      <PlaceWords text={match.address} lang={contentLocale} />
+                    </span>
                   </Button>
                 </li>
               ))}
@@ -430,6 +434,8 @@ export function LocationForm({
           onChange={(event) => {
             const value = event.target.value as Locale;
             setContentLocale(value);
+            // Addresses found in the other language would be saved under this one.
+            setMatches(null);
             autosave('contentLocale', { contentLocale: value });
           }}
         >

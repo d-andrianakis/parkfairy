@@ -17,6 +17,7 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { ClientMessages } from '@/components/client-messages';
 import { FocusHeading } from '@/components/focus-heading';
 import { BookSpacePicker } from '@/components/parking/book-space-picker';
+import { PlaceWords } from '@/components/parking/place-words';
 import { SearchLink } from '@/components/parking/search-link';
 import { FeatureBadges } from '@/components/parking/feature-badges';
 import { HoursExceptions } from '@/components/parking/hours-exceptions';
@@ -132,11 +133,12 @@ export default async function ListingPage(props: ListingPageProps) {
           >
             {t('moreNear', { area: tAreas(listing.area) })}
           </SearchLink>
+          {/* The owner's words, Greek ones marked inside English ones (a Greek street name). */}
           <h1 lang={listing.contentLocale} className="text-3xl font-semibold tracking-tight">
-            {listing.name}
+            <PlaceWords text={listing.name} lang={listing.contentLocale} />
           </h1>
           <p lang={listing.contentLocale} className="text-muted-foreground">
-            {listing.address}
+            <PlaceWords text={listing.address} lang={listing.contentLocale} />
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="outline">

@@ -35,9 +35,9 @@ describe.each([
   ['loadBooking', () => loadBooking('b'), api.getMyBooking, { path: { id: 'b' } }],
   [
     'loadOwnerBookings',
-    () => loadOwnerBookings('l', 2),
+    () => loadOwnerBookings('l', '1762934400000_0b1e7a52-3f4c-4d2a-9e8b-5c6d7e8f9a0b'),
     api.getListingBookings,
-    { path: { id: 'l' }, query: { page: 2 } },
+    { path: { id: 'l' }, query: { after: '1762934400000_0b1e7a52-3f4c-4d2a-9e8b-5c6d7e8f9a0b' } },
   ],
 ] as const)('%s', (_name, load, call, asked) => {
   it('asks as the visitor, so the API decides whose it is', async () => {
@@ -54,6 +54,17 @@ describe.each([
     call.mockRejectedValue(new Error('timeout'));
     await expect(load()).resolves.toBe('unavailable');
   });
+});
+
+it('asks for the first page of an owner’s list without a place, and back from one with it', async () => {
+  const place = '1762934400000_0b1e7a52-3f4c-4d2a-9e8b-5c6d7e8f9a0b';
+  api.getListingBookings.mockResolvedValue({ data: FOUND, response: new Response() });
+  await loadOwnerBookings('l');
+  expect(api.getListingBookings).toHaveBeenLastCalledWith(expect.objectContaining({ query: {} }));
+  await loadOwnerBookings('l', '', place);
+  expect(api.getListingBookings).toHaveBeenLastCalledWith(
+    expect.objectContaining({ query: { before: place } }),
+  );
 });
 
 describe('loadBookings', () => {

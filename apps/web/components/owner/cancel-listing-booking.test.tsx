@@ -17,13 +17,18 @@ const cancel = vi.mocked(cancelListingBooking);
 const renderInSubtree = rendererFor(CLIENT_NAMESPACES.owner);
 const BOOKING = 'b0b0b0b0-0000-4000-8000-000000000001';
 
-const show = (locale: 'en' | 'el' = 'en') =>
+const show = (locale: 'en' | 'el' = 'en', place?: { after?: string; before?: string }) =>
   renderInSubtree(
     <>
       <h1 id="owner-bookings-heading" tabIndex={-1}>
         Bookings
       </h1>
-      <CancelListingBooking listingId={LISTING_ID} bookingId={BOOKING} reference="K7M4-Q2ZD" />
+      <CancelListingBooking
+        listingId={LISTING_ID}
+        bookingId={BOOKING}
+        reference="K7M4-Q2ZD"
+        place={place}
+      />
     </>,
     { locale },
   );
@@ -47,11 +52,26 @@ describe('CancelListingBooking', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cancel booking K7M4-Q2ZD' }));
     await userEvent.click(screen.getByRole('button', { name: 'Yes, cancel it' }));
     await waitFor(() =>
-      expect(routerMock.replace).toHaveBeenCalledWith(
-        `/owner/listings/${LISTING_ID}/bookings?cancelled=K7M4-Q2ZD`,
-      ),
+      expect(routerMock.replace).toHaveBeenCalledWith({
+        pathname: `/owner/listings/${LISTING_ID}/bookings`,
+        query: { cancelled: 'K7M4-Q2ZD' },
+      }),
     );
     expect(cancel).toHaveBeenCalledWith({ path: { id: LISTING_ID, bookingId: BOOKING } });
+  });
+
+  it('comes back to the same place in a long list', async () => {
+    cancel.mockResolvedValue(answer(undefined) as never);
+    const after = '4100000000000_b0b0b0b0-0000-4000-8000-000000000009';
+    show('en', { after });
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel booking K7M4-Q2ZD' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, cancel it' }));
+    await waitFor(() =>
+      expect(routerMock.replace).toHaveBeenCalledWith({
+        pathname: `/owner/listings/${LISTING_ID}/bookings`,
+        query: { after, cancelled: 'K7M4-Q2ZD' },
+      }),
+    );
   });
 
   it('keeps it, and the focus goes back to the button', async () => {

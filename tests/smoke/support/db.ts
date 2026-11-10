@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { Client } from 'pg';
 
 /** The database of a local or CI run; a deployed target's is out of the suite's reach. */
@@ -35,4 +36,40 @@ export async function unpublishListing(id: string): Promise<void> {
   await run(`update parking_locations set status = 'draft', slug = 'draft-' || id where id = $1`, [
     id,
   ]);
+}
+
+const REFERENCE_LETTERS = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const reference = () => {
+  const four = () =>
+    Array.from({ length: 4 }, () => REFERENCE_LETTERS[randomInt(REFERENCE_LETTERS.length)]).join(
+      '',
+    );
+  return `${four()}-${four()}`;
+};
+
+/**
+ * A busy listing for the owner's pages: `count` confirmed bookings on its first space, an hour
+ * each, two hours apart from tomorrow, booked by the owner's own account (the API refuses that,
+ * which is why they go straight in). They are left behind: the listing goes back to a draft after
+ * the test, and the stays pass.
+ */
+export async function addBookings(listingId: string, count: number): Promise<void> {
+  await run(
+    `insert into bookings (reference, user_id, location_id, space_id, space_label, listing_name,
+       listing_address, listing_locale, starts_at, ends_at, gap_minutes, blocked_until, status,
+       hold_expires_at, total_minor, currency, cancellation_policy, vehicle_plate, confirmed_at)
+     select r.reference, p.user_id, l.id, s.id, s.label, l.name, l.address, l.content_locale,
+       date_trunc('hour', now()) + interval '1 day' + r.n * interval '2 hours',
+       date_trunc('hour', now()) + interval '1 day' + r.n * interval '2 hours' + interval '1 hour',
+       0,
+       date_trunc('hour', now()) + interval '1 day' + r.n * interval '2 hours' + interval '1 hour',
+       'confirmed', now(), 400, 'EUR', 'oneDay', 'IKB1234', now()
+     from unnest($2::text[]) with ordinality as r(reference, n)
+     join parking_locations l on l.id = $1
+     join owner_profiles p on p.id = l.owner_id
+     join lateral (
+       select id, label from parking_spaces where location_id = l.id order by label limit 1
+     ) s on true`,
+    [listingId, Array.from({ length: count }, reference)],
+  );
 }

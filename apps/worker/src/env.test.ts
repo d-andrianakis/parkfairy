@@ -8,7 +8,21 @@ const base = {
 
 describe('worker loadEnv', () => {
   it('applies defaults for optional settings', () => {
-    expect(loadEnv(base)).toMatchObject({ WORKER_HEALTH_PORT: 4100, LOG_LEVEL: 'info' });
+    expect(loadEnv(base)).toMatchObject({
+      WORKER_HEALTH_PORT: 4100,
+      LOG_LEVEL: 'info',
+      EMAIL_SENDS_PER_SECOND: 1,
+    });
+  });
+
+  it('sends as fast as it is told, within reason', () => {
+    expect(loadEnv({ ...base, EMAIL_SENDS_PER_SECOND: '8' }).EMAIL_SENDS_PER_SECOND).toBe(8);
+    expect(loadEnv({ ...base, EMAIL_SENDS_PER_SECOND: '' }).EMAIL_SENDS_PER_SECOND).toBe(1);
+    for (const pace of ['0', '-1', '1000', 'fast']) {
+      expect(() => loadEnv({ ...base, EMAIL_SENDS_PER_SECOND: pace }), pace).toThrow(
+        /EMAIL_SENDS_PER_SECOND/,
+      );
+    }
   });
 
   it('points links at this machine by default', () => {

@@ -1,6 +1,7 @@
 import type { Booking } from '@parkfairy/contracts';
 import { useFormatter, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
+import { PlaceWords } from '@/components/parking/place-words';
 import { StayRange } from '@/components/parking/stay-range';
 
 /**
@@ -21,7 +22,7 @@ export function BookingFacts({ booking }: { booking: Booking }) {
       t('parking'),
       listing.name ? (
         <span key="name" lang={listing.contentLocale}>
-          {listing.name}
+          <PlaceWords text={listing.name} lang={listing.contentLocale} />
         </span>
       ) : (
         t('unnamed')
@@ -32,7 +33,7 @@ export function BookingFacts({ booking }: { booking: Booking }) {
           [
             t('address'),
             <span key="address" lang={listing.contentLocale}>
-              {listing.address}
+              <PlaceWords text={listing.address} lang={listing.contentLocale} />
             </span>,
           ] as const,
         ]

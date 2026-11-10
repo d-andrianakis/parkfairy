@@ -42,6 +42,11 @@ const fake = vi.hoisted(() => {
       created.maps.push(this);
       this.layer = document.createElement('div');
       options.container.appendChild(this.layer);
+      // As Mapbox's attribution control, added by the constructor, writes it.
+      const attribution = document.createElement('div');
+      attribution.className = 'mapboxgl-ctrl-attrib-inner';
+      attribution.textContent = '© Mapbox © OpenStreetMap Improve this map';
+      options.container.appendChild(attribution);
     }
     getCanvasContainer = () => this.layer;
     once = (name: string, handler: () => void) => {
@@ -130,6 +135,12 @@ beforeEach(() => {
 });
 
 describe('ResultsMap', () => {
+  it('marks Mapbox’s attribution as the English it is written in, on a Greek page too', async () => {
+    const { container } = render(<ResultsMap {...props({ locale: 'el' })} />);
+    await waitFor(() => expect(fake.created.maps).toHaveLength(1));
+    expect(container.querySelector('.mapboxgl-ctrl-attrib-inner')).toHaveAttribute('lang', 'en');
+  });
+
   it('fits every pin and the searched point, in the page language, with its controls named', async () => {
     render(<ResultsMap {...props()} />);
     await waitFor(() => expect(fake.created.maps).toHaveLength(1));
@@ -196,6 +207,7 @@ describe('ResultsMap', () => {
     expect(links[1]).toHaveAccessibleName('Result 2: Syntagma, €6.00 in total');
     expect(links.map((link) => link.getAttribute('href'))).toEqual(PINS.map((pin) => pin.href));
     expect(links[0]?.querySelector('[lang="el"]')).toHaveTextContent('Γκαράζ Ερμού');
+    expect(links[1]?.querySelector('[lang="en"]')).toHaveTextContent('Syntagma');
     expect(links[0]?.querySelector('[aria-hidden="true"]')).toHaveTextContent('1');
     expect(screen.getByRole('img', { name: 'Where you searched' })).toBeInTheDocument();
     await expectNoAxeViolations(container);
@@ -223,6 +235,22 @@ describe('ResultsMap', () => {
     const broken = props();
     render(<ResultsMap {...broken} />);
     await waitFor(() => expect(broken.onFail).toHaveBeenCalledOnce());
+  });
+
+  it('marks the Greek words of an English listing’s name on its pin', async () => {
+    const [first] = PINS;
+    if (!first) throw new Error('No pin');
+    render(
+      <ResultsMap
+        {...props({
+          pins: [{ ...first, label: { ...first.label, name: 'Garage Ερμού 10', nameLang: 'en' } }],
+        })}
+      />,
+    );
+    const [link] = await screen.findAllByRole('link');
+    expect(link).toHaveAccessibleName('Result 1: Garage Ερμού 10, €4.00 in total');
+    const name = link?.querySelector('[lang="en"]');
+    expect(name?.querySelector('[lang="el"]')).toHaveTextContent(/^Ερμού$/);
   });
 
   it('removes the map when it goes', async () => {

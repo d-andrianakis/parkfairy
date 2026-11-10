@@ -99,8 +99,9 @@ export const bookings = pgTable(
   (t) => [
     // A driver's lists; also what deleting an account checks.
     index('bookings_user_starts_idx').on(t.userId, t.startsAt),
-    // An owner's bookings page and the check that closing hours strand nobody.
-    index('bookings_location_starts_idx').on(t.locationId, t.startsAt),
+    // An owner's bookings page and the check that closing hours strand nobody. The id last: the
+    // page goes by `(starts_at, id)` places, which this answers in order and exactly (0020).
+    index('bookings_location_starts_id_idx').on(t.locationId, t.startsAt, t.id),
     // Removing a space sets its bookings' space to null; without it, a scan per space.
     index('bookings_space_idx').on(t.spaceId),
     // One hold per driver at a time: a second press at once can't see the first's row, so this is

@@ -15,6 +15,7 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { ClientMessages } from '@/components/client-messages';
 import { ListingCard } from '@/components/parking/listing-card';
+import { PlaceWords } from '@/components/parking/place-words';
 import type { ResultPin } from '@/components/parking/results-map';
 import { ResultsMapToggle } from '@/components/parking/results-map-toggle';
 import { SEARCH_FIELD_IDS, SearchForm } from '@/components/parking/search-form';
@@ -97,8 +98,15 @@ async function load({ params, searchParams }: SearchPageProps) {
   const placeLang = search.values.placeLocale || locale;
   const plain = (key: 'titlePlace' | 'lookupPending', words: string) =>
     t.markup(key, { place: () => words });
+  // Greek-script words inside them (a Greek name Mapbox had no English for) are marked apart.
   const rich = (key: 'titlePlace' | 'lookupPending', words: string): ReactNode =>
-    t.rich(key, { place: () => <span lang={placeLang}>{words}</span> });
+    t.rich(key, {
+      place: () => (
+        <span lang={placeLang}>
+          <PlaceWords text={words} lang={placeLang} />
+        </span>
+      ),
+    });
   const title = query?.area
     ? t('titleArea', { area: tAreas(query.area) })
     : place

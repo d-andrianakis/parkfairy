@@ -35,7 +35,8 @@ export class OwnerBookingsController {
   constructor(private readonly bookings: BookingsService) {}
 
   @Get(':id/bookings')
-  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'after', required: false, type: String })
+  @ApiQuery({ name: 'before', required: false, type: String })
   @ApiOkResponse({ schema: schemaRef(OwnerListingBookingsSchema) })
   @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
   @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })

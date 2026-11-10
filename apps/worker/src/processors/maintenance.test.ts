@@ -19,7 +19,11 @@ vi.mock('@parkfairy/database', () => ({
 }));
 
 const logger = pino({ level: 'silent' });
-const email = { transport: { send: () => Promise.resolve() }, webUrl: 'http://localhost:3000' };
+const email = {
+  transport: { send: () => Promise.resolve() },
+  webUrl: 'http://localhost:3000',
+  sendsPerSecond: 1,
+};
 const jobNamed = (name: string) => ({ id: '1', name }) as Job;
 
 describe('maintenance processor', () => {

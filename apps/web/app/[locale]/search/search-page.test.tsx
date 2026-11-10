@@ -176,6 +176,47 @@ describe('a place typed or picked (decision #40)', () => {
     );
   });
 
+  it('marks the Greek words of a place named on an English page', async () => {
+    vi.mocked(loadSearchResults).mockResolvedValue(answer([result('a')]));
+    const { container } = await show({
+      place: 'Οδός Ερμού 10, Athens',
+      placeLocale: 'en',
+      latitude: '37.9755',
+      longitude: '23.7348',
+      ...stay,
+    });
+    const heading = screen.getByRole('heading', { level: 1 });
+    const place = heading.querySelector('[lang="en"]');
+    expect(place).toHaveTextContent('Οδός Ερμού 10, Athens');
+    expect(place?.querySelector('[lang="el"]')).toHaveTextContent(/^Οδός Ερμού$/);
+    await expectNoAxeViolations(container);
+  });
+
+  it('marks Greek words typed for a look-up the visitor must ask for, and none on a Greek page', async () => {
+    request.headers = new Headers({ 'sec-fetch-site': 'cross-site' });
+    const english = await show({ place: 'Πλατεία Συντάγματος', ...stay });
+    const asked = screen.getByText(
+      (_, element) => element?.tagName === 'P' && /Πλατεία Συντάγματος/.test(element.textContent),
+    );
+    expect(asked.querySelector('[lang="en"] [lang="el"]')).toHaveTextContent('Πλατεία Συντάγματος');
+    english.unmount();
+    request.headers = new Headers({ 'sec-fetch-site': 'same-origin' });
+    vi.mocked(loadSearchResults).mockResolvedValue(answer([result('a')]));
+    await show(
+      {
+        place: 'Πλατεία Συντάγματος',
+        placeLocale: 'el',
+        latitude: '37.9755',
+        longitude: '23.7348',
+        ...stay,
+      },
+      'el',
+    );
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading.querySelector('[lang="el"]')).toHaveTextContent('Πλατεία Συντάγματος');
+    expect(heading.querySelector('[lang="el"] [lang]')).toBeNull();
+  });
+
   it('reads right in Greek', async () => {
     vi.mocked(loadSearchResults).mockResolvedValue(answer([result('a')]));
     const { container } = await show(

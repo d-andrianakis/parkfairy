@@ -2541,11 +2541,19 @@
             }
           },
           {
-            "name": "page",
+            "name": "before",
             "required": false,
             "in": "query",
             "schema": {
-              "type": "number"
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -5774,16 +5782,13 @@
       "OwnerBookingsQuery": {
         "type": "object",
         "properties": {
-          "page": {
-            "default": 1,
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 50
+          "after": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
           }
         },
-        "required": [
-          "page"
-        ],
         "additionalProperties": false
       },
       "OwnerListingBookings": {
@@ -5808,14 +5813,15 @@
               "$ref": "#/components/schemas/OwnerBooking"
             }
           },
-          "page": {
-            "type": "integer",
-            "minimum": 0,
-            "exclusiveMinimum": true,
-            "maximum": 9007199254740991
+          "previous": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^(\\d{1,15})_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
           },
-          "hasMore": {
-            "type": "boolean"
+          "next": {
+            "nullable": true,
+            "type": "string",
+            "pattern": "^(\\d{1,15})_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
           }
         },
         "required": [
@@ -5823,8 +5829,8 @@
           "name",
           "contentLocale",
           "bookings",
-          "page",
-          "hasMore"
+          "previous",
+          "next"
         ],
         "additionalProperties": false
       },

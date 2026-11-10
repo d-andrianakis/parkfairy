@@ -20,13 +20,19 @@ import {
   type ListingStatus,
 } from '@parkfairy/contracts';
 import { expireLapsedHolds, schema, type Database } from '@parkfairy/database';
-import { and, eq, inArray, like, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, like, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type * as bookingReference from '../src/bookings/booking-reference.js';
 import { newBookingReference } from '../src/bookings/booking-reference.js';
 import { OWNER_EMAILS_PER_DRIVER_DAY } from '../src/bookings/bookings.service.js';
 import { strandedBookings } from '../src/bookings/stranded.js';
+import {
+  hoursExceptionsOf,
+  listingRulesIn,
+  openingHoursOf,
+  priceRulesOf,
+} from '../src/parking/listing-data.js';
 import { DB } from '../src/database/database.module.js';
 import { createTestApp, signUpUser, type TestApp, type TestUser } from './test-app.js';
 
@@ -513,9 +519,16 @@ describe('bookings', () => {
       ).toMatchObject({ code: 'LISTING_CLOSED' });
 
       const elsewhere = { ...garage, space: { A1: daytime.space.A1 ?? '' } };
+      // A space of this listing taken out of use is none to hold (read in the listing's query).
+      const withdrawn = await addListing('withdrawn-hold', { spaces: [{ label: 'W1' }] });
+      await db
+        .update(schema.parkingSpaces)
+        .set({ isActive: false })
+        .where(eq(schema.parkingSpaces.id, withdrawn.space.W1 ?? ''));
       for (const call of [
         () => hold(user, { ...garage, space: { A1: randomUUID() } }, 'A1', stayOn(day)),
         () => hold(user, elsewhere, 'A1', stayOn(day)),
+        () => hold(user, withdrawn, 'W1', stayOn(day)),
       ]) {
         expect((await call().expect(404)).body).toMatchObject({ code: 'SPACE_NOT_FOUND' });
       }
@@ -694,6 +707,43 @@ describe('bookings', () => {
       expect((await confirm(user, held.id).expect(409)).body).toMatchObject({
         code: 'SPACE_TAKEN',
       });
+    });
+
+    it('refuses a confirmation once the space was removed altogether', async () => {
+      const listing = await addListing('removed', { spaces: [{ label: 'R1' }, { label: 'R2' }] });
+      const user = await driver();
+      const held = BookingSchema.parse(
+        (await hold(user, listing, 'R1', stayOn(freshDay())).expect(201)).body,
+      );
+      // Straight in the database: the owner's save refuses it while the hold runs. The hold keeps
+      // its label with no space, which takes nothing.
+      await db
+        .delete(schema.parkingSpaces)
+        .where(eq(schema.parkingSpaces.id, listing.space.R1 ?? ''));
+      expect((await row(held.id)).spaceId).toBeNull();
+      expect((await confirm(user, held.id).expect(409)).body).toMatchObject({
+        code: 'SPACE_TAKEN',
+      });
+    });
+
+    it('holds the same space again for a driver whose hold lapsed, before the sweep', async () => {
+      const listing = await addListing('again');
+      const user = await driver();
+      const stay = stayOn(freshDay());
+      const first = BookingSchema.parse((await hold(user, listing, 'A1', stay).expect(201)).body);
+      await db
+        .update(schema.bookings)
+        .set({ holdExpiresAt: new Date(Date.now() - 60_000) })
+        .where(eq(schema.bookings.id, first.id));
+      const again = BookingSchema.parse((await hold(user, listing, 'A1', stay).expect(201)).body);
+      expect(again.id).not.toBe(first.id);
+      // Their own lapsed hold is let go as theirs, not marked expired as another driver's.
+      expect((await row(first.id)).status).toBe('released');
+      const held = await db
+        .select({ id: schema.bookings.id })
+        .from(schema.bookings)
+        .where(and(eq(schema.bookings.userId, user.id), eq(schema.bookings.status, 'held')));
+      expect(held.map((b) => b.id)).toEqual([again.id]);
     });
 
     it('refuses once the owner has closed that time since the hold', async () => {
@@ -970,7 +1020,12 @@ describe('bookings', () => {
           (await api(owner, 'get', `/owner/listings/${listing.id}/bookings`).expect(200)).body,
         );
       const before = await page();
-      expect(before).toMatchObject({ id: listing.id, name: 'Κράτηση owners', hasMore: false });
+      expect(before).toMatchObject({
+        id: listing.id,
+        name: 'Κράτηση owners',
+        previous: null,
+        next: null,
+      });
       expect(before.bookings.map((b) => b.id)).toEqual([first.id, second.id]);
       expect(before.bookings[1]).toMatchObject({
         reference: second.reference,
@@ -1017,6 +1072,109 @@ describe('bookings', () => {
             .expect(404)
         ).body,
       ).toMatchObject({ code: 'BOOKING_NOT_FOUND' });
+    });
+
+    it('pages a busy listing from a place, either way, whatever is called off meanwhile', async () => {
+      const user = await driver();
+      const listing = await addListing('busy', { gap: 0 });
+      // Three bookings to a start, on spaces of their own, so the id decides between them.
+      const starts = Array.from({ length: 15 }, () => new Date(stayOn(freshDay()).start));
+      await db.insert(schema.bookings).values(
+        starts.flatMap((startsAt) =>
+          ['A1', 'A2', 'A3'].map((label) => {
+            const endsAt = new Date(startsAt.getTime() + 3_600_000);
+            return {
+              reference: newBookingReference(),
+              userId: user.id,
+              locationId: listing.id,
+              spaceId: null,
+              spaceLabel: label,
+              listingLocale: 'el' as const,
+              startsAt,
+              endsAt,
+              gapMinutes: 0,
+              blockedUntil: endsAt,
+              status: 'confirmed' as const,
+              holdExpiresAt: startsAt,
+              totalMinor: 200,
+              currency: 'EUR',
+              cancellationPolicy: 'oneDay' as const,
+              vehiclePlate: 'IKB1234',
+              confirmedAt: new Date(),
+            };
+          }),
+        ),
+      );
+      const all = await db
+        .select({ id: schema.bookings.id })
+        .from(schema.bookings)
+        .where(eq(schema.bookings.locationId, listing.id))
+        .orderBy(asc(schema.bookings.startsAt), asc(schema.bookings.id));
+      const ids = all.map((b) => b.id);
+      expect(ids).toHaveLength(45);
+      const page = async (query: Record<string, string> = {}) =>
+        OwnerListingBookingsSchema.parse(
+          (
+            await api(owner, 'get', `/owner/listings/${listing.id}/bookings`)
+              .query(query)
+              .expect(200)
+          ).body,
+        );
+      const idsOf = (shown: { bookings: { id: string }[] }) => shown.bookings.map((b) => b.id);
+
+      const one = await page();
+      expect(idsOf(one)).toEqual(ids.slice(0, 20));
+      expect(one.previous).toBeNull();
+      const two = await page({ after: one.next ?? '' });
+      expect(idsOf(two)).toEqual(ids.slice(20, 40));
+      const three = await page({ after: two.next ?? '' });
+      expect(idsOf(three)).toEqual(ids.slice(40));
+      expect(three.next).toBeNull();
+      // Back from the last, to the same pages.
+      const backTwo = await page({ before: three.previous ?? '' });
+      expect(idsOf(backTwo)).toEqual(ids.slice(20, 40));
+      expect(backTwo.next).toBe(two.next);
+      const backOne = await page({ before: backTwo.previous ?? '' });
+      expect(idsOf(backOne)).toEqual(ids.slice(0, 20));
+      expect(backOne.previous).toBeNull();
+
+      // Calling off a booking on page one moves nothing on page two, even the one its place is.
+      for (const gone of [ids[3], ids[19]]) {
+        await api(owner, 'post', `/owner/listings/${listing.id}/bookings/${gone}/cancel`)
+          .send()
+          .expect(204);
+      }
+      expect(idsOf(await page({ after: one.next ?? '' }))).toEqual(ids.slice(20, 40));
+      // A page number from before places is the first page.
+      expect(idsOf(await page({ page: '2' }))[0]).toBe(ids[0]);
+      // A page whose bookings have all gone comes back empty, with no place to go from (the web
+      // then shows the first page).
+      await db
+        .update(schema.bookings)
+        .set({ status: 'cancelled', cancelledAt: new Date(), cancelledBy: 'owner', refundMinor: 0 })
+        .where(inArray(schema.bookings.id, ids.slice(40)));
+      const emptied = await page({ after: two.next ?? '' });
+      expect(emptied).toMatchObject({ bookings: [], previous: null, next: null });
+      // Before the first booking there is nothing, and nothing ahead of it.
+      expect(
+        await page({ before: one.previous ?? `${starts[0]?.getTime()}_${ids[0]}` }),
+      ).toMatchObject({ bookings: [], previous: null });
+
+      for (const query of [
+        { after: 'x' },
+        // Past 9999: Postgres couldn't read the date, so it is refused before it gets there.
+        { after: `999999999999999_${ids[0]}` },
+        { after: one.next ?? '', before: one.next ?? '' },
+        { after: '1_nope' },
+      ]) {
+        expect(
+          (
+            await api(owner, 'get', `/owner/listings/${listing.id}/bookings`)
+              .query(query)
+              .expect(400)
+          ).body,
+        ).toMatchObject({ code: 'VALIDATION_FAILED' });
+      }
     });
   });
 
@@ -1231,6 +1389,101 @@ describe('bookings', () => {
       const detail = ParkingListingDetailSchema.parse(response.body);
       expect(detail.availability?.freeSpaces).toBe(2);
       expect(detail.spaces.map((space) => space.label)).toEqual(labels.slice(LISTING_SPACES_LIMIT));
+    });
+
+    it('reads a hold’s hours, closures and prices in one statement, as the separate reads do', async () => {
+      const listing = await addListing('rules', { gap: 0 });
+      const [first, dated, special, window, last] = [
+        freshDay(),
+        freshDay(),
+        freshDay(),
+        freshDay(),
+        freshDay(),
+      ] as const;
+      await db.insert(schema.parkingHoursExceptions).values([
+        // From before the days asked about into them.
+        { locationId: listing.id, startsOn: addDays(first, -2), endsOn: first },
+        {
+          locationId: listing.id,
+          startsOn: special,
+          endsOn: special,
+          opensMinute: 600,
+          closesMinute: 900,
+        },
+        {
+          locationId: listing.id,
+          startsOn: window,
+          endsOn: window,
+          closedFromMinute: 720,
+          closedToMinute: 780,
+          label: 'Καθαρισμός',
+        },
+        // Outside the days asked about: left out by both.
+        { locationId: listing.id, startsOn: addDays(last, 30), endsOn: addDays(last, 31) },
+        // Starting on the last day asked about, and one ending the day before the first: added
+        // out of date order, read in order, the second by neither.
+        { locationId: listing.id, startsOn: last, endsOn: addDays(last, 2) },
+        { locationId: listing.id, startsOn: addDays(first, -6), endsOn: addDays(first, -3) },
+      ]);
+      await db.insert(schema.parkingPriceRules).values([
+        { locationId: listing.id, kind: 'weekend', hourlyRateMinor: 300 },
+        {
+          locationId: listing.id,
+          kind: 'night',
+          hourlyRateMinor: 150,
+          fromMinute: 1320,
+          toMinute: 360,
+        },
+        {
+          locationId: listing.id,
+          kind: 'dated',
+          hourlyRateMinor: 700,
+          startsOn: dated,
+          endsOn: dated,
+        },
+      ]);
+      await db.insert(schema.parkingStayDiscounts).values([
+        { locationId: listing.id, minDays: 14, percent: 20 },
+        { locationId: listing.id, minDays: 7, percent: 10 },
+      ]);
+
+      const together = await listingRulesIn(db, listing.id, first, last, { prices: true });
+      expect(together).toEqual({
+        periods: (await openingHoursOf(db, [listing.id])).get(listing.id),
+        exceptions: (await hoursExceptionsOf(db, [listing.id], first, last)).get(listing.id),
+        prices: (await priceRulesOf(db, [listing.id])).get(listing.id),
+      });
+      expect(together.exceptions.map((e) => e.startsOn)).toEqual([
+        addDays(first, -2),
+        special,
+        window,
+        last,
+      ]);
+      expect(together.exceptions[2]).not.toHaveProperty('label'); // the owner's note stays theirs
+      expect(together.prices?.discounts.map((d) => d.minDays)).toEqual([7, 14]);
+      expect(await listingRulesIn(db, listing.id, first, last, { prices: false })).toMatchObject({
+        prices: null,
+      });
+      const bare = await addListing('bare');
+      expect(await listingRulesIn(db, bare.id, first, last, { prices: true })).toMatchObject({
+        exceptions: [],
+        prices: { weekendRateMinor: null, night: null, dated: [], discounts: [] },
+      });
+
+      // A hold on the dated day costs what the listing page quotes for it.
+      const stay = stayOn(dated, '10:00', '12:00');
+      const quoted = ParkingListingDetailSchema.parse(
+        (await api(null, 'get', `/parking/${listing.slug}`).query(stay).expect(200)).body,
+      ).availability?.total;
+      expect(quoted?.amountMinor).toBe(1400);
+      const held = BookingSchema.parse(
+        (await hold(await driver(), listing, 'A1', stay).expect(201)).body,
+      );
+      expect(held.total).toEqual(quoted);
+      // And the closed day is refused, as the listing page says.
+      expect(
+        (await hold(await driver(), listing, 'A1', stayOn(first)).expect(409)).body,
+      ).toMatchObject({ code: 'LISTING_CLOSED' });
     });
 
     it('quotes the cheapest free space, in search and on the listing', async () => {

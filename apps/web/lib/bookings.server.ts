@@ -64,12 +64,13 @@ export const loadBookings = cache(
 
 /** A page of an owner's listing's bookings; another owner's listing is `'not-found'`. */
 export const loadOwnerBookings = cache(
-  async (id: string, page: number): Promise<Loaded<OwnerListingBookings>> => {
+  /** Strings, not an object, so the page and its metadata share one request (`cache` keys). */
+  async (id: string, after = '', before = ''): Promise<Loaded<OwnerListingBookings>> => {
     try {
       const { data, response } = await getListingBookings({
         ...(await asVisitor()),
         path: { id },
-        query: { page },
+        query: { ...(after ? { after } : {}), ...(before ? { before } : {}) },
       });
       if (data) return data;
       return response?.status === 404 ? 'not-found' : 'unavailable';

@@ -21,10 +21,13 @@ export function CancelListingBooking({
   listingId,
   bookingId,
   reference,
+  place = {},
 }: {
   listingId: string;
   bookingId: string;
   reference: string;
+  /** Where in the list the page is (`after`/`before`), so the owner comes back to it. */
+  place?: { after?: string; before?: string };
 }) {
   const t = useTranslations('Owner.bookings');
   const router = useRouter();
@@ -48,7 +51,10 @@ export function CancelListingBooking({
       cancelListingBooking({ path: { id: listingId, bookingId } }),
     );
     if (outcome.ok) {
-      router.replace(`${ownerBookingsHref(listingId)}?cancelled=${reference}`);
+      router.replace({
+        pathname: ownerBookingsHref(listingId),
+        query: { ...place, cancelled: reference },
+      });
     } else {
       setFailure(ownerError(outcome.failure));
       setSaving(false);

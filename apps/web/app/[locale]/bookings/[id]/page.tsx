@@ -99,8 +99,10 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
       </div>
       {notice ? (
         // Page content that replaced the form, not an interruption: no role="alert". After the
-        // page's heading, so the headings read in order; it takes the focus all the same.
-        <Alert role={undefined}>
+        // page's heading, so the headings read in order; it takes the focus all the same. Keyed:
+        // a page whose query alone changes keeps its components, and a reused heading wouldn't
+        // take the focus or say anything for the next thing done.
+        <Alert key={done === 'confirmed' ? 'confirmed' : 'cancelled'} role={undefined}>
           <CircleCheck aria-hidden />
           <div className="col-start-2 grid gap-1">
             <FocusHeading>{notice.heading}</FocusHeading>

@@ -4,7 +4,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/lib/mapbox-focus.css';
 import type { LngLatBoundsLike, Map as MapboxMap } from 'mapbox-gl';
 import { useEffect, useRef } from 'react';
-import { MAPBOX_STYLE, workerUrlFor } from '@/lib/mapbox';
+import { greekRuns } from '@/lib/greek-runs';
+import { markAttributionEnglish, MAPBOX_STYLE, workerUrlFor } from '@/lib/mapbox';
 
 export interface ResultPin {
   number: number;
@@ -66,7 +67,12 @@ function pinElement(pin: ResultPin): HTMLAnchorElement {
   link.className = PIN_CLASSES;
   link.append(span(String(pin.number), { 'aria-hidden': 'true' }));
   const name = span(pin.label.before, { class: 'sr-only' });
-  name.append(span(pin.label.name, { lang: pin.label.nameLang }), pin.label.after);
+  const listing = span('', { lang: pin.label.nameLang });
+  // Greek words inside an English name marked apart, as `PlaceWords` does in the list.
+  for (const run of greekRuns(pin.label.name, pin.label.nameLang)) {
+    listing.append(run.lang ? span(run.text, { lang: run.lang }) : run.text);
+  }
+  name.append(listing, pin.label.after);
   link.append(name);
   return link;
 }
@@ -137,6 +143,7 @@ export default function ResultsMap({
       });
       map = created;
       drawn.current = { map: created, bounds };
+      markAttributionEnglish(container.current);
       created.addControl(new mapboxgl.NavigationControl({ showCompass: false }));
       if (center) {
         new mapboxgl.Marker({ element: centerElement(labels.searched) })

@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   addDays,
+  bookingsCursor,
   BookingSchema,
   BOOKINGS_PAGE_SIZE,
   BookingListSchema,
@@ -10,12 +11,14 @@ import {
   NAME_MAX_LENGTH,
   normalizeVehiclePlate,
   OwnerListingBookingsSchema,
+  parseBookingsCursor,
   type Booking,
   type BookingCancelInput,
   type BookingConfirmInput,
   type BookingHoldInput,
   type BookingList,
   type BookingListQuery,
+  type BookingsCursor,
   type Locale,
   type Money,
   type OwnerBookingsQuery,
@@ -27,13 +30,7 @@ import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { DB } from '../database/database.module.js';
 import { conflict, listingNotFound } from '../owner/owner.errors.js';
-import {
-  hoursExceptionsOf,
-  openingHoursOf,
-  priceRulesOf,
-  utcDay,
-  type Reader,
-} from '../parking/listing-data.js';
+import { listingRulesIn, utcDay, type ListingRules, type Reader } from '../parking/listing-data.js';
 import { isOpenThroughout } from '../parking/opening-hours.js';
 import { NO_PRICE_RULES, quoteStayMinor } from '../parking/pricing.js';
 import { newBookingReference } from './booking-reference.js';
@@ -175,15 +172,22 @@ function outboxBooking(row: BookingRow, info: ListingInfo): OutboxBooking {
 }
 
 /**
- * Marks the space's holds whose time ran out, so the exclusion constraint stops counting them.
- * `skip locked`: a hold that another transaction has in hand is theirs to settle, and waiting on it
- * could deadlock two drivers releasing each other's spaces. Such a row being let go meanwhile
- * makes an insert wait for that transaction, not fail.
+ * Before a new hold, in one statement: lets go of the driver's other holds (one at a time, so one
+ * account can't sit on many spaces; a press of Book twice lets the first go and takes the space
+ * again), and marks other drivers' holds on the space whose time ran out, so the exclusion
+ * constraint stops counting them. Those are `skip locked`: a hold that another transaction has in
+ * hand is theirs to settle, and waiting on it could deadlock two drivers releasing each other's
+ * spaces; such a row being let go meanwhile makes the insert wait for that transaction, not fail.
+ * The driver's own are waited for, as a plain update would.
  */
-async function expireLapsedHolds(tx: Transaction, spaceId: string, except?: string) {
-  await tx.execute(sql`update ${booking} set status = 'expired', updated_at = now()
+async function clearForHold(tx: Transaction, userId: string, spaceId: string) {
+  await tx.execute(sql`with released as (
+      update ${booking} set status = 'released', updated_at = now()
+      where user_id = ${userId} and status = 'held'
+    )
+    update ${booking} set status = 'expired', updated_at = now()
     where id in (select id from ${booking} where space_id = ${spaceId} and status = 'held'
-      and hold_expires_at <= now() ${except ? sql`and id <> ${except}` : sql``}
+      and hold_expires_at <= now() and user_id <> ${userId}
       for update skip locked)`);
 }
 
@@ -237,36 +241,33 @@ export class BookingsService {
     input: BookingHoldInput,
     stay: { start: Date; end: Date },
   ): Promise<Booking> {
+    // Four round trips and the insert, all under the listing's lock: the listing with the space,
+    // its hours and prices, clearing the way, the hold.
     const [row] = await tx
-      .select(bookableColumns)
+      .select({
+        ...bookableColumns,
+        spot: { id: space.id, label: space.label, ownRate: space.hourlyRateMinor },
+      })
       .from(listing)
       .leftJoin(profile, eq(profile.id, listing.ownerId))
+      .leftJoin(
+        space,
+        and(eq(space.id, input.spaceId), eq(space.locationId, listing.id), sql`${space.isActive}`),
+      )
       .where(and(published, eq(listing.slug, input.listing)))
       .for('share', { of: listing });
     if (!row || row.hourlyRateMinor === null) throw notFound('LISTING_NOT_FOUND');
     // A booking of one's own would be a payout to oneself (Phase 4) and tells nobody anything.
     if (row.ownerUserId === userId) throw conflict('OWN_LISTING');
-    const [spot] = await tx
-      .select({ id: space.id, label: space.label, ownRate: space.hourlyRateMinor })
-      .from(space)
-      .where(
-        and(eq(space.id, input.spaceId), eq(space.locationId, row.id), sql`${space.isActive}`),
-      );
+    const { spot } = row;
     if (!spot) throw notFound('SPACE_NOT_FOUND');
-    await this.assertOpen(tx, row, stay);
+    const { prices } = await this.assertOpen(tx, row, stay, { prices: true });
 
-    // One hold at a time: a new one lets the driver's others go, so one account can't sit on
-    // many spaces. A press of Book twice lets the first go and takes the space again.
-    await tx
-      .update(booking)
-      .set({ status: 'released' })
-      .where(and(eq(booking.userId, userId), eq(booking.status, 'held')));
-    await expireLapsedHolds(tx, spot.id);
+    await clearForHold(tx, userId, spot.id);
 
-    const rules = (await priceRulesOf(tx, [row.id])).get(row.id) ?? NO_PRICE_RULES;
     const totalMinor = quoteStayMinor({
       rates: { hourlyRateMinor: row.hourlyRateMinor, dailyMaxMinor: row.dailyMaxMinor },
-      rules,
+      rules: prices ?? NO_PRICE_RULES,
       spaceRateMinor: spot.ownRate,
       start: stay.start,
       end: stay.end,
@@ -300,20 +301,27 @@ export class BookingsService {
     return view(created, row);
   }
 
-  /** The listing is open for the whole stay, read under its lock. */
+  /**
+   * The listing is open for the whole stay, read under its lock in one statement, with its prices
+   * when asked for (`listingRulesIn`).
+   */
   private async assertOpen(
-    db: Reader,
+    tx: Transaction,
     row: { id: string; timeZone: string },
     { start, end }: { start: Date; end: Date },
-  ) {
-    const periods = (await openingHoursOf(db, [row.id])).get(row.id) ?? [];
-    const exceptions =
-      (
-        await hoursExceptionsOf(db, [row.id], addDays(utcDay(start), -1), addDays(utcDay(end), 1))
-      ).get(row.id) ?? [];
-    if (!isOpenThroughout(periods, start, end, row.timeZone, exceptions)) {
+    { prices = false }: { prices?: boolean } = {},
+  ): Promise<ListingRules> {
+    const rules = await listingRulesIn(
+      tx,
+      row.id,
+      addDays(utcDay(start), -1),
+      addDays(utcDay(end), 1),
+      { prices },
+    );
+    if (!isOpenThroughout(rules.periods, start, end, row.timeZone, rules.exceptions)) {
       throw conflict('LISTING_CLOSED');
     }
+    return rules;
   }
 
   /**
@@ -329,19 +337,28 @@ export class BookingsService {
     const vehiclePlate = normalizeVehiclePlate(input.vehiclePlate);
     try {
       return await this.db.transaction(async (tx) => {
-        const [found] = await tx
-          .select({ locationId: booking.locationId })
-          .from(booking)
-          .where(and(eq(booking.id, id), eq(booking.userId, userId)));
-        if (!found) throw notFound('BOOKING_NOT_FOUND');
+        // The listing first (its lock before the booking's), found through the driver's booking.
         const [row] = await tx
           .select(bookableColumns)
           .from(listing)
           .leftJoin(profile, eq(profile.id, listing.ownerId))
-          .where(eq(listing.id, found.locationId))
+          .where(
+            eq(
+              listing.id,
+              sql`(select ${booking.locationId} from ${booking} where ${booking.id} = ${id} and ${booking.userId} = ${userId})`,
+            ),
+          )
           .for('share', { of: listing });
-        const [current] = await tx.select().from(booking).where(eq(booking.id, id)).for('update');
-        if (!row || !current) throw notFound('BOOKING_NOT_FOUND');
+        if (!row) throw notFound('BOOKING_NOT_FOUND');
+        // With its space, if that is still there and in use.
+        const [locked] = await tx
+          .select({ current: booking, activeSpaceId: space.id })
+          .from(booking)
+          .leftJoin(space, and(eq(space.id, booking.spaceId), sql`${space.isActive}`))
+          .where(and(eq(booking.id, id), eq(booking.userId, userId)))
+          .for('update', { of: booking });
+        if (!locked) throw notFound('BOOKING_NOT_FOUND');
+        const { current } = locked;
         if (current.status === 'confirmed') return view(current, row);
         const now = new Date();
         // A hold that ran out, swept or not, books nothing: the space may be someone else's now.
@@ -350,13 +367,7 @@ export class BookingsService {
         }
         if (row.status !== 'published') throw conflict('LISTING_CLOSED');
         // Removed from a listing sent back to its owner, or taken out of use, since the hold.
-        const [spot] = current.spaceId
-          ? await tx
-              .select({ id: space.id })
-              .from(space)
-              .where(and(eq(space.id, current.spaceId), sql`${space.isActive}`))
-          : [];
-        if (!current.spaceId || !spot) throw conflict('SPACE_TAKEN');
+        if (!current.spaceId || !locked.activeSpaceId) throw conflict('SPACE_TAKEN');
         // The owner may have closed that time since the hold; it is refused now, not later.
         await this.assertOpen(tx, row, { start: current.startsAt, end: current.endsAt });
 
@@ -528,46 +539,95 @@ export class BookingsService {
 
   /**
    * A listing's confirmed bookings that haven't ended, soonest first, with who is coming in which
-   * car (decision #35). Only to the listing's owner.
+   * car (decision #35). Only to the listing's owner. A page at a time from a place in the list
+   * (`after` or `before` a booking's start and id, keyset paging), so a page late in a busy
+   * garage's year reads what the first one does, on `bookings_location_starts_id_idx`.
    */
   async listingBookings(
     userId: string,
     listingId: string,
-    { page }: OwnerBookingsQuery,
+    { after, before }: OwnerBookingsQuery,
   ): Promise<OwnerListingBookings> {
     const owned = await this.ownedListing(userId, listingId);
     const now = new Date();
-    const rows = await this.db
-      .select({
-        id: booking.id,
-        reference: booking.reference,
-        spaceLabel: booking.spaceLabel,
-        startsAt: booking.startsAt,
-        endsAt: booking.endsAt,
-        // Names change after sign-up too; whatever the account holds, the owner gets the limit.
-        driverName: sql<string>`left(${users.name}, ${NAME_MAX_LENGTH})`,
-        vehiclePlate: booking.vehiclePlate,
-        totalMinor: booking.totalMinor,
-        currency: booking.currency,
-      })
-      .from(booking)
-      .innerJoin(users, eq(users.id, booking.userId))
-      .where(
-        and(
-          eq(booking.locationId, owned.id),
-          eq(booking.status, 'confirmed'),
-          gt(booking.endsAt, now),
-          // Implied by the line above (a stay lasts 30 days at most), and what keeps the index
-          // from reading every booking the listing ever had.
-          gt(booking.startsAt, new Date(now.getTime() - (MAX_BOOKING_DAYS + 1) * DAY_MS)),
-        ),
-      )
-      .orderBy(asc(booking.startsAt), asc(booking.id))
-      .limit(BOOKINGS_PAGE_SIZE + 1)
-      .offset((page - 1) * BOOKINGS_PAGE_SIZE);
+    const from = after ? parseBookingsCursor(after) : null;
+    const to = before ? parseBookingsCursor(before) : null;
+    const showing = and(
+      eq(booking.locationId, owned.id),
+      eq(booking.status, 'confirmed'),
+      gt(booking.endsAt, now),
+      // Implied by the line above (a stay lasts 30 days at most), and what keeps the index
+      // from reading every booking the listing ever had.
+      gt(booking.startsAt, new Date(now.getTime() - (MAX_BOOKING_DAYS + 1) * DAY_MS)),
+    );
+    // The place compares as a pair, and Postgres takes the bound on the start from it for the
+    // index. Don't add that bound by hand: estimated apart, the two looked so selective that deep
+    // pages read and sorted every booking left (performance review, 182k on one listing).
+    const pair = sql`(${booking.startsAt}, ${booking.id})`;
+    const at = ({ start, id }: BookingsCursor) =>
+      sql`(${start.toISOString()}::timestamptz, ${id}::uuid)`;
+    const later = (place: BookingsCursor, orAt: boolean) =>
+      orAt ? sql`${pair} >= ${at(place)}` : sql`${pair} > ${at(place)}`;
+    const earlier = (place: BookingsCursor, orAt: boolean) =>
+      orAt ? sql`${pair} <= ${at(place)}` : sql`${pair} < ${at(place)}`;
+    const backwards = to !== null;
+    const [found, beyond] = await Promise.all([
+      this.db
+        .select({
+          id: booking.id,
+          reference: booking.reference,
+          spaceLabel: booking.spaceLabel,
+          startsAt: booking.startsAt,
+          endsAt: booking.endsAt,
+          // Names change after sign-up too; whatever the account holds, the owner gets the limit.
+          driverName: sql<string>`left(${users.name}, ${NAME_MAX_LENGTH})`,
+          vehiclePlate: booking.vehiclePlate,
+          totalMinor: booking.totalMinor,
+          currency: booking.currency,
+        })
+        .from(booking)
+        .innerJoin(users, eq(users.id, booking.userId))
+        .where(
+          and(showing, from ? later(from, false) : undefined, to ? earlier(to, false) : undefined),
+        )
+        .orderBy(
+          ...(backwards
+            ? [desc(booking.startsAt), desc(booking.id)]
+            : [asc(booking.startsAt), asc(booking.id)]),
+        )
+        .limit(BOOKINGS_PAGE_SIZE + 1),
+      // Is there a page on the side we came from? Bookings there may have ended or been called off.
+      // Ordered from the place outwards: unordered, `limit 1` past ~1% of the table was planned as
+      // a scan of all of `bookings`.
+      from || to
+        ? this.db
+            .select({ id: booking.id })
+            .from(booking)
+            .where(
+              and(
+                showing,
+                from ? earlier(from, true) : undefined,
+                to ? later(to, true) : undefined,
+              ),
+            )
+            .orderBy(
+              ...(from
+                ? [desc(booking.startsAt), desc(booking.id)]
+                : [asc(booking.startsAt), asc(booking.id)]),
+            )
+            .limit(1)
+        : Promise.resolve([]),
+    ]);
+    const more = found.length > BOOKINGS_PAGE_SIZE;
+    const rows = found.slice(0, BOOKINGS_PAGE_SIZE);
+    if (backwards) rows.reverse();
+    const first = rows[0];
+    const last = rows.at(-1);
+    const place = (row: { startsAt: Date; id: string } | undefined) =>
+      row ? bookingsCursor({ start: row.startsAt, id: row.id }) : null;
     return OwnerListingBookingsSchema.parse({
       ...owned,
-      bookings: rows.slice(0, BOOKINGS_PAGE_SIZE).map((row) => ({
+      bookings: rows.map((row) => ({
         id: row.id,
         reference: row.reference,
         spaceLabel: row.spaceLabel,
@@ -579,8 +639,8 @@ export class BookingsService {
         total: money(row.totalMinor, row.currency),
         cancellable: row.startsAt > now,
       })),
-      page,
-      hasMore: rows.length > BOOKINGS_PAGE_SIZE,
+      previous: (backwards ? more : beyond.length > 0) ? place(first) : null,
+      next: (backwards ? beyond.length > 0 : more) ? place(last) : null,
     });
   }
 

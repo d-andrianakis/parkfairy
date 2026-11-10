@@ -677,9 +677,10 @@ Left open:
       kept on each booking)
 - [ ] Security, for Phase 4: Stripe Radar or review against self-dealing (`OWN_LISTING` stops only
       the same account)
-- [ ] Performance, deferred as low: keyset pages for the owner list (50 pages of 20 cap it at 1,000
-      upcoming bookings); the email sender's pace (40 a minute) in a rush; the hold's 11 round trips
-      under `FOR SHARE`; future indexes on a full `bookings` built `CONCURRENTLY`, and new email kinds
+- [x] Performance, deferred as low: keyset pages for the owner list, the email sender's pace and the
+      hold's 11 round trips: done in 3.4
+- [ ] Performance, for later migrations: future indexes on a full `bookings` built `CONCURRENTLY`
+      (outside the migration runner, which wraps each file in a transaction), and new email kinds
       added `NOT VALID` then validated
 - [x] Tests still missing: done in 3.3 (a stay under way with a fixed `now`, two confirmations at
       once with different plates, the reference collision and its giving up)
@@ -753,8 +754,8 @@ mocked (#42): the address field and the map show only where `MAPBOX_PUBLIC_TOKEN
       nested regions with one name; the logo link named by its picture; the active option scrolled
       out of view; numbered pins over an unordered list; the loading line not read; "My location"
       left after typing. Then, by decision #45: "Show all results" and cooperative gestures on the
-      map. Advisory, not done: `lang` on Greek-script names Mapbox returns in English, and on its
-      English attribution in Greek
+      map. The advisory (`lang` on Greek-script names Mapbox returns in English, and on its English
+      attribution in Greek) is done in 3.4
 - [x] **i18n** review: fixed the Greek heading («κοντά στο σημείο»), the pin's total without "from",
       the place's language after a switch, the address label read as "either… or", the error summary's
       and the list's names, the wording of `pickFailed`, `placeTooShort` (characters),
@@ -816,6 +817,121 @@ Left open:
       `Listing.releasedTitle`, `releasedLead`, `Owner.closures.draftRestored` (Questions: «επανήλθαν»;
       «να μείνει κρατημένη»)
 
+### 3.4 Phase 3 follow-ups (2026-11-10)
+
+The leftovers of 3.1 and 3.2 that need nobody outside the project: keyset pages for the owner's
+bookings, the hold's round trips, the email sender's pace, and `lang` on Greek words inside English
+text (the 3.2 advisory). No product decisions were needed; what the reviews changed is below.
+
+- [x] **Implemented** behind the API's authorization rules:
+  - The owner's bookings page by place, not page number: `?after=`/`?before=` cursors (a booking's
+    start and id), `previous`/`next` in the answer, a probe for the side we came from, a place with
+    nothing left going to the first page (the cancel notice kept), and a cancel coming back to its
+    page. Cursors past 9999 are refused.
+  - The hold in 6 round trips instead of 11, and the confirmation in 8: the space read with the
+    listing, hours, closures and prices in one statement (`listingRulesIn`), and the driver's holds
+    let go with other drivers' lapsed holds expired in one statement (`clearForHold`).
+  - The worker's sender drains a backlog while claims come back full. Each claim holds only what its
+    pace (`EMAIL_SENDS_PER_SECOND`, default 1) sends in the 25 s it has, and a claim whose sends all
+    fail ends the run. The web app's account emails go at one a second too, so the two together stay
+    within Resend's 2.
+  - Migration 0020: `bookings_location_starts_idx` replaced by `(location_id, starts_at, id)`, so a
+    place is an exact index condition and pages come in index order (chosen in the decisions form,
+    while it is still a plain migration).
+  - Greek-script runs marked `lang="el"` inside English text (`greekRuns`, `PlaceWords`) in these
+    places:
+    - Mapbox's suggestions and the search heading;
+    - the owner's address matches, now asked for in the listing's language;
+    - listing names and addresses on the card, the listing page, booking facts, the review summary,
+      the owner's pages and the map's pins;
+    - the address field after a language switch.
+
+    Mapbox's attribution is marked English on both maps.
+
+  - A second notice on the same page (owner cancels, `?done=`) is keyed, so it is read and focused.
+- [x] **Unit tests**:
+  - Contracts: cursors, both ways, past 9999.
+  - Worker: claims sized to the pace (1, 4 and 0.5 a second), failures across claims, a whole claim
+    failing.
+  - Env and transport: the pace, `intervalMs`.
+  - `greekRuns`: glued digits, the numeral sign, several runs, polytonic and decomposed accents.
+  - Web:
+    - the owner's page: cursors, refusals, both redirects in both languages, a cancel coming back to
+      its place, a second cancel focused, axe on a paged render;
+    - the booking page's second notice;
+    - the loader;
+    - the suggestion list, the search heading and the address field's `lang`;
+    - the card, the pins, the owner's matches in the listing's language, the attribution on both
+      maps.
+  - Integration (`bookings.integration.test.ts`, 63 tests):
+    - 45 bookings paged both ways, with ties on the start broken by id;
+    - cancels on an earlier page, including the booking the place is;
+    - an emptied page, refused cursors, an old `?page=`;
+    - `listingRulesIn` equal to the three separate reads, at the edges of its days and out of
+      insertion order, and a hold priced by a dated rate as the listing page quotes it;
+    - an inactive space at the hold, a removed space at the confirmation, a driver holding again
+      after an unswept lapse.
+- [x] **Smoke test**:
+  - `booking.smoke.ts`: an owner with 25 bookings pages Next and Previous, cancels on page two and
+    comes back to it with the notice focused, then a place with nothing after it in Greek lands on
+    the first page. The first test's emptied place keeps `?cancelled=` and focuses the notice.
+  - `parking.smoke.ts`: a Greek name in an English heading, with axe, and the attribution in the
+    token-gated test.
+- [x] **Security** review: nothing above low. Fixed: a cursor past year 9999 answering 500
+      (Postgres can't read `+010000-…`)
+- [x] **Performance** review: hold and confirmation confirmed at 6 and 8 round trips,
+      `listingRulesIn` 34 buffers. Fixed, measured on 1.68M bookings:
+  - the unordered probe, which scanned the whole table past ~1% of it;
+  - the hand-added start bound, which made deep pages read and sort every booking left;
+  - the web app's pace, which made the "half each" split hold.
+
+  Open below.
+
+- [x] **Accessibility** review. Fixed:
+  - a second cancel's notice, which was neither read nor focused (Next keeps the page when only the
+    query changes), and the same with `?done=`;
+  - Greek in stored names and addresses;
+  - ordinals split from their letters;
+  - the field's `lang` after a switch;
+  - axe on the new states.
+
+  Manual checks below.
+
+- [x] **i18n** review. Fixed:
+  - the owner's address search, which asked Mapbox in the page's language but saved the answer as
+    the listing's;
+  - stored text;
+  - run boundaries («28ης Οκτωβρίου», «Α1», «Γʹ»);
+  - Greek tests for the redirect and the pager.
+
+  No new strings.
+
+- [x] **Contracts & docs**: OpenAPI and client regenerated, migration 0020 reviewed, `.env.example`
+      (`EMAIL_SENDS_PER_SECOND`), memory.md
+
+Left open:
+
+- [ ] Performance, low:
+  - A covering partial index for page 1 of a very busy garage, which walks the last 31 days. Wait
+    until one exists.
+  - A deadline per email in the sender, handing back unsent claims: a slow Resend can stretch a
+    run past 30 s.
+  - `setGlobalConcurrency(1)` on the email queue once there are several worker replicas.
+  - A stop timeout above 30 s on the platform, or a closing flag checked before each claim.
+- [ ] Booking emails mark the address with the listing's language only: Greek words in an English
+      listing's address aren't marked in their HTML (`greekRuns` is the web app's)
+- [ ] Names inside translated sentences (`t.rich` chunks: milestones, the booking page's notices)
+      carry the listing's `lang` but no marking per run
+- [ ] Manual NVDA (Chrome, Firefox, a Greek voice installed), JAWS, VoiceOver (macOS, iOS) and
+      TalkBack:
+  - the English search heading switching voice for the Greek words only;
+  - an option with a Greek name (voice, and "name, detail");
+  - the owner's matches in a Greek and an English listing;
+  - the attribution read in English on `/el`;
+  - whether any reader honours `lang` inside the "Chosen: …" live region, which decides whether it
+    should carry it;
+  - two cancels in a row on one page, and the last booking of a later page called off.
+
 ## Phase 4: Payments and payouts
 
 - [ ] Accountant and lawyer confirm the Greek/EU rules before this phase starts (#18)
@@ -855,6 +971,9 @@ Left open:
       addresses drivers type (sent from our server, not kept) and of drivers' IP addresses when the
       results map is opened. Bookings now keep the listing's address (3.3, L6), which for a private
       owner may be their home and outlives later edits of the listing
+- [ ] Email in production: Resend's real limit (`ratelimit-limit` on a send). If it is raised, raise
+      `EMAIL_SENDS_PER_SECOND` and the web app's pace with it (the transport's default, one a
+      second; a code change for now). A stop timeout above 30 s for the worker (see 3.4)
 - [ ] Address search in production: `MAPBOX_SEARCH_TOKEN` (no URL restrictions, search scopes only,
       never the public token), the public token restricted to the site's URLs and the map's scopes,
       Mapbox usage alerts, and the hourly budget and per-visitor cap checked against real use

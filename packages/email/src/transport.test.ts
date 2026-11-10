@@ -11,7 +11,7 @@ const email = {
   html: '<p>hello</p>',
 };
 
-function resend(responses: (number | Error | Response)[]) {
+function resend(responses: (number | Error | Response)[], intervalMs?: number) {
   const fetchFn = vi.fn<typeof fetch>(() => {
     const next = responses.shift() ?? 200;
     if (next instanceof Error) return Promise.reject(next);
@@ -21,7 +21,7 @@ function resend(responses: (number | Error | Response)[]) {
   return {
     fetchFn,
     wait,
-    transport: resendTransport({ apiKey: 're_k', from: 'P <a@b.gr>', fetchFn, wait }),
+    transport: resendTransport({ apiKey: 're_k', from: 'P <a@b.gr>', fetchFn, wait, intervalMs }),
   };
 }
 
@@ -91,8 +91,19 @@ describe('resendTransport', () => {
     expect(fetchFn).toHaveBeenCalledTimes(3);
     const delays = wait.mock.calls.map(([ms]: number[]) => ms ?? 0);
     expect(delays).toHaveLength(2);
-    expect(delays[0]).toBeGreaterThan(400);
-    expect(delays[1]).toBeGreaterThan(900);
+    // One a second: the web app and the worker share Resend's 2 a second.
+    expect(delays[0]).toBeGreaterThan(900);
+    expect(delays[1]).toBeGreaterThan(1_900);
+  });
+
+  it('goes at the pace it is given, when Resend’s limit allows more', async () => {
+    const { wait, transport } = resend([200, 200], 250);
+
+    await Promise.all([transport.send(email), transport.send(email)]);
+
+    const [delay] = wait.mock.calls.map(([ms]: number[]) => ms ?? 0);
+    expect(delay).toBeGreaterThan(150);
+    expect(delay).toBeLessThanOrEqual(250);
   });
 
   it('waits as long as Retry-After asks, within reason', async () => {

@@ -19,8 +19,13 @@ export interface EmailTransport {
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const REQUEST_TIMEOUT_MS = 5_000;
 const RETRY_DELAYS_MS = [500, 2_000];
-/** Resend's default limit is 2 requests a second; check `ratelimit-limit` on a real send. */
-const SEND_INTERVAL_MS = 500;
+/**
+ * Resend's default limit is 2 requests a second for the whole account, whoever sends; check
+ * `ratelimit-limit` on a real send. Two senders share it, the web app (account emails) and the
+ * worker (everything else), so each takes one a second unless told otherwise (`intervalMs`, the
+ * worker's `EMAIL_SENDS_PER_SECOND`). Raise both with Resend's limit.
+ */
+const SEND_INTERVAL_MS = 1_000;
 /** Longest `Retry-After` honoured: a quota hours away would only hold the process open. */
 const MAX_RETRY_AFTER_MS = 30_000;
 
@@ -53,19 +58,22 @@ export function resendTransport({
   fetchFn = fetch,
   wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   timeoutMs = REQUEST_TIMEOUT_MS,
+  intervalMs = SEND_INTERVAL_MS,
 }: {
   apiKey: string;
   from: string;
   fetchFn?: typeof fetch;
   wait?: (ms: number) => Promise<void>;
   timeoutMs?: number;
+  /** The least time between two calls of this sender. */
+  intervalMs?: number;
 }): EmailTransport {
   let nextSlot = 0;
   /** Waits for this call's turn; each call books the next free slot. */
   async function turn() {
     const now = Date.now();
     const slot = Math.max(now, nextSlot);
-    nextSlot = slot + SEND_INTERVAL_MS;
+    nextSlot = slot + intervalMs;
     if (slot > now) await wait(slot - now);
   }
 

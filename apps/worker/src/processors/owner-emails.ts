@@ -27,8 +27,14 @@ const DAY_MS = 24 * 60 * MINUTE_MS;
 export const REMINDER_AFTER_DAYS = 3;
 /** Long enough to look into a complaint. */
 export const SENT_EMAIL_DAYS = 90;
-/** Each run; Resend's limit paces the sends inside the transport. */
-const SEND_BATCH = 20;
+/** The most one claim takes; Resend's limit paces the sends inside the transport. */
+export const SEND_BATCH = 20;
+/**
+ * How long one run goes on claiming while claims come back full (a rush), so the outbox drains at
+ * the transport's pace rather than a batch per run. Under the 30 s between runs, since the queue's
+ * other jobs wait behind it: each claim is only as big as the pace sends in the time left.
+ */
+export const SEND_RUN_MS = 25_000;
 
 const OWNER_KINDS = new Set<string>(OWNER_EMAIL_KINDS);
 const BOOKING_KINDS = new Set<string>(BOOKING_EMAIL_KINDS);
@@ -89,25 +95,38 @@ export const ownerEmailsProcessor: QueueProcessor = {
         return { queued };
       }
       case 'send-owner-emails': {
-        const due = await claimDueEmails(db, SEND_BATCH);
-        let sent = 0;
-        for (const row of due) {
-          try {
-            await email.transport.send({ ...render(row, email.webUrl), idempotencyKey: row.id });
-            await markEmailSent(db, row.id);
-            sent++;
-          } catch (error) {
-            const reason = error instanceof Error ? error.message : 'unknown error';
-            const gaveUp = await markEmailFailed(db, row, reason);
-            // The id and kind only: the address must stay out of the logs.
-            const details = { emailId: row.id, kind: row.kind, reason };
-            if (gaveUp) logger.error(details, 'owner email given up on');
-            else logger.warn(details, 'owner email not sent');
+        const started = Date.now();
+        let [sent, failed] = [0, 0];
+        for (;;) {
+          const left = SEND_RUN_MS - (Date.now() - started);
+          const size = Math.min(SEND_BATCH, Math.floor((left / 1000) * email.sendsPerSecond));
+          if (size < 1) break;
+          const due = await claimDueEmails(db, size);
+          let sentNow = 0;
+          for (const row of due) {
+            try {
+              await email.transport.send({ ...render(row, email.webUrl), idempotencyKey: row.id });
+              await markEmailSent(db, row.id);
+              sentNow++;
+            } catch (error) {
+              failed++;
+              const reason = error instanceof Error ? error.message : 'unknown error';
+              const gaveUp = await markEmailFailed(db, row, reason);
+              // The id and kind only: the address must stay out of the logs.
+              const details = { emailId: row.id, kind: row.kind, reason };
+              if (gaveUp) logger.error(details, 'owner email given up on');
+              else logger.warn(details, 'owner email not sent');
+            }
           }
+          sent += sentNow;
+          // A short claim: the outbox is empty for now, and the next run is 30 s away. Nothing
+          // sent: Resend is failing, and the rest wait for their next run rather than each spend
+          // a try now.
+          if (due.length < size || sentNow === 0) break;
         }
         const overdue = await countOverdueEmails(db, new Date(Date.now() - DAY_MS));
         if (overdue > 0) logger.error({ overdue }, 'owner emails waiting for over a day');
-        return { sent, failed: due.length - sent };
+        return { sent, failed };
       }
       case 'purge-sent-emails': {
         const purged = await purgeSentEmails(db, new Date(Date.now() - SENT_EMAIL_DAYS * DAY_MS));

@@ -667,8 +667,13 @@ describe('LocationForm', () => {
         'fetch',
         vi.fn(() => Promise.resolve(new Response(JSON.stringify({ features }), { status }))),
       );
-    const searchFor = async (address = 'Ερμού 1') => {
-      renderInSubtree(<LocationForm listing={listingFixture()} mapboxToken="pk.test" />);
+    const searchFor = async (address = 'Ερμού 1', contentLocale: 'el' | 'en' = 'el') => {
+      renderInSubtree(
+        <LocationForm
+          listing={listingFixture({ location: { ...listingFixture().location, contentLocale } })}
+          mapboxToken="pk.test"
+        />,
+      );
       if (address) await userEvent.type(screen.getByLabelText('Address'), address);
       await userEvent.click(screen.getByRole('button', { name: 'Find this address' }));
     };
@@ -679,7 +684,13 @@ describe('LocationForm', () => {
     it('offers what it finds, and a choice fills the address and the pin', async () => {
       answerWith([match]);
       await searchFor();
-      await userEvent.click(await screen.findByRole('button', { name: 'Ερμού 1, Αθήνα 105 63' }));
+      const choice = await screen.findByRole('button', { name: 'Ερμού 1, Αθήνα 105 63' });
+      // Asked for, and marked, in the listing's language: the one it is saved and shown in.
+      expect(
+        new URL(String(vi.mocked(fetch).mock.calls[0]?.[0])).searchParams.get('language'),
+      ).toBe('el');
+      expect(choice.querySelector('[lang="el"]')).toHaveTextContent('Ερμού 1, Αθήνα 105 63');
+      await userEvent.click(choice);
 
       expect(screen.getByLabelText('Address')).toHaveValue('Ερμού 1, Αθήνα 105 63');
       expect(screen.getByLabelText('Latitude')).toHaveValue('37.9755');
@@ -692,6 +703,22 @@ describe('LocationForm', () => {
           body: expect.objectContaining({ latitude: 37.9755 }),
         }),
       );
+    });
+
+    it('asks in English for an English listing, its Greek words marked, and forgets them on a switch', async () => {
+      answerWith([{ ...match, properties: { full_address: 'Οδός Ερμού 1, Athens 105 63' } }]);
+      await searchFor('Ermou 1', 'en');
+      const choice = await screen.findByRole('button', { name: 'Οδός Ερμού 1, Athens 105 63' });
+      expect(
+        new URL(String(vi.mocked(fetch).mock.calls[0]?.[0])).searchParams.get('language'),
+      ).toBe('en');
+      const words = choice.querySelector('[lang="en"]');
+      expect(words?.querySelector('[lang="el"]')).toHaveTextContent(/^Οδός Ερμού$/);
+      // Found in English: they would be saved under Greek after the switch, so they go.
+      await userEvent.selectOptions(screen.getByLabelText('Language of your text'), 'el');
+      expect(
+        screen.queryByRole('button', { name: 'Οδός Ερμού 1, Athens 105 63' }),
+      ).not.toBeInTheDocument();
     });
 
     it('says when nothing matched', async () => {

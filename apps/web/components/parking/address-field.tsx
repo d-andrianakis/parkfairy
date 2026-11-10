@@ -263,6 +263,10 @@ export function AddressField({
         name="place"
         type="text"
         value={value}
+        // Words Mapbox named in the other language, kept from before a language switch.
+        lang={
+          value === defaultValue && placeLocale && placeLocale !== locale ? placeLocale : undefined
+        }
         onChange={onChange}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
@@ -287,6 +291,7 @@ export function AddressField({
           container={slot}
           id={listId}
           label={t('suggestionsLabel')}
+          lang={locale}
           suggestions={suggestions}
           active={active}
           onPick={(index) => void pick(index)}

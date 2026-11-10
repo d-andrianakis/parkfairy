@@ -22,6 +22,15 @@ const EnvSchema = z
     RESEND_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
     EMAIL_FROM: z.preprocess(emptyToUndefined, z.string().optional()),
     EMAIL_OUTBOX_DIR: z.preprocess(emptyToUndefined, z.string().optional()),
+    /**
+     * How fast the worker sends through Resend. The limit is the account's, shared with the web
+     * app's account emails (password resets, which nobody can ask for again), which go at one a
+     * second: 1 leaves them the other half of Resend's default 2 a second. Raise both together.
+     */
+    EMAIL_SENDS_PER_SECOND: z.preprocess(
+      emptyToUndefined,
+      z.coerce.number().positive().max(100).default(1),
+    ),
   })
   .refine((env) => env.RESEND_API_KEY || isLoopback(env.BETTER_AUTH_URL ?? LOCAL_WEB_URL), {
     // As in the web app: keyed on the origin, so staging never writes emails to disk either.

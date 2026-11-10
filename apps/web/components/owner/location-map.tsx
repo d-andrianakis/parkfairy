@@ -4,7 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/lib/mapbox-focus.css';
 import type { Map as MapboxMap, Marker } from 'mapbox-gl';
 import { useEffect, useRef } from 'react';
-import { MAPBOX_STYLE as STYLE, workerUrlFor } from '@/lib/mapbox';
+import { markAttributionEnglish, MAPBOX_STYLE as STYLE, workerUrlFor } from '@/lib/mapbox';
 
 /** Attica, until there is a pin. */
 const DEFAULT_CENTER: [number, number] = [23.7275, 37.9838];
@@ -81,6 +81,7 @@ export default function LocationMap({
         },
       });
       created.addControl(new mapboxgl.NavigationControl({ showCompass: false }));
+      markAttributionEnglish(container.current);
       const pin = new mapboxgl.Marker({ draggable: true, color: '#092c99' });
       pin.getElement().setAttribute('aria-label', labels.pin);
       if (position) pin.setLngLat(position).addTo(created);

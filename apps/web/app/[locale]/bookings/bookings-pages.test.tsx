@@ -174,6 +174,31 @@ describe('a booking’s page', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
+  it('says a cancel after a confirm on the same page, though only the query changed', async () => {
+    const { rerender } = await showBooking(confirmed(), 'confirmed');
+    const main = document.createElement('main');
+    main.id = 'main-content';
+    main.tabIndex = -1;
+    document.body.append(main);
+    main.focus(); // where `RouteFocus` puts it after the navigation
+    const cancelled = confirmed({
+      status: 'cancelled',
+      cancelledBy: 'driver',
+      cancelledAt: '2099-12-02T10:00:00.000Z',
+      refund: { amountMinor: 400, currency: 'EUR' },
+      refundIfCancelled: null,
+    });
+    vi.mocked(loadBooking).mockResolvedValue(cancelled);
+    rerender(
+      await BookingPage({
+        params: Promise.resolve({ locale: 'en', id: ID }),
+        searchParams: Promise.resolve({ done: 'cancelled' }),
+      }),
+    );
+    expect(screen.getByRole('heading', { level: 2 })).toHaveFocus();
+    main.remove();
+  });
+
   it('announces nothing for a `done` that doesn’t match the booking', async () => {
     await showBooking(confirmed(), 'cancelled');
     expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();

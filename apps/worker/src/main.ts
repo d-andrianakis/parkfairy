@@ -28,7 +28,11 @@ const database = createDatabase({
   applicationName: 'parkfairy-worker',
 });
 
-const email = { transport: chooseEmailTransport(env), webUrl: env.webUrl };
+const email = {
+  transport: chooseEmailTransport(env),
+  webUrl: env.webUrl,
+  sendsPerSecond: env.EMAIL_SENDS_PER_SECOND,
+};
 
 const queues: Queue[] = [];
 const workers: Worker[] = [];

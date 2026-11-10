@@ -16,6 +16,7 @@ import {
 } from '@parkfairy/ui/components/card';
 import { CalendarCheck, CalendarX, CircleAlert, ImageOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { PlaceWords } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
 import { closuresHref, ownerBookingsHref } from '@/lib/owner-href';
@@ -78,7 +79,9 @@ export function ListingMilestones({ listing }: { listing: OwnerListingProgress }
           )}
           <div className="grid min-w-0 flex-1 gap-1">
             <CardTitle className="text-lg leading-snug">
-              <h2 lang={nameLang}>{name}</h2>
+              <h2 lang={nameLang}>
+                {nameLang ? <PlaceWords text={name} lang={nameLang} /> : name}
+              </h2>
             </CardTitle>
             <CardDescription>
               <Badge variant={listing.status === 'changes_requested' ? 'destructive' : 'secondary'}>

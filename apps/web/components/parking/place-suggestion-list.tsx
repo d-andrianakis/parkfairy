@@ -4,6 +4,7 @@ import type { PlaceSuggestion } from '@parkfairy/api-client';
 import { Popover, PopoverAnchor, PopoverContent } from '@parkfairy/ui/components/popover';
 import { useEffect, type RefObject } from 'react';
 import { optionId } from './place-option-id';
+import { PlaceWords } from './place-words';
 
 export interface PlaceSuggestionListProps {
   /** The address field: the list hangs from it, and the focus never leaves it. */
@@ -12,6 +13,8 @@ export interface PlaceSuggestionListProps {
   container: HTMLElement | null;
   id: string;
   label: string;
+  /** The page's language, which Mapbox wrote in where it could. */
+  lang: string;
   suggestions: PlaceSuggestion[];
   active: number;
   onPick: (index: number) => void;
@@ -32,6 +35,7 @@ export function PlaceSuggestionList({
   container,
   id,
   label,
+  lang,
   suggestions,
   active,
   onPick,
@@ -79,10 +83,12 @@ export function PlaceSuggestionList({
             }}
             onClick={() => onPick(index)}
           >
-            <span className="font-medium">{suggestion.name}</span>
+            <span className="font-medium">
+              <PlaceWords text={suggestion.name} lang={lang} />
+            </span>
             {suggestion.detail ? (
               <span className="text-xs text-muted-foreground group-aria-selected/option:text-accent-foreground">
-                {suggestion.detail}
+                <PlaceWords text={suggestion.detail} lang={lang} />
               </span>
             ) : null}
           </div>

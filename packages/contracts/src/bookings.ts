@@ -167,8 +167,43 @@ export const OwnerBookingSchema = z
   .register(contractsRegistry, { id: 'OwnerBooking' });
 export type OwnerBooking = z.infer<typeof OwnerBookingSchema>;
 
+/**
+ * A place in the owner's list of bookings: a booking's start (milliseconds since the epoch) and id,
+ * the two that order the list. Opaque to clients, which only send back what a page gave them. A
+ * place rather than a page number, so a page deep into a busy garage's year costs what the first
+ * does, and a booking called off on an earlier page doesn't shift the rest (keyset paging).
+ */
+export const BOOKINGS_CURSOR_PATTERN =
+  /^(\d{1,15})_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+
+export interface BookingsCursor {
+  start: Date;
+  id: string;
+}
+
+export const bookingsCursor = ({ start, id }: BookingsCursor) => `${start.getTime()}_${id}`;
+
+/** 9999-12-31T23:59:59.999Z, the last instant Postgres reads as JavaScript writes it. */
+const LAST_CURSOR_MS = 253_402_300_799_999;
+
+/** The place a cursor names, or null for anything a page didn't give out. */
+export function parseBookingsCursor(cursor: string): BookingsCursor | null {
+  const found = BOOKINGS_CURSOR_PATTERN.exec(cursor);
+  if (!found?.[1] || !found[2]) return null;
+  const ms = Number(found[1]);
+  // Past 9999 a date is written `+010000-…`, which Postgres refuses: a 500 for a made-up place.
+  if (ms > LAST_CURSOR_MS) return null;
+  return { start: new Date(ms), id: found[2] };
+}
+
+const cursor = z
+  .string(message('invalid'))
+  .refine((place) => parseBookingsCursor(place) !== null, message('invalid'));
+
+/** The bookings `after` one place or `before` it; neither is the first page. */
 export const OwnerBookingsQuerySchema = z
-  .object({ page })
+  .object({ after: cursor.optional(), before: cursor.optional() })
+  .refine((query) => !(query.after && query.before), message('invalid'))
   .register(contractsRegistry, { id: 'OwnerBookingsQuery' });
 export type OwnerBookingsQuery = z.infer<typeof OwnerBookingsQuerySchema>;
 
@@ -179,8 +214,10 @@ export const OwnerListingBookingsSchema = z
     name: z.string().nullable(),
     contentLocale: LocaleSchema,
     bookings: z.array(OwnerBookingSchema).max(BOOKINGS_PAGE_SIZE),
-    page: z.int().positive(),
-    hasMore: z.boolean(),
+    /** `before` for the page ahead of this one, null on the first. */
+    previous: z.string().regex(BOOKINGS_CURSOR_PATTERN).nullable(),
+    /** `after` for the page that follows, null on the last. */
+    next: z.string().regex(BOOKINGS_CURSOR_PATTERN).nullable(),
   })
   .register(contractsRegistry, { id: 'OwnerListingBookings' });
 export type OwnerListingBookings = z.infer<typeof OwnerListingBookingsSchema>;
