@@ -1,6 +1,6 @@
 import type { ParkingListingDetail } from '@parkfairy/api-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadFeaturedListings, loadListing, loadSearchResults } from './api.server';
+import { loadFeaturedListings, loadListing, loadSearchResults, lookupPlace } from './api.server';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache', () => ({ unstable_cache: (fn: () => unknown) => fn }));
@@ -12,6 +12,7 @@ vi.mock('react', async (importOriginal) => ({
 }));
 
 const api = vi.hoisted(() => ({
+  findPlaces: vi.fn(),
   getFeaturedParking: vi.fn(),
   searchParking: vi.fn(),
   getParkingListing: vi.fn(),
@@ -62,6 +63,27 @@ describe('loadSearchResults', () => {
     await expect(
       loadSearchResults('syntagma', undefined, undefined, window.start, window.end),
     ).resolves.toBeNull();
+  });
+});
+
+describe('lookupPlace', () => {
+  const place = { label: 'Ermou 10, Athens', latitude: 37.97, longitude: 23.73 };
+
+  it('takes the best match, asked in the page language for this visitor', async () => {
+    api.findPlaces.mockResolvedValue({ data: { places: [place, { ...place, label: 'Other' }] } });
+    await expect(lookupPlace('Ermou 10', 'en')).resolves.toEqual(place);
+    const [options] = api.findPlaces.mock.calls[0] as [Record<string, unknown>];
+    expect(options.query).toEqual({ q: 'Ermou 10', locale: 'en' });
+    expect(options.headers).toEqual({ 'x-forwarded-for': '203.0.113.7' });
+  });
+
+  it('tells nothing found from address search being unavailable', async () => {
+    api.findPlaces.mockResolvedValue({ data: { places: [] } });
+    await expect(lookupPlace('Xyzzy', 'el')).resolves.toBe('not-found');
+    api.findPlaces.mockResolvedValue({ data: undefined, error: { code: 'PLACES_UNAVAILABLE' } });
+    await expect(lookupPlace('Ermou', 'el')).resolves.toBe('unavailable');
+    api.findPlaces.mockRejectedValue(new DOMException('timeout', 'TimeoutError'));
+    await expect(lookupPlace('Ermou', 'el')).resolves.toBe('unavailable');
   });
 });
 

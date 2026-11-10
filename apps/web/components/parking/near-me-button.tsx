@@ -35,6 +35,7 @@ export function NearMeButton() {
         setField(form, 'latitude', coords.latitude.toFixed(3));
         setField(form, 'longitude', coords.longitude.toFixed(3));
         setField(form, 'area', '');
+        setField(form, 'place', '');
         setState('idle');
         form.requestSubmit();
       },

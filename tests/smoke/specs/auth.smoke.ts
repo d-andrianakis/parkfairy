@@ -107,3 +107,17 @@ test('wrong credentials get a translated, generic error', async ({ page }) => {
   ).toBeVisible();
   await expectAccessible(page);
 });
+
+test('signing in and creating an account keep where the visitor was going (3.1)', async ({
+  page,
+}) => {
+  const stay = '/parking/ermou-garage?startDate=2027-03-10&startTime=10:00';
+  const next = (url: string) => new URL(url).searchParams.get('next');
+  await page.goto(`/en/sign-in?next=${encodeURIComponent(stay)}`);
+  await page.getByRole('link', { name: 'Create an account' }).click();
+  await expect(page).toHaveURL(/\/en\/sign-up\?next=/);
+  expect(next(page.url())).toBe(stay);
+  await page.getByRole('main').getByRole('link', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(/\/en\/sign-in\?next=/);
+  expect(next(page.url())).toBe(stay);
+});

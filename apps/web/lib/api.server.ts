@@ -2,12 +2,14 @@ import 'server-only';
 import {
   createClient,
   createConfig,
+  findPlaces,
   getFeaturedParking,
   getParkingListing,
   searchParking,
   type ParkingListingDetail,
   type ParkingListingSummary,
   type ParkingSearchResponse,
+  type Place,
 } from '@parkfairy/api-client';
 import { isListingSlug, type ParkingSearchQuery } from '@parkfairy/contracts';
 import { unstable_cache } from 'next/cache';
@@ -78,6 +80,28 @@ export const loadSearchResults = cache(
       return data ?? null;
     } catch {
       return null;
+    }
+  },
+);
+
+/**
+ * Typed text's best match (decision #40): the place, `'not-found'` when Mapbox knows nothing like
+ * it, or `'unavailable'` (no token, the hour's budget spent, Mapbox or the API failing). Once per
+ * request: metadata and the page share it.
+ */
+export const lookupPlace = cache(
+  async (q: string, locale: string): Promise<Place | 'not-found' | 'unavailable'> => {
+    try {
+      const { data } = await findPlaces({
+        client: serverApi,
+        query: { q, locale: locale as 'el' | 'en' },
+        headers: await forwardedFor(),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!data) return 'unavailable';
+      return data.places[0] ?? 'not-found';
+    } catch {
+      return 'unavailable';
     }
   },
 );

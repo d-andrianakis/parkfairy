@@ -22,6 +22,7 @@ import { BookingsLink } from './bookings-link';
 import { FormField } from '@/components/form-field';
 import { useAnnouncer } from '@/components/use-announcer';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
+import { keepClosuresDraft, takeClosuresDraft } from '@/lib/closures-draft';
 import { attempt, useOwnerError } from '@/lib/owner-client';
 import { TIME_OPTIONS } from '@/lib/search';
 import { useValidationMessage } from '@/lib/use-validation-message';
@@ -120,6 +121,8 @@ export function HoursExceptionsForm({
   /** How many entries are stored, and whether the page has changed since: what copying copies. */
   const [stored, setStored] = useState(exceptions.length);
   const [unsaved, setUnsaved] = useState(false);
+  /** The entries the owner left to cancel bookings came back with them (3.1). */
+  const [restored, setRestored] = useState(false);
   const saving = state === 'saving';
   const latest = addDays(today, HOURS_EXCEPTION_AHEAD_DAYS);
   const fromHint = t('fromHint', {
@@ -136,6 +139,15 @@ export function HoursExceptionsForm({
     const active = document.activeElement;
     if (!active || active === document.body || !active.isConnected) saveButton.current?.focus();
   }, [state]);
+
+  // After hydration, as storage isn't there for the server render.
+  useEffect(() => {
+    const draft = takeClosuresDraft(id);
+    if (!draft) return;
+    setRows(draft.map((row) => ({ ...row, key: nextKey.current++ })));
+    setUnsaved(true);
+    setRestored(true);
+  }, [id]);
 
   const changed = () => {
     setState('idle');
@@ -215,6 +227,8 @@ export function HoursExceptionsForm({
     setStored(saved.length);
     setUnsaved(false);
     setState('saved');
+    // Saved now: what came back is no longer waiting for a save.
+    setRestored(false);
   }
 
   return (
@@ -223,6 +237,10 @@ export function HoursExceptionsForm({
         <FieldGroup>
           {invalid.region}
           {region}
+          {/* Always there, so it is read when the entries come back. */}
+          <p role="status" className="text-sm empty:sr-only">
+            {restored ? t('draftRestored') : ''}
+          </p>
           {rows.length === 0 ? <p className="text-muted-foreground">{t('empty')}</p> : null}
           {rows.map((row, index) => {
             const number = index + 1;
@@ -405,7 +423,13 @@ export function HoursExceptionsForm({
             </p>
           )}
           <FormError message={failure}>
-            {failure && failure === bookedFailure ? <BookingsLink id={id} /> : null}
+            {failure && failure === bookedFailure ? (
+              <BookingsLink
+                id={id}
+                // Nothing is saved while the refusal shows: keep the entries for the way back.
+                onFollow={() => keepClosuresDraft(id, rows)}
+              />
+            ) : null}
           </FormError>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <SaveStatus state={state} />

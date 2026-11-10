@@ -21,7 +21,9 @@ const renderInSubtree = rendererFor(CLIENT_NAMESPACES.booking);
 const ID = 'b0b0b0b0-0000-4000-8000-000000000001';
 const AGAIN = '/parking/ermou-garage?startDate=2026-12-10&startTime=10:00';
 const show = (locale: 'en' | 'el' = 'en') =>
-  renderInSubtree(<ConfirmBooking id={ID} chooseAgainHref={AGAIN} />, { locale });
+  renderInSubtree(<ConfirmBooking id={ID} chooseAgainHref={AGAIN} space="Α1" spaceLocale="el" />, {
+    locale,
+  });
 const plate = () => screen.getByRole('textbox', { name: 'Number plate' });
 const confirmButton = () => screen.getByRole('button', { name: 'Confirm booking' });
 
@@ -98,12 +100,53 @@ describe('ConfirmBooking', () => {
     expect(plate()).toHaveFocus();
   });
 
-  it('lets the space go and returns to the listing for the same times', async () => {
+  it('asks before letting the space go, then returns to the listing, which says so', async () => {
     release.mockResolvedValue(answer({ id: ID, status: 'released' }) as never);
+    const { container } = show();
+    await userEvent.click(screen.getByRole('button', { name: 'Let this space go' }));
+    expect(release).not.toHaveBeenCalled();
+    // The question takes the focus, so it is read, with the space in the owner's language.
+    const question = screen.getByText(/Someone else can book it straight away/);
+    expect(question).toHaveFocus();
+    expect(question.querySelector('[lang="el"]')).toHaveTextContent('Α1');
+    await expectNoAxeViolations(container);
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, let it go' }));
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith(`${AGAIN}&released=1`));
+    expect(release).toHaveBeenCalledWith({ path: { id: ID }, body: {} });
+  });
+
+  it('keeps the space on "No", and gives the focus back to the button every time', async () => {
+    show();
+    for (let n = 0; n < 2; n++) {
+      await userEvent.click(screen.getByRole('button', { name: 'Let this space go' }));
+      await userEvent.click(screen.getByRole('button', { name: 'No, keep it' }));
+      expect(screen.getByRole('button', { name: 'Let this space go' })).toHaveFocus();
+    }
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it('won’t say "keep it" once the space is being let go', async () => {
+    let settle: (value: unknown) => void = () => undefined;
+    release.mockReturnValue(new Promise((resolve) => (settle = resolve)) as never);
     show();
     await userEvent.click(screen.getByRole('button', { name: 'Let this space go' }));
-    await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith(AGAIN));
-    expect(release).toHaveBeenCalledWith({ path: { id: ID }, body: {} });
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, let it go' }));
+    const keep = screen.getByRole('button', { name: 'No, keep it' });
+    expect(keep).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(keep);
+    expect(screen.getByRole('button', { name: 'Letting it go…' })).toBeInTheDocument();
+    settle(answer({ id: ID, status: 'released' }));
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledOnce());
+  });
+
+  it('keeps the question when letting go fails, and says why', async () => {
+    release.mockResolvedValue(refusal('BOOKING_NOT_FOUND', 404) as never);
+    show();
+    await userEvent.click(screen.getByRole('button', { name: 'Let this space go' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, let it go' }));
+    expect(await screen.findByText('We can’t find this booking.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Yes, let it go' })).toBeInTheDocument();
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 
   it('keeps both buttons from a second press while one is busy', async () => {

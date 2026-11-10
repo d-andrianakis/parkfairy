@@ -122,6 +122,31 @@ Answered by the product owner on 2026-11-08, after the reviews:
 39. Owners see the driver's name and plate **from the moment of booking**, not only near arrival.
     How long they stay is the Phase 6 retention review's.
 
+Answered by the product owner on 2026-11-09, for the rest of Phase 3:
+
+40. Drivers search by address with **suggestions while typing** (Mapbox Search Box). Built through our
+    API rather than from the browser, so the token stays on the server, the search page's CSP needs
+    nothing for it, and every billed call sits behind our limits. Text that was never picked from the
+    list (or typed without JavaScript) is looked up once by the server, which redirects to its
+    coordinates.
+41. Search results get **a map on request** ("Show the map"), with Mapbox allowed on the search page
+    only. Pins are numbered as the list is.
+42. Built **without a Mapbox token**: unit tests mock Mapbox, the smoke suite covers the page with no
+    token (no address field, no map, everything else working). The first real run waits for a token.
+43. The 3.1 leftovers in the same round: the sign-up link keeping `?next=`, the missing tests, the
+    accessibility advisories, per-account hold limits (L2), a cap on booking emails to one owner (L3)
+    and **the listing's name and address copied onto each booking** (L6), so text changed on a
+    listing sent back never reaches drivers unreviewed.
+
+Answered by the product owner on 2026-11-10, after the reviews:
+
+44. The owner-email cap (L3) **stays as built**: a driver who books and cancels three times in a day
+    uses it up, and their next real booking then shows on the owner's page without an email. A rare
+    abuse case, and the driver still gets all of theirs.
+45. The results map gets **"Show all results" and cooperative gestures**: one press refits every pin
+    (a way back without dragging; the list stays the equivalent), and on touch one finger scrolls the
+    page while two move the map, with the hints in both languages.
+
 Our readings (2026-11-08), not asked; change any that are wrong:
 
 - **One hold per driver.** A new hold lets the driver's earlier ones go, so one account can't sit
@@ -632,6 +657,86 @@ check:shutdown` in CI (Linux); Windows cannot deliver SIGTERM, so it skips local
   shows and nothing about people: no names, no plate. `packages/email/src/booking-emails.ts` writes
   the stay in the listing's zone, 24-hour in Greek; the layout gained label/value `details`.
 
+- **2026-11-09 · Address search goes through our API, not from the browser to Mapbox** (#40):
+  `GET /v1/places/suggestions`, `/places/retrieve` and `/places` (`apps/api/src/places`). The token
+  stays on the server and the search page's CSP needs nothing for it. Mapbox has no spending cap, so
+  three things stand in front of it (security and performance reviews):
+  - the site's hourly budget (`MAPBOX_SEARCH_HOURLY_LIMIT`, 2,000) counts what Mapbox bills: a
+    session (one UUID from the first suggestion to the pick) the first time it is seen
+    (`SET … NX` in Redis), and each one-off look-up. Counting calls made it about five times too
+    tight. While Redis fails it counts per instance, since the request limits then let everything
+    through;
+  - each visitor gets 100 calls an hour across the three routes (`PlacesVisitorGuard`, one key the
+    handler isn't part of), a twentieth of the budget, so one client can't switch search off for all;
+  - requests another site's page makes from a visitor's browser are refused (`Sec-Fetch-Site`
+    present and not `same-origin`/`none`: an `<img>` would otherwise spend lookups from every
+    visitor's own address). The web server's own calls carry no such header.
+
+  After five Mapbox failures in a row the API answers unavailable for 30 s rather than after 3 s
+  each. The API's token is `MAPBOX_SEARCH_TOKEN`; `MAPBOX_PUBLIC_TOKEN` stands in on this machine
+  only, and outside it the two may not be the same: the public one reaches every browser, and making
+  it work from a server would mean lifting its URL restrictions. The web shows the field and the map
+  only when it has `MAPBOX_PUBLIC_TOKEN` (`lib/maps.server.ts`), so production sets both. Mapbox's
+  results are for temporary use: nothing is cached or stored, answers are `no-store`, and request
+  logs drop `q`, `session` and `id` along with positions (`log-redaction.ts`).
+
+- **2026-11-09 · A place in the search URL is `place` + `latitude`/`longitude` + `placeLocale`.** A
+  pick fills the position; any edit clears it. Text with no valid position (never picked, typed
+  without JavaScript, or a position edited by hand) is looked up once by the page (`lookupPlace`),
+  which redirects to the same search with the position, so a reload or a shared link costs no second
+  look-up. Only for a search made here or typed in: from another site the page asks for a press of
+  Search instead (`Search.lookupPending`). Because the position belongs to the words, the server
+  renders the hidden position fields empty when there is a place and the field puts them back after
+  hydration: without JavaScript an edited place would otherwise travel with the old position.
+  `placeLocale` is the language Mapbox named the place in (the page's at the time), so after a
+  language switch the heading marks the words with it; `<title>` can't carry `lang`. Without a token
+  nothing can look a place up, so a place with no position is left out
+  (`parseSearch(..., { lookups: false })`) and the search asks for an area. An area always wins.
+- **2026-11-09 · The address combobox is shadcn `Input` + `Popover`, not `Command` (cmdk).** cmdk
+  fixes the input's `id`, `aria-labelledby` and `aria-expanded` (always true) after its props, which
+  breaks our `FieldLabel`, the error summary's `#search-place` link and the collapsed state. The
+  popover is anchored with `virtualRef`, so it can load on focus without replacing the input (which
+  would lose the focus), and it is the listbox itself (`role="listbox"` on `PopoverContent`, options
+  only); "nothing found" and failures go to a visible status line under the field instead. It
+  renders right after the field (`container`, a `// Parkfairy:` prop on `PopoverContent`): at the end
+  of `<body>`, swipe navigation reached it last. Radix makes the list focusable, so a tap on its edge
+  can move the focus there; the field takes it back rather than closing the list before the pick
+  lands. The current option has an inset ring, as menu items do (the accent fill alone is 1.1:1). The
+  API client loads with the list, on focus: imported statically it put about 4 KiB on every home and
+  search visit.
+- **2026-11-09 · Links into `/search` load a real page where there can be a map (`SearchLink`).** The
+  CSP in force is the one of the page a visitor arrived on, and only the search page (and the owner
+  area) allows Mapbox (`allowsMaps` in `lib/security/csp.ts`, built from `SUPPORTED_LOCALES`), so a
+  client navigation from the home page would refuse the results map. Without a token there is no map
+  and the link stays a client navigation, prefetched and quicker. The search form is a plain GET form,
+  which loads a page anyway.
+- **2026-11-09 · Mapbox makes every marker an image named "Map marker"** (mapbox-gl 3.34 sets
+  `role="img"` and `aria-label` on any element it is given that lacks them). The results map's pins
+  are links: `results-map.tsx` removes both after creating each marker, and names the pin by its text
+  (the number `aria-hidden`, the full name in an `sr-only` span, the listing's name in a `lang` span of
+  its own, which an `aria-label` couldn't carry). The test's fake marker copies Mapbox's behaviour.
+  The map's own focus rings are in `lib/mapbox-focus.css` (both maps): Mapbox shows focus with a
+  box-shadow, which forced colours drop, and the tiles are light in both themes, so the colour is
+  fixed. Once shown, the map stays mounted and is only hidden: showing it again was another billed
+  map load.
+- **2026-11-09 · Bookings keep the listing's name, address and language** (`listing_*`, migration
+  0019, L6). The driver's pages and every email read them from the booking; the owner's own pages
+  still show the listing as it is now. Name and address are nullable: the backfill met listings sent
+  back with their name cleared. 0019 adds, backfills and constrains in one transaction under an
+  exclusive lock, which is fine before launch only: on a large `bookings`, add the column nullable,
+  deploy the writers, backfill in batches outside the migration, add the CHECK `NOT VALID`, validate
+  it, then `SET NOT NULL` (performance review).
+- **2026-11-09 · An owner hears of one driver's bookings at most six times a day** (L3,
+  `OWNER_EMAILS_PER_DRIVER_DAY`): confirmations and driver's cancellations of the last 24 hours at
+  any of the owner's listings, counted on the driver's own bookings inside the transaction, bounded to
+  rows with an event in the window. The owner's own cancellations don't count. Past it, the booking
+  still shows on the owner's page; the driver's own emails are never capped.
+- **2026-11-09 · Per-account hold limits are a route guard, not a second named throttler** (L2,
+  `AccountThrottlerGuard` with `@UseGuards`): the global throttler runs before the session is known,
+  on purpose, so a flood never reaches the session lookup. The guard re-runs the route's limits with
+  the account as the tracker; its keys never meet the per-address ones. Each guard instance builds
+  its own `commonOptions`, so a subclass's `getTracker`/`generateKey` stay its own.
+
 ## Conventions
 
 - **Data:** UUID PKs, `timestamptz` (UTC instants), snake_case SQL, money as integer minor
@@ -895,6 +1000,15 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   together. `.min(1, { message, abort: true })` stops there (2026-11-08).
 - **The React lint calls `Date.now()` impure during render**, server components included;
   `new Date().getTime()` reads the same clock and passes. Read it once per render.
+- **`vi.mock` of a source file that another module imports lazily didn't take** (2026-11-09): with
+  `React.lazy` or `next/dynamic` around `import('./results-map')`, the real module loaded even though
+  the mock's factory ran. Mock the library underneath instead (`mapbox-gl/dist/mapbox-gl-csp.js`), as
+  `results-map-toggle.test.tsx` does.
+- **The owner integration suite suspends earlier runs' live listings at its point** (2026-11-10): they
+  pile up in the test database run after run, and past search's 50 results this run's own fell off
+  the end at random (their slugs carry a random tag), failing four search tests in a full run only.
+- **The test `getPathname` returns the path `Link` renders** (`test/navigation-mock.tsx`, 2026-11-09):
+  it used to return undefined, so plain `<a href={getPathname(…)}>` links had no href in tests.
 - **A bash heredoc with nested quotes can break the shell** ("unexpected EOF while looking for
   matching"), besides mangling non-ASCII: put such scripts in a file.
 
@@ -944,6 +1058,12 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   public listing page unchanged at 167 KiB: its closures table renders on the server only.
 - 2026-11-04 (weekly hours copy, the same method): a listing step about 238.5 KiB, the closures
   page about 227.6 KiB, `/en/owner` 175 KiB. The shared copy section added about 1.5 KiB.
+- 2026-11-09 (address search and the results map, from the build manifests by the performance
+  review): `/en` 173.3 KiB, `/en/search` 174.0 KiB, the owner listing step 234.2 KiB (the tightest,
+  16 KiB under the budget), auth pages 222–224 KiB. That was before the API client moved out of the
+  address field's first load (about 4 KiB less on `/en` and `/en/search`). The suggestion list loads
+  on focus (about 6 KiB, plus 18 KiB shared with the date picker); the map's own chunk, its CSS and
+  the 481 KiB library on hover or press, the worker (268 KiB) after.
 - 2026-11-08 (booking, `performance.smoke.ts` on production builds): the public listing page 185
   KiB at first, signed in with the picker or not, because the server page imported it; 169 KiB once
   it loaded through `BookSpacePicker`, 185 KiB where it shows. A booking's page 210 KiB with zod for

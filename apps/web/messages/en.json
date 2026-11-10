@@ -77,7 +77,17 @@
     "today": "Today, {date}",
     "selectedDay": "{date}, selected",
     "untilMoved": "Departure moved to {date}",
-    "submit": "Search"
+    "submit": "Search",
+    "address": "Or type an address or place",
+    "addressHint": "Type a few letters, then choose from the list. A place you choose replaces the area.",
+    "suggestionCount": "{count, plural, one {# suggestion} other {# suggestions}} below the field.",
+    "noSuggestions": "No addresses found. Try other words, or choose an area.",
+    "suggestionsUnavailable": "Address search isn’t available right now. Choose an area or use your location.",
+    "placeChosen": "Chosen: {place}",
+    "pickFailed": "We couldn’t find where that is. Press “Search” to look it up again, or choose another suggestion.",
+    "suggestionsBy": "Suggestions by Mapbox.",
+    "addressName": "Address or place",
+    "suggestionsLabel": "Address suggestions"
   },
   "Search": {
     "metaTitle": "Search for parking",
@@ -93,7 +103,27 @@
     "invalid": "There is a problem with your search",
     "unavailable": "Search isn’t available right now. Please try again in a moment.",
     "prompt": "Choose where and when you want to park.",
-    "resultsTitle": "{title} – {count, plural, =0 {no parking found} one {# place with free spaces} other {# places with free spaces}}"
+    "resultsTitle": "{title} – {count, plural, =0 {no parking found} one {# place with free spaces} other {# places with free spaces}}",
+    "titlePlace": "Parking near “<place>{place}</place>”",
+    "showMap": "Show the map",
+    "hideMap": "Hide the map",
+    "lookupPending": "Press “Search” to look for “<place>{place}</place>”."
+  },
+  "ResultsMap": {
+    "map": "Map of the results",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "attribution": "Show map information",
+    "logo": "Mapbox home page",
+    "searched": "Where you searched",
+    "pin": "Result {number}: <name>{name}</name>, {from, select, true {from {price} in total} other {{price} in total}}",
+    "loading": "Loading the map…",
+    "failed": "The map couldn’t load. Every result is in the list.",
+    "canvas": "Map: the arrow keys move it, plus and minus zoom",
+    "showAll": "Show all results",
+    "zoomHintCtrl": "Use Ctrl + scroll to zoom the map",
+    "zoomHintCmd": "Use ⌘ + scroll to zoom the map",
+    "panHint": "Use two fingers to move the map"
   },
   "Listing": {
     "distance": "{distance} away",
@@ -146,7 +176,9 @@
     "signInToBook": "Sign in to book",
     "accountToBook": "You need an account to book. It’s free to create one.",
     "bookBelow": "Choose your space to book it.",
-    "moreFreeSpaces": "{count, plural, one {and # more free space} other {and # more free spaces}}"
+    "moreFreeSpaces": "{count, plural, one {and # more free space} other {and # more free spaces}}",
+    "releasedTitle": "You let the space go",
+    "releasedLead": "It isn’t kept for you any more. Choose a space below, or other times."
   },
   "Features": {
     "label": "Features",
@@ -319,7 +351,10 @@
     "dateRequired": "Choose a date",
     "lastDayBeforeFirst": "The last day must be the same as the first or after it",
     "plateRequired": "Enter the number plate",
-    "plateInvalid": "Enter the plate as it is on the car, for example IKB-1234"
+    "plateInvalid": "Enter the plate as it is on the car, for example IKB-1234",
+    "placeTooShort": "Type at least {min} characters",
+    "placeNotFound": "We couldn’t find that address or place. Check it, or choose an area",
+    "placeUnavailable": "Address search isn’t available right now. Choose an area or use your location"
   },
   "Forms": {
     "invalidSummary": "{count, plural, one {# field needs your attention} other {# fields need your attention}}",
@@ -714,7 +749,8 @@
       "fromHint": "Any day from today to {latest}.",
       "overlapWith": "These dates overlap period {number}",
       "limit": "You’ve reached {max} periods, the most one listing can have. Remove one to add another.",
-      "copyBooked": "Not copied to “<listing>{name}</listing>”: drivers are booked on those days. Cancel their bookings first."
+      "copyBooked": "Not copied to “<listing>{name}</listing>”: drivers are booked on those days. Cancel their bookings first.",
+      "draftRestored": "Your changes from before you left are back. Save them when you’re ready."
     },
     "prices": {
       "hourly": "Hourly rate (€)",
@@ -957,7 +993,10 @@
     "keeping": "Keeping it…",
     "kept": "Kept for you until {time} (Greek time).",
     "holdWarning": "Your hold on this space ends at {time} (Greek time). Need more time? Keep it for longer below.",
-    "holdLimit": "This space has been kept as long as it can be. Confirm before {time} (Greek time), or let it go."
+    "holdLimit": "This space has been kept as long as it can be. Confirm before {time} (Greek time), or let it go.",
+    "releaseQuestion": "Let space <space>{space}</space> go? Someone else can book it straight away.",
+    "releaseConfirm": "Yes, let it go",
+    "releaseKeep": "No, keep it"
   },
   "Bookings": {
     "metaTitle": "Your bookings",

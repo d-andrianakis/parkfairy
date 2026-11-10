@@ -66,9 +66,12 @@ export function useSentPanel() {
       setJustSentTo(email);
       if (rememberSentTo(pathname, email)) {
         // The history API, not the router: nothing on screen needs the server. It drops a dead
-        // confirmation token too.
+        // confirmation token too, and keeps only where to go after signing in.
         keepFocusThroughUrlChange();
-        window.history.replaceState(null, '', `?${SENT_PARAM}=1`);
+        const query = new URLSearchParams({ [SENT_PARAM]: '1' });
+        const next = new URLSearchParams(window.location.search).get('next');
+        if (next) query.set('next', next);
+        window.history.replaceState(null, '', `?${query.toString()}`);
       }
     },
   };

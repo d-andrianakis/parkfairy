@@ -72,6 +72,16 @@ describe('useSentPanel', () => {
     expect(window.location.search).toBe('?sent=1');
   });
 
+  it('keeps where to go after signing in, so a reload still has it (3.1)', () => {
+    window.history.replaceState(null, '', '/en/sign-up?next=%2Fparking%2Fermou&token=dead');
+    const { result } = renderHook(() => useSentPanel());
+
+    act(() => result.current.show(ADDRESS));
+
+    expect(new URLSearchParams(window.location.search).get('next')).toBe('/parking/ermou');
+    expect(window.location.search).not.toContain('token');
+  });
+
   it('brings the panel back after a language switch or a reload', () => {
     sessionStorage.setItem(STORED, ADDRESS);
     setPathname('/sign-up', 'sent=1');

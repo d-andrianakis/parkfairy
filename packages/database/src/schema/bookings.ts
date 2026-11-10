@@ -14,10 +14,12 @@ import {
   CANCELLATION_POLICIES,
   CURRENCIES,
   HOLD_MAX_EXTENSIONS,
+  SUPPORTED_LOCALES,
   VEHICLE_PLATE_LIMITS,
   type BookingCanceller,
   type BookingStatus,
   type CancellationPolicy,
+  type Locale,
 } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import {
@@ -59,6 +61,15 @@ export const bookings = pgTable(
      */
     spaceId: uuid('space_id').references(() => parkingSpaces.id, { onDelete: 'set null' }),
     spaceLabel: text('space_label').notNull(),
+    /**
+     * The listing's name, address and their language when booked: what the driver's pages and
+     * emails show, so text an owner changes later (a listing sent back is edited unreviewed) never
+     * reaches them. Null only where a booking made before this was kept met a listing whose owner
+     * had cleared it (migration 0019).
+     */
+    listingName: text('listing_name'),
+    listingAddress: text('listing_address'),
+    listingLocale: text('listing_locale').$type<Locale>().notNull(),
     startsAt: instant('starts_at').notNull(),
     endsAt: instant('ends_at').notNull(),
     /** The owner's gap when booked: a later change applies to later bookings. */
@@ -114,6 +125,10 @@ export const bookings = pgTable(
     check(
       'bookings_gap_check',
       sql`${t.gapMinutes} in (${sql.raw(BOOKING_GAPS.join(', '))}) and ${t.blockedUntil} = ${t.endsAt} + make_interval(mins => ${t.gapMinutes})`,
+    ),
+    check(
+      'bookings_listing_locale_check',
+      sql`${t.listingLocale} in (${sqlList(SUPPORTED_LOCALES)})`,
     ),
     check('bookings_currency_check', sql`${t.currency} in (${sqlList(CURRENCIES)})`),
     check(

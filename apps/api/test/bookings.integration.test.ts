@@ -22,10 +22,23 @@ import {
 import { expireLapsedHolds, schema, type Database } from '@parkfairy/database';
 import { and, eq, inArray, like, sql } from 'drizzle-orm';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import type * as bookingReference from '../src/bookings/booking-reference.js';
 import { newBookingReference } from '../src/bookings/booking-reference.js';
+import { OWNER_EMAILS_PER_DRIVER_DAY } from '../src/bookings/bookings.service.js';
+import { strandedBookings } from '../src/bookings/stranded.js';
 import { DB } from '../src/database/database.module.js';
 import { createTestApp, signUpUser, type TestApp, type TestUser } from './test-app.js';
+
+/** References the next holds take before random ones: a collision, on demand. */
+const forcedReferences = vi.hoisted(() => [] as string[]);
+vi.mock('../src/bookings/booking-reference.js', async (importOriginal) => {
+  const real = await importOriginal<typeof bookingReference>();
+  return {
+    ...real,
+    newBookingReference: () => forcedReferences.shift() ?? real.newBookingReference(),
+  };
+});
 
 // Agios Nikolaos: far from the demo areas and every other suite's point, so searches meet only these.
 const HERE = { latitude: 35.1913, longitude: 25.7164 };
@@ -912,6 +925,7 @@ describe('bookings', () => {
             locationId: listing.id,
             spaceId: listing.space.A1 ?? null,
             spaceLabel: 'A1',
+            listingLocale: 'el' as const,
             startsAt,
             endsAt,
             gapMinutes: 0,
@@ -1199,6 +1213,7 @@ describe('bookings', () => {
           locationId: listing.id,
           spaceId: listing.space[label] ?? null,
           spaceLabel: label,
+          listingLocale: 'el' as const,
           startsAt: new Date(stay.start),
           endsAt: new Date(stay.end),
           gapMinutes: 0,
@@ -1242,6 +1257,248 @@ describe('bookings', () => {
         total: { amountMinor: 800 },
         hourlyRate: { amountMinor: 400 },
       });
+    });
+  });
+  describe('follow-ups (3.3)', () => {
+    it('keeps the listing as booked when its owner changes the text later (L6)', async () => {
+      const user = await driver();
+      const listing = await addListing('snapshot');
+      const booking = await booked(user, listing, 'A1', stayOn(freshDay()));
+      // A listing sent back is edited without review; its bookings must not carry the new text.
+      await db
+        .update(schema.parkingLocations)
+        .set({ name: 'Άλλο όνομα', address: 'Κάπου αλλού 1', contentLocale: 'en' })
+        .where(eq(schema.parkingLocations.id, listing.id));
+      const shown = BookingSchema.parse(
+        (await api(user, 'get', `/bookings/${booking.id}`).expect(200)).body,
+      );
+      expect(shown.listing).toMatchObject({
+        name: 'Κράτηση snapshot',
+        address: 'Οδός Δοκιμής 2, Άγιος Νικόλαος',
+        contentLocale: 'el',
+      });
+      const listed = BookingListSchema.parse(
+        (await api(user, 'get', '/bookings').query({ when: 'upcoming' }).expect(200)).body,
+      );
+      expect(listed.bookings.find((item) => item.id === booking.id)?.listing.name).toBe(
+        'Κράτηση snapshot',
+      );
+      await cancel(user, booking.id).expect(200);
+      const [email] = await db
+        .select({ payload: schema.emailOutbox.payload })
+        .from(schema.emailOutbox)
+        .where(eq(schema.emailOutbox.dedupeKey, `booking:${booking.id}:cancelled:driver`));
+      expect(email?.payload).toMatchObject({
+        listingName: 'Κράτηση snapshot',
+        booking: { address: 'Οδός Δοκιμής 2, Άγιος Νικόλαος', contentLocale: 'el' },
+      });
+    });
+
+    it('keeps the listing as it was when held, through the confirmation and an owner’s cancel (L6)', async () => {
+      const user = await driver();
+      const listing = await addListing('snapshot-held');
+      const held = BookingSchema.parse(
+        (await hold(user, listing, 'A1', stayOn(freshDay())).expect(201)).body,
+      );
+      await db
+        .update(schema.parkingLocations)
+        .set({ name: 'Μετά την κράτηση', address: 'Αλλού 3' })
+        .where(eq(schema.parkingLocations.id, listing.id));
+      await confirm(user, held.id).expect(200);
+      await api(owner, 'post', `/owner/listings/${listing.id}/bookings/${held.id}/cancel`)
+        .send()
+        .expect(204);
+      const emails = await db
+        .select({ payload: schema.emailOutbox.payload })
+        .from(schema.emailOutbox)
+        .where(like(schema.emailOutbox.dedupeKey, `booking:${held.id}:%`));
+      expect(emails.length).toBeGreaterThanOrEqual(3);
+      for (const { payload } of emails) {
+        expect(payload).toMatchObject({
+          listingName: 'Κράτηση snapshot-held',
+          booking: { address: 'Οδός Δοκιμής 2, Άγιος Νικόλαος' },
+        });
+      }
+    });
+
+    it('stops emailing an owner about one driver who books and cancels in a loop (L3)', async () => {
+      const user = await driver();
+      const listing = await addListing('loop');
+      const stay = stayOn(freshDay());
+      const ownerEmails = async (id: string) =>
+        (await emailsAbout(id)).filter((email) => email.userId === owner.id).length;
+      // Each loop is two of the owner's emails: a new booking, then the driver's cancellation.
+      for (let n = 0; n < OWNER_EMAILS_PER_DRIVER_DAY / 2; n++) {
+        const booking = await booked(user, listing, 'A1', stay);
+        await cancel(user, booking.id).expect(200);
+        expect(await ownerEmails(booking.id)).toBe(2);
+      }
+      const quiet = await booked(user, listing, 'A1', stay);
+      await cancel(user, quiet.id).expect(200);
+      expect(await ownerEmails(quiet.id)).toBe(0);
+      // The driver still hears about every one of theirs.
+      expect((await emailsAbout(quiet.id)).map((email) => email.kind).sort()).toEqual([
+        'booking-cancelled',
+        'booking-confirmed',
+      ]);
+      // Another driver's booking still reaches the owner.
+      const other = await booked(await driver(), listing, 'A1', stay);
+      expect(await ownerEmails(other.id)).toBe(1);
+    });
+
+    it('emails the owner again once the driver’s earlier events are over a day old (L3)', async () => {
+      const user = await driver();
+      const listing = await addListing('loop-window');
+      const stay = stayOn(freshDay());
+      const ownerEmails = async (id: string) =>
+        (await emailsAbout(id)).filter((email) => email.userId === owner.id).length;
+      const ids: string[] = [];
+      for (let n = 0; n < OWNER_EMAILS_PER_DRIVER_DAY / 2; n++) {
+        const booking = await booked(user, listing, 'A1', stay);
+        await cancel(user, booking.id).expect(200);
+        ids.push(booking.id);
+      }
+      // A day and a minute ago: out of the window, so the cap starts again.
+      const before = new Date(Date.now() - 24 * 60 * 60_000 - 60_000);
+      await db
+        .update(schema.bookings)
+        .set({ confirmedAt: before, cancelledAt: before })
+        .where(inArray(schema.bookings.id, ids));
+      const later = await booked(user, listing, 'A1', stay);
+      expect(await ownerEmails(later.id)).toBe(1);
+    });
+
+    it('counts only the driver’s own doings, across all of one owner’s listings (L3)', async () => {
+      const user = await driver();
+      const first = await addListing('loop-first');
+      const second = await addListing('loop-second');
+      const stay = stayOn(freshDay());
+      const ownerEmails = async (id: string) =>
+        (await emailsAbout(id)).filter((email) => email.userId === owner.id).length;
+      // The owner calling bookings off is not the driver's doing: none of it counts.
+      for (let n = 0; n < OWNER_EMAILS_PER_DRIVER_DAY; n++) {
+        const booking = await booked(user, first, 'A1', stay);
+        await api(owner, 'post', `/owner/listings/${first.id}/bookings/${booking.id}/cancel`)
+          .send()
+          .expect(204);
+      }
+      // Six confirmations so far: the cap is reached, on either listing of that owner.
+      const elsewhere = await booked(user, second, 'A1', stay);
+      expect(await ownerEmails(elsewhere.id)).toBe(0);
+    });
+
+    it('limits holds per account, from however many addresses (L2)', async () => {
+      const user = await driver();
+      const day = freshDay();
+      const from = (n: number) =>
+        request(app.getHttpServer())
+          .post('/v1/bookings')
+          .set('Origin', ORIGIN)
+          .set('Cookie', user.cookie)
+          .set('X-Forwarded-For', `198.18.7.${n + 1}`)
+          .send({ listing: garage.slug, spaceId: garage.space.B1, ...stayOn(day) });
+      for (let n = 0; n < 10; n++) await from(n).expect(201);
+      await from(10).expect(429);
+    });
+
+    it('limits confirmations and extensions per account too (L2)', async () => {
+      const user = await driver();
+      const held = BookingSchema.parse(
+        (await hold(user, garage, 'B1', stayOn(freshDay())).expect(201)).body,
+      );
+      const post = (path: string, n: number) =>
+        request(app.getHttpServer())
+          .post(`/v1/bookings/${held.id}/${path}`)
+          .set('Origin', ORIGIN)
+          .set('Cookie', user.cookie)
+          .set('X-Forwarded-For', `198.18.8.${n + 1}`)
+          .send({ vehiclePlate: 'IKB1234' });
+      for (const path of ['extend', 'confirm']) {
+        // Kept or confirmed already, each press answers alike: only the count matters here.
+        for (let n = 0; n < 10; n++) expect((await post(path, n)).status).not.toBe(429);
+        await post(path, 10).expect(429);
+      }
+    });
+
+    it('confirms once when a driver presses twice at once, emailing once', async () => {
+      // Pairs on several drivers at once: one pair alone rarely interleaves (memory.md).
+      const pairs = await Promise.all(
+        ['P1', 'P2', 'P3'].map(async (label) => {
+          const user = await driver();
+          const listing = await addListing(`twice-${label.toLowerCase()}`, { spaces: [{ label }] });
+          const held = BookingSchema.parse(
+            (await hold(user, listing, label, stayOn(freshDay())).expect(201)).body,
+          );
+          return { user, held };
+        }),
+      );
+      // Each press with its own car: the second waits for the first and answers with what it stored.
+      const answers = await Promise.all(
+        pairs.flatMap(({ user, held }) => [
+          confirm(user, held.id, 'IKB-1111'),
+          confirm(user, held.id, 'YXA-2222'),
+        ]),
+      );
+      for (const answer of answers) expect(answer.status).toBe(200);
+      for (const [index, { held }] of pairs.entries()) {
+        const stored = await row(held.id);
+        const plates = [answers[index * 2], answers[index * 2 + 1]].map(
+          (answer) => BookingSchema.parse(answer?.body).vehiclePlate,
+        );
+        expect(plates).toEqual([stored.vehiclePlate, stored.vehiclePlate]);
+        expect(stored.status).toBe('confirmed');
+        expect((await emailsAbout(held.id)).map((email) => email.kind).sort()).toEqual([
+          'booking-confirmed',
+          'booking-received',
+        ]);
+      }
+    });
+
+    it('takes another reference when the one drawn is taken', async () => {
+      const first = await booked(await driver(), garage, 'A1', stayOn(freshDay()));
+      forcedReferences.push(first.reference);
+      const held = BookingSchema.parse(
+        (await hold(await driver(), garage, 'A1', stayOn(freshDay())).expect(201)).body,
+      );
+      expect(forcedReferences).toEqual([]);
+      expect(held.reference).toMatch(BOOKING_REFERENCE_PATTERN);
+      expect(held.reference).not.toBe(first.reference);
+    });
+
+    it('gives up after three taken references, holding nothing', async () => {
+      const first = await booked(await driver(), garage, 'A2', stayOn(freshDay()));
+      forcedReferences.push(first.reference, first.reference, first.reference);
+      const user = await driver();
+      await hold(user, garage, 'A2', stayOn(freshDay())).expect(500);
+      expect(forcedReferences).toEqual([]);
+      const mine = await db
+        .select({ id: schema.bookings.id })
+        .from(schema.bookings)
+        .where(eq(schema.bookings.userId, user.id));
+      expect(mine).toEqual([]);
+    });
+
+    it('checks a stay under way from now on, whatever the time of day (#38)', async () => {
+      const listing = await addListing('under-way', { gap: 0 });
+      const day = freshDay();
+      // 10:00 to 18:00; the checks below say it is 15:00 that day, or 09:00 before it.
+      await booked(await driver(), listing, 'A1', stayOn(day, '10:00', '18:00'));
+      const daily = (opens: number, closes: number) =>
+        WEEK.map((weekday) => ({ weekday, opensMinute: opens * 60, closesMinute: closes * 60 }));
+      const stranded = async (opens: number, closes: number, now: string) =>
+        (
+          await strandedBookings(
+            db,
+            [{ locationId: listing.id, periods: daily(opens, closes) }],
+            new Date(at(day, now)),
+          )
+        ).get(listing.id) ?? 0;
+      // Closed this morning: the driver is parked already, so only the rest of the stay matters.
+      expect(await stranded(14, 20, '15:00')).toBe(0);
+      // Before arrival, the same hours shut the gate at 10:00.
+      expect(await stranded(14, 20, '09:00')).toBe(1);
+      // Closing before 18:00 shuts a car in (#38), however much of the stay is behind it.
+      expect(await stranded(8, 16, '15:00')).toBe(1);
     });
   });
 });

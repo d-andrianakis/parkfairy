@@ -137,7 +137,12 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
           </p>
           <p className="text-sm text-muted-foreground">{t('noPayment')}</p>
           <ClientMessages namespaces={CLIENT_NAMESPACES.booking}>
-            <ConfirmBooking id={booking.id} chooseAgainHref={again} />
+            <ConfirmBooking
+              id={booking.id}
+              chooseAgainHref={again}
+              space={booking.spaceLabel}
+              spaceLocale={booking.listing.contentLocale}
+            />
             <HoldTimer
               id={booking.id}
               expiresAt={booking.holdExpiresAt}

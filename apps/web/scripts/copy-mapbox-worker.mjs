@@ -1,7 +1,7 @@
 // The map's worker must come from our own origin: the strict CSP refuses `blob:` workers, and
 // the CDN copy would be a third-party script. So the file ships with the app, copied from the
 // installed package at build time, which keeps it the same version as the library using it.
-// Its name carries that version (`workerUrlFor` in location-map.tsx builds the same name), so it
+// Its name carries that version (`workerUrlFor` in lib/mapbox.ts builds the same name), so it
 // can be cached for a year and an upgrade can never pair the library with an older worker.
 import { copyFile, mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';

@@ -84,6 +84,8 @@ export type ParkingSearchResult = {
     features: Array<ParkingFeature>;
     spaceCount: number;
     coverPhoto: ListingPhoto | null;
+    latitude: number;
+    longitude: number;
     distanceMeters: number;
     freeSpaces: number;
     total: Money;
@@ -564,6 +566,26 @@ export type OwnerListingBookings = {
     bookings: Array<OwnerBooking>;
     page: number;
     hasMore: boolean;
+};
+
+export type PlaceSuggestion = {
+    id: string;
+    name: string;
+    detail: string;
+};
+
+export type PlaceSuggestions = {
+    suggestions: Array<PlaceSuggestion>;
+};
+
+export type Place = {
+    label: string;
+    latitude: number;
+    longitude: number;
+};
+
+export type PlaceList = {
+    places: Array<Place>;
 };
 
 export type GetLivenessData = {
@@ -1476,3 +1498,87 @@ export type CancelListingBookingResponses = {
 };
 
 export type CancelListingBookingResponse = CancelListingBookingResponses[keyof CancelListingBookingResponses];
+
+export type GetPlaceSuggestionsData = {
+    body?: never;
+    path?: never;
+    query: {
+        locale: 'el' | 'en';
+        /**
+         * A UUID per search session, from the first suggestion to the pick.
+         */
+        session: string;
+        q: string;
+    };
+    url: '/v1/places/suggestions';
+};
+
+export type GetPlaceSuggestionsErrors = {
+    400: ErrorResponse;
+    403: ErrorResponse;
+    429: ErrorResponse;
+    503: ErrorResponse;
+};
+
+export type GetPlaceSuggestionsError = GetPlaceSuggestionsErrors[keyof GetPlaceSuggestionsErrors];
+
+export type GetPlaceSuggestionsResponses = {
+    200: PlaceSuggestions;
+};
+
+export type GetPlaceSuggestionsResponse = GetPlaceSuggestionsResponses[keyof GetPlaceSuggestionsResponses];
+
+export type RetrievePlaceData = {
+    body?: never;
+    path?: never;
+    query: {
+        locale: 'el' | 'en';
+        /**
+         * A UUID per search session, from the first suggestion to the pick.
+         */
+        session: string;
+        id: string;
+    };
+    url: '/v1/places/retrieve';
+};
+
+export type RetrievePlaceErrors = {
+    400: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    429: ErrorResponse;
+    503: ErrorResponse;
+};
+
+export type RetrievePlaceError = RetrievePlaceErrors[keyof RetrievePlaceErrors];
+
+export type RetrievePlaceResponses = {
+    200: Place;
+};
+
+export type RetrievePlaceResponse = RetrievePlaceResponses[keyof RetrievePlaceResponses];
+
+export type FindPlacesData = {
+    body?: never;
+    path?: never;
+    query: {
+        locale: 'el' | 'en';
+        q: string;
+    };
+    url: '/v1/places';
+};
+
+export type FindPlacesErrors = {
+    400: ErrorResponse;
+    403: ErrorResponse;
+    429: ErrorResponse;
+    503: ErrorResponse;
+};
+
+export type FindPlacesError = FindPlacesErrors[keyof FindPlacesErrors];
+
+export type FindPlacesResponses = {
+    200: PlaceList;
+};
+
+export type FindPlacesResponse = FindPlacesResponses[keyof FindPlacesResponses];

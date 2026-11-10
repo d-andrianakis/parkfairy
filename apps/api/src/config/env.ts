@@ -50,6 +50,25 @@ const EnvSchema = z
         })
         .optional(),
     ),
+    /**
+     * Address search (decision #40), from the server. A token without URL restrictions: Mapbox
+     * refuses restricted ones without a browser's Referer. On this machine MAPBOX_PUBLIC_TOKEN
+     * stands in; elsewhere never, as it reaches every visitor's browser, and making it work from a
+     * server would mean lifting its restrictions. With none, address search answers unavailable.
+     */
+    MAPBOX_SEARCH_TOKEN: z.preprocess(
+      emptyToUndefined,
+      z
+        .string()
+        .regex(/^(pk|sk)\./)
+        .optional(),
+    ),
+    MAPBOX_PUBLIC_TOKEN: z.preprocess(emptyToUndefined, z.string().startsWith('pk.').optional()),
+    /** Mapbox calls the whole site may make in a clock hour (each is billed, or part of a session). */
+    MAPBOX_SEARCH_HOURLY_LIMIT: z.preprocess(
+      emptyToUndefined,
+      z.coerce.number().int().positive().default(2000),
+    ),
   })
   .refine((env) => env.S3_BUCKET || isLoopback(env.BETTER_AUTH_URL), {
     // Keyed on the origin, not NODE_ENV: staging must not keep owners' documents on one disk.
@@ -60,6 +79,18 @@ const EnvSchema = z
     message: 'OWNER_DATA_KEY is required unless BETTER_AUTH_URL is this machine',
     path: ['OWNER_DATA_KEY'],
   })
+  .refine(
+    (env) =>
+      !env.MAPBOX_SEARCH_TOKEN ||
+      env.MAPBOX_SEARCH_TOKEN !== env.MAPBOX_PUBLIC_TOKEN ||
+      isLoopback(env.BETTER_AUTH_URL),
+    {
+      // The browser's token is public; the server's would then be too, with no limit of ours.
+      message:
+        'MAPBOX_SEARCH_TOKEN must not be the public token unless BETTER_AUTH_URL is this machine',
+      path: ['MAPBOX_SEARCH_TOKEN'],
+    },
+  )
   .refine((env) => env.NODE_ENV !== 'production' || env.REDIS_URL, {
     message: 'REDIS_URL is required in production (rate limits must be shared across instances)',
     path: ['REDIS_URL'],
@@ -97,6 +128,10 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env) {
      * offer no booking until Stripe takes the money.
      */
     bookingWithoutPayment: isLoopback(env.BETTER_AUTH_URL),
+    mapboxSearchToken:
+      env.MAPBOX_SEARCH_TOKEN ??
+      (isLoopback(env.BETTER_AUTH_URL) ? env.MAPBOX_PUBLIC_TOKEN : undefined) ??
+      null,
   };
 }
 

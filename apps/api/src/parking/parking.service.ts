@@ -273,6 +273,7 @@ export class ParkingService {
       const rows = (await this.db
         .select({
           ...listingColumns,
+          location: listing.location,
           distanceMeters: sql<number>`round(ST_Distance(${listing.location}, ${point}))::int`,
         })
         .from(listing)
@@ -289,7 +290,10 @@ export class ParkingService {
         // GiST bounding box and sorts the candidates (fine at today's density, memory.md).
         .orderBy(sql`${listing.location} <-> ${point}`, asc(listing.slug))
         .limit(SEARCH_BATCH)
-        .offset(batch * SEARCH_BATCH)) as (ListingRow & { distanceMeters: number })[];
+        .offset(batch * SEARCH_BATCH)) as (ListingRow & {
+        location: { latitude: number; longitude: number };
+        distanceMeters: number;
+      })[];
       if (rows.length === 0) break;
 
       const ids = rows.map((row) => row.id);
@@ -317,6 +321,8 @@ export class ParkingService {
         results.push(
           ParkingSearchResultSchema.parse({
             ...summary(row, spaceStats, covers.get(row.id) ?? null),
+            latitude: row.location.latitude,
+            longitude: row.location.longitude,
             distanceMeters: row.distanceMeters,
             freeSpaces: spaceStats.freeCount,
             total: total(row, priceRules.get(row.id) ?? NO_PRICE_RULES, lowest, window),

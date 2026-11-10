@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication, Type } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import type { Auth } from '@parkfairy/auth';
 import { schema, type Database } from '@parkfairy/database';
 import { eq } from 'drizzle-orm';
@@ -12,11 +12,14 @@ import { DB } from '../src/database/database.module.js';
 
 export type TestApp = INestApplication<Parameters<typeof request>[0]>;
 
-export async function createTestApp(extraControllers: Type[] = []): Promise<TestApp> {
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule],
-    controllers: extraControllers,
-  }).compile();
+/** `configure` may swap providers, e.g. a fake Mapbox for the places routes. */
+export async function createTestApp(
+  extraControllers: Type[] = [],
+  configure: (builder: TestingModuleBuilder) => TestingModuleBuilder = (builder) => builder,
+): Promise<TestApp> {
+  const moduleRef = await configure(
+    Test.createTestingModule({ imports: [AppModule], controllers: extraControllers }),
+  ).compile();
   const app = moduleRef.createNestApplication<TestApp>({ bodyParser: false, logger: false });
   configureApp(app);
   await app.init();

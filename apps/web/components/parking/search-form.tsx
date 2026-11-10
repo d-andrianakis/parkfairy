@@ -7,7 +7,13 @@ import {
   type ValidationMessage,
 } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
-import { FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@parkfairy/ui/components/field';
+import {
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@parkfairy/ui/components/field';
 import {
   NativeSelect,
   NativeSelectOptGroup,
@@ -21,6 +27,7 @@ import { validationArgs } from '@/lib/validation-args';
 import { ClientMessages } from '../client-messages';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { PlainField, PlainFieldError } from '../plain-field';
+import { AddressField } from './address-field';
 import { DateTimeField } from './date-time-field';
 import { NearMeButton } from './near-me-button';
 import { StayFields } from './stay-fields';
@@ -30,12 +37,15 @@ interface SearchFormProps {
   errors?: SearchErrors;
   /** Earliest selectable date (today in Athens). */
   minDate: string;
+  /** Offer the address field: only where Mapbox is set up (decisions #40, #42). */
+  addressSearch?: boolean;
   className?: string;
 }
 
 /** Element ids, also the targets of the search page's error summary links. */
 export const SEARCH_FIELD_IDS = {
   area: 'search-area',
+  place: 'search-place',
   start: 'search-start-date',
   end: 'search-end-date',
 } as const;
@@ -102,12 +112,19 @@ function WindowFields({
  * server validates and explains problems in the page language, so the browser's own
  * validation bubbles (untranslated) are switched off.
  */
-export function SearchForm({ values, errors = {}, minDate, className }: SearchFormProps) {
+export function SearchForm({
+  values,
+  errors = {},
+  minDate,
+  addressSearch = false,
+  className,
+}: SearchFormProps) {
   const t = useTranslations('SearchForm');
   const tAreas = useTranslations('Areas');
   const tCities = useTranslations('Cities');
   const errorText = useValidationText();
   const locale = useLocale();
+  const heldBack = addressSearch && values.place !== '';
 
   return (
     <form
@@ -131,7 +148,7 @@ export function SearchForm({ values, errors = {}, minDate, className }: SearchFo
               className="min-w-56"
             >
               <NativeSelectOption value="">
-                {values.latitude ? t('myLocation') : t('chooseArea')}
+                {values.latitude && !values.place ? t('myLocation') : t('chooseArea')}
               </NativeSelectOption>
               {CITIES.map((city) => (
                 <NativeSelectOptGroup key={city} label={tCities(city)}>
@@ -147,12 +164,45 @@ export function SearchForm({ values, errors = {}, minDate, className }: SearchFo
               <NearMeButton />
             </ClientMessages>
           </div>
-          <input type="hidden" name="latitude" defaultValue={values.latitude} />
-          <input type="hidden" name="longitude" defaultValue={values.longitude} />
+          {/* With the address field, a place's are empty until it puts them back (see there). */}
+          <input type="hidden" name="latitude" defaultValue={heldBack ? '' : values.latitude} />
+          <input type="hidden" name="longitude" defaultValue={heldBack ? '' : values.longitude} />
+          <input
+            type="hidden"
+            name="placeLocale"
+            defaultValue={heldBack ? '' : values.placeLocale}
+          />
           {errors.area ? (
             <PlainFieldError id="search-area-error">{errorText(errors.area)}</PlainFieldError>
           ) : null}
         </PlainField>
+        {addressSearch ? (
+          <PlainField data-invalid={errors.place ? true : undefined}>
+            <FieldLabel htmlFor={SEARCH_FIELD_IDS.place}>{t('address')}</FieldLabel>
+            <ClientMessages namespaces={CLIENT_NAMESPACES.searchForm}>
+              <AddressField
+                id={SEARCH_FIELD_IDS.place}
+                defaultValue={values.place}
+                latitude={values.latitude}
+                longitude={values.longitude}
+                placeLocale={values.placeLocale}
+                describedBy={
+                  errors.place ? 'search-place-hint search-place-error' : 'search-place-hint'
+                }
+                invalid={errors.place ? true : undefined}
+              />
+            </ClientMessages>
+            <FieldDescription id="search-place-hint">
+              {t('addressHint')} {t('suggestionsBy')}
+            </FieldDescription>
+            {errors.place ? (
+              <PlainFieldError id="search-place-error">{errorText(errors.place)}</PlainFieldError>
+            ) : null}
+          </PlainField>
+        ) : (
+          // Without the field, a place in the URL still names the position it came with.
+          <input type="hidden" name="place" defaultValue={values.place} />
+        )}
         <StayFields>
           <div className="grid gap-5">
             <WindowFields

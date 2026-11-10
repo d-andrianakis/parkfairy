@@ -28,6 +28,30 @@ describe('loadEnv', () => {
     ).toBe(false);
   });
 
+  it('searches addresses with its own Mapbox token, else the public one on this machine only', () => {
+    const local = { ...base, BETTER_AUTH_URL: 'http://localhost:3000' };
+    expect(loadEnv({ ...base }).mapboxSearchToken).toBeNull();
+    expect(loadEnv({ ...local, MAPBOX_PUBLIC_TOKEN: 'pk.public' }).mapboxSearchToken).toBe(
+      'pk.public',
+    );
+    // The public token reaches every browser: never the server's elsewhere, nor the same one.
+    expect(loadEnv({ ...base, MAPBOX_PUBLIC_TOKEN: 'pk.public' }).mapboxSearchToken).toBeNull();
+    expect(() =>
+      loadEnv({ ...base, MAPBOX_PUBLIC_TOKEN: 'pk.same', MAPBOX_SEARCH_TOKEN: 'pk.same' }),
+    ).toThrow(/MAPBOX_SEARCH_TOKEN/);
+    expect(
+      loadEnv({ ...base, MAPBOX_PUBLIC_TOKEN: 'pk.public', MAPBOX_SEARCH_TOKEN: 'sk.server' })
+        .mapboxSearchToken,
+    ).toBe('sk.server');
+    expect(() => loadEnv({ ...base, MAPBOX_SEARCH_TOKEN: 'tk.other' })).toThrow(
+      /MAPBOX_SEARCH_TOKEN/,
+    );
+    expect(loadEnv({ ...base }).MAPBOX_SEARCH_HOURLY_LIMIT).toBe(2000);
+    expect(loadEnv({ ...base, MAPBOX_SEARCH_HOURLY_LIMIT: '' }).MAPBOX_SEARCH_HOURLY_LIMIT).toBe(
+      2000,
+    );
+  });
+
   it('parses TRUST_PROXY into the forms Express accepts', () => {
     expect(loadEnv({ ...base, TRUST_PROXY: '2' }).trustProxy).toBe(2);
     expect(loadEnv({ ...base, TRUST_PROXY: 'true' }).trustProxy).toBe(true);

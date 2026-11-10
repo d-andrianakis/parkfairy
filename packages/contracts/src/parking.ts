@@ -199,6 +199,9 @@ export const FeaturedParkingResponseSchema = z
 export type FeaturedParkingResponse = z.infer<typeof FeaturedParkingResponseSchema>;
 
 export const ParkingSearchResultSchema = ParkingListingSummarySchema.extend({
+  /** Where to put its pin on the results map; the listing page shows the same point. */
+  latitude: z.number(),
+  longitude: z.number(),
   distanceMeters: z.int().nonnegative(),
   /** Spaces free for the whole window. */
   freeSpaces: z.int().nonnegative(),

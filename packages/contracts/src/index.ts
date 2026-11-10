@@ -9,3 +9,4 @@ export * from './time.js';
 export * from './parking.js';
 export * from './owner.js';
 export * from './bookings.js';
+export * from './places.js';

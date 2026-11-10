@@ -4,12 +4,14 @@ import {
   DEFAULT_TIME_ZONE,
   isValidationMessage,
   ParkingListingQuerySchema,
+  PLACE_QUERY_LIMITS,
   ParkingSearchQuerySchema,
   zonedParts,
   zonedTimeToUtc,
   type ParkingSearchQuery,
   type ValidationMessage,
 } from '@parkfairy/contracts';
+import { isLocale } from '@parkfairy/contracts/locales';
 import { DEFAULT_DURATION_MS, WINDOW_PARAM_KEYS } from './search-params';
 
 /**
@@ -36,11 +38,18 @@ export interface WindowValues {
 
 export interface SearchValues extends WindowValues {
   area: string;
+  /** An address or place typed or picked (decision #40); its position is `latitude`/`longitude`. */
+  place: string;
+  /**
+   * The language `place` is in: Mapbox names places in the page's language, so after a language
+   * switch the words are the other page's, and are marked up so (`lang`). Empty: this page's.
+   */
+  placeLocale: string;
   latitude: string;
   longitude: string;
 }
 
-export type SearchField = 'area' | 'start' | 'end';
+export type SearchField = 'area' | 'place' | 'start' | 'end';
 export type SearchErrors = Partial<Record<SearchField, ValidationMessage>>;
 
 const WINDOW_KEYS = WINDOW_PARAM_KEYS;
@@ -66,6 +75,22 @@ export function defaultWindow(now = Date.now()): WindowValues {
 function fieldOf(path: PropertyKey[]): SearchField {
   const [key] = path;
   return key === 'start' || key === 'end' ? key : 'area';
+}
+
+/** Both ends of a position, each a number within its bounds. */
+function isPosition(latitude: string, longitude: string): boolean {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  return (
+    latitude.trim() !== '' && longitude.trim() !== '' && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+  );
+}
+
+/** A place's text: too short to look up, too long for a URL and a title, or fine. */
+function placeProblem(place: string): ValidationMessage | undefined {
+  if (place.length > PLACE_QUERY_LIMITS.max) return 'textTooLong';
+  if (place.length < PLACE_QUERY_LIMITS.min) return 'placeTooShort';
+  return undefined;
 }
 
 function collect(
@@ -114,18 +139,39 @@ export interface ParsedSearch {
   errors: SearchErrors;
   /** Present only when everything is valid. */
   query?: ParkingSearchQuery;
+  /**
+   * A place with no position yet: typed without JavaScript, or never picked from the suggestions.
+   * The page looks it up once and sends the browser on to its position. Only when the rest is valid,
+   * as each look-up is billed.
+   */
+  lookup?: string;
 }
 
-export function parseSearch(params: SearchParams, now = Date.now()): ParsedSearch {
+/**
+ * `lookups: false` where address search isn't set up: a place with no position is then left out,
+ * as nothing could find it, and the search asks for an area instead.
+ */
+export function parseSearch(
+  params: SearchParams,
+  now = Date.now(),
+  { lookups = true }: { lookups?: boolean } = {},
+): ParsedSearch {
   const area = first(params.area);
-  // A chosen area wins over a previously shared position.
+  // A chosen area wins over a place or a previously shared position.
+  const typed = area ? '' : first(params.place).trim();
   const latitude = area ? '' : first(params.latitude);
   const longitude = area ? '' : first(params.longitude);
+  // A position that isn't one (edited by hand) is the same as none: the words are looked up.
+  const unplaced = typed !== '' && !isPosition(latitude, longitude);
+  const place = unplaced && !lookups ? '' : typed;
+  const language = first(params.placeLocale);
+  const placeLocale = place && isLocale(language) ? language : '';
   const window = readWindow(params, now);
-  const values = { area, latitude, longitude, ...window.values };
-  const submitted = area !== '' || latitude !== '' || window.given;
+  const values = { area, place, placeLocale, latitude, longitude, ...window.values };
+  const submitted = area !== '' || typed !== '' || latitude !== '' || window.given;
   if (!submitted) return { values, submitted, errors: {} };
 
+  const placeError = place ? placeProblem(place) : undefined;
   const result = ParkingSearchQuerySchema.safeParse({
     area: area || undefined,
     latitude: latitude || undefined,
@@ -133,13 +179,15 @@ export function parseSearch(params: SearchParams, now = Date.now()): ParsedSearc
     start: window.start ?? '',
     end: window.end ?? '',
   });
-  const errors = collect(result.error?.issues ?? [], window.errors);
-  return {
-    values,
-    submitted,
-    errors,
-    query: result.success && Object.keys(errors).length === 0 ? result.data : undefined,
-  };
+  const errors = collect(
+    // Where is the place's to answer once it is looked up, not "choose an area".
+    (result.error?.issues ?? []).filter((issue) => !(place && fieldOf(issue.path) === 'area')),
+    window.errors,
+  );
+  if (placeError) errors.place = placeError;
+  const valid = Object.keys(errors).length === 0;
+  if (unplaced && place) return { values, submitted, errors, lookup: valid ? place : undefined };
+  return { values, submitted, errors, query: result.success && valid ? result.data : undefined };
 }
 
 export interface ParsedListingWindow {

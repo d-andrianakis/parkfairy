@@ -7,7 +7,9 @@ import { useTranslations } from 'next-intl';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { FormError } from '@/components/form-error';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
+import { Link } from '@/i18n/navigation';
 import { useOwnerError, type Outcome } from '@/lib/owner-client';
+import { ownerBookingsHref } from '@/lib/owner-href';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 import { CheckboxField } from './fields';
 import { useFocusAfterRender } from './navigation';
@@ -72,6 +74,7 @@ export function CopyToListings({
   prepare?: () => Promise<boolean>;
 }) {
   const tDashboard = useTranslations('Owner.dashboard');
+  const tBookings = useTranslations('Owner.bookings');
   const ownerError = useOwnerError();
   const focusAfter = useFocusAfterRender();
   const invalid = useInvalidSubmitStatus();
@@ -220,6 +223,18 @@ export function CopyToListings({
               {texts.kept(outcome, nameOf(listingId), (chunks) => (
                 <span lang={langOf(listingId)}>{chunks}</span>
               ))}
+              {/* Where to cancel them, beside the listing it names (WCAG 2.4.4, in context). */}
+              {outcome === 'booked' ? (
+                <>
+                  {' '}
+                  <Link
+                    href={ownerBookingsHref(listingId)}
+                    className="underline underline-offset-4 hover:decoration-2"
+                  >
+                    {tBookings('seeBookings')}
+                  </Link>
+                </>
+              ) : null}
             </p>
           ))}
         </div>

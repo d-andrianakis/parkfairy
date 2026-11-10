@@ -1,11 +1,26 @@
+import { SUPPORTED_LOCALES } from '@parkfairy/contracts/locales';
+
 export interface CspOptions {
   nonce: string;
   /** Next.js dev tooling (React refresh, Turbopack) needs eval. Never true in production. */
   isDev: boolean;
   /** Only meaningful over HTTPS; on plain-http localhost it would break subresource loads. */
   upgradeInsecureRequests: boolean;
-  /** The owner area, whose location step shows a Mapbox map. Nothing else gets these origins. */
+  /** Pages with a Mapbox map (`allowsMaps`). Nothing else gets these origins. */
   maps?: boolean;
+}
+
+/**
+ * The pages that may load a Mapbox map. The whole owner area, not just the location step: moving
+ * between its pages doesn't load a new document, so the policy in force is that of the page the
+ * owner arrived on; from outside it, links to the location step load a real page (`StepLink`).
+ * And the search page, for its results map (decision #41), which links into it also load as real
+ * pages (`SearchLink`). Address suggestions need nothing here: they come through our API (#40).
+ */
+const MAP_PAGES = new RegExp(`^/(?:${SUPPORTED_LOCALES.join('|')})/(?:owner(?:/|$)|search/?$)`);
+
+export function allowsMaps(pathname: string): boolean {
+  return MAP_PAGES.test(pathname);
 }
 
 /** Tiles, styles, fonts and search come from the first; the second is its usage telemetry. */

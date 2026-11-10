@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -29,12 +29,14 @@ import { CurrentUser } from '../auth/auth.decorators.js';
 import { parseOrThrow } from '../common/validation.js';
 import { SESSION_COOKIE_SECURITY } from '../openapi/document.js';
 import { schemaRef } from '../openapi/zod-openapi.js';
+import { AccountThrottlerGuard } from '../rate-limit/account-throttler.guard.js';
 import { BookingsService } from './bookings.service.js';
 
 const MINUTE_MS = 60_000;
 /**
  * A hold takes a space from everyone else for ten minutes: a driver needs a few (another space,
- * another time), not hundreds. Confirming is a step after one, so it gets the same allowance.
+ * another time), not hundreds. Confirming is a step after one, so it gets the same allowance. Per
+ * address and, through `AccountThrottlerGuard`, per account (L2).
  */
 const HOLD_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
 
@@ -52,6 +54,7 @@ export class BookingsController {
   /** Holds the space for ten minutes; `SPACE_TAKEN` when another driver got there first. */
   @Post()
   @Throttle(HOLD_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
   @ApiBody({ schema: schemaRef(BookingHoldInputSchema) })
   @ApiCreatedResponse({ schema: schemaRef(BookingSchema) })
   @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
@@ -81,6 +84,7 @@ export class BookingsController {
   @Post(':id/confirm')
   @HttpCode(200)
   @Throttle(HOLD_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
   @ApiBody({ schema: schemaRef(BookingConfirmInputSchema) })
   @ApiOkResponse({ schema: schemaRef(BookingSchema) })
   @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
@@ -101,6 +105,7 @@ export class BookingsController {
   @Post(':id/extend')
   @HttpCode(200)
   @Throttle(HOLD_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
   @ApiOkResponse({ schema: schemaRef(BookingSchema) })
   @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
   @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })

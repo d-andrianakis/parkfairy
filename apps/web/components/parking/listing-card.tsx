@@ -26,6 +26,11 @@ interface ListingCardProps {
   headingLevel?: 'h2' | 'h3';
   /** The first result on a page: its photo is likely the largest thing in view. */
   priority?: boolean;
+  /**
+   * Its pin's number on the results map, shown while the map is (`data-map="shown"` on a
+   * `group/results` around the list). Hidden from screen readers: each pin is named in full.
+   */
+  number?: number;
 }
 
 /** A listing in a grid or result list; the whole card links to the listing page. */
@@ -34,6 +39,7 @@ export function ListingCard({
   query,
   headingLevel: Heading = 'h3',
   priority = false,
+  number,
 }: ListingCardProps) {
   const t = useTranslations('Listing');
   const tAreas = useTranslations('Areas');
@@ -66,7 +72,15 @@ export function ListingCard({
         />
       ) : null}
       <CardHeader className={listing.coverPhoto ? 'px-5' : 'px-5 pt-5'}>
-        <CardTitle className="text-base">
+        <CardTitle className="flex items-start gap-2 text-base">
+          {number !== undefined ? (
+            <span
+              aria-hidden
+              className="hidden size-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground group-data-[map=shown]/results:grid"
+            >
+              {number}
+            </span>
+          ) : null}
           <Heading lang={listing.contentLocale}>
             <Link
               href={{ pathname: `/parking/${listing.slug}`, query }}

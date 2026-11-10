@@ -67,6 +67,9 @@ export const VALIDATION_MESSAGES = [
   'lastDayBeforeFirst',
   'plateRequired',
   'plateInvalid',
+  'placeTooShort',
+  'placeNotFound',
+  'placeUnavailable',
 ] as const;
 export type ValidationMessage = (typeof VALIDATION_MESSAGES)[number];
 
@@ -94,6 +97,12 @@ export const HOLD_MINUTES = 10;
  * no more, so a space isn't kept from others for long.
  */
 export const HOLD_MAX_EXTENSIONS = 10;
+
+/**
+ * Address search (decision #40): suggestions start at `min` characters, and `max` bounds both what
+ * is sent to Mapbox (it takes 256) and the place named in a search's URL and title.
+ */
+export const PLACE_QUERY_LIMITS = { min: 3, max: 200 } as const;
 
 /** Typed helper so schemas can only reference keys that exist in the catalogs. */
 export const message = <K extends ValidationMessage>(key: K): K => key;

@@ -24,8 +24,10 @@ export const CLIENT_NAMESPACES = {
   account: ['Account', 'TwoFactorSettings', 'AuthErrors', 'Validation', 'Forms'],
   /** The owner area: dashboard buttons and every onboarding step. */
   owner: ['Owner', 'Validation', 'Forms', 'Features', 'Areas'],
-  /** The search form's "use my location" button. */
+  /** The search form's "use my location" button and the address field's suggestions. */
   searchForm: ['SearchForm'],
+  /** "Show the map" on the search results, and the map's own labels. */
+  resultsMap: ['ResultsMap'],
   /** The listing page's space picker: its button and refusals, no zod and no Validation. */
   bookSpace: ['BookSpace', 'BookingErrors'],
   /** A booking's page: the plate, confirming, letting go and cancelling. */

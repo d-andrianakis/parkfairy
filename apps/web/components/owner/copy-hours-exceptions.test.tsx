@@ -177,6 +177,11 @@ describe('CopyHoursExceptions', () => {
     expect(status).toHaveTextContent(
       'Not copied to “Γκαράζ Πειραιά”: drivers are booked on those days. Cancel their bookings first.',
     );
+    // The way to them, beside the listing it names; none for the listing that took the dates.
+    const links = within(status).getAllByRole('link', { name: 'See the bookings' });
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      `/en/owner/listings/${PIRAEUS}/bookings`,
+    ]);
   });
 
   it('translates a refusal from the server', async () => {

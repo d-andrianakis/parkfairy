@@ -8,7 +8,7 @@ import {
   type OwnerHoursException,
 } from '@parkfairy/contracts';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
@@ -241,6 +241,42 @@ describe('HoursExceptionsForm', () => {
     await userEvent.click(saveButton());
     expect(await screen.findByText('We can’t find that listing.')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'See the bookings' })).not.toBeInTheDocument();
+  });
+
+  it('keeps unsaved entries while the owner goes to cancel bookings, and brings them back', async () => {
+    save.mockResolvedValueOnce({
+      error: { code: 'LISTING_BOOKED', statusCode: 409, message: 'LISTING_BOOKED', bookings: 1 },
+      response: new Response(null, { status: 409 }),
+    } as never);
+    const first = show([closedOn(day(3))]);
+    await userEvent.click(screen.getByRole('button', { name: 'Add dates' }));
+    pick('First day', day(9), 2);
+    pick('Last day', day(9), 2);
+    await userEvent.click(saveButton());
+    const alert = await screen.findByRole('alert');
+    await userEvent.click(within(alert).getByRole('link', { name: 'See the bookings' }));
+    first.unmount();
+
+    // Back on the page: the server still has one entry, the owner had typed two.
+    const { container } = show([closedOn(day(3))]);
+    await waitFor(() =>
+      expect(screen.getByRole('group', { name: 'Period 2' })).toBeInTheDocument(),
+    );
+    expect(
+      within(screen.getByRole('group', { name: 'Period 2' })).getByLabelText('First day'),
+    ).toHaveValue(day(9));
+    expect(screen.getByText(/Your changes from before you left are back/)).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+    // Saved: nothing is waiting for a save any more, so the message goes.
+    await userEvent.click(saveButton());
+    await screen.findByText('Saved');
+    expect(
+      screen.queryByText(/Your changes from before you left are back/),
+    ).not.toBeInTheDocument();
+    // Once: a later visit shows what is stored.
+    cleanup();
+    show([closedOn(day(3))]);
+    expect(screen.queryByRole('group', { name: 'Period 2' })).not.toBeInTheDocument();
   });
 
   it('ignores a second press while the first is saving', async () => {

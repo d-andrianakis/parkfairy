@@ -369,6 +369,9 @@ describe('public parking catalogue', () => {
     });
     expect(open?.distanceMeters).toBeGreaterThan(100);
     expect(open?.distanceMeters).toBeLessThan(120);
+    // Its pin on the results map: about 111 m north.
+    expect(open?.longitude).toBeCloseTo(HERE.longitude, 6);
+    expect(open?.latitude).toBeCloseTo(HERE.latitude + 0.001, 6);
   });
 
   it('searches around a curated area', async () => {

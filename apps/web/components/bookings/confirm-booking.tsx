@@ -20,13 +20,29 @@ function plateProblem(plate: string): 'plateRequired' | 'plateInvalid' | null {
   return isVehiclePlate(plate.trim()) ? null : 'plateInvalid';
 }
 
+/** Where the focus goes and shows, though it is no control: the question asked in its place. */
+const FOCUS_TARGET =
+  'rounded-sm outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/50';
+
 /**
  * The car, and the press that turns the hold into a booking: until Phase 4 it charges nothing
  * (decision #33). Done, the page comes back confirmed with its own notice, which takes the focus.
- * Letting the space go returns the driver to the listing for the same times. A plate typed on an
- * earlier hold in this tab comes back filled in.
+ * Letting the space go asks first, in place (the question takes the focus; "No, keep it" gives it
+ * back), then returns the driver to the listing for the same times, which says the space went. A
+ * plate typed on an earlier hold in this tab comes back filled in.
  */
-export function ConfirmBooking({ id, chooseAgainHref }: { id: string; chooseAgainHref: string }) {
+export function ConfirmBooking({
+  id,
+  chooseAgainHref,
+  space,
+  spaceLocale,
+}: {
+  id: string;
+  chooseAgainHref: string;
+  /** The space held, in the owner's language, for the question before letting it go. */
+  space: string;
+  spaceLocale: string;
+}) {
   const t = useTranslations('Booking');
   const validation = useValidationMessage();
   const bookingError = useBookingError();
@@ -36,6 +52,16 @@ export function ConfirmBooking({ id, chooseAgainHref }: { id: string; chooseAgai
   const [error, setError] = useState<string | undefined>();
   const [failure, setFailure] = useState<{ text: string; chooseAgain: boolean } | null>(null);
   const [busy, setBusy] = useState<'confirm' | 'release' | null>(null);
+  const [asking, setAsking] = useState(false);
+  /** Counts the times "No, keep it" was pressed: each one gives the focus back. */
+  const [returning, setReturning] = useState(0);
+  const question = useRef<HTMLParagraphElement>(null);
+  const releaseButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (asking) question.current?.focus();
+    else if (returning > 0) releaseButton.current?.focus();
+  }, [asking, returning]);
 
   // After hydration, as storage isn't there for the server render: into the field itself, which
   // is the one place the plate lives (it is read when sent), unless something is typed already.
@@ -85,7 +111,8 @@ export function ConfirmBooking({ id, chooseAgainHref }: { id: string; chooseAgai
     setBusy('release');
     const outcome = await attempt(() => cancelMyBooking({ path: { id }, body: {} }));
     if (outcome.ok) {
-      router.push(chooseAgainHref);
+      // The listing says the space went, and its notice takes the focus.
+      router.push(`${chooseAgainHref}${chooseAgainHref.includes('?') ? '&' : '?'}released=1`);
       return;
     }
     setBusy(null);
@@ -126,16 +153,57 @@ export function ConfirmBooking({ id, chooseAgainHref }: { id: string; chooseAgai
         >
           {busy === 'confirm' ? t('confirming') : t('confirm')}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className={WRAPPING_BUTTON}
-          aria-disabled={busy !== null || undefined}
-          onClick={() => void release()}
-        >
-          {busy === 'release' ? t('releasing') : t('release')}
-        </Button>
+        {asking ? null : (
+          <Button
+            ref={releaseButton}
+            type="button"
+            variant="outline"
+            className={WRAPPING_BUTTON}
+            aria-disabled={busy !== null || undefined}
+            onClick={() => {
+              if (busy) return;
+              setFailure(null);
+              setAsking(true);
+            }}
+          >
+            {t('release')}
+          </Button>
+        )}
       </div>
+      {asking ? (
+        <div className="grid gap-3">
+          <p ref={question} tabIndex={-1} className={FOCUS_TARGET}>
+            {t.rich('releaseQuestion', {
+              space: () => <span lang={spaceLocale}>{space}</span>,
+            })}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="destructive"
+              className={WRAPPING_BUTTON}
+              aria-disabled={busy !== null || undefined}
+              onClick={() => void release()}
+            >
+              {busy === 'release' ? t('releasing') : t('releaseConfirm')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className={WRAPPING_BUTTON}
+              // Once the space is being let go, "keep it" would say what isn't true.
+              aria-disabled={busy === 'release' || undefined}
+              onClick={() => {
+                if (busy === 'release') return;
+                setAsking(false);
+                setReturning((times) => times + 1);
+              }}
+            >
+              {t('releaseKeep')}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 }

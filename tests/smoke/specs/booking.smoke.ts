@@ -168,7 +168,15 @@ test('a driver books a space, the owner sees who is coming, and closing that day
     );
     await expectAccessible(page);
     await page.setViewportSize({ width: 1280, height: 800 });
-    await closeTheDay();
+    // Back to the closures from there: the day typed before the refusal is still in the form (3.3).
+    await page.goto(`/en/owner/listings/${id}/bookings`);
+    await page.getByRole('link', { name: 'Closures and special hours' }).click();
+    await expect(page.getByText(/Your changes from before you left are back/)).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Period 1' }).getByLabel('First day')).toHaveValue(
+      day,
+    );
+    await expectAccessible(page);
+    await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
 
     // The driver is told, and refunded in full.
@@ -290,9 +298,22 @@ test('a space taken meanwhile is said so, a driver cancels by the terms, and Gre
       320,
     );
     await expectAccessible(slow);
+    // Letting it go asks first, in place, and the listing says it went (3.3).
     await slow.getByRole('button', { name: 'Αποδέσμευση της θέσης' }).click();
-    await expect(slow).toHaveURL(stayUrl('el', slug, day));
+    await expect(slow.getByText(/Να αποδεσμευτεί η θέση K1;/)).toBeFocused();
+    await expectAccessible(slow);
+    await slow.getByRole('button', { name: 'Ναι, αποδέσμευση' }).click();
+    await expect(slow).toHaveURL(
+      new RegExp(`/el/parking/${slug}\\?startDate=${day}&.*&released=1$`),
+    );
+    await expect(
+      slow.getByRole('heading', { level: 2, name: 'Αποδεσμεύσατε τη θέση' }),
+    ).toBeFocused();
     await expect(slow.getByRole('radio', { name: 'K1' })).toBeChecked();
+    expect(await slow.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      320,
+    );
+    await expectAccessible(slow);
   } finally {
     await slowContext.close();
     await fast.context.close();

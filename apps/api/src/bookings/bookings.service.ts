@@ -53,6 +53,12 @@ type OutboxKind = typeof outbox.$inferInsert.kind;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
+/**
+ * How many emails one driver's bookings may send one owner in 24 hours, a new booking and a
+ * cancellation counting one each (L3). A driver booking and cancelling in a loop would otherwise
+ * fill the owner's inbox; past this the bookings still show on the owner's page.
+ */
+export const OWNER_EMAILS_PER_DRIVER_DAY = 6;
 
 /** What a booking shows of its listing. */
 const listingInfo = {
@@ -101,6 +107,19 @@ const money = (amountMinor: number, currency: string): Money => ({
   currency: currency as Money['currency'],
 });
 
+/**
+ * The listing as it was when booked (L6): name, address and their language come from the booking,
+ * so an owner's later edit, unreviewed on a listing sent back, never reaches the driver.
+ */
+function booked(row: BookingRow, info: ListingInfo): ListingInfo {
+  return {
+    ...info,
+    name: row.listingName,
+    address: row.listingAddress,
+    contentLocale: row.listingLocale,
+  };
+}
+
 /** The booking as its driver reads it; `now` decides what cancelling would give back. */
 function view(row: BookingRow, info: ListingInfo, now = new Date()): Booking {
   const cancellable = row.status === 'confirmed' && row.startsAt > now;
@@ -108,7 +127,7 @@ function view(row: BookingRow, info: ListingInfo, now = new Date()): Booking {
     id: row.id,
     reference: row.reference,
     status: row.status,
-    listing: info,
+    listing: booked(row, info),
     spaceLabel: row.spaceLabel,
     start: row.startsAt.toISOString(),
     end: row.endsAt.toISOString(),
@@ -142,8 +161,8 @@ function outboxBooking(row: BookingRow, info: ListingInfo): OutboxBooking {
     id: row.id,
     listingId: row.locationId,
     reference: row.reference,
-    address: info.address,
-    contentLocale: info.contentLocale,
+    address: row.listingAddress,
+    contentLocale: row.listingLocale,
     spaceLabel: row.spaceLabel,
     start: row.startsAt.toISOString(),
     end: row.endsAt.toISOString(),
@@ -261,6 +280,9 @@ export class BookingsService {
         locationId: row.id,
         spaceId: spot.id,
         spaceLabel: spot.label,
+        listingName: row.name,
+        listingAddress: row.address,
+        listingLocale: row.contentLocale,
         startsAt: stay.start,
         endsAt: stay.end,
         gapMinutes: row.bookingGapMinutes,
@@ -344,10 +366,11 @@ export class BookingsService {
           .where(eq(booking.id, id))
           .returning();
         if (!confirmed) throw notFound('BOOKING_NOT_FOUND');
+        const owner = row.ownerUserId;
         await this.queueEmails(tx, confirmed, row, [
           { kind: 'booking-confirmed', userId, to: 'driver' },
-          ...(row.ownerUserId
-            ? [{ kind: 'booking-received' as const, userId: row.ownerUserId, to: 'owner' as const }]
+          ...(owner && (await this.ownerStillHears(tx, userId, owner))
+            ? [{ kind: 'booking-received' as const, userId: owner, to: 'owner' as const }]
             : []),
         ]);
         return view(confirmed, row, now);
@@ -443,7 +466,7 @@ export class BookingsService {
       const ownerUserId = await this.ownerUserOf(tx, current.locationId);
       await this.queueEmails(tx, cancelled, info, [
         { kind: 'booking-cancelled', userId, to: 'driver' },
-        ...(ownerUserId
+        ...(ownerUserId && (await this.ownerStillHears(tx, userId, ownerUserId))
           ? [
               {
                 kind: 'booking-cancelled-by-driver' as const,
@@ -614,6 +637,34 @@ export class BookingsService {
     return info;
   }
 
+  /**
+   * Whether this driver's bookings may still email this owner today (L3): the confirmations and
+   * driver's cancellations of the last 24 hours at any of the owner's listings, the one being
+   * written included, against OWNER_EMAILS_PER_DRIVER_DAY. Read on the driver's own bookings
+   * (`bookings_user_starts_idx`), which are few. Two at once may both pass: a cap, not a count.
+   */
+  private async ownerStillHears(tx: Transaction, driverId: string, ownerUserId: string) {
+    const since = new Date(Date.now() - DAY_MS);
+    const [row] = await tx
+      .select({
+        events: sql<number>`(count(*) filter (where ${booking.confirmedAt} > ${since})
+          + count(*) filter (where ${booking.cancelledBy} = 'driver' and ${booking.cancelledAt} > ${since}))::int`,
+      })
+      .from(booking)
+      .innerJoin(listing, eq(listing.id, booking.locationId))
+      .innerJoin(profile, eq(profile.id, listing.ownerId))
+      .where(
+        and(
+          eq(booking.userId, driverId),
+          eq(profile.userId, ownerUserId),
+          // Only rows with an event in the window (a cancellation comes after its confirmation),
+          // so neither a long history nor a week of holds is read under the locks.
+          sql`coalesce(${booking.cancelledAt}, ${booking.confirmedAt}) > ${since}`,
+        ),
+      );
+    return (row?.events ?? 0) <= OWNER_EMAILS_PER_DRIVER_DAY;
+  }
+
   private async ownerUserOf(db: Reader, locationId: string): Promise<string | null> {
     const [row] = await db
       .select({ userId: profile.userId })
@@ -642,7 +693,7 @@ export class BookingsService {
         emails.map(({ kind, userId, to }) => ({
           kind,
           userId,
-          payload: { listingName: info.name ?? undefined, booking: outboxBooking(row, info) },
+          payload: { listingName: row.listingName ?? undefined, booking: outboxBooking(row, info) },
           dedupeKey: `booking:${row.id}:${event}:${to}`,
         })),
       )

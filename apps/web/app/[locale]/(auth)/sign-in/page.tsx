@@ -41,7 +41,11 @@ export default async function SignInPage({
         <p className="text-sm text-muted-foreground">
           {t('noAccount')}{' '}
           <Link
-            href="/sign-up"
+            // The way back here after signing up keeps the stay a driver was booking.
+            href={{
+              pathname: '/sign-up',
+              query: typeof next === 'string' ? { next: returnTo } : {},
+            }}
             className="text-primary underline underline-offset-4 hover:decoration-2"
           >
             {t('signUpLink')}

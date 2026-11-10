@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { DEMO_DATA } from '../support/env';
 import { expectAccessible, trackCspViolations } from '../support/fixtures';
@@ -400,4 +401,122 @@ test('listing pages are public, and unknown listings are 404', async ({ request 
   }
   expect((await request.get('/el/parking/no-such-listing')).status()).toBe(404);
   expect((await request.get('/el/parking/Not_A_Slug')).status()).toBe(404);
+});
+
+test.describe('address search and the results map (decisions #40–#42)', () => {
+  /** Whether this run has Mapbox: the search form offers addresses only then. */
+  async function withMapbox(page: Page) {
+    await page.goto('/en/search');
+    return (await page.getByRole('combobox', { name: 'Or type an address or place' }).count()) > 0;
+  }
+
+  test('a place with its position searches there, and names it in the title', async ({ page }) => {
+    needsDemoData();
+    const day = nextAthensWeekday(3);
+    const csp = await trackCspViolations(page);
+    const place = new URLSearchParams({
+      place: 'Syntagma Square',
+      latitude: '37.9755',
+      longitude: '23.7348',
+      startDate: day,
+      startTime: '10:00',
+      endDate: day,
+      endTime: '12:00',
+    });
+    await page.goto(`/en/search?${place.toString()}`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      'Parking near “Syntagma Square”',
+    );
+    await expect(page).toHaveTitle(/^Parking near “Syntagma Square” – /);
+    await expect(
+      results(page, 'Results').getByRole('link', { name: 'Γκαράζ Πλατείας Συντάγματος' }),
+    ).toBeVisible();
+    await expectAccessible(page);
+    expect(await csp()).toEqual([]);
+
+    // In Greek, and marked as English after a switch: the words are the English page's.
+    await page.goto(`/el/search?${place.toString()}&placeLocale=en`);
+    const heading = page.getByRole('heading', { level: 1 });
+    await expect(heading).toHaveText('Στάθμευση κοντά στο σημείο «Syntagma Square»');
+    await expect(heading.locator('[lang="en"]')).toHaveText('Syntagma Square');
+    await expectAccessible(page);
+  });
+
+  test('with a token: an address picked from the suggestions searches there, and the map pins the results', async ({
+    page,
+  }) => {
+    // Decision #42: no token on this machine yet, so this waits for the first run with one.
+    test.skip(!(await withMapbox(page)), 'Needs a Mapbox token');
+    needsDemoData();
+    const csp = await trackCspViolations(page);
+    const field = page.getByRole('combobox', { name: 'Or type an address or place' });
+    await field.fill('Syntagma Square');
+    const list = page.getByRole('listbox', { name: 'Address suggestions' });
+    await expect(list.getByRole('option').first()).toBeVisible();
+    await expectAccessible(page);
+    await field.press('ArrowDown');
+    await field.press('Enter');
+    await expect(field).toBeFocused();
+    await expect(page.getByRole('status').filter({ hasText: 'Chosen:' })).toBeAttached();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await expect(page).toHaveURL(/[?&]latitude=\d/);
+    await expect(page).toHaveURL(/[?&]place=/);
+    await page.getByRole('button', { name: 'Show the map' }).click();
+    const map = page.getByRole('region', { name: 'Map of the results' });
+    await expect(map.getByRole('link').first()).toBeVisible();
+    await expect(map.getByRole('link').first()).toHaveAccessibleName(/^Result 1: /);
+    await expectAccessible(page);
+    expect(await csp()).toEqual([]);
+  });
+
+  test('without a token there is no address field and no map, and a place alone asks where', async ({
+    page,
+  }) => {
+    test.skip(await withMapbox(page), 'Mapbox is set up here');
+    const day = nextAthensWeekday(3);
+    await page.goto(`/en/search?${searchQuery('syntagma', day, '10:00', '12:00')}`);
+    await expect(page.getByRole('button', { name: 'Show the map' })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Or type an address or place' })).toHaveCount(
+      0,
+    );
+
+    // Nothing could look the words up, so the search asks for an area instead.
+    const typed = new URLSearchParams({
+      place: 'Σύνταγμα',
+      startDate: day,
+      startTime: '10:00',
+      endDate: day,
+      endTime: '12:00',
+    });
+    await page.goto(`/el/search?${typed.toString()}`);
+    await expect(page).toHaveTitle(/^Σφάλμα: /);
+    const summary = page.getByRole('alert').filter({ hasText: 'Υπάρχει πρόβλημα' });
+    await expect(summary.getByRole('link')).toHaveAttribute('href', '#search-area');
+    await expectAccessible(page);
+
+    // The API says so too, and asks Mapbox nothing.
+    const suggestions = await page.request.get('/api/v1/places/suggestions', {
+      params: { q: 'Ermou', session: randomUUID(), locale: 'en' },
+    });
+    expect(suggestions.status()).toBe(503);
+    expect(await suggestions.json()).toMatchObject({ code: 'PLACES_UNAVAILABLE' });
+  });
+
+  test('an area link loads the search page itself, under the policy that allows its map', async ({
+    page,
+  }) => {
+    // Without a token there is no map, and the link stays a client navigation.
+    test.skip(!(await withMapbox(page)), 'Needs a Mapbox token');
+    await page.goto('/en');
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (answer) =>
+          answer.url().includes('/en/search?area=koukaki') &&
+          answer.request().resourceType() === 'document',
+      ),
+      page.getByRole('link', { name: 'Koukaki', exact: true }).click(),
+    ]);
+    expect(response.headers()['content-security-policy']).toContain('https://api.mapbox.com');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Parking near Koukaki');
+  });
 });

@@ -13,6 +13,7 @@ import { CircleAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { StayRange } from '@/components/parking/stay-range';
+import { SearchLink } from '@/components/parking/search-link';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { loadBookings } from '@/lib/bookings.server';
@@ -82,7 +83,7 @@ export default async function BookingsPage({ params, searchParams }: BookingsPag
           <p>{t(when === 'past' ? 'emptyPast' : 'emptyUpcoming')}</p>
           <div>
             <Button asChild variant="outline">
-              <Link href="/search">{t('findParking')}</Link>
+              <SearchLink>{t('findParking')}</SearchLink>
             </Button>
           </div>
         </div>

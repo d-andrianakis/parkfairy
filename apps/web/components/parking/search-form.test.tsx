@@ -14,6 +14,8 @@ const byId = (id: string) => document.getElementById(id) as HTMLElement;
 
 const values: SearchValues = {
   area: 'koukaki',
+  place: '',
+  placeLocale: '',
   latitude: '',
   longitude: '',
   startDate: '2026-11-02',
@@ -41,6 +43,62 @@ describe('SearchForm', () => {
     expect(screen.getByRole('combobox', { name: 'Πού' })).toHaveValue('koukaki');
     expect(screen.getByRole('button', { name: 'Χρήση τοποθεσίας' })).toBeInTheDocument();
     await expectNoAxeViolations(container);
+  });
+
+  describe('the address field (decision #40)', () => {
+    const placed = {
+      ...values,
+      area: '',
+      place: 'Ermou 10',
+      latitude: '37.97',
+      longitude: '23.73',
+    };
+
+    it('is offered only where address search is set up', () => {
+      const { unmount } = renderWithProviders(<SearchForm values={values} minDate="2026-10-29" />);
+      expect(screen.queryByRole('combobox', { name: 'Or type an address or place' })).toBeNull();
+      unmount();
+      renderWithProviders(<SearchForm values={values} minDate="2026-10-29" addressSearch />);
+      const field = screen.getByRole('combobox', { name: 'Or type an address or place' });
+      expect(field).toHaveAttribute('name', 'place');
+      expect(field).toHaveAccessibleDescription(
+        'Type a few letters, then choose from the list. A place you choose replaces the area. Suggestions by Mapbox.',
+      );
+    });
+
+    it('renders a place’s position empty, for the field to put back once it runs', () => {
+      // On the server, before any script: what a browser without JavaScript would send.
+      const html = renderToString(
+        <NextIntlClientProvider locale="en" messages={catalogs.en} timeZone={DEFAULT_TIME_ZONE}>
+          <SearchForm values={placed} minDate="2026-10-29" addressSearch />
+        </NextIntlClientProvider>,
+      );
+      expect(html).toContain('value="Ermou 10"');
+      expect(html).not.toContain('value="37.97"');
+      // Without the field, the position stays with the place it came with.
+      const without = renderToString(
+        <NextIntlClientProvider locale="en" messages={catalogs.en} timeZone={DEFAULT_TIME_ZONE}>
+          <SearchForm values={placed} minDate="2026-10-29" />
+        </NextIntlClientProvider>,
+      );
+      expect(without).toContain('value="37.97"');
+    });
+
+    it('shows its own error, tied to it, and says "choose an area" rather than "my location"', async () => {
+      const { container } = renderWithProviders(
+        <SearchForm
+          values={{ ...placed, latitude: '', longitude: '' }}
+          errors={{ place: 'placeNotFound' }}
+          minDate="2026-10-29"
+          addressSearch
+        />,
+      );
+      const field = screen.getByRole('combobox', { name: 'Or type an address or place' });
+      expect(field).toHaveAttribute('aria-invalid', 'true');
+      expect(field).toHaveAccessibleDescription(/We couldn’t find that address/);
+      expect(screen.getByRole('option', { name: 'Choose an area' })).toBeInTheDocument();
+      await expectNoAxeViolations(container);
+    });
   });
 
   it('groups areas by city, named in the page language', () => {

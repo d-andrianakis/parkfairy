@@ -15,7 +15,9 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { ClientMessages } from '@/components/client-messages';
+import { FocusHeading } from '@/components/focus-heading';
 import { BookSpacePicker } from '@/components/parking/book-space-picker';
+import { SearchLink } from '@/components/parking/search-link';
 import { FeatureBadges } from '@/components/parking/feature-badges';
 import { HoursExceptions } from '@/components/parking/hours-exceptions';
 import { ListingPhotoImage } from '@/components/parking/listing-photo';
@@ -88,6 +90,8 @@ export default async function ListingPage(props: ListingPageProps) {
   const bookable = offered && available;
   // Booking needs an account (decision #8); the layout has read the session already.
   const signedIn = offered ? Boolean(await getLayoutSession()) : false;
+  // Back from a booking's page after letting its space go (3.3): say so, where the choice is made.
+  const released = (await props.searchParams).released === '1';
   const windowParams = parsed.window ? windowQuery(parsed.values) : {};
   const here = `/parking/${listing.slug}?${new URLSearchParams(windowParams).toString()}`;
   const cheapest = listing.spaces.reduce<(typeof listing.spaces)[number] | undefined>(
@@ -116,21 +120,18 @@ export default async function ListingPage(props: ListingPageProps) {
     const field = tSearchForm(part === 'start' ? 'from' : 'until');
     return [{ part, text: tForms('fieldError', { field, message }) }];
   });
-  const searchHere = {
-    pathname: '/search',
-    query: { area: listing.area, ...(parsed.window ? windowQuery(parsed.values) : {}) },
-  };
+  const searchHere = { area: listing.area, ...(parsed.window ? windowQuery(parsed.values) : {}) };
 
   return (
     <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-3">
-          <Link
-            href={searchHere}
+          <SearchLink
+            query={searchHere}
             className="w-fit text-sm text-primary underline underline-offset-4 hover:decoration-2"
           >
             {t('moreNear', { area: tAreas(listing.area) })}
-          </Link>
+          </SearchLink>
           <h1 lang={listing.contentLocale} className="text-3xl font-semibold tracking-tight">
             {listing.name}
           </h1>
@@ -213,6 +214,16 @@ export default async function ListingPage(props: ListingPageProps) {
         </section>
 
         <section id="spaces" aria-labelledby="spaces-heading" className="scroll-mt-4">
+          {released ? (
+            // What the press just did, not an interruption: no role="alert". It takes the focus.
+            <Alert role={undefined} className="mb-6">
+              <CircleCheck aria-hidden />
+              <div className="col-start-2 grid gap-1">
+                <FocusHeading>{t('releasedTitle')}</FocusHeading>
+                <AlertDescription>{t('releasedLead')}</AlertDescription>
+              </div>
+            </Alert>
+          ) : null}
           {/* Focusable: where the picker puts the focus when the last space goes under it. */}
           <h2
             id="spaces-heading"
@@ -378,7 +389,9 @@ export default async function ListingPage(props: ListingPageProps) {
               </p>
             ) : null}
             <Button asChild variant={availability ? 'outline' : 'default'}>
-              <Link href={searchHere}>{t(availability ? 'changeDates' : 'chooseDates')}</Link>
+              <SearchLink query={searchHere}>
+                {t(availability ? 'changeDates' : 'chooseDates')}
+              </SearchLink>
             </Button>
             {listing.bookingOpen ? null : (
               <p className="text-sm text-muted-foreground">{t('bookingSoon')}</p>

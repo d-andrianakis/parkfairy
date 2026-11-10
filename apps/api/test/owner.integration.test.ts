@@ -194,6 +194,11 @@ describe('owner onboarding', () => {
     app = await createTestApp();
     db = app.get<Database>(DB);
     store = app.get<ObjectStore>(OBJECT_STORE);
+    // Earlier runs' live listings pile up at this point; past search's 50 results, this run's own
+    // fell off the end, depending on their random slugs (memory.md). Out of search with them.
+    await db.execute(sql`update ${schema.parkingLocations} set status = 'suspended'
+      where status = 'published'
+        and ST_DWithin(location, ST_SetSRID(ST_MakePoint(${HERE.longitude}, ${HERE.latitude}), 4326)::geography, 5000)`);
     owner = await signUpUser(app);
     stranger = await signUpUser(app);
   });

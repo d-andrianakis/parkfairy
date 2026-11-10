@@ -1,0 +1,16 @@
+/*
+ * Focus on a Mapbox map's own parts (WCAG 2.4.7, 1.4.11). Its CSS hides the outline and shows focus
+ * with a box-shadow, which Windows contrast themes drop, and the map's `overflow: hidden` cuts the
+ * canvas's outline off. The tiles are light in both themes, so the colour is the light theme's
+ * primary, fixed (the emails use the same, memory.md); forced colours replace it with their own.
+ */
+.mapboxgl-canvas:focus-visible {
+  outline: 3px solid #092c99;
+  outline-offset: -3px;
+}
+
+.mapboxgl-ctrl button:focus-visible,
+.mapboxgl-ctrl a:focus-visible {
+  outline: 2px solid #092c99;
+  outline-offset: 1px;
+}

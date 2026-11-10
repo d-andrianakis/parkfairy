@@ -139,6 +139,10 @@ test('the check-your-inbox panel stays through a language switch and a reload', 
   await expect(page).toHaveTitle(/^Ελέγξτε τα εισερχόμενά σας/);
 
   await page.emulateMedia({ colorScheme: 'dark' });
+  // Axe at once can catch a fill mid-transition and measure it against the new text (memory.md).
+  await page.evaluate(() =>
+    Promise.allSettled(document.getAnimations().map((animation) => animation.finished)),
+  );
   await expectAccessible(page);
   await page.emulateMedia({ colorScheme: 'light' });
 

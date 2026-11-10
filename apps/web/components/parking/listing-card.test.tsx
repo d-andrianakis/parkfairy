@@ -21,12 +21,26 @@ const listing: ParkingListingSummary = {
 
 const result: ParkingSearchResult = {
   ...listing,
+  latitude: 37.9755,
+  longitude: 23.7348,
   distanceMeters: 86,
   freeSpaces: 1,
   total: { amountMinor: 1050, currency: 'EUR' },
 };
 
 describe('ListingCard', () => {
+  it('shows its pin’s number only beside the map, kept out of the link’s name', () => {
+    const { container } = renderWithProviders(
+      <div className="group/results" data-map="shown">
+        <ListingCard listing={result} number={3} />
+      </div>,
+    );
+    const badge = container.querySelector('[aria-hidden="true"]');
+    expect(badge).toHaveTextContent('3');
+    expect(badge).toHaveClass('hidden', 'group-data-[map=shown]/results:grid');
+    expect(screen.getByRole('link')).toHaveAccessibleName('Γκαράζ Πλατείας Συντάγματος');
+  });
+
   it('leaves the cover photo out of what a screen reader hears', () => {
     const photo = { key: 'a'.repeat(32), width: 1600, height: 1067, alt: 'x', color: '#112233' };
     const { container } = renderWithProviders(

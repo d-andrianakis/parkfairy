@@ -350,12 +350,17 @@ test('a Greek owner on a phone can reach every step without sideways scrolling',
   await expectAccessible(page);
 });
 
-test('the map’s origins are allowed in the owner area and nowhere else', async ({ request }) => {
+test('the map’s origins are allowed in the owner area and on search, and nowhere else', async ({
+  request,
+}) => {
   const policy = async (path: string) =>
     (await request.get(path, { maxRedirects: 0 })).headers()['content-security-policy'] ?? '';
-  expect(await policy('/en/owner')).toContain('https://api.mapbox.com');
-  expect(await policy('/en/owner')).toContain("worker-src 'self'");
-  for (const path of ['/en', '/en/sign-in', '/en/search']) {
+  // Search has the results map since decision #41; its address suggestions need none (#40).
+  for (const path of ['/en/owner', '/el/search']) {
+    expect(await policy(path), path).toContain('https://api.mapbox.com');
+    expect(await policy(path), path).toContain("worker-src 'self'");
+  }
+  for (const path of ['/en', '/en/sign-in', '/en/sign-up', '/en/parking/demo-listing']) {
     const csp = await policy(path);
     expect(csp, path).not.toContain('mapbox');
     expect(csp, path).not.toContain('worker-src');

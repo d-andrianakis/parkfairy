@@ -134,6 +134,13 @@
       "when": 1794165783406,
       "tag": "0018_bookings_hold_extensions",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794242863058,
+      "tag": "0019_bookings_listing_snapshot",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import {
   MAX_START_AHEAD_DAYS,
   NAME_MAX_LENGTH,
   PASSWORD_POLICY,
+  PLACE_QUERY_LIMITS,
   type ValidationMessage,
 } from '@parkfairy/contracts/validation';
 
@@ -19,5 +20,6 @@ export function validationArgs(key: ValidationMessage) {
           : key === 'dateTooFar'
             ? HOURS_EXCEPTION_AHEAD_DAYS
             : PASSWORD_POLICY.maxLength;
-  return { min: PASSWORD_POLICY.minLength, max };
+  const min = key === 'placeTooShort' ? PLACE_QUERY_LIMITS.min : PASSWORD_POLICY.minLength;
+  return { min, max };
 }

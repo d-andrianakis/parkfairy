@@ -46,4 +46,8 @@ export const useRouter = () => routerMock;
 export const usePathname = () => currentPathname;
 export const useSearchParams = () => currentSearchParams;
 export const redirect = vi.fn();
-export const getPathname = vi.fn();
+/** The path next-intl would give, as `Link` renders it; tests may still set their own. */
+export const getPathname = vi.fn(({ href, locale = 'en' }: { href: Href; locale?: string }) => {
+  const path = toPath(href);
+  return `/${locale}${path === '/' ? '' : path}`;
+});

@@ -5,9 +5,11 @@ import { CalendarClock, Car, MapPinned, type LucideIcon } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { ListingCard } from '@/components/parking/listing-card';
 import { SearchForm } from '@/components/parking/search-form';
+import { SearchLink } from '@/components/parking/search-link';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { loadFeaturedListings } from '@/lib/api.server';
+import { mapboxToken } from '@/lib/maps.server';
 import { defaultWindow, today } from '@/lib/search';
 
 const STEPS: { key: 'search' | 'compare' | 'park'; icon: LucideIcon }[] = [
@@ -37,8 +39,16 @@ export default async function HomePage({ params }: LocaleParams) {
             <CardContent>
               <h2 className="sr-only">{t('searchHeading')}</h2>
               <SearchForm
-                values={{ area: '', latitude: '', longitude: '', ...defaultWindow() }}
+                values={{
+                  area: '',
+                  place: '',
+                  placeLocale: '',
+                  latitude: '',
+                  longitude: '',
+                  ...defaultWindow(),
+                }}
                 minDate={today()}
+                addressSearch={mapboxToken() !== null}
               />
             </CardContent>
           </Card>
@@ -57,9 +67,7 @@ export default async function HomePage({ params }: LocaleParams) {
                 {AREAS.filter((area) => area.city === city).map((area) => (
                   <li key={area.id}>
                     <Button asChild variant="outline" size="sm">
-                      <Link href={{ pathname: '/search', query: { area: area.id } }}>
-                        {tAreas(area.id)}
-                      </Link>
+                      <SearchLink query={{ area: area.id }}>{tAreas(area.id)}</SearchLink>
                     </Button>
                   </li>
                 ))}

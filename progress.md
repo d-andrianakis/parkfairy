@@ -602,8 +602,9 @@ Left open:
 
 ## Phase 3: Search and booking engine
 
-- [~] Geospatial search + listing pages: done with curated areas + browser location (1.11);
-  map (Mapbox, CSP updated deliberately) and address search missing
+- [~] Geospatial search + listing pages: curated areas + browser location (1.11), address search
+  with suggestions and a results map on request (3.2). Built and tested with Mapbox mocked: the first
+  run with a real token is still to come (#42)
 - [x] Availability + quote endpoints: free spaces subtract bookings and running holds, the owner's
       gap included, in search and on the listing page; "from" is the cheapest free space (3.1)
 - [x] Transactional allocation + holds (exclusion constraint on `[starts_at, blocked_until)`): the
@@ -672,23 +673,21 @@ readings taken without asking are in memory.md.
 
 Left open:
 
-- [ ] Security, for Phase 4 before booking goes beyond this machine: the hold and confirm limits per
-      account as well as per address (L2); a cap on booking emails to one owner (L3, a confirm and
-      cancel loop mails them twice); owner text changed on a listing sent back reaches drivers'
-      booking pages and emails unreviewed (L6: snapshot name and address, or refuse changes while
-      bookings are upcoming); Stripe Radar or review against self-dealing (`OWN_LISTING` stops only
+- [x] Security L2, L3, L6: done in 3.3 (limits per account, the owner's email cap, the listing
+      kept on each booking)
+- [ ] Security, for Phase 4: Stripe Radar or review against self-dealing (`OWN_LISTING` stops only
       the same account)
 - [ ] Performance, deferred as low: keyset pages for the owner list (50 pages of 20 cap it at 1,000
       upcoming bookings); the email sender's pace (40 a minute) in a rush; the hold's 11 round trips
       under `FOR SHARE`; future indexes on a full `bookings` built `CONCURRENTLY`, and new email kinds
       added `NOT VALID` then validated
-- [ ] Tests still missing: a booking already under way is checked only from now on (time-of-day
-      dependent as written); two confirmations at once; the reference-collision retry
-- [ ] The sign-in page's link to sign up drops `?next=`, so a driver who creates an account there
-      loses the stay they chose
-- [ ] Accessibility, advisory and not done: "Let this space go" acts on one press and the listing
-      says nothing on arrival; a `booked` line in a copy report could link to that listing's
-      bookings; following "See the bookings" from the closures page loses the rows not yet saved
+- [x] Tests still missing: done in 3.3 (a stay under way with a fixed `now`, two confirmations at
+      once with different plates, the reference collision and its giving up)
+- [x] The sign-in page's link to sign up drops `?next=`: fixed in 3.3, both ways and through the
+      "check your inbox" panel. The emailed link still can't carry it (links in emails are rebuilt)
+- [x] Accessibility advisories: done in 3.3 ("Let this space go" asks first and the listing says
+      it went; `booked` lines link to that listing's bookings; the closures page keeps its unsaved
+      rows while the owner cancels bookings)
 - [ ] Manual NVDA and VoiceOver: the hold's warning (read once, two minutes before, without
       moving the focus) and "Kept for you until"; the ended heading taking the focus when the form
       goes; the last space taken (focus, the alert once); radios with features
@@ -706,6 +705,116 @@ Left open:
       παραμονή; «ιδιοκτήτης» for a host who may rent the space or be a business; Επερχόμενες or
       Προσεχείς, Παλαιότερες or Προηγούμενες; Κωδικός or Αριθμός κράτησης; «έως τις 01:05» or
       «έως τη 01:05»; «Κρατημένη για εσάς» as a badge; Εισαγάγετε or Συμπληρώστε, now for the plate
+
+### 3.2 Address search and the results map (2026-11-09)
+
+Drivers type an address and pick from suggestions (Mapbox Search Box through our API, #40); text
+not picked is looked up by the server, once, and the page goes on to its position. Results can show
+a map on request, its pins numbered as the list (#41). No token on this machine yet, so Mapbox is
+mocked (#42): the address field and the map show only where `MAPBOX_PUBLIC_TOKEN` is set.
+
+- [x] **Implemented** behind the API's authorization rules: `GET /v1/places/suggestions`,
+      `/places/retrieve`, `/places` (public, `no-store`, per-route limits, 100 an hour per visitor
+      across the three, cross-site requests refused, the site's hourly budget in billed units, a
+      breaker when Mapbox keeps failing); search results carry each listing's position; the search
+      page's look-up and redirect (`place`, `placeLocale`), only for searches made here; the address
+      combobox (`AddressField`, its list loaded on focus); "Show the map" (`ResultsMapToggle`, the map
+      loaded on a press and kept once shown); Mapbox in the CSP of the search page only; links into
+      search load a real page where there can be a map (`SearchLink`)
+- [x] **Unit tests**: contracts (queries, place ids, labels), the Mapbox client (parameters, shapes,
+      refusals, the token kept out of messages), the budget (sessions once, per hour, Redis failing),
+      the visitor guard, the service (no token, budget, breaker), env, log redaction; web: the
+      combobox (keys, pointer, stale answers, blur into the list, positions and language, area and
+      place clearing each other, failures, Greek, axe), the list, the map (pins as named links with
+      `lang`, Mapbox's defaults removed, token and worker, out-of-view pins, axe), the toggle (one map
+      per page, the status line), the search page (look-up and redirect, not found, unavailable,
+      cross-site, no token, the heading's language, pins, `<ol>`, Greek, axe), `parseSearch`,
+      `lookupPlace`, the search form, near me, `SearchLink`, `allowsMaps`, the card's number.
+      Integration (`places.integration.test.ts`): anonymous use, Mapbox as its docs describe it,
+      validation before any call, the visitor limit, `no-store`, cross-site refused, no token
+- [~] **Smoke test** (`parking.smoke.ts`): a place with its position searched and named (English,
+  and Greek marked as English after a switch), no address field or map without a token, a place
+  alone then asking for an area, the API unavailable without a token; the CSP in
+  `owner-onboarding.smoke.ts`. The path with a token (suggestions, a pick, the map's pins) is
+  written and skips until a token exists (#42)
+- [x] **Security** review: nothing above medium. Fixed: one client could spend the site's budget, and
+      other sites' pages could spend it from visitors' browsers (M1); typed addresses reached the
+      request log (M2); the public token standing in for the server's in production (L3); `.`/`..`
+      parts in place ids (L4); the budget failing open with Redis (L5). Accepted: any text can head the
+      results as the place's name (escaped, as any search page echoes its query). Open below
+- [x] **Performance** review: nothing high, every page under budget. Fixed: the budget counted calls,
+      not what Mapbox bills (M1); the owner-email count reading a driver's whole history under the
+      locks; full page loads into search with no map to allow; the map library fetched only after the
+      press, and a new map at every show; the API client on every home and search visit; no breaker.
+      Recorded: how to run 0019's kind of backfill on a large table (memory.md)
+- [x] **Accessibility** review: fixed Mapbox turning every pin into an image named "Map marker"; the
+      current suggestion shown by a 1.1:1 fill only; a tap on the list's edge closing it before the
+      pick; the list read last on phones (portal at the end of `<body>`); the map's focus rings;
+      nested regions with one name; the logo link named by its picture; the active option scrolled
+      out of view; numbered pins over an unordered list; the loading line not read; "My location"
+      left after typing. Then, by decision #45: "Show all results" and cooperative gestures on the
+      map. Advisory, not done: `lang` on Greek-script names Mapbox returns in English, and on its
+      English attribution in Greek
+- [x] **i18n** review: fixed the Greek heading («κοντά στο σημείο»), the pin's total without "from",
+      the place's language after a switch, the address label read as "either… or", the error summary's
+      and the list's names, the wording of `pickFailed`, `placeTooShort` (characters),
+      `placeNotFound`, the map's control names, the "keep" buttons. Native speaker below
+- [x] **Contracts & docs**: OpenAPI and client regenerated, `.env.example` (`MAPBOX_SEARCH_TOKEN`,
+      `MAPBOX_SEARCH_HOURLY_LIMIT`), memory.md
+
+Left open:
+
+- [ ] The first run with a Mapbox token: the token-gated smoke test, the map and the combobox in real
+      browsers, and the numbers the budget and limits were set to (#42)
+- [ ] Manual NVDA, JAWS, VoiceOver (macOS, iOS) and TalkBack: the count and "Chosen: …" read once
+      without cutting off typing; options read "name, detail"; Enter picks; the problem line read
+      once; `aria-activedescendant` into the list; a tap on an option (and on the list's edge) picks;
+      swiping from the field reaches the list next; pins in the links list, the canvas's name, the tab
+      order (pins, then controls), focus on pins and zoom buttons in Windows contrast themes and the
+      dark theme
+- [ ] Native speaker: `SearchForm.address*`, `suggestion*`, `placeChosen`, `pickFailed`,
+      `noSuggestions`, `suggestionsUnavailable`; `Search.titlePlace`, `lookupPending`, `showMap`,
+      `hideMap`; `ResultsMap.*`; `Validation.place*`. Questions: σημείο or τοποθεσία for "place";
+      «Ο χάρτης δεν φόρτωσε»; «Χάρτης των αποτελεσμάτων» or «Χάρτης αποτελεσμάτων»; «κάτω από το πεδίο»
+
+### 3.3 Booking follow-ups (2026-11-09)
+
+The 3.1 leftovers chosen in #43: sign-up keeps `?next=`, the missing tests, the accessibility
+advisories, per-account hold limits (L2), the owner's email cap (L3), the listing's name and address
+kept on each booking (L6).
+
+- [x] **Implemented** behind the API's authorization rules: `AccountThrottlerGuard` on hold, confirm
+      and extend; `ownerStillHears` (six emails a day from one driver's doings at one owner's
+      listings); migration 0019 and the snapshot read by the driver's pages and every email; the
+      sign-in and sign-up links and the sent panel keeping `next`; "Let this space go" asking first
+      and the listing's notice; the copy report's links to bookings; the closures draft
+- [x] **Unit tests**: the account guard, env; web: the release question (every "No" gives the focus
+      back, none while letting go, a failure keeps it), the released notice, the copy report's link,
+      the closures draft (kept, restored once, the message gone after a save, storage blocked,
+      expiry), the auth pages' links, the sent panel. Integration (`bookings.integration.test.ts`,
+      follow-ups): the snapshot through an edit, the confirmation and an owner's cancel; the email
+      cap, its day and its scope (owner cancels don't count, all of one owner's listings); limits per
+      account on hold, confirm and extend; two confirmations at once with different plates; a taken
+      reference and giving up after three; a stay under way checked from a fixed `now`
+- [x] **Smoke test**: `booking.smoke.ts` (the closures entry back after the owner cancels the booking,
+      the release question and the listing's notice in Greek at 320 px), `auth.smoke.ts` (`next` both
+      ways)
+- [x] **Security** review: nothing on these above low; noted that a driver can use up the cap with
+      three book-and-cancel loops before a real booking (it still shows on the owner's page; #43)
+- [x] **Performance** review: fixed the cap's query (bounded to the day); 0019 recorded above
+- [x] **Accessibility** review: fixed "No, keep it" losing the focus on a second press and answering
+      while the space was being let go, and the restored-entries message outliving the save
+- [x] **i18n** review: «Όχι, να μείνει κρατημένη» for the release's "keep"
+- [x] **Contracts & docs**: migration 0019 reviewed, memory.md
+
+Left open:
+
+- [ ] Manual NVDA and VoiceOver: the release question read in full with the Greek space label; the
+      released notice on `/el` read with the Greek voice; the restored-entries message read after
+      `RouteFocus` moves the focus
+- [ ] Native speaker: `Booking.releaseQuestion`, `releaseConfirm`, `releaseKeep`,
+      `Listing.releasedTitle`, `releasedLead`, `Owner.closures.draftRestored` (Questions: «επανήλθαν»;
+      «να μείνει κρατημένη»)
 
 ## Phase 4: Payments and payouts
 
@@ -742,7 +851,13 @@ Left open:
       until the entry ends (swept). Booking adds: how long plates and drivers' names stay on
       bookings (#35), whether owners should see them only from some days before arrival, failed
       outbox rows (never purged; they hold a place and time), and deleting an account with bookings
-      (`bookings.user_id` restricts it)
+      (`bookings.user_id` restricts it). Address search adds (3.2): Mapbox as a processor of the
+      addresses drivers type (sent from our server, not kept) and of drivers' IP addresses when the
+      results map is opened. Bookings now keep the listing's address (3.3, L6), which for a private
+      owner may be their home and outlives later edits of the listing
+- [ ] Address search in production: `MAPBOX_SEARCH_TOKEN` (no URL restrictions, search scopes only,
+      never the public token), the public token restricted to the site's URLs and the map's scopes,
+      Mapbox usage alerts, and the hourly budget and per-visitor cap checked against real use
 - [ ] Owner onboarding in production: `OWNER_DATA_KEY`, `S3_BUCKET` and a role with
       `s3:ListBucket` (without it a missing photo is a 500 rather than a 404), `MAPBOX_PUBLIC_TOKEN`
       and a card on the account for permanent geocoding, `UV_THREADPOOL_SIZE=16`, a CDN in front of

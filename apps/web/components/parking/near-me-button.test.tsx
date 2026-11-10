@@ -18,6 +18,7 @@ function Form() {
       </select>
       <input type="hidden" name="latitude" defaultValue="" />
       <input type="hidden" name="longitude" defaultValue="" />
+      <input type="hidden" name="place" defaultValue="Ermou 10" />
       <NearMeButton />
     </form>
   );
@@ -51,6 +52,8 @@ describe('NearMeButton', () => {
     expect(new FormData(form).get('latitude')).toBe('37.976');
     expect(new FormData(form).get('longitude')).toBe('23.735');
     expect(new FormData(form).get('area')).toBe('');
+    // A place typed before would otherwise name the position (decision #40).
+    expect(new FormData(form).get('place')).toBe('');
     expect(requestSubmit).toHaveBeenCalledTimes(1);
     // Bounded, so "Finding your location…" can never hang.
     expect(getCurrentPosition).toHaveBeenCalledWith(

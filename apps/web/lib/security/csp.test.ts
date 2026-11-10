@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildContentSecurityPolicy, createNonce } from './csp';
+import { allowsMaps, buildContentSecurityPolicy, createNonce } from './csp';
 
 function directives(policy: string): Map<string, string[]> {
   return new Map(
@@ -9,6 +9,32 @@ function directives(policy: string): Map<string, string[]> {
     }),
   );
 }
+
+describe('allowsMaps', () => {
+  it('allows Mapbox in the owner area and on the search page, in both languages', () => {
+    for (const path of [
+      '/el/owner',
+      '/en/owner/listings/1/location',
+      '/el/search',
+      '/en/search/',
+    ]) {
+      expect(allowsMaps(path)).toBe(true);
+    }
+  });
+
+  it('nowhere else, however close the path', () => {
+    for (const path of [
+      '/el',
+      '/en/parking/demo',
+      '/en/searches',
+      '/en/search/x',
+      '/el/ownerx',
+      '/search',
+    ]) {
+      expect(allowsMaps(path)).toBe(false);
+    }
+  });
+});
 
 describe('buildContentSecurityPolicy', () => {
   const production = directives(

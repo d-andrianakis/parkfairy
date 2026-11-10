@@ -86,7 +86,11 @@ const listing = (overrides: Partial<ParkingListingDetail> = {}): ParkingListingD
   ...overrides,
 });
 
-async function show(found: ParkingListingDetail, signedIn: boolean, params = windowParams) {
+async function show(
+  found: ParkingListingDetail,
+  signedIn: boolean,
+  params: Record<string, string> = windowParams,
+) {
   vi.mocked(loadListing).mockResolvedValue(found);
   vi.mocked(getLayoutSession).mockResolvedValue(
     (signedIn ? { user: { id: 'u' } } : null) as Awaited<ReturnType<typeof getLayoutSession>>,
@@ -129,6 +133,19 @@ describe('the listing page’s booking', () => {
     expect(next).toBe(
       `/parking/ermou-garage?startDate=${day}&startTime=10%3A00&endDate=${day}&endTime=12%3A00`,
     );
+  });
+
+  it('says the space went when a driver lets it go, where they choose another', async () => {
+    const { container } = await show(listing(), true, { ...windowParams, released: '1' });
+    const notice = screen.getByRole('heading', { level: 2, name: 'You let the space go' });
+    expect(notice.closest('section')).toHaveAttribute('id', 'spaces');
+    expect(screen.getByText(/Choose a space below, or other times/)).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+
+  it('says nothing of it on an ordinary visit', async () => {
+    await show(listing(), true);
+    expect(screen.queryByRole('heading', { name: 'You let the space go' })).not.toBeInTheDocument();
   });
 
   it('says booking is coming where it can’t be taken yet (decision #33)', async () => {

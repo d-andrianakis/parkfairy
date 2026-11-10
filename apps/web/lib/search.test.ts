@@ -118,6 +118,85 @@ describe('parseSearch', () => {
       'ladadika',
     );
   });
+
+  describe('a place (decision #40)', () => {
+    it('searches at a picked place’s position and keeps its words for the title', () => {
+      const parsed = parseSearch(
+        { place: ' Ermou 10, Athens ', latitude: '37.9762', longitude: '23.7329', ...window },
+        NOW,
+      );
+      expect(parsed.values.place).toBe('Ermou 10, Athens');
+      expect(parsed.query).toMatchObject({ latitude: 37.9762, longitude: 23.7329 });
+      expect(parsed.lookup).toBeUndefined();
+    });
+
+    it('asks for a look-up when the place has no position yet, and searches nothing meanwhile', () => {
+      const parsed = parseSearch({ place: 'Σύνταγμα', latitude: '', ...window }, NOW);
+      expect(parsed).toMatchObject({ submitted: true, errors: {}, lookup: 'Σύνταγμα' });
+      expect(parsed.query).toBeUndefined();
+    });
+
+    it('spends no look-up on a search that fails anyway', () => {
+      const parsed = parseSearch({ place: 'Σύνταγμα', ...window, endTime: '08:00' }, NOW);
+      // The place's own problem is the look-up's to find, not "choose an area".
+      expect(parsed.errors).toEqual({ end: 'endBeforeStart' });
+      expect(parsed.lookup).toBeUndefined();
+    });
+
+    it('refuses a place too short to look up or too long to carry', () => {
+      expect(parseSearch({ place: 'Σύ', ...window }, NOW)).toMatchObject({
+        errors: { place: 'placeTooShort' },
+        lookup: undefined,
+      });
+      expect(parseSearch({ place: 'x'.repeat(201), ...window }, NOW).errors).toEqual({
+        place: 'textTooLong',
+      });
+    });
+
+    it('looks a place up again when its position isn’t one, rather than saying nothing', () => {
+      for (const position of [
+        { latitude: 'abc', longitude: '23.7' },
+        { latitude: '137.9', longitude: '23.7' },
+        { latitude: '37.9', longitude: '' },
+      ]) {
+        const parsed = parseSearch({ place: 'Ermou 10', ...position, ...window }, NOW);
+        expect(parsed).toMatchObject({ errors: {}, lookup: 'Ermou 10' });
+      }
+    });
+
+    it('keeps the language a place is named in, only when it is one', () => {
+      const placed = { place: 'Ερμού 10', latitude: '37.97', longitude: '23.73', ...window };
+      expect(parseSearch({ ...placed, placeLocale: 'el' }, NOW).values.placeLocale).toBe('el');
+      expect(parseSearch({ ...placed, placeLocale: 'xx' }, NOW).values.placeLocale).toBe('');
+      expect(
+        parseSearch({ ...window, area: 'koukaki', placeLocale: 'el' }, NOW).values.placeLocale,
+      ).toBe('');
+    });
+
+    it('is left out where nothing could look it up, and the search asks where', () => {
+      const parsed = parseSearch({ place: 'Σύνταγμα', ...window }, NOW, { lookups: false });
+      expect(parsed.values.place).toBe('');
+      expect(parsed).toMatchObject({ submitted: true, errors: { area: 'locationRequired' } });
+      expect(parsed.lookup).toBeUndefined();
+      // With a position it needs no look-up, and keeps its words for the title.
+      const placed = parseSearch(
+        { place: 'Σύνταγμα', latitude: '37.97', longitude: '23.73', ...window },
+        NOW,
+        { lookups: false },
+      );
+      expect(placed.values.place).toBe('Σύνταγμα');
+      expect(placed.query).toMatchObject({ latitude: 37.97 });
+    });
+
+    it('gives way to a chosen area, as a shared position does', () => {
+      const parsed = parseSearch(
+        { area: 'koukaki', place: 'Ermou 10', latitude: '37.9', longitude: '23.7', ...window },
+        NOW,
+      );
+      expect(parsed.values.place).toBe('');
+      expect(parsed.query).toMatchObject({ area: 'koukaki' });
+    });
+  });
 });
 
 describe('parseListingWindow', () => {
