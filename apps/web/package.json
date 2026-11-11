@@ -21,7 +21,7 @@
     "@parkfairy/database": "workspace:*",
     "@parkfairy/email": "workspace:*",
     "@parkfairy/ui": "workspace:*",
-    "@tanstack/react-query": "5.105.0",
+    "@tanstack/react-query": "5.107.1",
     "better-auth": "1.7.14",
     "ioredis": "6.0.0",
     "lucide-react": "1.63.0",
