@@ -14,7 +14,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@hookform/resolvers": "6.0.2",
+    "@hookform/resolvers": "7.0.3",
     "@parkfairy/api-client": "workspace:*",
     "@parkfairy/auth": "workspace:*",
     "@parkfairy/contracts": "workspace:*",
