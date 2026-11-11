@@ -2258,11 +2258,14 @@ describe('owner onboarding', () => {
       expect(toUser(await drain(), user)).toEqual(['listing-submitted']);
     });
 
-    it('puts the listing’s name in the email', async () => {
+    it('puts the listing’s name in the email, with the language it is written in', async () => {
       const { user } = await submitted();
       await enqueueListingStatusEmails(db);
       const mine = (await drain()).find((email) => email.to === user.email);
-      expect(mine?.payload.listingName).toBe(location.name);
+      expect(mine?.payload).toEqual({
+        listingName: location.name,
+        contentLocale: location.contentLocale,
+      });
     });
 
     it('reminds an owner who went quiet, once, and nobody else', async () => {
@@ -2330,7 +2333,7 @@ describe('owner onboarding', () => {
 
         await db
           .update(schema.emailOutbox)
-          .set({ nextAttemptAt: new Date(Date.now() - 1000) })
+          .set({ nextAttemptAt: sql`now() - interval '1 minute'` })
           .where(eq(schema.emailOutbox.id, email.id));
         const again = (await claimDueEmails(db, 500)).find((due) => due.id === email.id);
         expect(again?.attempts).toBe(2);
@@ -2346,7 +2349,7 @@ describe('owner onboarding', () => {
         expect(row.lastError).toHaveLength(200);
         await db
           .update(schema.emailOutbox)
-          .set({ nextAttemptAt: new Date(Date.now() - 1000) })
+          .set({ nextAttemptAt: sql`now() - interval '1 minute'` })
           .where(eq(schema.emailOutbox.id, email.id));
         expect((await claimDueEmails(db, 500)).map((due) => due.id)).not.toContain(email.id);
       });
@@ -2381,7 +2384,7 @@ describe('owner onboarding', () => {
         // Its claim lapsed and another worker took it: that claim is the other worker's.
         await db
           .update(schema.emailOutbox)
-          .set({ nextAttemptAt: new Date(Date.now() - 1000) })
+          .set({ nextAttemptAt: sql`now() - interval '1 minute'` })
           .where(eq(schema.emailOutbox.id, lost.id));
         const retaken = (await claimDueEmails(db, 500)).find((due) => due.id === lost.id);
         expect(retaken?.attempts).toBe(2);
@@ -2394,11 +2397,25 @@ describe('owner onboarding', () => {
         await releaseEmails(db, []);
       });
 
+      it('leaves a lapsed claim as it is, and gives back the held one beside it', async () => {
+        const held = await queued();
+        const lapsed = await queued();
+        // Nobody took it again, but it is due already: there is nothing to give back.
+        await db
+          .update(schema.emailOutbox)
+          .set({ nextAttemptAt: sql`now() - interval '1 minute'` })
+          .where(eq(schema.emailOutbox.id, lapsed.id));
+        await releaseEmails(db, [held, lapsed]);
+        expect((await stored(held.id)).attempts).toBe(0);
+        expect((await stored(lapsed.id)).attempts).toBe(1);
+        await Promise.all([markEmailSent(db, held.id), markEmailSent(db, lapsed.id)]);
+      });
+
       it('takes back an email whose worker died', async () => {
         const email = await queued();
         await db
           .update(schema.emailOutbox)
-          .set({ nextAttemptAt: new Date(Date.now() - 1000) })
+          .set({ nextAttemptAt: sql`now() - interval '1 minute'` })
           .where(eq(schema.emailOutbox.id, email.id));
         const reclaimed = (await claimDueEmails(db, 500)).map((due) => due.id);
         expect(reclaimed).toContain(email.id);

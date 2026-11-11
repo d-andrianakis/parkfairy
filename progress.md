@@ -962,16 +962,68 @@ sentences.
     copying; the booking page, the facts and the list; the owner's bookings (space, driver's name in
     both languages); closures; the listing page's description and spaces; the space list; the
     release question.
-  - Integration: `releaseEmails` returning a try and leaving a claim it no longer holds.
+  - Integration: `releaseEmails` returning a try, leaving a claim it no longer holds and a lapsed
+    one beside a held one; owner emails' payload carrying the listing's language. Claims are
+    lapsed by the database's clock, which Docker's can put ahead of the tests'.
 - [x] **Smoke test** (`booking.smoke.ts`): both booking emails mark the Greek listing's name in an
       English email. The busy-listing test now uses an English listing with Greek words, a Greek
-      «Α1» space and a Greek driver's name, checked on `/en/owner` and the bookings page with axe
-- [ ] **Security** review: nothing above low; two lows to settle
-- [ ] **Performance** review (running)
-- [ ] **Accessibility** review (running)
-- [x] **i18n** review: no blocker or major. Minor ones to settle
-- [ ] **Test** review (running)
-- [x] **Contracts & docs**: no API or schema change (client and schema unchanged), memory.md
+      «Α1» space and a Greek owner's name: the account's greeting, `/en/owner` and the bookings
+      page with axe, then `/el/owner` (the English name inside a Greek sentence) and the Greek
+      bookings page (nothing marked in a Greek name)
+- [x] **Security** review: nothing above low. Fixed:
+  - a long `Retry-After` (a spent quota) cut by the deadline gave the try back every run, for
+    ever, and hid the reason. The transport now says what Resend answered before it was stopped
+    (`SendStopped.failure`), and such a send counts as failed;
+  - a real failure landing as the deadline fired was handed back too;
+  - `releaseEmails`'s precondition, stated.
+- [x] **Performance** review: nothing high; its medium was the same `Retry-After` loop. Measured: a
+      run ends at 25.02 s whatever Resend does, `releaseEmails` 0.25–1.7 ms on 1M rows, the regex
+      linear (147 µs for the worst 2,000-character description), `greek-runs` 261 B gzipped.
+      Fixed:
+  - a job fetched as closing began, which BullMQ can't cancel: the process's own signal
+    (`jobHandler`'s `stopping`);
+  - claims held 5 minutes, now 2: a crashed worker's emails come back sooner;
+  - a pace below 0.04 a second, which would never claim anything, refused.
+- [x] **Accessibility** review: nothing above minor. Fixed:
+  - the delete-draft button and question;
+  - "Remove {label}" on the spaces step;
+  - the account's greeting (isolated, as a driver's name is: `PersonName`);
+  - owner emails' names in the listing's language;
+  - staff's review note marked as a driver's name is.
+- [x] **i18n** review: no blocker or major. Fixed:
+  - owner emails carry the listing's `contentLocale`;
+  - the delete-draft texts;
+  - `sentenceWith`'s rule held by a test over every catalog sentence;
+  - the name tags held to wrap exactly one argument (`catalogs.test.ts`);
+  - Greek checks in the emails and the smoke test.
+- [x] **Test** review: no test would pass with the code broken. Fixed:
+  - the deadline tests run beside a worker's signal too;
+  - BullMQ's three-parameter handler tested (`jobHandler`);
+  - a stop during a claim;
+  - the real transport across the package boundary;
+  - email assertions free of inline styles;
+  - claims lapsed by the database's clock;
+  - a stop while waiting for a turn;
+  - `placeTag` given chunks, with axe.
+- [x] **Contracts & docs**: no API or schema change (the outbox payload's new `contentLocale` is
+      JSON, optional), memory.md
+
+Left open:
+
+- [ ] Claims sized by the pace alone: above about 1.25 s a send (pace 1/s), each run ends by
+      stopping one in flight (no duplicate, an extra call). Size by measured send time if seen
+- [ ] Owner text in emails isn't isolated (`bdi`/`dir="auto"`): a direction control in a name
+      could reorder a driver's subject line. Earlier than 3.5; staff review limits it
+- [ ] The listing page's fallback photo `alt` ("{name}, photo 2") can't mark the name's language
+      in an attribute; consider leaving the name out, since the heading names the listing
+- [ ] Two replicas: time how long a SIGKILLed sender holds the email queue (stalled-job check,
+      30–90 s by the review's reading of BullMQ)
+- [ ] Manual checks to add to 3.4's list:
+  - links whose name mixes languages, by Tab (focus announcements may ignore inner `lang`);
+  - the space radios «Α2»/«B1», and VoiceOver iOS keeping each link one swipe stop;
+  - without a Greek voice, what a one-letter run like «Α1» sounds like;
+  - TalkBack and `lang` on inline spans;
+  - whether Gmail, Outlook.com and Apple Mail keep `lang` on `<span>` and `<td>`.
 
 ## Phase 4: Payments and payouts
 

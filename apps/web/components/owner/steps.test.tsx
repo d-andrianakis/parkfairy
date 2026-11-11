@@ -116,6 +116,26 @@ describe('SpacesForm', () => {
     expect(screen.getByRole('button', { name: 'Remove A2' })).toBeInTheDocument();
   });
 
+  it('reads a space’s label in the listing’s language on its remove button, Greek marked', async () => {
+    const english = listingFixture({
+      spaces: [
+        { id: 'a', label: 'Α1', features: [], hourlyRateMinor: null },
+        { id: 'b', label: 'B2', features: [], hourlyRateMinor: null },
+      ],
+    });
+    const { container } = renderInSubtree(
+      <SpacesForm
+        listing={{ ...english, location: { ...english.location, contentLocale: 'en' } }}
+      />,
+    );
+    const greek = within(screen.getByRole('button', { name: 'Remove Α1' })).getByText('Α1');
+    expect(greek).toHaveAttribute('lang', 'el');
+    expect(greek.parentElement).toHaveAttribute('lang', 'en');
+    const latin = within(screen.getByRole('button', { name: 'Remove B2' })).getByText('B2');
+    expect(latin).toHaveAttribute('lang', 'en');
+    await expectNoAxeViolations(container);
+  });
+
   it('removes a space, says so and keeps the focus in the list', async () => {
     renderInSubtree(<SpacesForm listing={listingFixture()} />);
     await addThree();

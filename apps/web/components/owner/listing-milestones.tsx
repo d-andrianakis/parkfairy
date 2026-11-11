@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from '@parkfairy/ui/components/card';
 import { CalendarCheck, CalendarX, CircleAlert, ImageOff } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { PlaceWords, placeTag } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
@@ -53,6 +53,7 @@ function AfterSubmission({ listing }: { listing: OwnerListingProgress }) {
 /** One listing's journey: its milestones, each with the steps inside it. */
 export function ListingMilestones({ listing }: { listing: OwnerListingProgress }) {
   const t = useTranslations('Owner');
+  const locale = useLocale();
   const name = listing.name ?? t('dashboard.untitled');
   const nameLang = listing.name ? listing.contentLocale : undefined;
   const cover = listing.coverPhoto;
@@ -97,7 +98,11 @@ export function ListingMilestones({ listing }: { listing: OwnerListingProgress }
             <CircleAlert aria-hidden />
             <AlertTitle className="line-clamp-none">{t('review.noteHeading')}</AlertTitle>
             <AlertDescription className="whitespace-pre-line">
-              {listing.reviewNote}
+              {/* Staff's words, in a language nobody told us: Greek script is marked on /en. One
+                  element, as the description is a grid and loose runs would each take a row. */}
+              <p>
+                <PlaceWords text={listing.reviewNote} lang={locale} />
+              </p>
             </AlertDescription>
           </Alert>
         ) : null}
@@ -175,7 +180,11 @@ export function ListingMilestones({ listing }: { listing: OwnerListingProgress }
             </Button>
           </div>
           {listing.status === 'draft' ? (
-            <DeleteDraftButton id={listing.id} name={listing.name} />
+            <DeleteDraftButton
+              id={listing.id}
+              name={listing.name}
+              contentLocale={listing.contentLocale}
+            />
           ) : null}
         </div>
       </CardContent>

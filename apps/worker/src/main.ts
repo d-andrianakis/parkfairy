@@ -6,7 +6,7 @@ import { chooseEmailTransport } from './email-transport.js';
 import { loadEnv } from './env.js';
 import { maintenanceProcessor } from './processors/maintenance.js';
 import { ownerEmailsProcessor } from './processors/owner-emails.js';
-import { prepareQueue, type QueueProcessor } from './queues.js';
+import { jobHandler, prepareQueue, type QueueProcessor } from './queues.js';
 import { createShutdown } from './shutdown.js';
 
 const processors: QueueProcessor[] = [maintenanceProcessor, ownerEmailsProcessor];
@@ -36,6 +36,8 @@ const email = {
 
 const queues: Queue[] = [];
 const workers: Worker[] = [];
+/** Aborted on SIGTERM, for jobs BullMQ can't cancel itself. */
+const stopping = new AbortController();
 
 for (const processor of processors) {
   const queue = new Queue(processor.queue, { connection });
@@ -44,14 +46,15 @@ for (const processor of processors) {
 
   const worker = new Worker(
     processor.queue,
-    // Three parameters, so BullMQ hands over a signal that `cancelAllJobs` aborts on shutdown.
-    (job, _token, signal) =>
-      processor.process(job, {
+    jobHandler(
+      processor,
+      (job) => ({
         db: database.db,
         logger: logger.child({ queue: processor.queue, job: job.name }),
         email,
-        signal,
       }),
+      stopping.signal,
+    ),
     { connection, concurrency: processor.concurrency },
   );
   worker.on('failed', (job, error) =>
@@ -79,6 +82,7 @@ health.listen(env.WORKER_HEALTH_PORT, () =>
 
 const shutdown = createShutdown({
   health,
+  stop: (reason) => stopping.abort(reason),
   workers,
   queues,
   database,

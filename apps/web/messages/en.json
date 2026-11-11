@@ -248,7 +248,7 @@
   },
   "Account": {
     "metaTitle": "Account",
-    "greeting": "Hi, {name}",
+    "greeting": "Hi, <person>{name}</person>",
     "signedInAs": "Signed in as {email}",
     "apiHeading": "Verified by the API",
     "checking": "Checking your session with the API…",
@@ -504,8 +504,8 @@
       "addAnother": "Add another listing",
       "untitled": "Unnamed listing",
       "viewLive": "See “<listing>{name}</listing>” as drivers see it",
-      "deleteDraft": "Delete “{name}”",
-      "deleteQuestion": "Delete “{name}” and everything in it? This can’t be undone.",
+      "deleteDraft": "Delete “<listing>{name}</listing>”",
+      "deleteQuestion": "Delete “<listing>{name}</listing>” and everything in it? This can’t be undone.",
       "deleteConfirm": "Yes, delete it",
       "deleteCancel": "Keep it",
       "milestoneCount": "{done} of {total}",
@@ -670,7 +670,7 @@
       "rateHint": "Leave a space’s rate empty to use your listing’s price. If you set one, that space’s other prices change in proportion.",
       "label": "Name of space {number}",
       "rate": "Own hourly rate (€)",
-      "remove": "Remove {label}",
+      "remove": "Remove <space>{label}</space>",
       "featureOf": "{feature}: {label}",
       "removed": "{label} removed",
       "rowLabel": "Space {number}"

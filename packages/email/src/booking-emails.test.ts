@@ -21,6 +21,11 @@ const booking: BookingEmailFacts = {
   currency: 'EUR',
 };
 const base = { to: 'someone@example.gr', webUrl: 'https://parkfairy.example', booking } as const;
+/** A fact's cell, its inline style left out: `lang` (or none) and what it holds. */
+const cell = (html: string, content: string) =>
+  [...html.matchAll(/<td( lang="[a-z]+")? style="[^"]*">(.*?)<\/td>/g)]
+    .filter(([, , inner]) => inner === content)
+    .map(([, lang]) => lang?.trim() ?? '');
 
 describe('renderBookingEmail', () => {
   it.each(
@@ -114,16 +119,10 @@ describe('the owner’s words', () => {
       listingName: 'Γκαράζ Ερμού',
       booking: { ...booking, contentLocale: 'el' },
     });
-    expect(email.html).toContain(
-      '<td lang="el" style="padding:2px 0;vertical-align:top;color:#0f172a">Γκαράζ Ερμού</td>',
-    );
-    expect(email.html).toContain(
-      'lang="el" style="padding:2px 0;vertical-align:top;color:#0f172a">Ερμού 1, Αθήνα',
-    );
+    expect(cell(email.html, 'Γκαράζ Ερμού')).toEqual(['lang="el"']);
+    expect(cell(email.html, 'Ερμού 1, Αθήνα')).toEqual(['lang="el"']);
     // Our own words aren't the owner's.
-    expect(email.html).not.toContain(
-      'lang="el" style="padding:2px 0;vertical-align:top;color:#0f172a">K7M4-Q2ZD',
-    );
+    expect(cell(email.html, 'K7M4-Q2ZD')).toEqual(['']);
     // And in the sentence that names it.
     expect(email.html).toContain('Your space at “<span lang="el">Γκαράζ Ερμού</span>” is booked.');
     expect(email.text).toContain('Your space at “Γκαράζ Ερμού” is booked.');
@@ -143,18 +142,18 @@ describe('the owner’s words', () => {
       listingName: 'Garage by Πλατεία Συντάγματος',
       booking: facts,
     });
-    expect(english.html).toContain(
-      '<td lang="en" style="padding:2px 0;vertical-align:top;color:#0f172a">Ermou 1, <span lang="el">Σύνταγμα</span>, Athens</td>',
-    );
+    expect(cell(english.html, 'Ermou 1, <span lang="el">Σύνταγμα</span>, Athens')).toEqual([
+      'lang="en"',
+    ]);
     // A Greek alpha in a space's label too.
-    expect(english.html).toContain('color:#0f172a"><span lang="el">Α1</span></td>');
+    expect(cell(english.html, '<span lang="el">Α1</span>')).toEqual(['lang="en"']);
     // The name is the email's language already: only its Greek words are marked.
     expect(english.html).toContain(
       'A driver has booked a space at “Garage by <span lang="el">Πλατεία Συντάγματος</span>”.',
     );
     expect(english.text).toContain('Address: Ermou 1, Σύνταγμα, Athens');
 
-    // In Greek the name is English, Greek words and all: nothing is marked inside it.
+    // In Greek the name is English, its Greek words marked inside it.
     const greek = renderBookingEmail({
       ...base,
       locale: 'el',
@@ -165,9 +164,20 @@ describe('the owner’s words', () => {
     expect(greek.html).toContain(
       'στον χώρο «<span lang="en">Garage by <span lang="el">Πλατεία Συντάγματος</span></span>».',
     );
-    expect(greek.html).toContain(
-      '<td lang="en" style="padding:2px 0;vertical-align:top;color:#0f172a">Ermou 1, <span lang="el">Σύνταγμα</span>, Athens</td>',
-    );
+    expect(cell(greek.html, 'Ermou 1, <span lang="el">Σύνταγμα</span>, Athens')).toEqual([
+      'lang="en"',
+    ]);
+  });
+
+  it('leave a Greek listing alone in a Greek email', () => {
+    const email = renderBookingEmail({
+      ...base,
+      locale: 'el',
+      kind: 'booking-confirmed',
+      listingName: 'Γκαράζ Ερμού',
+      booking: { ...booking, contentLocale: 'el' },
+    });
+    expect(email.html).not.toMatch(/<span lang/);
   });
 
   it('leave a listing with no name, and our own facts, in the email’s language', () => {
@@ -178,9 +188,7 @@ describe('the owner’s words', () => {
       booking: { ...booking, contentLocale: 'el' },
     });
     expect(email.html).toContain('Your space at “Unnamed parking” is booked.');
-    expect(email.html).toContain(
-      '<td style="padding:2px 0;vertical-align:top;color:#0f172a">Unnamed parking</td>',
-    );
+    expect(cell(email.html, 'Unnamed parking')).toEqual(['']);
   });
 
   it('are escaped wherever they are marked', () => {

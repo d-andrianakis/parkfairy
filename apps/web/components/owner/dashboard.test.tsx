@@ -147,7 +147,23 @@ describe('ListingMilestones', () => {
       />,
     );
     expect(screen.getByText('Needs a change')).toBeInTheDocument();
-    expect(screen.getByText('Χρειάζεται καλύτερη φωτογραφία.')).toBeInTheDocument();
+    // Staff's Greek on an English page, read in Greek; the full stop is the page's.
+    const note = screen.getByText('Χρειάζεται καλύτερη φωτογραφία');
+    expect(note).toHaveAttribute('lang', 'el');
+    expect(note.parentElement).toHaveTextContent(/^Χρειάζεται καλύτερη φωτογραφία\.$/);
+  });
+
+  it('leaves staff’s words alone on a Greek page', () => {
+    renderInSubtree(
+      <ListingMilestones
+        listing={progressFixture({
+          status: 'changes_requested',
+          reviewNote: 'Χρειάζεται καλύτερη φωτογραφία.',
+        })}
+      />,
+      { locale: 'el' },
+    );
+    expect(screen.getByText('Χρειάζεται καλύτερη φωτογραφία.')).not.toHaveAttribute('lang');
   });
 
   it('shows where a listing with staff has got to', () => {
@@ -225,7 +241,7 @@ describe('ListingMilestones', () => {
       expect(greek).toHaveAttribute('lang', 'el');
       expect(greek.parentElement).toHaveAttribute('lang', 'en');
     }
-    // The heading too, whose name is the page's own.
+    // The heading too, which carries the listing's language itself.
     expect(
       within(screen.getByRole('heading', { level: 2 })).getByText('Οδός Ερμού'),
     ).toHaveAttribute('lang', 'el');
@@ -296,7 +312,7 @@ describe('NewListingButton', () => {
 describe('DeleteDraftButton', () => {
   it('asks first, in place, and deletes only on the second press', async () => {
     vi.mocked(deleteOwnerListing).mockResolvedValue(answer(undefined) as never);
-    renderInSubtree(<DeleteDraftButton id={LISTING_ID} name="Γκαράζ" />);
+    renderInSubtree(<DeleteDraftButton id={LISTING_ID} name="Γκαράζ" contentLocale="el" />);
     await userEvent.click(screen.getByRole('button', { name: 'Delete “Γκαράζ”' }));
     expect(deleteOwnerListing).not.toHaveBeenCalled();
     expect(screen.getByText(/everything in it/)).toHaveFocus();
@@ -307,7 +323,7 @@ describe('DeleteDraftButton', () => {
   });
 
   it('can be called off', async () => {
-    renderInSubtree(<DeleteDraftButton id={LISTING_ID} name="Γκαράζ" />);
+    renderInSubtree(<DeleteDraftButton id={LISTING_ID} name="Γκαράζ" contentLocale="el" />);
     await userEvent.click(screen.getByRole('button', { name: 'Delete “Γκαράζ”' }));
     await userEvent.click(screen.getByRole('button', { name: 'Keep it' }));
     expect(deleteOwnerListing).not.toHaveBeenCalled();
@@ -316,8 +332,23 @@ describe('DeleteDraftButton', () => {
     );
   });
 
+  it('names the draft in its own language, its Greek words marked, in button and question', async () => {
+    const { container } = renderInSubtree(
+      <DeleteDraftButton id={LISTING_ID} name="Lot on Οδός Ερμού" contentLocale="en" />,
+      { locale: 'el' },
+    );
+    const button = screen.getByRole('button', { name: 'Διαγραφή: «Lot on Οδός Ερμού»' });
+    const greek = within(button).getByText('Οδός Ερμού');
+    expect(greek).toHaveAttribute('lang', 'el');
+    expect(greek.parentElement).toHaveAttribute('lang', 'en');
+    await userEvent.click(button);
+    const question = screen.getByText(/με όλα του τα στοιχεία/);
+    expect(within(question).getByText('Οδός Ερμού').parentElement).toHaveAttribute('lang', 'en');
+    await expectNoAxeViolations(container);
+  });
+
   it('reads properly for a draft with no name', async () => {
-    renderInSubtree(<DeleteDraftButton id={LISTING_ID} name={null} />);
+    renderInSubtree(<DeleteDraftButton id={LISTING_ID} name={null} contentLocale="el" />);
     await userEvent.click(screen.getByRole('button', { name: 'Delete this draft' }));
     expect(screen.getByText(/^Delete this draft and everything/)).toBeInTheDocument();
   });
@@ -348,7 +379,9 @@ describe('StepShell', () => {
       </StepShell>,
     );
     expect(screen.getByText('What needs changing')).toBeInTheDocument();
-    expect(screen.getByText('Μια αλλαγή.')).toBeInTheDocument();
+    expect(screen.getByText('Μια αλλαγή')).toHaveAttribute('lang', 'el');
+    // One element in the description's grid, the runs inside it.
+    expect(screen.getByText('Μια αλλαγή').parentElement?.tagName).toBe('P');
   });
 });
 

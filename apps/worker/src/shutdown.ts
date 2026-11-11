@@ -1,5 +1,7 @@
 export interface ShutdownParts {
   health: { close: () => unknown };
+  /** Tells every running job to stop, including one BullMQ fetched as closing began. */
+  stop: (reason: string) => void;
   workers: {
     close: (force?: boolean) => Promise<void>;
     cancelAllJobs: (reason?: string) => void;
@@ -27,6 +29,7 @@ export function createShutdown(parts: ShutdownParts) {
     shuttingDown = true;
     parts.logger.info({ signal }, 'shutting down: finishing active jobs');
     parts.health.close();
+    parts.stop('shutting down');
     try {
       await Promise.all(
         parts.workers.map((worker) => {

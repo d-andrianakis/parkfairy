@@ -777,9 +777,17 @@ locked`) in one statement. The two sets are kept apart (`user_id <> $user`) beca
     stop timeout. A send cut half way is safe to repeat under its idempotency key.
   - `releaseEmails` is for rows not yet marked sent or failed: a row `markEmailFailed` rescheduled
     is still `pending` with the same `attempts`, and would get its try back.
+  - **Only a send stopped before Resend answered is given back.** One stopped while waiting out a
+    refusal (`SendStopped.failure`, e.g. a spent quota's long `Retry-After`) counts as failed:
+    given back, it was tried every 30 s for ever, its reason never logged. A 5 s request timeout
+    means a run's first send always has an answer before 25 s, so there is no loop without tries.
+  - Claims last 2 minutes (`CLAIM_MINUTES`), safely past a run's 25 s.
+  - The pace's floor is 0.04 a second: below one send in 25 s the sender claims nothing.
   - BullMQ hands the processor its abort signal only when the function takes three parameters
-    (`processor.length >= 3`), and only `worker.cancelAllJobs()` aborts it: `close()` waits for
-    running jobs but never signals them. Shutdown calls `close()` first, so no job starts after.
+    (`processor.length >= 3`, so keep `jobHandler`'s shape), and only `worker.cancelAllJobs()`
+    aborts it: `close()` waits for running jobs but never signals them. Shutdown calls `close()`
+    first, so no job starts after. A job fetched as closing began isn't tracked yet and
+    `cancelAllJobs` misses it, so the process has its own `stopping` signal, aborted first.
   - The email queue's global concurrency (1) lives in Redis, set by `prepareQueue` at each start; a
     processor without one has it removed, so dropping it from the code drops it there too.
 - **2026-11-10 · Greek words inside English text are marked `lang="el"`** (`greekRuns` in
@@ -790,12 +798,15 @@ locked`) in one statement. The two sets are kept apart (`user_id <> $user`) beca
     its runs marked, and `placeTag(text, lang)` is the `t.rich` tag for it. The tag ignores its
     chunks, so a rich tag around a name must wrap exactly `{name}`. Without `lang` (our own words
     for an unnamed listing) it is plain text.
-  - **A driver's name** has no language we know, but Greek script can only be Greek, so it is
-    marked on an English page and left alone on a Greek one.
+  - **A person's own name** (a driver's on the owner's page, the account's greeting) and staff's
+    review note have no language we know, but Greek script can only be Greek: marked on an
+    English page, left alone on a Greek one. Names go in `PersonName` (`bdi`, isolated). Inside
+    `AlertDescription`, a grid, the runs need one wrapping element or each takes a row.
   - **Emails** (2026-11-11): `marked()` in `layout.ts` escapes each run. `sentenceWith` calls a
     catalog sentence with U+E000 for the name and splits there, so the name keeps the listing's
-    `lang`; it relies on the catalog only putting its argument in, unchanged. Owner emails carry no
-    `contentLocale` in their payload, so only their Greek words are marked.
+    `lang`; it relies on the catalog only putting its argument in, unchanged (`layout.test.ts`
+    checks every sentence). Owner emails carry the listing's `contentLocale` from 2026-11-11;
+    older rows mark only Greek words.
   - **A run** goes from the first Greek letter to the last. It takes the punctuation and spaces
     between them, digits glued on («28ης Οκτωβρίου», «Α1») and the numeral sign («Γʹ»). A number
     after a space stays with the page.

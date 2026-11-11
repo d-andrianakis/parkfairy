@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { outboxTransport, resendTransport } from './transport.js';
+import { outboxTransport, resendTransport, SendStopped } from './transport.js';
 
 const email = {
   to: 'maria@example.gr',
@@ -181,7 +181,38 @@ describe('resendTransport', () => {
       );
       const transport = resendTransport({ apiKey: 're_k', from: 'P <a@b.gr>', fetchFn });
 
-      await expect(transport.send(email, { signal: controller.signal })).rejects.toBe(stop);
+      const error = await transport
+        .send(email, { signal: controller.signal })
+        .catch((caught: unknown) => caught);
+      // Nothing was answered: the caller may give the try back.
+      expect(error).toBeInstanceOf(SendStopped);
+      expect(error).toMatchObject({ failure: undefined });
+      expect(fetchFn).toHaveBeenCalledOnce();
+    });
+
+    it('says what Resend answered before it was stopped', async () => {
+      const controller = new AbortController();
+      const fetchFn = vi.fn<typeof fetch>(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ name: 'daily_quota_exceeded' }), {
+            status: 429,
+            headers: { 'retry-after': '3600' },
+          }),
+        ),
+      );
+      // The caller's time runs out while the transport waits out the refusal.
+      const wait = vi.fn((_ms: number, signal?: AbortSignal) => {
+        controller.abort(stop);
+        return Promise.reject(signal?.reason as Error);
+      });
+      const transport = resendTransport({ apiKey: 're_k', from: 'P <a@b.gr>', fetchFn, wait });
+
+      const error = await transport
+        .send(email, { signal: controller.signal })
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(SendStopped);
+      expect(error).toMatchObject({ failure: 'Resend answered 429 daily_quota_exceeded' });
+      expect(String(error)).not.toMatch(/maria|token/);
       expect(fetchFn).toHaveBeenCalledOnce();
     });
 
@@ -195,22 +226,51 @@ describe('resendTransport', () => {
       const transport = resendTransport({ apiKey: 're_k', from: 'P <a@b.gr>', fetchFn });
       const started = performance.now();
 
-      await expect(transport.send(email, { signal: controller.signal })).rejects.toThrow();
+      await expect(transport.send(email, { signal: controller.signal })).rejects.toThrow(
+        'Stopped after: Resend answered 503',
+      );
       expect(fetchFn).toHaveBeenCalledOnce();
       expect(performance.now() - started).toBeLessThan(400);
     });
 
     it('sends nothing once stopped', async () => {
       const { fetchFn, transport } = resend([200]);
-      await expect(transport.send(email, { signal: AbortSignal.abort(stop) })).rejects.toBe(stop);
+      await expect(
+        transport.send(email, { signal: AbortSignal.abort(stop) }),
+      ).rejects.toBeInstanceOf(SendStopped);
       expect(fetchFn).not.toHaveBeenCalled();
+    });
+
+    it('stops while waiting for its turn behind another send', async () => {
+      const controller = new AbortController();
+      const wait = vi.fn((_ms: number, signal?: AbortSignal) => {
+        // The second send waits for its slot; its caller gives up meanwhile.
+        controller.abort(stop);
+        return Promise.reject(signal?.reason as Error);
+      });
+      const { fetchFn } = resend([200, 200]);
+      const transport = resendTransport({
+        apiKey: 're_k',
+        from: 'P <a@b.gr>',
+        fetchFn,
+        wait,
+        intervalMs: 1_000,
+      });
+      await transport.send(email);
+      const error = await transport
+        .send(email, { signal: controller.signal })
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(SendStopped);
+      expect(error).toMatchObject({ failure: undefined });
+      expect(fetchFn).toHaveBeenCalledOnce();
     });
 
     it('still times out a request that never answers', async () => {
       const fetchFn = vi.fn<typeof fetch>(
         (_, init) =>
           new Promise((_resolve, reject) => {
-            init?.signal?.addEventListener('abort', () => reject(new Error('timed out')));
+            // As fetch does: rejects with the signal's reason, a TimeoutError here.
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error));
           }),
       );
       const transport = resendTransport({
@@ -222,7 +282,7 @@ describe('resendTransport', () => {
       });
 
       const signal = new AbortController().signal;
-      await expect(transport.send(email, { signal })).rejects.toThrow('Error');
+      await expect(transport.send(email, { signal })).rejects.toThrow(/^TimeoutError$/);
       expect(fetchFn).toHaveBeenCalledTimes(3);
     });
   });
@@ -243,7 +303,7 @@ describe('outboxTransport', () => {
     const stop = new Error('shutting down');
     await expect(
       outboxTransport(directory).send(email, { signal: AbortSignal.abort(stop) }),
-    ).rejects.toBe(stop);
+    ).rejects.toBeInstanceOf(SendStopped);
     expect(readdirSync(directory)).toEqual([]);
   });
 

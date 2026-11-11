@@ -6,6 +6,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { FormError } from '@/components/form-error';
+import { placeTag } from '@/components/parking/place-words';
 import { useRouter } from '@/i18n/navigation';
 import { attempt, useOwnerError } from '@/lib/owner-client';
 import { listingStepHref } from '@/lib/owner-href';
@@ -54,8 +55,19 @@ export function NewListingButton({ label }: { label: string }) {
  * the focus, which is what makes it read out. Once the draft is gone the card goes with it, so
  * the region here speaks first and the focus moves up to the page's heading.
  */
-export function DeleteDraftButton({ id, name }: { id: string; name: string | null }) {
+export function DeleteDraftButton({
+  id,
+  name,
+  contentLocale,
+}: {
+  id: string;
+  name: string | null;
+  /** The language the owner wrote the name in. */
+  contentLocale: string;
+}) {
   const t = useTranslations('Owner.dashboard');
+  // The owner's name for it, read in the language they wrote it in.
+  const listing = placeTag(name ?? '', contentLocale);
   const router = useRouter();
   const ownerError = useOwnerError();
   const focusAfter = useFocusAfterRender();
@@ -94,7 +106,7 @@ export function DeleteDraftButton({ id, name }: { id: string; name: string | nul
         <div className="grid gap-2">
           <FormError message={failure} />
           <p ref={question} tabIndex={-1} className="text-sm outline-none">
-            {name ? t('deleteQuestion', { name }) : t('deleteQuestionUnnamed')}
+            {name ? t.rich('deleteQuestion', { name, listing }) : t('deleteQuestionUnnamed')}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -131,7 +143,8 @@ export function DeleteDraftButton({ id, name }: { id: string; name: string | nul
           onClick={() => setAsking(true)}
         >
           <Trash2 aria-hidden />
-          {name ? t('deleteDraft', { name }) : t('deleteDraftUnnamed')}
+          {/* One flex item: the button's gap would otherwise open around the name. */}
+          <span>{name ? t.rich('deleteDraft', { name, listing }) : t('deleteDraftUnnamed')}</span>
         </Button>
       )}
     </>

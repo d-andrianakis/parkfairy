@@ -2,8 +2,9 @@ import { LISTING_STEPS, type ListingStep, type OwnerListing } from '@parkfairy/c
 import { Alert, AlertDescription, AlertTitle } from '@parkfairy/ui/components/alert';
 import { Progress } from '@parkfairy/ui/components/progress';
 import { ArrowLeft, CircleAlert } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
+import { PlaceWords } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
 import { StepLink } from './navigation';
@@ -24,6 +25,7 @@ export function StepShell({
   children: ReactNode;
 }) {
   const t = useTranslations('Owner');
+  const locale = useLocale();
   const { doneSteps, reviewNote } = listing.progress;
   const position = LISTING_STEPS.indexOf(step) + 1;
   const total = LISTING_STEPS.length;
@@ -71,7 +73,13 @@ export function StepShell({
           <Alert role={undefined} variant="destructive">
             <CircleAlert aria-hidden />
             <AlertTitle className="line-clamp-none">{t('review.noteHeading')}</AlertTitle>
-            <AlertDescription className="whitespace-pre-line">{reviewNote}</AlertDescription>
+            <AlertDescription className="whitespace-pre-line">
+              {/* Staff's words, in a language nobody told us: Greek script is marked on /en. One
+                  element, as the description is a grid and loose runs would each take a row. */}
+              <p>
+                <PlaceWords text={reviewNote} lang={locale} />
+              </p>
+            </AlertDescription>
           </Alert>
         ) : null}
         {children}

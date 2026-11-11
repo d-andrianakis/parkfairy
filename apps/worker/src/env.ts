@@ -29,7 +29,8 @@ const EnvSchema = z
      */
     EMAIL_SENDS_PER_SECOND: z.preprocess(
       emptyToUndefined,
-      z.coerce.number().positive().max(100).default(1),
+      // At least one send in a run's 25 s: below that the sender would claim nothing, silently.
+      z.coerce.number().min(0.04).max(100).default(1),
     ),
   })
   .refine((env) => env.RESEND_API_KEY || isLoopback(env.BETTER_AUTH_URL ?? LOCAL_WEB_URL), {

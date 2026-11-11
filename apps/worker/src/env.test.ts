@@ -18,7 +18,9 @@ describe('worker loadEnv', () => {
   it('sends as fast as it is told, within reason', () => {
     expect(loadEnv({ ...base, EMAIL_SENDS_PER_SECOND: '8' }).EMAIL_SENDS_PER_SECOND).toBe(8);
     expect(loadEnv({ ...base, EMAIL_SENDS_PER_SECOND: '' }).EMAIL_SENDS_PER_SECOND).toBe(1);
-    for (const pace of ['0', '-1', '1000', 'fast']) {
+    // One send in a run's 25 s, the least that sends anything.
+    expect(loadEnv({ ...base, EMAIL_SENDS_PER_SECOND: '0.04' }).EMAIL_SENDS_PER_SECOND).toBe(0.04);
+    for (const pace of ['0', '0.03', '-1', '1000', 'fast']) {
       expect(() => loadEnv({ ...base, EMAIL_SENDS_PER_SECOND: pace }), pace).toThrow(
         /EMAIL_SENDS_PER_SECOND/,
       );

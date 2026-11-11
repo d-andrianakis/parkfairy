@@ -44,3 +44,25 @@ export function placeTag(text: string, lang: string | undefined) {
     return <PlaceName text={text} lang={lang} />;
   };
 }
+
+/**
+ * Someone's own name, in a language nobody told us: isolated, so a right-to-left script can't
+ * reorder the text around it, and Greek letters (which can only be Greek) marked on a page in
+ * another language.
+ */
+export function PersonName({
+  name,
+  lang,
+  className,
+}: {
+  name: string;
+  /** The page's language. */
+  lang: string;
+  className?: string;
+}) {
+  return (
+    <bdi className={className}>
+      <PlaceWords text={name} lang={lang} />
+    </bdi>
+  );
+}

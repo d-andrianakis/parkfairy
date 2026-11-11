@@ -248,7 +248,7 @@
   },
   "Account": {
     "metaTitle": "Λογαριασμός",
-    "greeting": "Γεια σας, {name}",
+    "greeting": "Γεια σας, <person>{name}</person>",
     "signedInAs": "Έχετε συνδεθεί ως {email}",
     "apiHeading": "Επαληθευμένο από το API",
     "checking": "Γίνεται έλεγχος της συνεδρίας σας με το API…",
@@ -504,8 +504,8 @@
       "addAnother": "Προσθήκη άλλου χώρου",
       "untitled": "Χώρος χωρίς όνομα",
       "viewLive": "Δείτε τον χώρο «<listing>{name}</listing>» όπως τον βλέπουν οι οδηγοί",
-      "deleteDraft": "Διαγραφή: «{name}»",
-      "deleteQuestion": "Να διαγραφεί ο χώρος «{name}» με όλα του τα στοιχεία; Η ενέργεια δεν αναιρείται.",
+      "deleteDraft": "Διαγραφή: «<listing>{name}</listing>»",
+      "deleteQuestion": "Να διαγραφεί ο χώρος «<listing>{name}</listing>» με όλα του τα στοιχεία; Η ενέργεια δεν αναιρείται.",
       "deleteConfirm": "Ναι, διαγραφή",
       "deleteCancel": "Να παραμείνει",
       "milestoneCount": "{done} από {total}",
@@ -670,7 +670,7 @@
       "rateHint": "Αφήστε κενή την τιμή μιας θέσης για να ισχύει η τιμή του χώρου. Αν ορίσετε τιμή, οι υπόλοιπες τιμές αυτής της θέσης αλλάζουν αναλογικά.",
       "label": "Όνομα θέσης {number}",
       "rate": "Τιμή θέσης ανά ώρα (€)",
-      "remove": "Αφαίρεση: {label}",
+      "remove": "Αφαίρεση: <space>{label}</space>",
       "featureOf": "{feature}: {label}",
       "removed": "Η θέση {label} αφαιρέθηκε",
       "rowLabel": "Θέση {number}"

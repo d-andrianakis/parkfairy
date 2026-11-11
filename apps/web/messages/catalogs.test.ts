@@ -65,6 +65,16 @@ describe('message catalogs', () => {
       }
     });
 
+    it('wraps exactly a name in the tags for names, which render the name and not the words', () => {
+      // `placeTag` and the person tag ignore their chunks: anything else inside would be lost.
+      const nameTag = /<(listing|space|place|name|person)>([\s\S]*?)<\/\1>/g;
+      for (const [key, message] of Object.entries(messages)) {
+        for (const [, tag, inside] of message.matchAll(nameTag)) {
+          expect(inside, `${key} <${tag}>`).toMatch(/^\{[A-Za-z_]\w*\}$/);
+        }
+      }
+    });
+
     it('wraps the same words in the same tags as English', () => {
       for (const [key, message] of Object.entries(messages)) {
         expect(richTags(message), key).toEqual(richTags(reference[key] ?? ''));

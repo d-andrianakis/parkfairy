@@ -127,9 +127,7 @@ test('a driver books a space, the owner sees who is coming, and closing that day
       WORKER_EMAIL,
     );
     expect(booked.html).toContain(`Your space at “<span lang="el">${name}</span>” is booked.`);
-    expect(booked.html).toContain(
-      'lang="el" style="padding:2px 0;vertical-align:top;color:#0f172a">Οδός Δοκιμής 1, Ηράκλειο</td>',
-    );
+    expect(booked.html).toMatch(/<td lang="el"[^>]*>Οδός Δοκιμής 1, Ηράκλειο<\/td>/);
     const received = await waitForEmail(ownerEmail, `New booking for “${name}”`, WORKER_EMAIL);
     expect(received.html).toContain(
       `A driver has booked a space at “<span lang="el">${name}</span>”.`,
@@ -354,6 +352,9 @@ test('an owner pages through a busy listing, and a cancel on a later page comes 
   // Greek words in an English listing, a Greek alpha for its space, and a Greek name for the
   // driver (the bookings are the owner's own): each read in Greek on the English page.
   await registerAndSignIn(page, uniqueEmail('busy-owner'), 'Νίκη Πολλών');
+  // The account greets them by name, isolated, the Greek read in Greek on the English page.
+  const greeting = page.getByRole('heading', { level: 1, name: 'Hi, Νίκη Πολλών' });
+  await expect(greeting.locator('bdi > [lang="el"]')).toHaveText('Νίκη Πολλών');
   const name = `Garage by Πλατεία Κλαυθμώνος ${randomUUID().slice(0, 6)}`;
   const { id } = await listingWithStaff(page, name, { spaces: ['Α1'], contentLocale: 'en' });
   await publishListing(id);
@@ -374,9 +375,9 @@ test('an owner pages through a busy listing, and a cancel on a later page comes 
     const first = page.getByRole('main').getByRole('listitem').first();
     await expect(first.locator('[lang="en"] > [lang="el"]')).toHaveText('Α1');
     await expect(first.locator('bdi > [lang="el"]')).toHaveText('Νίκη Πολλών');
-    await expect(page.locator('main [lang="en"] > [lang="el"]').first()).toHaveText(
-      'Πλατεία Κλαυθμώνος',
-    );
+    const greek = page.getByRole('main').getByText('Πλατεία Κλαυθμώνος', { exact: true });
+    await expect(greek).toHaveAttribute('lang', 'el');
+    await expect(greek.locator('..')).toHaveAttribute('lang', 'en');
     await expect(pages.getByRole('link', { name: 'Previous page' })).toHaveCount(0);
     await pages.getByRole('link', { name: 'Next page' }).click();
     await expect(page).toHaveURL(/\?after=\d+_[0-9a-f-]{36}$/);
@@ -413,6 +414,16 @@ test('an owner pages through a busy listing, and a cancel on a later page comes 
     await expect(page).toHaveURL(`/el/owner/listings/${id}/bookings`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Κρατήσεις');
     await expect(page.getByRole('navigation', { name: 'Σελίδες' })).toBeVisible();
+    // On a Greek page the driver's Greek name is the page's own: nothing marked inside it.
+    const greekCard = page.getByRole('main').getByRole('listitem').first();
+    await expect(greekCard.locator('bdi')).toHaveText('Νίκη Πολλών');
+    await expect(greekCard.locator('bdi [lang]')).toHaveCount(0);
+
+    // The English listing inside a Greek sentence: its words in English, its Greek words in Greek.
+    await page.goto('/el/owner');
+    const greekLink = page.getByRole('link', { name: `Κρατήσεις για «${name}»` });
+    await expect(greekLink.locator('[lang="en"] > [lang="el"]')).toHaveText('Πλατεία Κλαυθμώνος');
+    await expectAccessible(page);
   } finally {
     await unpublishListing(id);
   }

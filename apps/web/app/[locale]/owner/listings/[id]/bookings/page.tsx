@@ -9,7 +9,7 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { FocusHeading } from '@/components/focus-heading';
 import { CancelListingBooking } from '@/components/owner/cancel-listing-booking';
-import { PlaceWords } from '@/components/parking/place-words';
+import { PersonName, PlaceWords } from '@/components/parking/place-words';
 import { StayRange } from '@/components/parking/stay-range';
 import { Link, redirect } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
@@ -163,14 +163,15 @@ export default async function OwnerBookingsPage({ params, searchParams }: OwnerB
                 t('bookings.stay'),
                 <StayRange key="stay" start={booking.start} end={booking.end} />,
               ],
-              // The driver's own words, in a language nobody told us. Greek script can only be
-              // Greek, so that is marked on an English page.
+              // The driver's own words, in a language nobody told us.
               [
                 t('bookings.driver'),
-                // Isolated: a name in a right-to-left script mustn't reorder the line around it.
-                <bdi key="driver" className="wrap-anywhere">
-                  <PlaceWords text={booking.driverName} lang={locale} />
-                </bdi>,
+                <PersonName
+                  key="driver"
+                  name={booking.driverName}
+                  lang={locale}
+                  className="wrap-anywhere"
+                />,
               ],
               [
                 t('bookings.plate'),

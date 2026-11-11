@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
+import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { PlaceName, placeTag, PlaceWords } from './place-words';
+import { PersonName, PlaceName, placeTag, PlaceWords } from './place-words';
 
 const html = (node: ReactNode) => render(<p>{node}</p>).container.innerHTML;
 
@@ -35,10 +36,27 @@ describe('PlaceName', () => {
 });
 
 describe('placeTag', () => {
-  it('gives t.rich a tag that renders the words whatever the chunks hold', () => {
-    const tag = placeTag('Garage by Σύνταγμα', 'en');
-    expect(html(tag())).toBe(
+  it('gives t.rich a tag that renders the words whatever the chunks hold', async () => {
+    const tag = placeTag('Garage by Σύνταγμα', 'en') as (chunks: ReactNode) => ReactNode;
+    expect(html(tag(['other words']))).toBe(
       '<p><span lang="en">Garage by <span lang="el">Σύνταγμα</span></span></p>',
     );
+    const { container } = render(
+      <main>
+        <p>{tag(['other words'])}</p>
+      </main>,
+    );
+    await expectNoAxeViolations(container);
+  });
+});
+
+describe('PersonName', () => {
+  it('isolates a name, and marks its Greek letters on an English page only', () => {
+    expect(html(<PersonName name="Νίκη Πολλών" lang="en" className="wrap-anywhere" />)).toBe(
+      '<p><bdi class="wrap-anywhere"><span lang="el">Νίκη Πολλών</span></bdi></p>',
+    );
+    expect(html(<PersonName name="Νίκη Πολλών" lang="el" />)).toBe('<p><bdi>Νίκη Πολλών</bdi></p>');
+    // A right-to-left name is isolated and left as it is.
+    expect(html(<PersonName name="نور Smith" lang="en" />)).toBe('<p><bdi>نور Smith</bdi></p>');
   });
 });

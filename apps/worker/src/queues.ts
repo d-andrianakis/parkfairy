@@ -65,3 +65,22 @@ export async function prepareQueue(
   if (globalConcurrency) await queue.setGlobalConcurrency(globalConcurrency);
   else await queue.removeGlobalConcurrency();
 }
+
+/**
+ * The function BullMQ runs for a processor's jobs. Its three parameters are what make BullMQ hand
+ * a job its abort signal (it checks `processor.length >= 3`), which `cancelAllJobs` aborts on
+ * shutdown: written as `(job) => …` the sender would only stop at its own deadline. `stopping`,
+ * the process's own, reaches a job BullMQ fetched as closing began, which it doesn't track yet
+ * and so can't cancel.
+ */
+export function jobHandler(
+  processor: Pick<QueueProcessor, 'process'>,
+  context: (job: Job) => Omit<ProcessorContext, 'signal'>,
+  stopping: AbortSignal,
+) {
+  return (job: Job, _token?: string, signal?: AbortSignal) =>
+    processor.process(job, {
+      ...context(job),
+      signal: signal ? AbortSignal.any([signal, stopping]) : stopping,
+    });
+}

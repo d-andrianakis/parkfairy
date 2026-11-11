@@ -53,6 +53,8 @@ export interface OutboxBooking {
 /** What the templates may show. `listingName` is the owner's own text, about their own listing. */
 export interface OutboxPayload {
   listingName?: string;
+  /** The language the listing is written in, for `lang` on its name (rows from 2026-11-11 on). */
+  contentLocale?: string;
   booking?: OutboxBooking;
 }
 

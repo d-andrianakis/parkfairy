@@ -1,4 +1,4 @@
-import { renderEmail } from './layout.js';
+import { renderEmail, sentenceWith } from './layout.js';
 import type { OutgoingEmail } from './transport.js';
 
 export const OWNER_EMAIL_KINDS = [
@@ -117,6 +117,8 @@ export interface OwnerEmail {
   /** The web app's origin. */
   webUrl: string;
   listingName?: string | undefined;
+  /** The language the owner wrote the listing in, for `lang` on its name. */
+  contentLocale?: string | undefined;
 }
 
 export function renderOwnerEmail({
@@ -125,6 +127,7 @@ export function renderOwnerEmail({
   locale,
   webUrl,
   listingName = '',
+  contentLocale,
 }: OwnerEmail): OutgoingEmail {
   const catalog = OWNER_EMAIL_COPY[locale];
   const copy = catalog.kinds[kind];
@@ -133,7 +136,9 @@ export function renderOwnerEmail({
     locale,
     subject: copy.subject,
     heading: copy.heading,
-    body: copy.body(listingName),
+    // The name read in the language it was written in. Older rows carry no language: then only
+    // its Greek words are marked, in an English email.
+    body: sentenceWith(copy.body, listingName, listingName ? contentLocale : undefined),
     action: copy.action,
     url: new URL(`/${locale}/owner`, webUrl).toString(),
     note: copy.note,

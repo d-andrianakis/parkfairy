@@ -10,6 +10,7 @@ function parts() {
     finishJob,
     shutdownParts: {
       health: { close: vi.fn(() => events.push('health closed')) },
+      stop: vi.fn(() => events.push('jobs stopping')),
       workers: [
         {
           close: vi.fn(async (force?: boolean) => {
@@ -34,14 +35,21 @@ describe('createShutdown', () => {
     const done = createShutdown(shutdownParts)('SIGTERM');
 
     await Promise.resolve();
-    // Waiting on the job, which was told to stop once no other could start.
-    expect(events).toEqual(['health closed', 'worker closing', 'jobs told to stop']);
+    // Waiting on the job, which was told to stop: by the process's signal, which reaches a job
+    // fetched as closing began, and by BullMQ's once no other could start.
+    expect(events).toEqual([
+      'health closed',
+      'jobs stopping',
+      'worker closing',
+      'jobs told to stop',
+    ]);
     expect(shutdownParts.workers[0]?.cancelAllJobs).toHaveBeenCalledWith('shutting down');
     finishJob();
     await done;
 
     expect(events).toEqual([
       'health closed',
+      'jobs stopping',
       'worker closing',
       'jobs told to stop',
       'worker closed',

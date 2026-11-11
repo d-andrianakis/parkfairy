@@ -10,7 +10,7 @@ import {
   type ClaimedEmail,
   type Database,
 } from '@parkfairy/database';
-import type { EmailTransport } from '@parkfairy/email';
+import { resendTransport, SendStopped, type EmailTransport } from '@parkfairy/email';
 import type { Job } from 'bullmq';
 import { pino } from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -157,45 +157,94 @@ describe('owner emails processor', () => {
     const handedBackIds = () =>
       vi.mocked(releaseEmails).mock.calls.flatMap(([, rows]) => rows.map(({ id }) => id));
 
-    it('hands back what a slow Resend left unsent, with nothing counted as failed', async () => {
-      vi.useFakeTimers({ now: new Date('2027-06-10T12:00:00Z') });
-      const started = Date.now();
-      backlog();
-      // Three seconds a send instead of one: the claim of 20 would take a minute.
-      send.mockImplementation(() => {
-        vi.setSystemTime(Date.now() + 3_000);
-        return Promise.resolve();
+    // In production BullMQ always hands the job a signal, so the deadline is one of two.
+    describe.each([
+      ['alone', () => undefined],
+      ['beside a worker’s signal', () => new AbortController().signal],
+    ])('with the deadline %s', (_how, live: () => AbortSignal | undefined) => {
+      it('hands back what a slow Resend left unsent, with nothing counted as failed', async () => {
+        vi.useFakeTimers({ now: new Date('2027-06-10T12:00:00Z') });
+        const started = Date.now();
+        backlog();
+        // Three seconds a send instead of one: the claim of 20 would take a minute.
+        send.mockImplementation(() => {
+          vi.setSystemTime(Date.now() + 3_000);
+          return Promise.resolve();
+        });
+        await expect(run('send-owner-emails', 1, live())).resolves.toEqual({
+          sent: 9,
+          failed: 0,
+          handedBack: 11,
+        });
+        expect(claimDueEmails).toHaveBeenCalledOnce();
+        expect(handedBackIds()).toEqual(Array.from({ length: 11 }, (_, n) => `email-${n + 9}`));
+        expect(markEmailFailed).not.toHaveBeenCalled();
+        // The last send began before the deadline; none began after it.
+        expect(Date.now() - started).toBeLessThan(SEND_RUN_MS + 3_000);
       });
-      await expect(run('send-owner-emails')).resolves.toEqual({
-        sent: 9,
-        failed: 0,
-        handedBack: 11,
-      });
-      expect(claimDueEmails).toHaveBeenCalledOnce();
-      expect(handedBackIds()).toEqual(Array.from({ length: 11 }, (_, n) => `email-${n + 9}`));
-      expect(markEmailFailed).not.toHaveBeenCalled();
-      // The last send began before the deadline; none began after it.
-      expect(Date.now() - started).toBeLessThan(SEND_RUN_MS + 3_000);
-    });
 
-    it('stops a send still going at the deadline, and hands it back with the rest', async () => {
-      vi.useFakeTimers({ now: new Date('2027-06-10T12:00:00Z') });
-      backlog();
-      // The second send never answers by itself (retries, a long Retry-After).
-      send.mockResolvedValueOnce().mockImplementation(
-        (_email, options) =>
-          new Promise((_resolve, reject) => {
-            options?.signal?.addEventListener('abort', () => reject(new Error('AbortError')));
-          }),
-      );
-      const result = run('send-owner-emails');
-      await vi.advanceTimersByTimeAsync(SEND_RUN_MS);
-      await expect(result).resolves.toEqual({ sent: 1, failed: 0, handedBack: 19 });
-      expect(handedBackIds()[0]).toBe('email-1');
-      expect(markEmailFailed).not.toHaveBeenCalled();
-      expect(claimDueEmails).toHaveBeenCalledOnce();
-      // Nothing is left waiting on the run.
-      expect(vi.getTimerCount()).toBe(0);
+      it('stops a send still going at the deadline, and hands it back with the rest', async () => {
+        vi.useFakeTimers({ now: new Date('2027-06-10T12:00:00Z') });
+        backlog();
+        // The second send never answers by itself (Resend doesn't answer before the deadline).
+        send.mockResolvedValueOnce().mockImplementation(
+          (_email, options) =>
+            new Promise((_resolve, reject) => {
+              options?.signal?.addEventListener('abort', () => reject(new SendStopped(undefined)));
+            }),
+        );
+        const result = run('send-owner-emails', 1, live());
+        await vi.advanceTimersByTimeAsync(SEND_RUN_MS);
+        await expect(result).resolves.toEqual({ sent: 1, failed: 0, handedBack: 19 });
+        expect(handedBackIds()[0]).toBe('email-1');
+        expect(markEmailFailed).not.toHaveBeenCalled();
+        expect(claimDueEmails).toHaveBeenCalledOnce();
+        // Nothing is left waiting on the run.
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it('counts a send stopped while waiting out a refusal as failed, with Resend’s reason', async () => {
+        vi.useFakeTimers({ now: new Date('2027-06-10T12:00:00Z') });
+        backlog();
+        // A quota spent for the day: 429 with a Retry-After past the deadline.
+        send.mockImplementation(
+          (_email, options) =>
+            new Promise((_resolve, reject) => {
+              options?.signal?.addEventListener('abort', () =>
+                reject(new SendStopped('Resend answered 429 daily_quota_exceeded')),
+              );
+            }),
+        );
+        const result = run('send-owner-emails', 1, live());
+        await vi.advanceTimersByTimeAsync(SEND_RUN_MS);
+        await expect(result).resolves.toEqual({ sent: 0, failed: 1, handedBack: SEND_BATCH - 1 });
+        // Its try spent and its reason kept, so the wait between tries and the last try apply.
+        expect(markEmailFailed).toHaveBeenCalledWith(
+          db,
+          expect.objectContaining({ id: 'email-0' }),
+          'Resend answered 429 daily_quota_exceeded',
+        );
+        expect(handedBackIds()).toEqual(
+          Array.from({ length: SEND_BATCH - 1 }, (_, n) => `email-${n + 1}`),
+        );
+      });
+
+      it('counts a real failure as one, even when it lands as time runs out', async () => {
+        vi.useFakeTimers({ now: new Date('2027-06-10T12:00:00Z') });
+        backlog();
+        send.mockImplementationOnce(() => {
+          // Refused for good on the last try, just as the deadline aborts the run.
+          vi.advanceTimersByTime(SEND_RUN_MS);
+          return Promise.reject(new Error('Resend answered 422 validation_error'));
+        });
+        await expect(run('send-owner-emails', 1, live())).resolves.toEqual({
+          sent: 0,
+          failed: 1,
+          handedBack: SEND_BATCH - 1,
+        });
+        expect(markEmailFailed).toHaveBeenCalledOnce();
+        expect(handedBackIds()[0]).toBe('email-1');
+      });
     });
 
     it('stops at once when the worker shuts down, handing back the claim’s rest', async () => {
@@ -215,6 +264,48 @@ describe('owner emails processor', () => {
       expect(claimDueEmails).toHaveBeenCalledOnce();
     });
 
+    it('hands back the whole claim when the worker stops while it is being claimed', async () => {
+      const shutdown = new AbortController();
+      vi.mocked(claimDueEmails).mockImplementation((_db, limit) => {
+        // SIGTERM lands during the claim's round trip.
+        shutdown.abort('shutting down');
+        return Promise.resolve(Array.from({ length: limit }, (_, n) => row({ id: `email-${n}` })));
+      });
+      await expect(run('send-owner-emails', 1, shutdown.signal)).resolves.toEqual({
+        sent: 0,
+        failed: 0,
+        handedBack: SEND_BATCH,
+      });
+      expect(send).not.toHaveBeenCalled();
+      expect(handedBackIds()).toEqual(Array.from({ length: SEND_BATCH }, (_, n) => `email-${n}`));
+    });
+
+    it('stops the real transport’s request at the deadline, and hands the email back', async () => {
+      vi.useFakeTimers({ now: new Date('2027-06-10T12:00:00Z') });
+      backlog();
+      // Across the package boundary: Resend's transport, its request never answered.
+      const fetchFn = vi.fn<typeof fetch>(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error));
+          }),
+      );
+      const transport = resendTransport({
+        apiKey: 're_k',
+        from: 'P <a@b.gr>',
+        fetchFn,
+        timeoutMs: 60_000,
+      });
+      const result = ownerEmailsProcessor.process({ id: '1', name: 'send-owner-emails' } as Job, {
+        ...context(1, new AbortController().signal),
+        email: { transport, webUrl: 'https://parkfairy.example', sendsPerSecond: 1 },
+      });
+      await vi.advanceTimersByTimeAsync(SEND_RUN_MS);
+      await expect(result).resolves.toEqual({ sent: 0, failed: 0, handedBack: SEND_BATCH });
+      expect(fetchFn).toHaveBeenCalledOnce();
+      expect(markEmailFailed).not.toHaveBeenCalled();
+    });
+
     it('claims nothing once the worker is shutting down', async () => {
       backlog();
       await expect(
@@ -222,6 +313,26 @@ describe('owner emails processor', () => {
       ).resolves.toEqual({ sent: 0, failed: 0, handedBack: 0 });
       expect(claimDueEmails).not.toHaveBeenCalled();
       expect(releaseEmails).not.toHaveBeenCalled();
+    });
+
+    it('says in the logs when the deadline, not a shutdown, stopped it', async () => {
+      vi.useFakeTimers({ now: new Date('2027-06-10T12:00:00Z') });
+      const lines: string[] = [];
+      const loud = pino({ level: 'info' }, { write: (line: string) => void lines.push(line) });
+      backlog();
+      send.mockImplementation(() => {
+        vi.setSystemTime(Date.now() + SEND_RUN_MS);
+        return Promise.resolve();
+      });
+      await ownerEmailsProcessor.process({ id: '1', name: 'send-owner-emails' } as Job, {
+        ...context(1, new AbortController().signal),
+        logger: loud,
+      });
+      expect(JSON.parse(lines[0] ?? '{}')).toMatchObject({
+        msg: 'unsent emails handed back for the next run',
+        handedBack: SEND_BATCH - 1,
+        shuttingDown: false,
+      });
     });
 
     it('says so in the logs, without addresses', async () => {
@@ -274,6 +385,14 @@ describe('owner emails processor', () => {
     });
     expect(claimDueEmails).toHaveBeenCalledOnce();
     expect(markEmailFailed).toHaveBeenCalledTimes(SEND_BATCH);
+  });
+
+  it('reads a listing’s name in the language it is written in', async () => {
+    vi.mocked(claimDueEmails).mockResolvedValue([
+      row({ payload: { listingName: 'Seaside Garage', contentLocale: 'en' } }),
+    ]);
+    await run('send-owner-emails');
+    expect(send.mock.calls[0]?.[0].html).toContain('«<span lang="en">Seaside Garage</span>»');
   });
 
   it('writes in the language on the account', async () => {

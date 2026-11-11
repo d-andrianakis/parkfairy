@@ -19,6 +19,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { FormError } from '@/components/form-error';
 import { BookingsLink } from './bookings-link';
 import { FormField } from '@/components/form-field';
+import { placeTag } from '@/components/parking/place-words';
 import { useAnnouncer } from '@/components/use-announcer';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { listingStepHref } from '@/lib/owner';
@@ -262,7 +263,15 @@ export function SpacesForm({ listing }: { listing: OwnerListing }) {
                       onClick={() => remove(row, index)}
                     >
                       <Trash2 aria-hidden />
-                      <span>{t('remove', { label: row.label || index + 1 })}</span>
+                      <span>
+                        {t.rich('remove', {
+                          label: row.label || index + 1,
+                          space: placeTag(
+                            row.label || String(index + 1),
+                            row.label ? listing.location.contentLocale : undefined,
+                          ),
+                        })}
+                      </span>
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-x-6 gap-y-2">

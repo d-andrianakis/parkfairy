@@ -5,8 +5,11 @@ import { emailOutbox, type OutboxEmailKind, type OutboxPayload } from './schema/
 
 /** Per sweep, so one run never holds locks on much of a table. */
 const SWEEP_LIMIT = 200;
-/** How long a claimed email stays out of other workers' reach: past the send and its retries. */
-const CLAIM_MINUTES = 5;
+/**
+ * How long a claimed email stays out of other workers' reach: past the sender's run, which stops
+ * at 25 s whatever Resend does, so a worker that dies gives its emails back within minutes.
+ */
+const CLAIM_MINUTES = 2;
 /** Backoff doubles from 2 minutes, so this is about a day and a half, then a person should look. */
 export const MAX_EMAIL_ATTEMPTS = 11;
 
@@ -21,7 +24,7 @@ export const MAX_EMAIL_ATTEMPTS = 11;
 export async function enqueueListingStatusEmails(db: Database): Promise<number> {
   const result = await db.execute(sql`
     with due as (
-      select l.id, l.status, l.name, l.submitted_at, p.user_id
+      select l.id, l.status, l.name, l.content_locale, l.submitted_at, p.user_id
       from parking_locations l
       join owner_profiles p on p.id = l.owner_id
       where l.owner_id is not null
@@ -39,7 +42,7 @@ export async function enqueueListingStatusEmails(db: Database): Promise<number> 
           else 'listing-approved'
         end,
         due.user_id,
-        jsonb_build_object('listingName', due.name),
+        jsonb_build_object('listingName', due.name, 'contentLocale', due.content_locale),
         concat_ws(':', 'listing', due.id, due.status, extract(epoch from due.submitted_at)::bigint)
       from due
       on conflict (dedupe_key) do nothing
@@ -134,8 +137,11 @@ export async function claimDueEmails(db: Database, limit: number): Promise<Claim
  * Gives back claimed emails the worker didn't finish: its run's time was up, or it is shutting
  * down. They are due again at once, with the try their claim counted given back, since no try
  * was made (or none that can be told apart from one; a send stopped half way is safe to repeat
- * under its idempotency key). For emails not marked sent or failed: a row since sent, given up on
- * or claimed again keeps what it has.
+ * under its idempotency key). A row since sent, given up on or claimed again keeps what it has.
+ *
+ * Only for emails not marked at all: a row `markEmailFailed` put off is still `pending`, with the
+ * same `attempts` and a later `next_attempt_at`, so it would match and get its try back, and the
+ * wait between tries and the last try would never come.
  */
 export async function releaseEmails(
   db: Database,

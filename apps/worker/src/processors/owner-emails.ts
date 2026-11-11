@@ -14,6 +14,7 @@ import {
   OWNER_EMAIL_KINDS,
   renderBookingEmail,
   renderOwnerEmail,
+  SendStopped,
   type BookingEmailKind,
   type OutgoingEmail,
   type OwnerEmailKind,
@@ -36,9 +37,11 @@ export const SEND_BATCH = 20;
  * other jobs wait behind it: each claim is only as big as the pace sends in the time left.
  *
  * It is a deadline as well. A slow Resend (5 s a try, three tries, waits of up to 30 s between
- * them) would otherwise stretch a claim of 20 over minutes, so a send still going then is stopped,
- * and it and the claim's unsent rest go back to the outbox, due at once and with their try
- * returned. A shutdown stops the run the same way.
+ * them) would otherwise stretch a claim of 20 over minutes, so a send still going then is stopped.
+ * The claim's untried rest goes back to the outbox, due at once and with its try returned, and so
+ * does the send stopped before Resend answered. One stopped after a refusal (a quota's long
+ * `Retry-After`) failed, and counts so: given back, a quota that never lifts would be tried every
+ * run for ever, and its reason never logged. A shutdown stops the run the same way.
  */
 export const SEND_RUN_MS = 25_000;
 
@@ -48,7 +51,7 @@ const BOOKING_KINDS = new Set<string>(BOOKING_EMAIL_KINDS);
 /** The message for an outbox row. A kind nobody knows, or a booking email without its booking, throws. */
 function render(row: ClaimedEmail, webUrl: string): OutgoingEmail {
   const locale = row.locale as OwnerEmailLocale;
-  const { listingName, booking } = row.payload;
+  const { listingName, contentLocale, booking } = row.payload;
   if (OWNER_KINDS.has(row.kind)) {
     return renderOwnerEmail({
       kind: row.kind as OwnerEmailKind,
@@ -56,6 +59,7 @@ function render(row: ClaimedEmail, webUrl: string): OutgoingEmail {
       locale,
       webUrl,
       listingName,
+      contentLocale,
     });
   }
   if (BOOKING_KINDS.has(row.kind)) {
@@ -115,6 +119,14 @@ export const ownerEmailsProcessor: QueueProcessor = {
           await releaseEmails(db, rows);
           handedBack += rows.length;
         };
+        const fail = async (row: ClaimedEmail, reason: string) => {
+          failed++;
+          const gaveUp = await markEmailFailed(db, row, reason);
+          // The id and kind only: the address must stay out of the logs.
+          const details = { emailId: row.id, kind: row.kind, reason };
+          if (gaveUp) logger.error(details, 'owner email given up on');
+          else logger.warn(details, 'owner email not sent');
+        };
         try {
           for (;;) {
             const left = SEND_RUN_MS - (Date.now() - started);
@@ -136,18 +148,14 @@ export const ownerEmailsProcessor: QueueProcessor = {
                 await markEmailSent(db, row.id);
                 sentNow++;
               } catch (error) {
-                // Stopped half way, not failed: back with the rest.
-                if (stop.aborted) {
-                  await handBack(due.slice(index));
+                if (error instanceof SendStopped) {
+                  // Stopped before Resend answered: not tried, back with the rest. Stopped after
+                  // a refusal: failed, and the rest go back.
+                  if (error.failure) await fail(row, error.failure);
+                  await handBack(due.slice(error.failure ? index + 1 : index));
                   break;
                 }
-                failed++;
-                const reason = error instanceof Error ? error.message : 'unknown error';
-                const gaveUp = await markEmailFailed(db, row, reason);
-                // The id and kind only: the address must stay out of the logs.
-                const details = { emailId: row.id, kind: row.kind, reason };
-                if (gaveUp) logger.error(details, 'owner email given up on');
-                else logger.warn(details, 'owner email not sent');
+                await fail(row, error instanceof Error ? error.message : 'unknown error');
               }
             }
             sent += sentNow;

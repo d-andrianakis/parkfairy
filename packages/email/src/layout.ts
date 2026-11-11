@@ -22,7 +22,8 @@ const NAME_SLOT = '\u{E000}';
 
 /**
  * A sentence from a catalog with someone's name in it (a listing's, as its owner wrote it), the
- * name kept apart so the HTML can mark the language it is written in.
+ * name kept apart so the HTML can mark the language it is written in. The sentence must only put
+ * its argument in, unchanged: one that changed it or chose its words by it would be cut wrong.
  */
 export function sentenceWith(
   sentence: (name: string) => string,

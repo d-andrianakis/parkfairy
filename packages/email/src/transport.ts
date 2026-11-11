@@ -14,10 +14,23 @@ export interface OutgoingEmail {
 
 export interface SendOptions {
   /**
-   * Stops the send where it is (the request, a wait between tries) and rejects. Whether Resend got
-   * the email is then unknown; sending it again under the same idempotency key is safe.
+   * Stops the send where it is (the request, a wait between tries) and rejects with `SendStopped`.
+   * Whether Resend got the email is then unknown; sending it again under the same idempotency key
+   * is safe.
    */
   signal?: AbortSignal | undefined;
+}
+
+/**
+ * A send its caller stopped. `failure` is what Resend answered before that, if it answered: a
+ * send stopped while waiting out a refusal (a 429 with a long `Retry-After`) failed, and its
+ * caller should count it so, or a quota that never lifts would be tried for ever.
+ */
+export class SendStopped extends Error {
+  constructor(readonly failure: string | undefined) {
+    super(failure ? `Stopped after: ${failure}` : 'Stopped before any answer');
+    this.name = 'SendStopped';
+  }
 }
 
 export interface EmailTransport {
@@ -91,11 +104,18 @@ export function resendTransport({
     async send({ to, subject, text, html, idempotencyKey = randomUUID() }, { signal } = {}) {
       let failure = '';
       let retryAfter = 0;
+      // However it was stopped (in a wait, at the call, during it), the caller learns the same.
+      const stopped = () => new SendStopped(failure || undefined);
       for (const delay of [0, ...RETRY_DELAYS_MS]) {
-        if (delay) await wait(Math.max(delay, retryAfter), signal);
-        await turn(signal);
+        try {
+          if (delay) await wait(Math.max(delay, retryAfter), signal);
+          await turn(signal);
+        } catch (error) {
+          if (signal?.aborted) throw stopped();
+          throw error;
+        }
         // An abort between the turn and the call (the wait passed undisturbed) still stops it.
-        signal?.throwIfAborted();
+        if (signal?.aborted) throw stopped();
         try {
           const response = await fetchFn(RESEND_ENDPOINT, {
             method: 'POST',
@@ -118,7 +138,7 @@ export function resendTransport({
           retryAfter = retryAfterMs(response);
         } catch (error) {
           // Stopped by whoever sent it: no more tries.
-          if (signal?.aborted) throw signal.reason;
+          if (signal?.aborted) throw stopped();
           failure = error instanceof Error ? error.name : 'Network error';
         }
       }
@@ -135,7 +155,7 @@ export function resendTransport({
 export function outboxTransport(directory: string): EmailTransport {
   return {
     async send(email, { signal } = {}) {
-      signal?.throwIfAborted();
+      if (signal?.aborted) throw new SendStopped(undefined);
       await mkdir(directory, { recursive: true });
       const name = `${Date.now()}-${randomUUID()}.json`;
       const partial = join(directory, `${name}.partial`);

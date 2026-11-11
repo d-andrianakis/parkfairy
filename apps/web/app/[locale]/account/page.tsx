@@ -11,6 +11,7 @@ import { getTranslations } from 'next-intl/server';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { requireSession } from '@/lib/session';
 import { ClientMessages } from '@/components/client-messages';
+import { PersonName } from '@/components/parking/place-words';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { ApiIdentity } from './api-identity';
 import { Providers } from './providers';
@@ -35,7 +36,12 @@ export default async function AccountPage({ params }: LocaleParams) {
           <Card>
             <CardHeader>
               <CardTitle className="text-xl">
-                <h1>{t('greeting', { name: session.user.name })}</h1>
+                <h1>
+                  {t.rich('greeting', {
+                    name: session.user.name,
+                    person: () => <PersonName name={session.user.name} lang={locale} />,
+                  })}
+                </h1>
               </CardTitle>
               {/* Email addresses have no break points; let them wrap on narrow screens. */}
               <CardDescription className="wrap-anywhere">

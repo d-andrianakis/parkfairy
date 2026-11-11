@@ -54,6 +54,40 @@ describe('renderOwnerEmail', () => {
     expect(greek.html).not.toMatch(/<span lang/);
   });
 
+  it('reads the name in the language the listing is written in', () => {
+    const greek = renderOwnerEmail({
+      ...base,
+      kind: 'listing-approved',
+      listingName: 'Seaside Garage',
+      contentLocale: 'en',
+    });
+    expect(greek.html).toContain('Ο χώρος «<span lang="en">Seaside Garage</span>» πέρασε');
+    const english = renderOwnerEmail({
+      ...base,
+      locale: 'en',
+      kind: 'listing-submitted',
+      listingName: 'Parking Ερμού',
+      contentLocale: 'el',
+    });
+    expect(english.html).toContain('“<span lang="el">Parking Ερμού</span>” is with our team');
+    // A Greek email of a Greek listing: nothing to mark.
+    const plain = renderOwnerEmail({
+      ...base,
+      kind: 'listing-approved',
+      listingName: 'Γκαράζ',
+      contentLocale: 'el',
+    });
+    expect(plain.html).not.toMatch(/<span lang/);
+    // The reminder names no listing.
+    const reminder = renderOwnerEmail({
+      ...base,
+      locale: 'en',
+      kind: 'onboarding-reminder',
+      contentLocale: 'el',
+    });
+    expect(reminder.html).not.toMatch(/<span lang/);
+  });
+
   it('builds the link from the origin, whatever trails it', () => {
     const email = renderOwnerEmail({
       ...base,
