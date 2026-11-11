@@ -22,7 +22,7 @@
     "@parkfairy/email": "workspace:*",
     "@parkfairy/ui": "workspace:*",
     "@tanstack/react-query": "5.105.0",
-    "better-auth": "1.7.14",
+    "better-auth": "1.7.18",
     "ioredis": "6.0.0",
     "lucide-react": "1.63.0",
     "mapbox-gl": "3.34.1",
