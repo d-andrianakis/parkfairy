@@ -1,3 +1,4 @@
+import { greekRuns } from '@parkfairy/contracts/greek-runs';
 import type { OutgoingEmail } from './transport.js';
 
 /** The light theme's `--primary`, held to it by tokens.test.ts: mail clients can't read our CSS. */
@@ -10,13 +11,62 @@ export const escapeHtml = (value: string) =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
 
+/** Text with a language of its own, or none for the email's. */
+export interface TextPart {
+  text: string;
+  lang?: string | undefined;
+}
+
+/** Stands for the name while the catalog writes its sentence: no catalog text holds it. */
+const NAME_SLOT = '\u{E000}';
+
+/**
+ * A sentence from a catalog with someone's name in it (a listing's, as its owner wrote it), the
+ * name kept apart so the HTML can mark the language it is written in.
+ */
+export function sentenceWith(
+  sentence: (name: string) => string,
+  name: string,
+  lang: string | undefined,
+): TextPart[] {
+  return sentence(NAME_SLOT)
+    .split(NAME_SLOT)
+    .flatMap((text, index) => (index === 0 ? [{ text }] : [{ text: name, lang }, { text }]))
+    .filter(({ text }) => text);
+}
+
+/**
+ * Escaped HTML for text in an email in `locale`. A part in another language gets `lang`, and Greek
+ * words inside English (a Greek street in an English listing's address, a Greek name in an
+ * English email) are marked `lang="el"` apart, as the web app does (WCAG 3.1.2): an English voice
+ * spells Greek out letter by letter.
+ */
+function marked(parts: TextPart[], locale: string): string {
+  return parts
+    .map(({ text, lang }) => {
+      const own = lang ?? locale;
+      const inner = greekRuns(text, own)
+        .map((run) =>
+          run.lang
+            ? `<span lang="${run.lang}">${escapeHtml(run.text)}</span>`
+            : escapeHtml(run.text),
+        )
+        .join('');
+      return own === locale ? inner : `<span lang="${escapeHtml(own)}">${inner}</span>`;
+    })
+    .join('');
+}
+
+const plain = (content: string | TextPart[]) =>
+  typeof content === 'string' ? content : content.map(({ text }) => text).join('');
+
 export interface EmailContent {
   to: string;
   locale: string;
   subject: string;
   heading: string;
-  /** The text before the button. */
-  body: string;
+  /** The text before the button; parts where a name in it has a language of its own. */
+  body: string | TextPart[];
   /** Facts set out after the body, label beside value: a booking's place and times. */
   details?: { label: string; value: string; lang?: string | undefined }[];
   action: string;
@@ -43,7 +93,7 @@ export function renderEmail({
   footer,
 }: EmailContent): OutgoingEmail {
   const facts = details.map(({ label, value }) => `${label}: ${value}`).join('\n');
-  const text = [heading, body, facts, `${action}: ${url}`, note, '--', footer]
+  const text = [heading, plain(body), facts, `${action}: ${url}`, note, '--', footer]
     .filter(Boolean)
     .join('\n\n');
 
@@ -55,12 +105,12 @@ export function renderEmail({
       : `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;font-size:16px;line-height:1.5;color:#0f172a">${details
           .map(
             ({ label, value, lang }) =>
-              `<tr><td style="padding:2px 16px 2px 0;vertical-align:top;font-weight:bold;color:#0f172a">${escapeHtml(label)}</td><td${lang ? ` lang="${escapeHtml(lang)}"` : ''} style="padding:2px 0;vertical-align:top;color:#0f172a">${escapeHtml(value)}</td></tr>`,
+              `<tr><td style="padding:2px 16px 2px 0;vertical-align:top;font-weight:bold;color:#0f172a">${escapeHtml(label)}</td><td${lang ? ` lang="${escapeHtml(lang)}"` : ''} style="padding:2px 0;vertical-align:top;color:#0f172a">${marked([{ text: value }], lang ?? locale)}</td></tr>`,
           )
           .join('')}</table>\n`;
-  const paragraph = (content: string) =>
-    content
-      ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.5;color:#0f172a">${escapeHtml(content)}</p>`
+  const paragraph = (content: string | TextPart[]) =>
+    plain(content)
+      ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.5;color:#0f172a">${marked(typeof content === 'string' ? [{ text: content }] : content, locale)}</p>`
       : '';
   // The facts belong to the body, before the note that follows them.
   const paragraphs = `${paragraph(body)}\n${table}${paragraph(note)}`;

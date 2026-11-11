@@ -154,9 +154,40 @@ describe('CopyHoursExceptions', () => {
     expect(status).toHaveTextContent(
       'Not copied to “Unnamed listing”: it would go over the limit of 30 periods.',
     );
-    // The owner's names are read in the language they wrote them in.
+    // The owner's names are read in the language they wrote them in; ours are the sentence's.
     expect(within(status).getByText('Γκαράζ Πειραιά')).toHaveAttribute('lang', 'el');
-    expect(within(status).getByText('Unnamed listing')).not.toHaveAttribute('lang');
+    const ours = within(status).getByText(/^Not copied to “Unnamed listing”/);
+    expect(ours.querySelector('[lang]')).toBeNull();
+  });
+
+  it('marks the Greek words in an English listing’s name, in the list and the report', async () => {
+    const listings: OtherListing[] = [
+      { id: PIRAEUS, name: 'Lot on Ακτή Μιαούλη', contentLocale: 'en' },
+      { id: HARBOUR, name: 'Harbour lot', contentLocale: 'en' },
+    ];
+    copy.mockResolvedValue(
+      answer({
+        results: [
+          { id: PIRAEUS, outcome: 'clash' },
+          { id: HARBOUR, outcome: 'copied' },
+        ],
+      }) as never,
+    );
+    const { container } = show(false, listings);
+    const label = screen.getByText('Ακτή Μιαούλη');
+    expect(label).toHaveAttribute('lang', 'el');
+    expect(label.parentElement).toHaveAttribute('lang', 'en');
+    expect(screen.getByRole('checkbox', { name: 'Lot on Ακτή Μιαούλη' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'All your other listings' }));
+    await userEvent.click(copyButton());
+    const status = (await screen.findByText('Dates copied to 1 listing')).closest(
+      '[role="status"]',
+    ) as HTMLElement;
+    const named = within(status).getByText('Ακτή Μιαούλη');
+    expect(named).toHaveAttribute('lang', 'el');
+    expect(named.parentElement).toHaveTextContent(/^Lot on Ακτή Μιαούλη$/);
+    expect(named.parentElement).toHaveAttribute('lang', 'en');
+    await expectNoAxeViolations(container);
   });
 
   it('names a listing it would close over bookings (decision #27)', async () => {

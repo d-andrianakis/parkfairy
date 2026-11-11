@@ -1,6 +1,6 @@
 import { cancelMyBooking, confirmMyBooking } from '@parkfairy/api-client';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
@@ -113,6 +113,15 @@ describe('ConfirmBooking', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Yes, let it go' }));
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith(`${AGAIN}&released=1`));
     expect(release).toHaveBeenCalledWith({ path: { id: ID }, body: {} });
+  });
+
+  it('marks a Greek label in an English listing as Greek inside the question', async () => {
+    renderInSubtree(<ConfirmBooking id={ID} chooseAgainHref={AGAIN} space="Α1" spaceLocale="en" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Let this space go' }));
+    const question = screen.getByText(/Someone else can book it straight away/);
+    const label = within(question).getByText('Α1');
+    expect(label).toHaveAttribute('lang', 'el');
+    expect(label.parentElement).toHaveAttribute('lang', 'en');
   });
 
   it('keeps the space on "No", and gives the focus back to the button every time', async () => {

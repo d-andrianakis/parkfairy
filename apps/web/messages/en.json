@@ -503,7 +503,7 @@
       "addListing": "Add your parking",
       "addAnother": "Add another listing",
       "untitled": "Unnamed listing",
-      "viewLive": "See “{name}” as drivers see it",
+      "viewLive": "See “<listing>{name}</listing>” as drivers see it",
       "deleteDraft": "Delete “{name}”",
       "deleteQuestion": "Delete “{name}” and everything in it? This can’t be undone.",
       "deleteConfirm": "Yes, delete it",

@@ -770,9 +770,32 @@ locked`) in one statement. The two sets are kept apart (`user_id <> $user`) beca
   - A claim whose sends all fail ends the run, so an outage spends one try of 20 emails, not of the
     whole backlog.
   - Raising the pace means raising Resend's limit first, and the web's with it.
+  - **(2026-11-11) The 25 s is a deadline too, and a shutdown stops the run the same way.** The send
+    in flight is aborted (`send(email, { signal })`), and it and the claim's rest go back with
+    `releaseEmails`: due at once, the claim's try returned. Without it, 5 s tries, three of them
+    and `Retry-After` waits of up to 30 s stretched a claim of 20 over minutes, past the platform's
+    stop timeout. A send cut half way is safe to repeat under its idempotency key.
+  - `releaseEmails` is for rows not yet marked sent or failed: a row `markEmailFailed` rescheduled
+    is still `pending` with the same `attempts`, and would get its try back.
+  - BullMQ hands the processor its abort signal only when the function takes three parameters
+    (`processor.length >= 3`), and only `worker.cancelAllJobs()` aborts it: `close()` waits for
+    running jobs but never signals them. Shutdown calls `close()` first, so no job starts after.
+  - The email queue's global concurrency (1) lives in Redis, set by `prepareQueue` at each start; a
+    processor without one has it removed, so dropping it from the code drops it there too.
 - **2026-11-10 · Greek words inside English text are marked `lang="el"`** (`greekRuns` in
-  `lib/greek-runs.ts`, `PlaceWords`). Mapbox falls back to Greek names, and owners type Greek into
-  English listings; an English voice spells Greek letters out (WCAG 3.1.2).
+  `@parkfairy/contracts/greek-runs` since 2026-11-11, for the emails; `PlaceWords` on the web).
+  Mapbox falls back to Greek names, and owners type Greek into English listings; an English voice
+  spells Greek letters out (WCAG 3.1.2).
+  - **Owner text inside our sentences** (2026-11-11): `PlaceName` sets it in its own language with
+    its runs marked, and `placeTag(text, lang)` is the `t.rich` tag for it. The tag ignores its
+    chunks, so a rich tag around a name must wrap exactly `{name}`. Without `lang` (our own words
+    for an unnamed listing) it is plain text.
+  - **A driver's name** has no language we know, but Greek script can only be Greek, so it is
+    marked on an English page and left alone on a Greek one.
+  - **Emails** (2026-11-11): `marked()` in `layout.ts` escapes each run. `sentenceWith` calls a
+    catalog sentence with U+E000 for the name and splits there, so the name keeps the listing's
+    `lang`; it relies on the catalog only putting its argument in, unchanged. Owner emails carry no
+    `contentLocale` in their payload, so only their Greek words are marked.
   - **A run** goes from the first Greek letter to the last. It takes the punctuation and spaces
     between them, digits glued on («28ης Οκτωβρίου», «Α1») and the numeral sign («Γʹ»). A number
     after a space stays with the page.

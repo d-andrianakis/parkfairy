@@ -911,17 +911,12 @@ text (the 3.2 advisory). No product decisions were needed; what the reviews chan
 
 Left open:
 
-- [ ] Performance, low:
-  - A covering partial index for page 1 of a very busy garage, which walks the last 31 days. Wait
-    until one exists.
-  - A deadline per email in the sender, handing back unsent claims: a slow Resend can stretch a
-    run past 30 s.
-  - `setGlobalConcurrency(1)` on the email queue once there are several worker replicas.
-  - A stop timeout above 30 s on the platform, or a closing flag checked before each claim.
-- [ ] Booking emails mark the address with the listing's language only: Greek words in an English
-      listing's address aren't marked in their HTML (`greekRuns` is the web app's)
-- [ ] Names inside translated sentences (`t.rich` chunks: milestones, the booking page's notices)
-      carry the listing's `lang` but no marking per run
+- [ ] Performance, low: a covering partial index for page 1 of a very busy garage, which walks the
+      last 31 days. Wait until one exists
+- [x] Performance, low: a deadline per email in the sender handing back unsent claims,
+      `setGlobalConcurrency(1)` on the email queue, and a closing flag: done in 3.5
+- [x] Booking emails marking Greek words in an English listing's words, and names inside
+      translated sentences (`t.rich` chunks) marked per run: done in 3.5
 - [ ] Manual NVDA (Chrome, Firefox, a Greek voice installed), JAWS, VoiceOver (macOS, iOS) and
       TalkBack:
   - the English search heading switching voice for the Greek words only;
@@ -931,6 +926,52 @@ Left open:
   - whether any reader honours `lang` inside the "Chosen: …" live region, which decides whether it
     should carry it;
   - two cancels in a row on one page, and the last booking of a later page called off.
+
+### 3.5 Phase 3 follow-ups, second round (2026-11-11)
+
+What 3.4 left open that needs nobody outside the project: the email sender's deadline and its
+shutdown, its limit over several workers, and Greek words marked in emails and inside our own
+sentences.
+
+- [x] **Implemented**:
+  - The sender stops at its 25 s deadline or when the worker shuts down, the send in flight
+    included (`send(email, { signal })`; BullMQ's job signal, aborted by `cancelAllJobs` on
+    SIGTERM). What it didn't finish goes back to the outbox, due at once and with its try returned
+    (`releaseEmails`). A slow Resend no longer stretches a run over minutes, and the platform's
+    default stop timeout is enough.
+  - The email queue runs one job at a time over every worker process (`setGlobalConcurrency(1)`,
+    set by `prepareQueue` at start), so several workers can't pass Resend's limit together.
+  - `greekRuns` moved to `@parkfairy/contracts/greek-runs`, for the emails. Booking emails mark
+    Greek words in an English listing's facts, and the listing's name in the body keeps its own
+    language. Owner emails mark Greek words in English.
+  - On the web, `PlaceName` and `placeTag` (for `t.rich`) mark owner text inside our sentences: the
+    dashboard's three links ("See … as drivers see it" now has the listing's language too), copying
+    to other listings, the held space, the release question. Also marked: space labels everywhere,
+    the listing's description, the closures page's name, the driver's bookings list, and a driver's
+    name on the owner's bookings page (Greek script only, on an English page).
+- [x] **Unit tests**:
+  - Worker: slow sends cut at the deadline and the rest handed back; a send in flight stopped and
+    handed back with nothing left waiting; a shutdown mid-claim; nothing claimed once stopping; the
+    log line; `prepareQueue` setting and removing the limit; shutdown telling jobs to stop after
+    closing.
+  - Transport: a request in flight dropped, a wait between tries cut short, nothing sent once
+    stopped, the timeout still working with a signal; the outbox transport writing nothing.
+  - Emails: Greek words in an English listing's address, label and name in both languages; an
+    unnamed listing; escaping inside the marking; owner emails.
+  - Web: `PlaceWords`/`PlaceName`/`placeTag`; the dashboard's links in Greek with an English listing;
+    copying; the booking page, the facts and the list; the owner's bookings (space, driver's name in
+    both languages); closures; the listing page's description and spaces; the space list; the
+    release question.
+  - Integration: `releaseEmails` returning a try and leaving a claim it no longer holds.
+- [x] **Smoke test** (`booking.smoke.ts`): both booking emails mark the Greek listing's name in an
+      English email. The busy-listing test now uses an English listing with Greek words, a Greek
+      «Α1» space and a Greek driver's name, checked on `/en/owner` and the bookings page with axe
+- [ ] **Security** review: nothing above low; two lows to settle
+- [ ] **Performance** review (running)
+- [ ] **Accessibility** review (running)
+- [x] **i18n** review: no blocker or major. Minor ones to settle
+- [ ] **Test** review (running)
+- [x] **Contracts & docs**: no API or schema change (client and schema unchanged), memory.md
 
 ## Phase 4: Payments and payouts
 
@@ -973,7 +1014,8 @@ Left open:
       owner may be their home and outlives later edits of the listing
 - [ ] Email in production: Resend's real limit (`ratelimit-limit` on a send). If it is raised, raise
       `EMAIL_SENDS_PER_SECOND` and the web app's pace with it (the transport's default, one a
-      second; a code change for now). A stop timeout above 30 s for the worker (see 3.4)
+      second; a code change for now). The sender stops at SIGTERM (3.5), so the platform's usual
+      30 s stop timeout is enough
 - [ ] Address search in production: `MAPBOX_SEARCH_TOKEN` (no URL restrictions, search scopes only,
       never the public token), the public token restricted to the site's URLs and the map's scopes,
       Mapbox usage alerts, and the hourly budget and per-visitor cap checked against real use

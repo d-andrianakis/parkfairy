@@ -20,6 +20,10 @@
     "./plates": {
       "types": "./dist/plates.d.ts",
       "default": "./dist/plates.js"
+    },
+    "./greek-runs": {
+      "types": "./dist/greek-runs.d.ts",
+      "default": "./dist/greek-runs.js"
     }
   },
   "files": [

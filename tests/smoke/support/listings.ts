@@ -37,13 +37,17 @@ export function athensInstant(day: string, time: string): string {
 
 /**
  * Everything up to staff, through the API, for the owner signed in on `page`: the steps have
- * their own smoke test. Open all week at €2.00 an hour, with the spaces named. Far from the demo
- * areas, so no other test's search meets it.
+ * their own smoke test. Open all week at €2.00 an hour, with the spaces named, written in Greek
+ * unless `contentLocale` says otherwise. Far from the demo areas, so no other test's search meets
+ * it.
  */
 export async function listingWithStaff(
   page: Page,
   name: string,
-  { spaces = ['K1'] }: { spaces?: string[] } = {},
+  {
+    spaces = ['K1'],
+    contentLocale = 'el',
+  }: { spaces?: string[]; contentLocale?: 'el' | 'en' } = {},
 ): Promise<{ id: string; slug: string }> {
   const headers = { origin: WEB_URL };
   const call = async (method: 'patch' | 'put' | 'post', path: string, data: unknown) => {
@@ -73,7 +77,7 @@ export async function listingWithStaff(
     areaId: 'syntagma',
     latitude: 35.3387,
     longitude: 25.1442,
-    contentLocale: 'el',
+    contentLocale,
   });
   await call('put', `/listings/${id}/spaces`, {
     spaces: spaces.map((label) => ({ label, features: [], hourlyRateMinor: null })),

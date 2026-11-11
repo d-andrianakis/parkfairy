@@ -6,7 +6,7 @@ import { chooseEmailTransport } from './email-transport.js';
 import { loadEnv } from './env.js';
 import { maintenanceProcessor } from './processors/maintenance.js';
 import { ownerEmailsProcessor } from './processors/owner-emails.js';
-import type { QueueProcessor } from './queues.js';
+import { prepareQueue, type QueueProcessor } from './queues.js';
 import { createShutdown } from './shutdown.js';
 
 const processors: QueueProcessor[] = [maintenanceProcessor, ownerEmailsProcessor];
@@ -40,24 +40,17 @@ const workers: Worker[] = [];
 for (const processor of processors) {
   const queue = new Queue(processor.queue, { connection });
   queues.push(queue);
-  for (const schedule of processor.schedules) {
-    await queue.upsertJobScheduler(
-      schedule.id,
-      { every: schedule.everyMs },
-      {
-        name: schedule.id,
-        opts: { removeOnComplete: 100, removeOnFail: 1000 },
-      },
-    );
-  }
+  await prepareQueue(queue, processor);
 
   const worker = new Worker(
     processor.queue,
-    (job) =>
+    // Three parameters, so BullMQ hands over a signal that `cancelAllJobs` aborts on shutdown.
+    (job, _token, signal) =>
       processor.process(job, {
         db: database.db,
         logger: logger.child({ queue: processor.queue, job: job.name }),
         email,
+        signal,
       }),
     { connection, concurrency: processor.concurrency },
   );

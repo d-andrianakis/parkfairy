@@ -12,6 +12,7 @@ import {
 import { CircleAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import { PlaceWords } from '@/components/parking/place-words';
 import { StayRange } from '@/components/parking/stay-range';
 import { SearchLink } from '@/components/parking/search-link';
 import { Link } from '@/i18n/navigation';
@@ -103,7 +104,14 @@ export default async function BookingsPage({ params, searchParams }: BookingsPag
                         <span
                           lang={booking.listing.name ? booking.listing.contentLocale : undefined}
                         >
-                          {booking.listing.name ?? tBooking('unnamed')}
+                          {booking.listing.name ? (
+                            <PlaceWords
+                              text={booking.listing.name}
+                              lang={booking.listing.contentLocale}
+                            />
+                          ) : (
+                            tBooking('unnamed')
+                          )}
                         </span>
                       </Link>
                     </h2>
@@ -118,9 +126,12 @@ export default async function BookingsPage({ params, searchParams }: BookingsPag
                   <span>
                     {t.rich('space', {
                       label: booking.spaceLabel,
-                      space: (chunks) => (
+                      space: () => (
                         <span lang={booking.listing.contentLocale} className="font-mono">
-                          {chunks}
+                          <PlaceWords
+                            text={booking.spaceLabel}
+                            lang={booking.listing.contentLocale}
+                          />
                         </span>
                       ),
                     })}

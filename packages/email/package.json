@@ -20,6 +20,9 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "dependencies": {
+    "@parkfairy/contracts": "workspace:*"
+  },
   "devDependencies": {
     "@parkfairy/config": "workspace:*",
     "@types/node": "24.19.2",

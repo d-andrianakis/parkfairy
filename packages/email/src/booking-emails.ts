@@ -1,4 +1,4 @@
-import { renderEmail } from './layout.js';
+import { renderEmail, sentenceWith } from './layout.js';
 import { OWNER_EMAIL_COPY, type OwnerEmailLocale } from './owner-emails.js';
 import type { OutgoingEmail } from './transport.js';
 
@@ -244,7 +244,8 @@ export function renderBookingEmail({
     locale,
     subject: copy.subject(booking.reference, listing),
     heading: copy.heading,
-    body: copy.body(listing),
+    // The name read in the language its owner wrote it in; "Unnamed parking" is the email's own.
+    body: sentenceWith(copy.body, listing, listingName ? booking.contentLocale : undefined),
     details,
     action: copy.action,
     url: new URL(path, webUrl).toString(),

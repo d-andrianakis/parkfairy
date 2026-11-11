@@ -16,7 +16,7 @@ import {
 } from '@parkfairy/ui/components/card';
 import { CalendarCheck, CalendarX, CircleAlert, ImageOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { PlaceWords } from '@/components/parking/place-words';
+import { PlaceWords, placeTag } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
 import { closuresHref, ownerBookingsHref } from '@/lib/owner-href';
@@ -140,7 +140,12 @@ export function ListingMilestones({ listing }: { listing: OwnerListingProgress }
           <div className="flex flex-wrap gap-3">
             {listing.status === 'published' && listing.slug ? (
               <Button asChild variant="outline" size="sm" className={WRAPPING_BUTTON}>
-                <Link href={`/parking/${listing.slug}`}>{t('dashboard.viewLive', { name })}</Link>
+                <Link href={`/parking/${listing.slug}`}>
+                  {/* One flex item: the button's gap would otherwise open around the name. */}
+                  <span>
+                    {t.rich('dashboard.viewLive', { name, listing: placeTag(name, nameLang) })}
+                  </span>
+                </Link>
               </Button>
             ) : null}
             {/* Once sent in: a listing staff sent back may have bookings from when it was live. */}
@@ -149,10 +154,7 @@ export function ListingMilestones({ listing }: { listing: OwnerListingProgress }
                 <Link href={ownerBookingsHref(listing.id)}>
                   <CalendarCheck aria-hidden />
                   <span>
-                    {t.rich('dashboard.bookings', {
-                      name,
-                      listing: (chunks) => <span lang={nameLang}>{chunks}</span>,
-                    })}
+                    {t.rich('dashboard.bookings', { name, listing: placeTag(name, nameLang) })}
                   </span>
                 </Link>
               </Button>
@@ -166,7 +168,7 @@ export function ListingMilestones({ listing }: { listing: OwnerListingProgress }
                   {t.rich('dashboard.closures', {
                     name,
                     // The owner's name for it, read in the language they wrote it in.
-                    listing: (chunks) => <span lang={nameLang}>{chunks}</span>,
+                    listing: placeTag(name, nameLang),
                   })}
                 </span>
               </Link>

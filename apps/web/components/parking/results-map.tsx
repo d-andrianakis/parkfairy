@@ -4,7 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/lib/mapbox-focus.css';
 import type { LngLatBoundsLike, Map as MapboxMap } from 'mapbox-gl';
 import { useEffect, useRef } from 'react';
-import { greekRuns } from '@/lib/greek-runs';
+import { greekRuns } from '@parkfairy/contracts/greek-runs';
 import { markAttributionEnglish, MAPBOX_STYLE, workerUrlFor } from '@/lib/mapbox';
 
 export interface ResultPin {

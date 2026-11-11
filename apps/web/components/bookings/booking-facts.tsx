@@ -41,7 +41,7 @@ export function BookingFacts({ booking }: { booking: Booking }) {
     [
       t('space'),
       <span key="space" lang={listing.contentLocale} className="font-mono">
-        {booking.spaceLabel}
+        <PlaceWords text={booking.spaceLabel} lang={listing.contentLocale} />
       </span>,
     ],
     [t('stay'), <StayRange key="stay" start={booking.start} end={booking.end} />],

@@ -187,3 +187,43 @@ describe('the listing page’s booking', () => {
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   });
 });
+
+describe('an English listing with Greek words in it', () => {
+  const english = listing({
+    name: 'Garage by Πλατεία Κλαυθμώνος',
+    contentLocale: 'en',
+    description: 'Enter from Σταδίου street; the gate opens at 7.',
+    spaces: [
+      space('22222222-2222-4222-8222-222222222222', 'Α2', 800),
+      space('11111111-1111-4111-8111-111111111111', 'B1', 400),
+    ],
+  });
+  const marked = (text: string, within: HTMLElement = document.body) =>
+    Array.from(within.querySelectorAll('[lang="el"]')).filter(
+      (element) => element.textContent === text,
+    );
+
+  it('marks them in the description and the spaces to choose from', async () => {
+    const { container } = await show(english, true);
+    const about = screen.getByRole('region', { name: 'About this parking' });
+    const street = within(about).getByText('Σταδίου');
+    expect(street).toHaveAttribute('lang', 'el');
+    expect(street.parentElement).toHaveAttribute('lang', 'en');
+    expect(within(about).getByText(/^Enter from/)).toHaveTextContent(
+      'Enter from Σταδίου street; the gate opens at 7.',
+    );
+    // A Greek alpha in a space's label, and a Latin B left alone.
+    const choice = screen.getByRole('radio', { name: /^Α2/ });
+    const label = choice.closest('label') ?? document.body;
+    expect(marked('Α2', label)).toHaveLength(1);
+    expect(marked('B1')).toHaveLength(0);
+    await expectNoAxeViolations(container);
+  });
+
+  it('marks them in the list of spaces when no stay is chosen', async () => {
+    await show({ ...english, availability: null }, true, {} as typeof windowParams);
+    const spaces = screen.getByRole('list', { name: 'Spaces' });
+    expect(marked('Α2', spaces)).toHaveLength(1);
+    expect(marked('B1', spaces)).toHaveLength(0);
+  });
+});

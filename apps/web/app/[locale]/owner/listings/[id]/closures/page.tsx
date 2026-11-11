@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import { HoursExceptionsForm } from '@/components/owner/hours-exceptions-form';
+import { PlaceWords } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';
 import { loadOtherListings, loadOwnerClosures } from '@/lib/owner.server';
@@ -74,7 +75,7 @@ export default async function ClosuresPage({ params }: ClosuresPageProps) {
       </Link>
       <div className="grid gap-2">
         <p className="text-sm text-muted-foreground" lang={name ? contentLocale : undefined}>
-          {name ?? t('dashboard.untitled')}
+          {name ? <PlaceWords text={name} lang={contentLocale} /> : t('dashboard.untitled')}
         </p>
         <h1 className="text-3xl font-semibold tracking-tight">{t('closures.title')}</h1>
         <p className="text-muted-foreground">{t('closures.lead')}</p>

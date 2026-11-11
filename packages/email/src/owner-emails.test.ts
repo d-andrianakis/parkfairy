@@ -41,6 +41,19 @@ describe('renderOwnerEmail', () => {
     expect(email.html).toContain('&lt;img');
   });
 
+  it('marks Greek words in an English email, and nothing in a Greek one', () => {
+    const english = renderOwnerEmail({
+      ...base,
+      locale: 'en',
+      kind: 'listing-approved',
+      listingName: 'Γκαράζ Ερμού',
+    });
+    expect(english.html).toContain('“<span lang="el">Γκαράζ Ερμού</span>” passed our checks');
+    expect(english.text).toContain('“Γκαράζ Ερμού” passed our checks');
+    const greek = renderOwnerEmail({ ...base, kind: 'listing-approved', listingName: 'Γκαράζ' });
+    expect(greek.html).not.toMatch(/<span lang/);
+  });
+
   it('builds the link from the origin, whatever trails it', () => {
     const email = renderOwnerEmail({
       ...base,

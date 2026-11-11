@@ -1,6 +1,7 @@
 import type { ParkingListingDetail } from '@parkfairy/contracts';
 import { useFormatter, useTranslations } from 'next-intl';
 import { FeatureBadges } from './feature-badges';
+import { PlaceWords } from './place-words';
 
 /**
  * The spaces the API sends, and how many more a big garage has. With a stay asked about it sends
@@ -35,7 +36,7 @@ export function SpaceList({
             >
               {/* Owner content: Greek "Α1" looks like Latin "A1" but is read differently. */}
               <span lang={listing.contentLocale} className="font-mono font-medium">
-                {space.label}
+                <PlaceWords text={space.label} lang={listing.contentLocale} />
               </span>
               <FeatureBadges features={space.features} />
               {/* Only where prices differ; otherwise the price card has already said it. */}

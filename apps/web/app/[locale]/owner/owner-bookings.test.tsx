@@ -97,6 +97,27 @@ beforeEach(() => {
 });
 
 describe('a listing’s bookings page', () => {
+  it('marks Greek words in an English listing’s space, and in a driver’s name', async () => {
+    const english = listing({ name: 'Garage on Οδός Ερμού', contentLocale: 'en' });
+    const { container, unmount } = await show(english);
+    const [first] = screen.getAllByRole('listitem');
+    const space = within(first as HTMLElement).getByText('Α1');
+    expect(space).toHaveAttribute('lang', 'el');
+    expect(space.parentElement).toHaveAttribute('lang', 'en');
+    // The driver's name has no language of its own, but Greek letters are Greek.
+    const driver = within(first as HTMLElement).getByText('Νίκος Οδηγός');
+    expect(driver).toHaveAttribute('lang', 'el');
+    expect(driver.closest('bdi')).not.toHaveAttribute('lang');
+    expect(screen.getByText('Οδός Ερμού')).toHaveAttribute('lang', 'el');
+    await expectNoAxeViolations(container);
+    unmount();
+
+    // On a Greek page they are the page's own.
+    await show(english, {}, 'el');
+    const [greekFirst] = screen.getAllByRole('listitem');
+    expect(within(greekFirst as HTMLElement).getByText('Νίκος Οδηγός')).not.toHaveAttribute('lang');
+  });
+
   it('shows who is coming in which car, and lets the owner call off what hasn’t begun', async () => {
     const { container } = await show(listing());
     expect(requireSession).toHaveBeenCalledWith(`/owner/listings/${LISTING_ID}/bookings`);
@@ -152,7 +173,9 @@ describe('a listing’s bookings page', () => {
 
   it('isolates the driver’s name, and leads back to closures', async () => {
     await show(listing());
-    expect(screen.getAllByText('Νίκος Οδηγός')[0]?.tagName).toBe('BDI');
+    expect(screen.getAllByText('Νίκος Οδηγός')[0]?.closest('bdi')).toHaveTextContent(
+      /^Νίκος Οδηγός$/,
+    );
     expect(screen.getByRole('link', { name: 'Closures and special hours' })).toHaveAttribute(
       'href',
       `/en/owner/listings/${LISTING_ID}/closures`,

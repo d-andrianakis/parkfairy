@@ -156,19 +156,20 @@ export default async function OwnerBookingsPage({ params, searchParams }: OwnerB
               [
                 t('bookings.space'),
                 <span key="space" lang={listing.contentLocale} className="font-mono">
-                  {booking.spaceLabel}
+                  <PlaceWords text={booking.spaceLabel} lang={listing.contentLocale} />
                 </span>,
               ],
               [
                 t('bookings.stay'),
                 <StayRange key="stay" start={booking.start} end={booking.end} />,
               ],
-              // The driver's own words, in a language nobody told us.
+              // The driver's own words, in a language nobody told us. Greek script can only be
+              // Greek, so that is marked on an English page.
               [
                 t('bookings.driver'),
                 // Isolated: a name in a right-to-left script mustn't reorder the line around it.
                 <bdi key="driver" className="wrap-anywhere">
-                  {booking.driverName}
+                  <PlaceWords text={booking.driverName} lang={locale} />
                 </bdi>,
               ],
               [

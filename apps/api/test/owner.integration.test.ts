@@ -33,6 +33,7 @@ import {
   markEmailSent,
   MAX_EMAIL_ATTEMPTS,
   purgeSentEmails,
+  releaseEmails,
   schema,
   type ClaimedEmail,
   type Database,
@@ -2353,6 +2354,44 @@ describe('owner onboarding', () => {
       it('keeps trying for about a day, so an outage doesn’t lose emails', () => {
         const minutes = Array.from({ length: MAX_EMAIL_ATTEMPTS - 1 }, (_, i) => 2 ** (i + 1));
         expect(minutes.reduce((sum, wait) => sum + wait, 0)).toBeGreaterThan(24 * 60);
+      });
+
+      it('gives back what a run didn’t get to: due now, with its try returned', async () => {
+        const email = await queued();
+        expect(email.attempts).toBe(1);
+        await releaseEmails(db, [email]);
+        // Due by the database's clock, which claims go by (Docker's can run ahead of this one).
+        const [row] = await db
+          .select({
+            attempts: schema.emailOutbox.attempts,
+            due: sql<boolean>`${schema.emailOutbox.nextAttemptAt} <= now()`,
+          })
+          .from(schema.emailOutbox)
+          .where(eq(schema.emailOutbox.id, email.id));
+        expect(row).toEqual({ attempts: 0, due: true });
+        const again = (await claimDueEmails(db, 500)).find((due) => due.id === email.id);
+        expect(again?.attempts).toBe(1);
+        if (again) await markEmailSent(db, again.id);
+      });
+
+      it('gives back only a claim still held', async () => {
+        const sent = await queued();
+        await markEmailSent(db, sent.id);
+        const lost = await queued();
+        // Its claim lapsed and another worker took it: that claim is the other worker's.
+        await db
+          .update(schema.emailOutbox)
+          .set({ nextAttemptAt: new Date(Date.now() - 1000) })
+          .where(eq(schema.emailOutbox.id, lost.id));
+        const retaken = (await claimDueEmails(db, 500)).find((due) => due.id === lost.id);
+        expect(retaken?.attempts).toBe(2);
+        await releaseEmails(db, [sent, lost]);
+        expect((await stored(sent.id)).status).toBe('sent');
+        const row = await stored(lost.id);
+        expect(row.attempts).toBe(2);
+        expect(row.nextAttemptAt.getTime()).toBeGreaterThan(Date.now());
+        await markEmailSent(db, lost.id);
+        await releaseEmails(db, []);
       });
 
       it('takes back an email whose worker died', async () => {

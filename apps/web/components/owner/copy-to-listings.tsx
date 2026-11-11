@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { FormError } from '@/components/form-error';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
+import { PlaceName, placeTag } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { useOwnerError, type Outcome } from '@/lib/owner-client';
 import { ownerBookingsHref } from '@/lib/owner-href';
@@ -191,8 +192,8 @@ export function CopyToListings({
                 <CheckboxField
                   id={`${name}-${listing.id}`}
                   label={
-                    <span lang={langOf(listing.id)} className="wrap-anywhere">
-                      {nameOf(listing.id)}
+                    <span className="wrap-anywhere">
+                      <PlaceName text={nameOf(listing.id)} lang={langOf(listing.id)} />
                     </span>
                   }
                   checked={chosen.has(listing.id)}
@@ -220,9 +221,11 @@ export function CopyToListings({
           ) : null}
           {kept.map(({ id: listingId, outcome }) => (
             <p key={listingId}>
-              {texts.kept(outcome, nameOf(listingId), (chunks) => (
-                <span lang={langOf(listingId)}>{chunks}</span>
-              ))}
+              {texts.kept(
+                outcome,
+                nameOf(listingId),
+                placeTag(nameOf(listingId), langOf(listingId)),
+              )}
               {/* Where to cancel them, beside the listing it names (WCAG 2.4.4, in context). */}
               {outcome === 'booked' ? (
                 <>

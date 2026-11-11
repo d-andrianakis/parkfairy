@@ -130,6 +130,31 @@ export async function claimDueEmails(db: Database, limit: number): Promise<Claim
     .orderBy(asc(emailOutbox.createdAt));
 }
 
+/**
+ * Gives back claimed emails the worker didn't finish: its run's time was up, or it is shutting
+ * down. They are due again at once, with the try their claim counted given back, since no try
+ * was made (or none that can be told apart from one; a send stopped half way is safe to repeat
+ * under its idempotency key). For emails not marked sent or failed: a row since sent, given up on
+ * or claimed again keeps what it has.
+ */
+export async function releaseEmails(
+  db: Database,
+  emails: Pick<ClaimedEmail, 'id' | 'attempts'>[],
+): Promise<void> {
+  if (emails.length === 0) return;
+  const claims = sql.join(
+    emails.map(({ id, attempts }) => sql`(${id}::uuid, ${attempts}::integer)`),
+    sql`, `,
+  );
+  await db.execute(sql`
+    update email_outbox
+    set next_attempt_at = now(), attempts = attempts - 1
+    where (id, attempts) in (${claims})
+      and status = 'pending'
+      and next_attempt_at > now()
+  `);
+}
+
 export async function markEmailSent(db: Database, id: string): Promise<void> {
   await db
     .update(emailOutbox)

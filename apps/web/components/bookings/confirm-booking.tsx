@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
+import { placeTag } from '@/components/parking/place-words';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { Link, useRouter } from '@/i18n/navigation';
 import { attempt, CHOOSE_AGAIN, useBookingError } from '@/lib/booking-client';
@@ -174,7 +175,7 @@ export function ConfirmBooking({
         <div className="grid gap-3">
           <p ref={question} tabIndex={-1} className={FOCUS_TARGET}>
             {t.rich('releaseQuestion', {
-              space: () => <span lang={spaceLocale}>{space}</span>,
+              space: placeTag(space, spaceLocale),
             })}
           </p>
           <div className="flex flex-wrap gap-2">

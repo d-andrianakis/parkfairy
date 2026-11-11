@@ -195,6 +195,51 @@ describe('ListingMilestones', () => {
     expect(within(link).getByText('Γκαράζ Ερμού')).toHaveAttribute('lang', 'el');
   });
 
+  it('names a live listing in its own language in the link to its page', () => {
+    renderInSubtree(
+      <ListingMilestones listing={progressFixture({ status: 'published', slug: 'garaz-ermou' })} />,
+    );
+    const link = screen.getByRole('link', { name: 'See “Γκαράζ Ερμού” as drivers see it' });
+    expect(within(link).getByText('Γκαράζ Ερμού')).toHaveAttribute('lang', 'el');
+  });
+
+  it('marks the Greek words in an English listing’s name, in each link that names it', () => {
+    const { container } = renderInSubtree(
+      <ListingMilestones
+        listing={progressFixture({
+          name: 'Garage on Οδός Ερμού',
+          contentLocale: 'en',
+          status: 'published',
+          slug: 'garage-on-ermou',
+        })}
+      />,
+      { locale: 'el' },
+    );
+    for (const name of [
+      'Δείτε τον χώρο «Garage on Οδός Ερμού» όπως τον βλέπουν οι οδηγοί',
+      'Κρατήσεις για «Garage on Οδός Ερμού»',
+      'Κλειστές ημέρες και ειδικό ωράριο για «Garage on Οδός Ερμού»',
+    ]) {
+      const link = screen.getByRole('link', { name });
+      const greek = within(link).getByText('Οδός Ερμού');
+      expect(greek).toHaveAttribute('lang', 'el');
+      expect(greek.parentElement).toHaveAttribute('lang', 'en');
+    }
+    // The heading too, whose name is the page's own.
+    expect(
+      within(screen.getByRole('heading', { level: 2 })).getByText('Οδός Ερμού'),
+    ).toHaveAttribute('lang', 'el');
+    return expectNoAxeViolations(container);
+  });
+
+  it('leaves an untitled listing’s name in the sentence, ours', () => {
+    renderInSubtree(
+      <ListingMilestones listing={progressFixture({ name: null, status: 'in_review' })} />,
+    );
+    const link = screen.getByRole('link', { name: /^Bookings for “/ });
+    expect(link.querySelector('[lang]')).toBeNull();
+  });
+
   it('shows the owner’s cover photo as decoration', () => {
     const { container } = renderInSubtree(
       <ListingMilestones

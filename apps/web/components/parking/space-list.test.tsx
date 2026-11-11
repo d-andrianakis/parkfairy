@@ -85,6 +85,32 @@ describe('SpaceList', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('marks a Greek label in an English listing, and leaves a Latin one', () => {
+    renderWithProviders(
+      <>
+        <h2 id="spaces">Spaces</h2>
+        <SpaceList
+          labelledBy="spaces"
+          listing={{
+            spaces: [
+              { ...spaces(1)[0]!, label: 'Θέση 1' },
+              { ...spaces(2)[1]!, label: 'P2' },
+            ],
+            spaceCount: 2,
+            contentLocale: 'en',
+            spacePricesVary: false,
+          }}
+        />
+      </>,
+    );
+    // The number after the space is the same in both languages, and stays with the label.
+    const greek = screen.getByText('Θέση');
+    expect(greek).toHaveAttribute('lang', 'el');
+    expect(greek.parentElement).toHaveAttribute('lang', 'en');
+    expect(greek.parentElement).toHaveTextContent(/^Θέση 1$/);
+    expect(screen.getByText('P2')).toHaveAttribute('lang', 'en');
+  });
+
   it('says how many more a big garage has, in the page language', () => {
     renderList(LISTING_SPACES_LIMIT + 3, 'el');
     expect(screen.getAllByRole('listitem')).toHaveLength(LISTING_SPACES_LIMIT);

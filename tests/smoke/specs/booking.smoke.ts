@@ -119,9 +119,21 @@ test('a driver books a space, the owner sees who is coming, and closing that day
     expect(reference).toMatch(REFERENCE);
     await expectAccessible(driver);
 
-    // Both sides hear of it, from the worker.
-    await waitForEmail(driverEmail, `Your parking is booked (${reference})`, WORKER_EMAIL);
-    await waitForEmail(ownerEmail, `New booking for “${name}”`, WORKER_EMAIL);
+    // Both sides hear of it, from the worker, the Greek listing's name read in Greek in their
+    // English emails, and its address beside it.
+    const booked = await waitForEmail(
+      driverEmail,
+      `Your parking is booked (${reference})`,
+      WORKER_EMAIL,
+    );
+    expect(booked.html).toContain(`Your space at “<span lang="el">${name}</span>” is booked.`);
+    expect(booked.html).toContain(
+      'lang="el" style="padding:2px 0;vertical-align:top;color:#0f172a">Οδός Δοκιμής 1, Ηράκλειο</td>',
+    );
+    const received = await waitForEmail(ownerEmail, `New booking for “${name}”`, WORKER_EMAIL);
+    expect(received.html).toContain(
+      `A driver has booked a space at “<span lang="el">${name}</span>”.`,
+    );
 
     // The driver's own list has it.
     await driver.goto('/en/bookings');
@@ -339,19 +351,32 @@ test('an owner pages through a busy listing, and a cancel on a later page comes 
   test.skip(!HAS_DATABASE, 'Putting a listing live, and its bookings, are done in the database');
   test.setTimeout(120_000);
 
-  await registerAndSignIn(page, uniqueEmail('busy-owner'), 'Owner Busy');
-  const { id } = await listingWithStaff(
-    page,
-    `Γκαράζ πολλών κρατήσεων ${randomUUID().slice(0, 6)}`,
-  );
+  // Greek words in an English listing, a Greek alpha for its space, and a Greek name for the
+  // driver (the bookings are the owner's own): each read in Greek on the English page.
+  await registerAndSignIn(page, uniqueEmail('busy-owner'), 'Νίκη Πολλών');
+  const name = `Garage by Πλατεία Κλαυθμώνος ${randomUUID().slice(0, 6)}`;
+  const { id } = await listingWithStaff(page, name, { spaces: ['Α1'], contentLocale: 'en' });
   await publishListing(id);
   await addBookings(id, 25);
   const cards = page.getByRole('heading', { level: 2, name: /^Booking [0-9A-Z]{4}-[0-9A-Z]{4}$/ });
   const pages = page.getByRole('navigation', { name: 'Pages' });
 
   try {
-    await page.goto(`/en/owner/listings/${id}/bookings`);
+    // The dashboard's link to them names the listing, its Greek words marked inside the sentence.
+    await page.goto('/en/owner');
+    const toBookings = page.getByRole('link', { name: `Bookings for “${name}”` });
+    await expect(toBookings.locator('[lang="en"] > [lang="el"]')).toHaveText('Πλατεία Κλαυθμώνος');
+    await expectAccessible(page);
+
+    await toBookings.click();
+    await expect(page).toHaveURL(`/en/owner/listings/${id}/bookings`);
     await expect(cards).toHaveCount(20);
+    const first = page.getByRole('main').getByRole('listitem').first();
+    await expect(first.locator('[lang="en"] > [lang="el"]')).toHaveText('Α1');
+    await expect(first.locator('bdi > [lang="el"]')).toHaveText('Νίκη Πολλών');
+    await expect(page.locator('main [lang="en"] > [lang="el"]').first()).toHaveText(
+      'Πλατεία Κλαυθμώνος',
+    );
     await expect(pages.getByRole('link', { name: 'Previous page' })).toHaveCount(0);
     await pages.getByRole('link', { name: 'Next page' }).click();
     await expect(page).toHaveURL(/\?after=\d+_[0-9a-f-]{36}$/);

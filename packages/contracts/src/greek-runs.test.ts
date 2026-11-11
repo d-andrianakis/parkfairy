@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { greekRuns } from './greek-runs';
+import { greekRuns } from './greek-runs.js';
 
 describe('greekRuns', () => {
   it('marks a Greek name inside English, keeping the words between Greek ones in it', () => {

@@ -58,7 +58,7 @@ describe('resendTransport', () => {
     await transport.send(email);
 
     expect(fetchFn).toHaveBeenCalledTimes(2);
-    expect(wait).toHaveBeenCalledWith(500);
+    expect(wait).toHaveBeenCalledWith(500, undefined);
     expect(requestAt(fetchFn, 1).headers.get('idempotency-key')).toBe(
       requestAt(fetchFn, 0).headers.get('idempotency-key'),
     );
@@ -113,8 +113,8 @@ describe('resendTransport', () => {
 
     await transport.send(email);
 
-    expect(wait).toHaveBeenCalledWith(7_000);
-    expect(wait).toHaveBeenCalledWith(30_000); // a quota hours away must not hold the process
+    expect(wait).toHaveBeenCalledWith(7_000, undefined);
+    expect(wait).toHaveBeenCalledWith(30_000, undefined); // a quota hours away must not hold the process
   });
 
   it('names Resend’s error, so an unverified domain shows in the logs', async () => {
@@ -166,6 +166,66 @@ describe('resendTransport', () => {
     const error = await transport.send(email).catch((caught: unknown) => caught);
     expect(String(error)).not.toMatch(/maria|token/);
   });
+
+  describe('stopped by its caller', () => {
+    const stop = new Error('time is up');
+
+    it('drops the request in flight and tries no more', async () => {
+      const controller = new AbortController();
+      const fetchFn = vi.fn<typeof fetch>(
+        (_, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+            controller.abort(stop);
+          }),
+      );
+      const transport = resendTransport({ apiKey: 're_k', from: 'P <a@b.gr>', fetchFn });
+
+      await expect(transport.send(email, { signal: controller.signal })).rejects.toBe(stop);
+      expect(fetchFn).toHaveBeenCalledOnce();
+    });
+
+    it('stops waiting between tries', async () => {
+      const controller = new AbortController();
+      const fetchFn = vi.fn<typeof fetch>(() => {
+        // Resend fails, and the caller gives up during the 500 ms before the next try.
+        setTimeout(() => controller.abort(stop), 10);
+        return Promise.resolve(new Response(null, { status: 503 }));
+      });
+      const transport = resendTransport({ apiKey: 're_k', from: 'P <a@b.gr>', fetchFn });
+      const started = performance.now();
+
+      await expect(transport.send(email, { signal: controller.signal })).rejects.toThrow();
+      expect(fetchFn).toHaveBeenCalledOnce();
+      expect(performance.now() - started).toBeLessThan(400);
+    });
+
+    it('sends nothing once stopped', async () => {
+      const { fetchFn, transport } = resend([200]);
+      await expect(transport.send(email, { signal: AbortSignal.abort(stop) })).rejects.toBe(stop);
+      expect(fetchFn).not.toHaveBeenCalled();
+    });
+
+    it('still times out a request that never answers', async () => {
+      const fetchFn = vi.fn<typeof fetch>(
+        (_, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new Error('timed out')));
+          }),
+      );
+      const transport = resendTransport({
+        apiKey: 're_k',
+        from: 'P <a@b.gr>',
+        fetchFn,
+        wait: () => Promise.resolve(),
+        timeoutMs: 1,
+      });
+
+      const signal = new AbortController().signal;
+      await expect(transport.send(email, { signal })).rejects.toThrow('Error');
+      expect(fetchFn).toHaveBeenCalledTimes(3);
+    });
+  });
 });
 
 let directory = '';
@@ -176,6 +236,15 @@ describe('outboxTransport', () => {
     const file = join(directory, 'a-file');
     writeFileSync(file, '');
     await expect(outboxTransport(join(file, 'nested')).send(email)).rejects.toThrow();
+  });
+
+  it('writes nothing once stopped', async () => {
+    directory = mkdtempSync(join(tmpdir(), 'parkfairy-outbox-'));
+    const stop = new Error('shutting down');
+    await expect(
+      outboxTransport(directory).send(email, { signal: AbortSignal.abort(stop) }),
+    ).rejects.toBe(stop);
+    expect(readdirSync(directory)).toEqual([]);
   });
 
   afterEach(() => {

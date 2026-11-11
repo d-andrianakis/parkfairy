@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 export interface OutgoingEmail {
   to: string;
@@ -11,9 +12,17 @@ export interface OutgoingEmail {
   idempotencyKey?: string;
 }
 
+export interface SendOptions {
+  /**
+   * Stops the send where it is (the request, a wait between tries) and rejects. Whether Resend got
+   * the email is then unknown; sending it again under the same idempotency key is safe.
+   */
+  signal?: AbortSignal | undefined;
+}
+
 export interface EmailTransport {
   /** Resolves once the email is accepted; rejects with a reason that holds no address or link. */
-  send(email: OutgoingEmail): Promise<void>;
+  send(email: OutgoingEmail, options?: SendOptions): Promise<void>;
 }
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
@@ -56,34 +65,37 @@ export function resendTransport({
   apiKey,
   from,
   fetchFn = fetch,
-  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  wait = (ms, signal) => sleep(ms, undefined, { signal }),
   timeoutMs = REQUEST_TIMEOUT_MS,
   intervalMs = SEND_INTERVAL_MS,
 }: {
   apiKey: string;
   from: string;
   fetchFn?: typeof fetch;
-  wait?: (ms: number) => Promise<void>;
+  /** Rejects once `signal` is aborted. */
+  wait?: (ms: number, signal?: AbortSignal) => Promise<unknown>;
   timeoutMs?: number;
   /** The least time between two calls of this sender. */
   intervalMs?: number;
 }): EmailTransport {
   let nextSlot = 0;
   /** Waits for this call's turn; each call books the next free slot. */
-  async function turn() {
+  async function turn(signal?: AbortSignal) {
     const now = Date.now();
     const slot = Math.max(now, nextSlot);
     nextSlot = slot + intervalMs;
-    if (slot > now) await wait(slot - now);
+    if (slot > now) await wait(slot - now, signal);
   }
 
   return {
-    async send({ to, subject, text, html, idempotencyKey = randomUUID() }) {
+    async send({ to, subject, text, html, idempotencyKey = randomUUID() }, { signal } = {}) {
       let failure = '';
       let retryAfter = 0;
       for (const delay of [0, ...RETRY_DELAYS_MS]) {
-        if (delay) await wait(Math.max(delay, retryAfter));
-        await turn();
+        if (delay) await wait(Math.max(delay, retryAfter), signal);
+        await turn(signal);
+        // An abort between the turn and the call (the wait passed undisturbed) still stops it.
+        signal?.throwIfAborted();
         try {
           const response = await fetchFn(RESEND_ENDPOINT, {
             method: 'POST',
@@ -93,7 +105,9 @@ export function resendTransport({
               'idempotency-key': idempotencyKey,
             },
             body: JSON.stringify({ from, to: [to], subject, text, html }),
-            signal: AbortSignal.timeout(timeoutMs),
+            signal: signal
+              ? AbortSignal.any([AbortSignal.timeout(timeoutMs), signal])
+              : AbortSignal.timeout(timeoutMs),
           });
           if (response.ok) {
             await response.body?.cancel(); // an unread body would hold the connection
@@ -103,6 +117,8 @@ export function resendTransport({
           if (!isRetryable(response.status)) break;
           retryAfter = retryAfterMs(response);
         } catch (error) {
+          // Stopped by whoever sent it: no more tries.
+          if (signal?.aborted) throw signal.reason;
           failure = error instanceof Error ? error.name : 'Network error';
         }
       }
@@ -118,7 +134,8 @@ export function resendTransport({
  */
 export function outboxTransport(directory: string): EmailTransport {
   return {
-    async send(email) {
+    async send(email, { signal } = {}) {
+      signal?.throwIfAborted();
       await mkdir(directory, { recursive: true });
       const name = `${Date.now()}-${randomUUID()}.json`;
       const partial = join(directory, `${name}.partial`);

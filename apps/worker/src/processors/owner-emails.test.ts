@@ -6,6 +6,7 @@ import {
   markEmailFailed,
   markEmailSent,
   purgeSentEmails,
+  releaseEmails,
   type ClaimedEmail,
   type Database,
 } from '@parkfairy/database';
@@ -29,18 +30,20 @@ vi.mock('@parkfairy/database', () => ({
   markEmailFailed: vi.fn(),
   markEmailSent: vi.fn(),
   purgeSentEmails: vi.fn(),
+  releaseEmails: vi.fn(),
 }));
 
 const db = {} as Database;
 const logger = pino({ level: 'silent' });
 const send = vi.fn<EmailTransport['send']>();
-const context = (sendsPerSecond = 1) => ({
+const context = (sendsPerSecond = 1, signal?: AbortSignal) => ({
   db,
   logger,
   email: { transport: { send }, webUrl: 'https://parkfairy.example', sendsPerSecond },
+  signal,
 });
-const run = (name: string, sendsPerSecond?: number) =>
-  ownerEmailsProcessor.process({ id: '1', name } as Job, context(sendsPerSecond));
+const run = (name: string, sendsPerSecond?: number, signal?: AbortSignal) =>
+  ownerEmailsProcessor.process({ id: '1', name } as Job, context(sendsPerSecond, signal));
 
 const row = (overrides: Partial<ClaimedEmail> = {}): ClaimedEmail => ({
   id: 'email-1',
@@ -65,6 +68,8 @@ beforeEach(() => {
 describe('owner emails processor', () => {
   it('runs on its own queue, with a schedule for each job', () => {
     expect(ownerEmailsProcessor.queue).toBe(QUEUES.email);
+    // One job at a time over every worker process: two senders would pass Resend's limit.
+    expect(ownerEmailsProcessor.globalConcurrency).toBe(1);
     expect(ownerEmailsProcessor.schedules.map((s) => s.id).sort()).toEqual([
       'enqueue-listing-status-emails',
       'enqueue-onboarding-reminders',
@@ -91,7 +96,7 @@ describe('owner emails processor', () => {
 
   it('sends each due email with its outbox id as the idempotency key', async () => {
     vi.mocked(claimDueEmails).mockResolvedValue([row()]);
-    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 1, failed: 0 });
+    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 1, failed: 0, handedBack: 0 });
 
     const email = send.mock.calls[0]?.[0];
     expect(email?.to).toBe('owner@example.gr');
@@ -111,6 +116,7 @@ describe('owner emails processor', () => {
     await expect(run('send-owner-emails')).resolves.toEqual({
       sent: 2 * SEND_BATCH + 3,
       failed: 0,
+      handedBack: 0,
     });
     expect(claimDueEmails).toHaveBeenCalledTimes(3);
     expect(countOverdueEmails).toHaveBeenCalledOnce();
@@ -136,10 +142,111 @@ describe('owner emails processor', () => {
       });
       const result = await run('send-owner-emails', pace);
       expect(vi.mocked(claimDueEmails).mock.calls.map(([, limit]) => limit)).toEqual(sizes);
-      expect(result).toEqual({ sent: sizes.reduce((a, b) => a + b), failed: 0 });
+      expect(result).toEqual({ sent: sizes.reduce((a, b) => a + b), failed: 0, handedBack: 0 });
       expect(Date.now() - started).toBeLessThanOrEqual(SEND_RUN_MS);
     },
   );
+
+  describe('when its time is up', () => {
+    const backlog = () =>
+      vi
+        .mocked(claimDueEmails)
+        .mockImplementation((_db, limit) =>
+          Promise.resolve(Array.from({ length: limit }, (_, n) => row({ id: `email-${n}` }))),
+        );
+    const handedBackIds = () =>
+      vi.mocked(releaseEmails).mock.calls.flatMap(([, rows]) => rows.map(({ id }) => id));
+
+    it('hands back what a slow Resend left unsent, with nothing counted as failed', async () => {
+      vi.useFakeTimers({ now: new Date('2027-06-10T12:00:00Z') });
+      const started = Date.now();
+      backlog();
+      // Three seconds a send instead of one: the claim of 20 would take a minute.
+      send.mockImplementation(() => {
+        vi.setSystemTime(Date.now() + 3_000);
+        return Promise.resolve();
+      });
+      await expect(run('send-owner-emails')).resolves.toEqual({
+        sent: 9,
+        failed: 0,
+        handedBack: 11,
+      });
+      expect(claimDueEmails).toHaveBeenCalledOnce();
+      expect(handedBackIds()).toEqual(Array.from({ length: 11 }, (_, n) => `email-${n + 9}`));
+      expect(markEmailFailed).not.toHaveBeenCalled();
+      // The last send began before the deadline; none began after it.
+      expect(Date.now() - started).toBeLessThan(SEND_RUN_MS + 3_000);
+    });
+
+    it('stops a send still going at the deadline, and hands it back with the rest', async () => {
+      vi.useFakeTimers({ now: new Date('2027-06-10T12:00:00Z') });
+      backlog();
+      // The second send never answers by itself (retries, a long Retry-After).
+      send.mockResolvedValueOnce().mockImplementation(
+        (_email, options) =>
+          new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener('abort', () => reject(new Error('AbortError')));
+          }),
+      );
+      const result = run('send-owner-emails');
+      await vi.advanceTimersByTimeAsync(SEND_RUN_MS);
+      await expect(result).resolves.toEqual({ sent: 1, failed: 0, handedBack: 19 });
+      expect(handedBackIds()[0]).toBe('email-1');
+      expect(markEmailFailed).not.toHaveBeenCalled();
+      expect(claimDueEmails).toHaveBeenCalledOnce();
+      // Nothing is left waiting on the run.
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('stops at once when the worker shuts down, handing back the claim’s rest', async () => {
+      backlog();
+      const shutdown = new AbortController();
+      send.mockImplementation(() => {
+        // SIGTERM while the third email is sent: it goes out, the rest wait.
+        if (send.mock.calls.length === 3) shutdown.abort('shutting down');
+        return Promise.resolve();
+      });
+      await expect(run('send-owner-emails', 1, shutdown.signal)).resolves.toEqual({
+        sent: 3,
+        failed: 0,
+        handedBack: SEND_BATCH - 3,
+      });
+      expect(handedBackIds()).toHaveLength(SEND_BATCH - 3);
+      expect(claimDueEmails).toHaveBeenCalledOnce();
+    });
+
+    it('claims nothing once the worker is shutting down', async () => {
+      backlog();
+      await expect(
+        run('send-owner-emails', 1, AbortSignal.abort('shutting down')),
+      ).resolves.toEqual({ sent: 0, failed: 0, handedBack: 0 });
+      expect(claimDueEmails).not.toHaveBeenCalled();
+      expect(releaseEmails).not.toHaveBeenCalled();
+    });
+
+    it('says so in the logs, without addresses', async () => {
+      const lines: string[] = [];
+      const loud = pino({ level: 'info' }, { write: (line: string) => void lines.push(line) });
+      backlog();
+      const shutdown = new AbortController();
+      send.mockImplementation(() => {
+        shutdown.abort('shutting down');
+        return Promise.resolve();
+      });
+      await ownerEmailsProcessor.process({ id: '1', name: 'send-owner-emails' } as Job, {
+        ...context(1, shutdown.signal),
+        logger: loud,
+      });
+      const entry = JSON.parse(lines[0] ?? '{}') as Record<string, unknown>;
+      expect(entry).toMatchObject({
+        level: 40,
+        msg: 'unsent emails handed back for the next run',
+        handedBack: SEND_BATCH - 1,
+        shuttingDown: true,
+      });
+      expect(lines.join('')).not.toContain('owner@example.gr');
+    });
+  });
 
   it('counts failures across claims', async () => {
     const batch = (from: number, count: number) =>
@@ -151,6 +258,7 @@ describe('owner emails processor', () => {
     await expect(run('send-owner-emails')).resolves.toEqual({
       sent: SEND_BATCH + 2,
       failed: 1,
+      handedBack: 0,
     });
   });
 
@@ -159,7 +267,11 @@ describe('owner emails processor', () => {
       Promise.resolve(Array.from({ length: limit }, (_, n) => row({ id: `email-${n}` }))),
     );
     send.mockRejectedValue(new Error('Resend answered 503'));
-    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 0, failed: SEND_BATCH });
+    await expect(run('send-owner-emails')).resolves.toEqual({
+      sent: 0,
+      failed: SEND_BATCH,
+      handedBack: 0,
+    });
     expect(claimDueEmails).toHaveBeenCalledOnce();
     expect(markEmailFailed).toHaveBeenCalledTimes(SEND_BATCH);
   });
@@ -174,7 +286,7 @@ describe('owner emails processor', () => {
     vi.mocked(claimDueEmails).mockResolvedValue([row(), row({ id: 'email-2' })]);
     send.mockRejectedValueOnce(new Error('Resend answered 500'));
 
-    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 1, failed: 1 });
+    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 1, failed: 1, handedBack: 0 });
     expect(markEmailFailed).toHaveBeenCalledWith(
       db,
       expect.objectContaining({ id: 'email-1' }),
@@ -201,7 +313,7 @@ describe('owner emails processor', () => {
       row({ kind: 'booking-confirmed', locale: 'en', payload: { listingName: 'Γκαράζ', booking } }),
       row({ id: 'email-2', kind: 'booking-received', payload: { listingName: 'Γκαράζ', booking } }),
     ]);
-    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 2, failed: 0 });
+    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 2, failed: 0, handedBack: 0 });
     const [driver, owner] = send.mock.calls.map(([email]) => email);
     expect(driver?.subject).toBe('Your parking is booked (K7M4-Q2ZD)');
     expect(driver?.text).toContain(`https://parkfairy.example/en/bookings/${booking.id}`);
@@ -216,7 +328,7 @@ describe('owner emails processor', () => {
       row({ kind: 'booking-confirmed', payload: {} }),
       row({ id: 'email-2' }),
     ]);
-    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 1, failed: 1 });
+    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 1, failed: 1, handedBack: 0 });
     expect(markEmailFailed).toHaveBeenCalledWith(
       db,
       expect.objectContaining({ id: 'email-1' }),
@@ -227,7 +339,7 @@ describe('owner emails processor', () => {
   it('refuses a kind it has no template for, without losing the rest', async () => {
     const unknown = row({ kind: 'nonsense' as ClaimedEmail['kind'] });
     vi.mocked(claimDueEmails).mockResolvedValue([unknown, row({ id: 'email-2' })]);
-    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 1, failed: 1 });
+    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 1, failed: 1, handedBack: 0 });
     expect(send).toHaveBeenCalledOnce();
   });
 

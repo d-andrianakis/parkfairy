@@ -124,6 +124,78 @@ describe('the owner’s words', () => {
     expect(email.html).not.toContain(
       'lang="el" style="padding:2px 0;vertical-align:top;color:#0f172a">K7M4-Q2ZD',
     );
+    // And in the sentence that names it.
+    expect(email.html).toContain('Your space at “<span lang="el">Γκαράζ Ερμού</span>” is booked.');
+    expect(email.text).toContain('Your space at “Γκαράζ Ερμού” is booked.');
+  });
+
+  it('mark Greek words inside an English listing’s, whichever language the email is in', () => {
+    const facts = {
+      ...booking,
+      contentLocale: 'en',
+      address: 'Ermou 1, Σύνταγμα, Athens',
+      spaceLabel: 'Α1',
+    };
+    const english = renderBookingEmail({
+      ...base,
+      locale: 'en',
+      kind: 'booking-received',
+      listingName: 'Garage by Πλατεία Συντάγματος',
+      booking: facts,
+    });
+    expect(english.html).toContain(
+      '<td lang="en" style="padding:2px 0;vertical-align:top;color:#0f172a">Ermou 1, <span lang="el">Σύνταγμα</span>, Athens</td>',
+    );
+    // A Greek alpha in a space's label too.
+    expect(english.html).toContain('color:#0f172a"><span lang="el">Α1</span></td>');
+    // The name is the email's language already: only its Greek words are marked.
+    expect(english.html).toContain(
+      'A driver has booked a space at “Garage by <span lang="el">Πλατεία Συντάγματος</span>”.',
+    );
+    expect(english.text).toContain('Address: Ermou 1, Σύνταγμα, Athens');
+
+    // In Greek the name is English, Greek words and all: nothing is marked inside it.
+    const greek = renderBookingEmail({
+      ...base,
+      locale: 'el',
+      kind: 'booking-received',
+      listingName: 'Garage by Πλατεία Συντάγματος',
+      booking: facts,
+    });
+    expect(greek.html).toContain(
+      'στον χώρο «<span lang="en">Garage by <span lang="el">Πλατεία Συντάγματος</span></span>».',
+    );
+    expect(greek.html).toContain(
+      '<td lang="en" style="padding:2px 0;vertical-align:top;color:#0f172a">Ermou 1, <span lang="el">Σύνταγμα</span>, Athens</td>',
+    );
+  });
+
+  it('leave a listing with no name, and our own facts, in the email’s language', () => {
+    const email = renderBookingEmail({
+      ...base,
+      locale: 'en',
+      kind: 'booking-confirmed',
+      booking: { ...booking, contentLocale: 'el' },
+    });
+    expect(email.html).toContain('Your space at “Unnamed parking” is booked.');
+    expect(email.html).toContain(
+      '<td style="padding:2px 0;vertical-align:top;color:#0f172a">Unnamed parking</td>',
+    );
+  });
+
+  it('are escaped wherever they are marked', () => {
+    const email = renderBookingEmail({
+      ...base,
+      locale: 'el',
+      kind: 'booking-confirmed',
+      listingName: '<b>Γκαράζ</b> & "Co"',
+      booking: { ...booking, contentLocale: 'en', address: '<img src=x> Ερμού' },
+    });
+    expect(email.html).not.toMatch(/<b>|<img/);
+    expect(email.html).toContain(
+      '«<span lang="en">&lt;b&gt;<span lang="el">Γκαράζ</span>&lt;/b&gt; &amp; &quot;Co&quot;</span>»',
+    );
+    expect(email.html).toContain('&lt;img src=x&gt; <span lang="el">Ερμού</span>');
   });
 });
 

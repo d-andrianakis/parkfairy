@@ -116,6 +116,33 @@ describe('a booking’s page', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('marks the Greek words in an English listing’s words, the space’s label included', async () => {
+    const english = {
+      ...booking().listing,
+      name: 'Garage by Πλατεία Κλαυθμώνος',
+      address: 'Ermou 1, Σύνταγμα, Athens',
+      contentLocale: 'en' as const,
+    };
+    const { container } = await showBooking(booking({ listing: english, spaceLabel: 'Α1' }));
+    // Inside the sentence that holds it: a Greek alpha, read as Greek in an English label.
+    const held = screen.getByText(/keeping space/);
+    const label = within(held).getByText('Α1');
+    expect(label).toHaveAttribute('lang', 'el');
+    expect(label.parentElement).toHaveAttribute('lang', 'en');
+    expect(screen.getByText('Πλατεία Κλαυθμώνος')).toHaveAttribute('lang', 'el');
+    expect(screen.getByText('Σύνταγμα')).toHaveAttribute('lang', 'el');
+    await expectNoAxeViolations(container);
+  });
+
+  it('marks them in the facts of a booking made', async () => {
+    const english = { ...booking().listing, contentLocale: 'en' as const };
+    await showBooking(confirmed({ listing: english, spaceLabel: 'Θέση Α1' }), 'confirmed');
+    const label = screen.getByText('Θέση Α1');
+    expect(label).toHaveAttribute('lang', 'el');
+    expect(label.parentElement).toHaveAttribute('lang', 'en');
+    expect(label.parentElement).toHaveClass('font-mono');
+  });
+
   it('asks to choose again as soon as the hold has run out, swept or not (decision #37)', async () => {
     const lapsed = new Date(Date.now() - 60_000).toISOString();
     for (const status of ['held', 'expired'] as const) {
@@ -281,6 +308,30 @@ describe('the bookings list', () => {
     expect(first).toHaveAttribute('href', `/en/bookings/${ID}`);
     expect(screen.getAllByText('Booking K7M4-Q2ZD')).toHaveLength(2);
     await expectNoAxeViolations(container);
+  });
+
+  it('marks the Greek words in an English listing’s name and space', async () => {
+    const english = {
+      ...booking().listing,
+      name: 'Garage by Πλατεία Κλαυθμώνος',
+      contentLocale: 'en' as const,
+    };
+    const { container } = await show({}, list([confirmed({ listing: english })]));
+    const link = screen.getByRole('link', { name: 'Garage by Πλατεία Κλαυθμώνος' });
+    const greek = within(link).getByText('Πλατεία Κλαυθμώνος');
+    expect(greek).toHaveAttribute('lang', 'el');
+    expect(greek.parentElement).toHaveAttribute('lang', 'en');
+    const space = screen.getByText('Α1');
+    expect(space).toHaveAttribute('lang', 'el');
+    expect(space.parentElement).toHaveAttribute('lang', 'en');
+    await expectNoAxeViolations(container);
+  });
+
+  it('leaves an unnamed listing’s name, ours, unmarked', async () => {
+    const unnamed = { ...booking().listing, name: null };
+    await show({}, list([confirmed({ listing: unnamed })]));
+    const link = screen.getByRole('link', { name: 'Unnamed parking' });
+    expect(link.querySelector('[lang]')).toBeNull();
   });
 
   it('pages through the past, and keeps a made-up page in range', async () => {

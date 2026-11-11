@@ -186,7 +186,7 @@ export default async function ListingPage(props: ListingPageProps) {
               {t('aboutHeading')}
             </h2>
             <p lang={listing.contentLocale} className="mt-2">
-              {listing.description}
+              <PlaceWords text={listing.description} lang={listing.contentLocale} />
             </p>
           </section>
         ) : null}
@@ -250,7 +250,11 @@ export default async function ListingPage(props: ListingPageProps) {
                 spaces={listing.spaces.map((space) => ({
                   id: space.id,
                   // Owner content: Greek "Α1" looks like Latin "A1" but is read differently.
-                  label: <span lang={listing.contentLocale}>{space.label}</span>,
+                  label: (
+                    <span lang={listing.contentLocale}>
+                      <PlaceWords text={space.label} lang={listing.contentLocale} />
+                    </span>
+                  ),
                   details: (
                     <>
                       <FeatureBadges features={space.features} named={false} />

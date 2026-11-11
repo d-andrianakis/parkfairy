@@ -6,7 +6,6 @@ import { ArrowLeft, CircleAlert, CircleCheck } from 'lucide-react';
 import { HOLD_MINUTES } from '@parkfairy/contracts/validation';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import type { ReactNode } from 'react';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { BookingFacts } from '@/components/bookings/booking-facts';
 import { CancelBooking } from '@/components/bookings/cancel-booking';
@@ -14,6 +13,7 @@ import { ConfirmBooking } from '@/components/bookings/confirm-booking';
 import { HoldTimer } from '@/components/bookings/hold-timer';
 import { ClientMessages } from '@/components/client-messages';
 import { FocusHeading } from '@/components/focus-heading';
+import { placeTag } from '@/components/parking/place-words';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { timeOptions } from '@/i18n/formats';
 import { Link } from '@/i18n/navigation';
@@ -71,9 +71,6 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
   // Ended, swept or not: only choosing again books it (decision #37).
   const ended = booking.status === 'expired' || heldUntil <= now;
   const clock = (instant: number) => format.dateTime(new Date(instant), timeOptions(locale));
-  const spaceLabel = (chunks: ReactNode) => (
-    <span lang={booking.listing.contentLocale}>{chunks}</span>
-  );
   const again = listingStayHref(booking.listing.slug, booking.start, booking.end);
   const notice =
     done === 'confirmed' && booking.status === 'confirmed'
@@ -132,7 +129,7 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
         <div className="grid gap-4">
           <p>
             {t.rich('heldUntil', {
-              space: () => spaceLabel(booking.spaceLabel),
+              space: placeTag(booking.spaceLabel, booking.listing.contentLocale),
               time: clock(heldUntil),
               minutes: HOLD_MINUTES,
             })}

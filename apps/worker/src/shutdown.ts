@@ -1,6 +1,9 @@
 export interface ShutdownParts {
   health: { close: () => unknown };
-  workers: { close: (force?: boolean) => Promise<void> }[];
+  workers: {
+    close: (force?: boolean) => Promise<void>;
+    cancelAllJobs: (reason?: string) => void;
+  }[];
   queues: { close: () => Promise<void> }[];
   database: { close: () => Promise<void> };
   logger: {
@@ -12,8 +15,10 @@ export interface ShutdownParts {
 
 /**
  * The SIGTERM/SIGINT handler: stop taking health checks, let running jobs finish (workers
- * close unforced), then close queues and the database, and exit 0. A second signal while
- * this runs is ignored rather than starting a second shutdown. If closing fails, exit 1.
+ * close unforced), then close queues and the database, and exit 0. Running jobs are told to stop
+ * too (their signal), so a long one, the email sender in a rush, stops at its next safe point
+ * instead of outlasting the platform's stop timeout. A second signal while this runs is ignored
+ * rather than starting a second shutdown. If closing fails, exit 1.
  */
 export function createShutdown(parts: ShutdownParts) {
   let shuttingDown = false;
@@ -23,7 +28,14 @@ export function createShutdown(parts: ShutdownParts) {
     parts.logger.info({ signal }, 'shutting down: finishing active jobs');
     parts.health.close();
     try {
-      await Promise.all(parts.workers.map((worker) => worker.close()));
+      await Promise.all(
+        parts.workers.map((worker) => {
+          // Closing first: no new job starts after the running ones are told to stop.
+          const closed = worker.close();
+          worker.cancelAllJobs('shutting down');
+          return closed;
+        }),
+      );
       await Promise.all(parts.queues.map((queue) => queue.close()));
       await parts.database.close();
     } catch (error) {

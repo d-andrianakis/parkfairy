@@ -239,6 +239,16 @@ describe('the closures page', () => {
     await expect(page('not-found')).rejects.toThrow('not found');
   });
 
+  it('marks the Greek words in an English listing’s name, and leaves an unnamed one ours', async () => {
+    const named = await page(closures({ name: 'Garage on Οδός Ερμού' }));
+    const greek = screen.getByText('Οδός Ερμού');
+    expect(greek).toHaveAttribute('lang', 'el');
+    expect(greek.parentElement).toHaveAttribute('lang', 'en');
+    named.unmount();
+    await page(closures({ name: null }));
+    expect(screen.getByText('Unnamed listing')).not.toHaveAttribute('lang');
+  });
+
   it('names the listing in the page title, and only the page otherwise', async () => {
     const title = async (listing: Closures, locale = 'en') => {
       vi.mocked(loadOwnerClosures).mockResolvedValue(listing);
