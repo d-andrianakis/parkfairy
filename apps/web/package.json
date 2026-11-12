@@ -21,6 +21,8 @@
     "@parkfairy/database": "workspace:*",
     "@parkfairy/email": "workspace:*",
     "@parkfairy/ui": "workspace:*",
+    "@stripe/react-stripe-js": "7.0.1",
+    "@stripe/stripe-js": "10.2.0",
     "@tanstack/react-query": "5.105.0",
     "better-auth": "1.7.14",
     "ioredis": "6.0.0",

@@ -485,6 +485,30 @@ export type OwnerListingCreated = {
     id: string;
 };
 
+export type CheckoutKind = 'payment' | 'confirm';
+
+export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'refunding' | 'refunded';
+
+export type BookingPayment = {
+    clientSecret: string;
+    status: PaymentStatus;
+};
+
+export type PayoutStatus = 'none' | 'pending' | 'restricted' | 'active';
+
+export type OwnerPayouts = {
+    available: boolean;
+    status: PayoutStatus;
+};
+
+export type PayoutLinkInput = {
+    locale: Locale;
+};
+
+export type PayoutLink = {
+    url: string;
+};
+
 export type BookingStatus = 'held' | 'confirmed' | 'cancelled' | 'expired' | 'released';
 
 export type BookingCanceller = 'driver' | 'owner';
@@ -530,6 +554,8 @@ export type Booking = {
     cancelledBy: BookingCanceller | null;
     refund: Money | null;
     refundIfCancelled: Money | null;
+    checkout: CheckoutKind;
+    payment: PaymentStatus | null;
 };
 
 export type BookingListQuery = {
@@ -1404,6 +1430,55 @@ export type ConfirmMyBookingResponses = {
 
 export type ConfirmMyBookingResponse = ConfirmMyBookingResponses[keyof ConfirmMyBookingResponses];
 
+export type PayForMyBookingData = {
+    body: BookingConfirmInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/bookings/{id}/payment';
+};
+
+export type PayForMyBookingErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+    503: ErrorResponse;
+};
+
+export type PayForMyBookingError = PayForMyBookingErrors[keyof PayForMyBookingErrors];
+
+export type PayForMyBookingResponses = {
+    200: BookingPayment;
+};
+
+export type PayForMyBookingResponse = PayForMyBookingResponses[keyof PayForMyBookingResponses];
+
+export type SettleMyPaymentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/bookings/{id}/payment/settle';
+};
+
+export type SettleMyPaymentErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+    503: ErrorResponse;
+};
+
+export type SettleMyPaymentError = SettleMyPaymentErrors[keyof SettleMyPaymentErrors];
+
+export type SettleMyPaymentResponses = {
+    200: Booking;
+};
+
+export type SettleMyPaymentResponse = SettleMyPaymentResponses[keyof SettleMyPaymentResponses];
+
 export type ExtendMyHoldData = {
     body?: never;
     path: {
@@ -1500,6 +1575,68 @@ export type CancelListingBookingResponses = {
 };
 
 export type CancelListingBookingResponse = CancelListingBookingResponses[keyof CancelListingBookingResponses];
+
+export type GetOwnerPayoutsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/payouts';
+};
+
+export type GetOwnerPayoutsErrors = {
+    401: ErrorResponse;
+    503: ErrorResponse;
+};
+
+export type GetOwnerPayoutsError = GetOwnerPayoutsErrors[keyof GetOwnerPayoutsErrors];
+
+export type GetOwnerPayoutsResponses = {
+    200: OwnerPayouts;
+};
+
+export type GetOwnerPayoutsResponse = GetOwnerPayoutsResponses[keyof GetOwnerPayoutsResponses];
+
+export type StartPayoutOnboardingData = {
+    body: PayoutLinkInput;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/payouts/onboarding';
+};
+
+export type StartPayoutOnboardingErrors = {
+    401: ErrorResponse;
+    409: ErrorResponse;
+    503: ErrorResponse;
+};
+
+export type StartPayoutOnboardingError = StartPayoutOnboardingErrors[keyof StartPayoutOnboardingErrors];
+
+export type StartPayoutOnboardingResponses = {
+    200: PayoutLink;
+};
+
+export type StartPayoutOnboardingResponse = StartPayoutOnboardingResponses[keyof StartPayoutOnboardingResponses];
+
+export type OpenPayoutDashboardData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/payouts/dashboard';
+};
+
+export type OpenPayoutDashboardErrors = {
+    401: ErrorResponse;
+    409: ErrorResponse;
+    503: ErrorResponse;
+};
+
+export type OpenPayoutDashboardError = OpenPayoutDashboardErrors[keyof OpenPayoutDashboardErrors];
+
+export type OpenPayoutDashboardResponses = {
+    200: PayoutLink;
+};
+
+export type OpenPayoutDashboardResponse = OpenPayoutDashboardResponses[keyof OpenPayoutDashboardResponses];
 
 export type GetPlaceSuggestionsData = {
     body?: never;

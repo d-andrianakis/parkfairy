@@ -11,10 +11,16 @@ import { useEffect, useRef, type ReactNode } from 'react';
 export function FocusHeading({
   level: Heading = 'h2',
   retitle = false,
+  id,
+  className = 'text-base',
   children,
 }: {
   level?: 'h2' | 'h3';
   retitle?: boolean;
+  /** For a section it names (`aria-labelledby`). */
+  id?: string;
+  /** Its size: the notices' by default. */
+  className?: string;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLHeadingElement>(null);
@@ -33,8 +39,9 @@ export function FocusHeading({
     <>
       <Heading
         ref={ref}
+        id={id}
         tabIndex={-1}
-        className="rounded-sm text-base font-semibold outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className={`rounded-sm font-semibold outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/50 ${className}`}
       >
         {children}
       </Heading>

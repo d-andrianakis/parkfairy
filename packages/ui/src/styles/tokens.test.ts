@@ -134,6 +134,39 @@ it('the emails still use the light primary', () => {
   expect(/const PRIMARY = '(#[0-9a-f]{6})'/.exec(email)?.[1]).toBe(`#${channels?.join('')}`);
 });
 
+// Stripe's fields can't read this file either, nor oklch: the payment page writes ours as hex.
+it.each([
+  ['STRIPE_LIGHT', light],
+  ['STRIPE_DARK', dark],
+] as const)('the payment form’s %s colours are our tokens', (name, palette) => {
+  const source = readFileSync(
+    new URL('../../../../apps/web/lib/stripe-appearance.ts', import.meta.url),
+    'utf8',
+  );
+  const block = new RegExp(`export const ${name} = \\{([^}]*)\\}`).exec(source)?.[1] ?? '';
+  const hex = (token: string) =>
+    `#${(palette[token]?.rgb ?? [])
+      .map((v) =>
+        Math.round(v * 255)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')}`;
+  for (const [key, token] of [
+    ['background', 'background'],
+    ['foreground', 'foreground'],
+    ['muted', 'muted-foreground'],
+    ['border', 'input'],
+    ['primary', 'primary'],
+    ['destructive', 'destructive'],
+    ['ring', 'ring'],
+  ] as const) {
+    expect(new RegExp(`${key}: '(#[0-9a-f]{6})'`).exec(block)?.[1], `${name}.${key}`).toBe(
+      hex(token),
+    );
+  }
+});
+
 describe.each([
   ['light', light],
   ['dark', dark],

@@ -7,6 +7,7 @@ import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { answer, refusal } from '@/test/owner-fixtures';
 import { routerMock } from '@/test/navigation-mock';
 import { rendererFor } from '@/test/render';
+import { setPaying } from '@/lib/payment-progress';
 import { HOLD_WARNING_MS, HoldTimer } from './hold-timer';
 
 vi.mock('@parkfairy/api-client', () => ({
@@ -23,6 +24,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  setPaying(false);
 });
 
 describe('HoldTimer', () => {
@@ -72,6 +74,43 @@ describe('HoldTimer', () => {
     });
     await userEvent.click(screen.getByRole('button', { name: 'Κρατήστε τη για άλλα 10 λεπτά' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('δεν μπορεί να κρατηθεί άλλο');
+    expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('HoldTimer, where the driver pays (decision #49)', () => {
+  it('says to pay, not confirm, once it can be kept no longer', () => {
+    renderInSubtree(
+      <HoldTimer id={ID} expiresAt={inMinutes(5)} extensionsLeft={0} checkout="payment" />,
+    );
+    expect(
+      screen.getByText(/^This space has been kept as long as it can be\. Pay before/),
+    ).toBeInTheDocument();
+  });
+
+  it('doesn’t end the page in the middle of a payment, and does once it is over', () => {
+    vi.useFakeTimers();
+    renderInSubtree(
+      <HoldTimer id={ID} expiresAt={inMinutes(1)} extensionsLeft={10} checkout="payment" />,
+    );
+    setPaying(true);
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(routerMock.refresh).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(routerMock.refresh).not.toHaveBeenCalled();
+    setPaying(false);
+    act(() => vi.advanceTimersByTime(15_000));
+    expect(routerMock.refresh).toHaveBeenCalledOnce();
+  });
+
+  it('follows the hold the server kept longer (going to pay renews one running low)', () => {
+    vi.useFakeTimers();
+    const view = renderInSubtree(<HoldTimer id={ID} expiresAt={inMinutes(1)} extensionsLeft={5} />);
+    act(() => vi.advanceTimersByTime(0));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    view.rerender(<HoldTimer id={ID} expiresAt={inMinutes(10)} extensionsLeft={4} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(60_000));
     expect(routerMock.refresh).not.toHaveBeenCalled();
   });
 });

@@ -6,11 +6,13 @@ import {
   getOtherOwnerListings,
   getOwnerListing,
   getOwnerOnboarding,
+  getOwnerPayouts,
   getOwnerProfile,
   type OwnerListing,
   type OwnerListingClosures,
   type OwnerOnboarding,
   type OwnerOtherListings,
+  type OwnerPayouts,
   type OwnerProfile,
 } from '@parkfairy/api-client';
 import { headers } from 'next/headers';
@@ -47,6 +49,16 @@ const request = async () => ({
 export const loadOwnerOnboarding = cache(async (): Promise<OwnerOnboarding | null> => {
   try {
     const { data } = await getOwnerOnboarding(await request());
+    return data ?? null;
+  } catch {
+    return null;
+  }
+});
+
+/** Where the owner's payouts stand (decision #48), or null when the API could not answer. */
+export const loadOwnerPayouts = cache(async (): Promise<OwnerPayouts | null> => {
+  try {
+    const { data } = await getOwnerPayouts(await request());
     return data ?? null;
   } catch {
     return null;

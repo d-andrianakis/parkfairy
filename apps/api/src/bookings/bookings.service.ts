@@ -1,7 +1,14 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import {
   addDays,
   bookingsCursor,
+  BookingPaymentSchema,
   BookingSchema,
   BOOKINGS_PAGE_SIZE,
   BookingListSchema,
@@ -15,6 +22,8 @@ import {
   type Booking,
   type BookingCancelInput,
   type BookingConfirmInput,
+  type BookingPayment,
+  type CheckoutKind,
   type BookingHoldInput,
   type BookingList,
   type BookingListQuery,
@@ -25,7 +34,7 @@ import {
   type OwnerListingBookings,
 } from '@parkfairy/contracts';
 import { schema, type Database, type OutboxBooking } from '@parkfairy/database';
-import { and, asc, desc, eq, gt, lte, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { DB } from '../database/database.module.js';
@@ -33,6 +42,12 @@ import { conflict, listingNotFound } from '../owner/owner.errors.js';
 import { listingRulesIn, utcDay, type ListingRules, type Reader } from '../parking/listing-data.js';
 import { isOpenThroughout } from '../parking/opening-hours.js';
 import { NO_PRICE_RULES, quoteStayMinor } from '../parking/pricing.js';
+import { PAYMENTS } from '../payments/payments.tokens.js';
+import {
+  PaymentProviderError,
+  type PaymentState,
+  type PaymentsGateway,
+} from '../payments/stripe-gateway.js';
 import { newBookingReference } from './booking-reference.js';
 import { refundMinor } from './refunds.js';
 
@@ -42,6 +57,8 @@ const space = schema.parkingSpaces;
 const profile = schema.ownerProfiles;
 const users = schema.users;
 const outbox = schema.emailOutbox;
+const payout = schema.payoutAccounts;
+const settings = schema.platformSettings;
 
 type BookingRow = typeof booking.$inferSelect;
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
@@ -117,8 +134,11 @@ function booked(row: BookingRow, info: ListingInfo): ListingInfo {
   };
 }
 
-/** The booking as its driver reads it; `now` decides what cancelling would give back. */
-function view(row: BookingRow, info: ListingInfo, now = new Date()): Booking {
+/**
+ * The booking as its driver reads it; `now` decides what cancelling would give back, `checkout`
+ * how a hold becomes a booking here (paying, or the stand-in press of #33).
+ */
+function viewOf(row: BookingRow, info: ListingInfo, now: Date, checkout: CheckoutKind): Booking {
   const cancellable = row.status === 'confirmed' && row.startsAt > now;
   return BookingSchema.parse({
     id: row.id,
@@ -149,8 +169,23 @@ function view(row: BookingRow, info: ListingInfo, now = new Date()): Booking {
           row.currency,
         )
       : null,
+    checkout,
+    payment: row.paymentStatus,
   });
 }
+
+/** Stripe failed or was too slow: nothing was charged, and trying again may work. */
+function providerFailed(): ServiceUnavailableException {
+  return new ServiceUnavailableException({
+    statusCode: 503,
+    error: 'Service Unavailable',
+    message: 'PAYMENT_PROVIDER_ERROR',
+    code: 'PAYMENT_PROVIDER_ERROR',
+  });
+}
+
+/** What a paid booking's settling came to. */
+type Settled = 'confirmed' | 'done' | 'refund' | 'ignore';
 
 /** What the emails about a booking may say: no people's names, no plate. */
 function outboxBooking(row: BookingRow, info: ListingInfo): OutboxBooking {
@@ -208,16 +243,27 @@ export class BookingsService {
   constructor(
     @Inject(DB) private readonly db: Database,
     @Inject(ENV) private readonly env: Pick<Env, 'bookingWithoutPayment'>,
+    @Inject(PAYMENTS) private readonly payments: PaymentsGateway | null,
   ) {}
 
-  /** Until Phase 4, holds and confirmations work only where no payment is due (decision #33). */
-  private assertBookable() {
-    if (!this.env.bookingWithoutPayment) throw conflict('BOOKING_UNAVAILABLE');
+  private view(row: BookingRow, info: ListingInfo, now = new Date()): Booking {
+    return viewOf(row, info, now, this.payments ? 'payment' : 'confirm');
+  }
+
+  /** Holds work where the driver pays (Stripe), or on a local run without it (#33, #47). */
+  private assertBooking() {
+    if (!this.payments && !this.env.bookingWithoutPayment) throw conflict('BOOKING_UNAVAILABLE');
+  }
+
+  /** The stand-in press that charges nothing: a local run without Stripe only (#33, #47). */
+  private assertStandIn() {
+    // Never beside Stripe: where it is configured, every booking is paid for.
+    if (this.payments || !this.env.bookingWithoutPayment) throw conflict('BOOKING_UNAVAILABLE');
   }
 
   /** Keeps a space for the driver for HOLD_MINUTES (decision #3). */
   async hold(userId: string, input: BookingHoldInput): Promise<Booking> {
-    this.assertBookable();
+    this.assertBooking();
     const stay = { start: new Date(input.start), end: new Date(input.end) };
     for (let tries = 1; ; tries++) {
       try {
@@ -247,9 +293,11 @@ export class BookingsService {
       .select({
         ...bookableColumns,
         spot: { id: space.id, label: space.label, ownRate: space.hourlyRateMinor },
+        payoutStatus: payout.status,
       })
       .from(listing)
       .leftJoin(profile, eq(profile.id, listing.ownerId))
+      .leftJoin(payout, eq(payout.ownerId, listing.ownerId))
       .leftJoin(
         space,
         and(eq(space.id, input.spaceId), eq(space.locationId, listing.id), sql`${space.isActive}`),
@@ -259,6 +307,8 @@ export class BookingsService {
     if (!row || row.hourlyRateMinor === null) throw notFound('LISTING_NOT_FOUND');
     // A booking of one's own would be a payout to oneself (Phase 4) and tells nobody anything.
     if (row.ownerUserId === userId) throw conflict('OWN_LISTING');
+    // Paying needs somewhere for the owner's share to go (#5): their payout account, active.
+    if (this.payments && row.payoutStatus !== 'active') throw conflict('BOOKING_UNAVAILABLE');
     const { spot } = row;
     if (!spot) throw notFound('SPACE_NOT_FOUND');
     const { prices } = await this.assertOpen(tx, row, stay, { prices: true });
@@ -295,10 +345,12 @@ export class BookingsService {
         currency: row.currency,
         // Every listing sent in has a policy; one without gets the driver's best terms.
         cancellationPolicy: row.cancellationPolicy ?? 'oneHour',
+        // The rate now, kept with the booking (#15): in the insert, so no round trip more.
+        commissionBps: sql`(select ${settings.commissionBps} from ${settings})`,
       })
       .returning();
     if (!created) throw new Error('Hold not inserted');
-    return view(created, row);
+    return this.view(created, row);
   }
 
   /**
@@ -325,69 +377,354 @@ export class BookingsService {
   }
 
   /**
-   * Turns the driver's hold into a booking; until Phase 4 this stands in for paying (#33). Only
-   * while the hold runs (decision #37): after it, the driver chooses the space again, and to have
-   * more time they keep the hold (`extend`). A payment arriving late in Phase 4 is decision #3's
-   * case, settled where the payment is, not by this press. Asked again, a confirmed booking answers
-   * as it is.
+   * The driver's hold, under the listing's lock and then its own, checked as booking it needs: the
+   * hold still runs (decision #37), the listing is live and open for the stay (the owner may have
+   * closed that time since), the space is still there. A booking already confirmed comes back as
+   * it is, unchecked.
+   */
+  private async lockHold(
+    tx: Transaction,
+    userId: string,
+    id: string,
+  ): Promise<{
+    row: ListingInfo & { id: string; timeZone: string; ownerUserId: string | null };
+    current: BookingRow;
+  }> {
+    // The listing first (its lock before the booking's), found through the driver's booking.
+    const [row] = await tx
+      .select(bookableColumns)
+      .from(listing)
+      .leftJoin(profile, eq(profile.id, listing.ownerId))
+      .where(
+        eq(
+          listing.id,
+          sql`(select ${booking.locationId} from ${booking} where ${booking.id} = ${id} and ${booking.userId} = ${userId})`,
+        ),
+      )
+      .for('share', { of: listing });
+    if (!row) throw notFound('BOOKING_NOT_FOUND');
+    // With its space, if that is still there and in use.
+    const [locked] = await tx
+      .select({ current: booking, activeSpaceId: space.id })
+      .from(booking)
+      .leftJoin(space, and(eq(space.id, booking.spaceId), sql`${space.isActive}`))
+      .where(and(eq(booking.id, id), eq(booking.userId, userId)))
+      .for('update', { of: booking });
+    if (!locked) throw notFound('BOOKING_NOT_FOUND');
+    const { current } = locked;
+    if (current.status === 'confirmed') return { row, current };
+    // A hold that ran out, swept or not, books nothing: the space may be someone else's now.
+    if (current.status !== 'held' || current.holdExpiresAt <= new Date()) {
+      throw conflict('BOOKING_NOT_ACTIVE');
+    }
+    if (row.status !== 'published') throw conflict('LISTING_CLOSED');
+    // Removed from a listing sent back to its owner, or taken out of use, since the hold.
+    if (!current.spaceId || !locked.activeSpaceId) throw conflict('SPACE_TAKEN');
+    await this.assertOpen(tx, row, { start: current.startsAt, end: current.endsAt });
+    return { row, current };
+  }
+
+  /**
+   * Turns the driver's hold into a booking without paying: the stand-in of a local run without
+   * Stripe (#33, #47). Only while the hold runs (decision #37): after it, the driver chooses the
+   * space again, and to have more time they keep the hold (`extend`). Asked again, a confirmed
+   * booking answers as it is.
    */
   async confirm(userId: string, id: string, input: BookingConfirmInput): Promise<Booking> {
-    this.assertBookable();
+    this.assertStandIn();
     if (!UUID.test(id)) throw notFound('BOOKING_NOT_FOUND');
     const vehiclePlate = normalizeVehiclePlate(input.vehiclePlate);
     try {
       return await this.db.transaction(async (tx) => {
-        // The listing first (its lock before the booking's), found through the driver's booking.
-        const [row] = await tx
-          .select(bookableColumns)
-          .from(listing)
-          .leftJoin(profile, eq(profile.id, listing.ownerId))
-          .where(
-            eq(
-              listing.id,
-              sql`(select ${booking.locationId} from ${booking} where ${booking.id} = ${id} and ${booking.userId} = ${userId})`,
-            ),
-          )
-          .for('share', { of: listing });
-        if (!row) throw notFound('BOOKING_NOT_FOUND');
-        // With its space, if that is still there and in use.
-        const [locked] = await tx
-          .select({ current: booking, activeSpaceId: space.id })
-          .from(booking)
-          .leftJoin(space, and(eq(space.id, booking.spaceId), sql`${space.isActive}`))
-          .where(and(eq(booking.id, id), eq(booking.userId, userId)))
-          .for('update', { of: booking });
-        if (!locked) throw notFound('BOOKING_NOT_FOUND');
-        const { current } = locked;
-        if (current.status === 'confirmed') return view(current, row);
+        const { row, current } = await this.lockHold(tx, userId, id);
+        if (current.status === 'confirmed') return this.view(current, row);
         const now = new Date();
-        // A hold that ran out, swept or not, books nothing: the space may be someone else's now.
-        if (current.status !== 'held' || current.holdExpiresAt <= now) {
-          throw conflict('BOOKING_NOT_ACTIVE');
-        }
-        if (row.status !== 'published') throw conflict('LISTING_CLOSED');
-        // Removed from a listing sent back to its owner, or taken out of use, since the hold.
-        if (!current.spaceId || !locked.activeSpaceId) throw conflict('SPACE_TAKEN');
-        // The owner may have closed that time since the hold; it is refused now, not later.
-        await this.assertOpen(tx, row, { start: current.startsAt, end: current.endsAt });
-
         const [confirmed] = await tx
           .update(booking)
           .set({ status: 'confirmed', vehiclePlate, confirmedAt: now })
           .where(eq(booking.id, id))
           .returning();
         if (!confirmed) throw notFound('BOOKING_NOT_FOUND');
-        const owner = row.ownerUserId;
-        await this.queueEmails(tx, confirmed, row, [
-          { kind: 'booking-confirmed', userId, to: 'driver' },
-          ...(owner && (await this.ownerStillHears(tx, userId, owner))
-            ? [{ kind: 'booking-received' as const, userId: owner, to: 'owner' as const }]
-            : []),
-        ]);
-        return view(confirmed, row, now);
+        await this.queueConfirmedEmails(tx, confirmed, row);
+        return this.view(confirmed, row, now);
       });
     } catch (error) {
       if (violates(error, '23P01', 'bookings_space_no_overlap')) throw conflict('SPACE_TAKEN');
+      throw error;
+    }
+  }
+
+  /** Both sides hear of a new booking: the driver, and the owner unless this driver used it up. */
+  private async queueConfirmedEmails(
+    tx: Transaction,
+    confirmed: BookingRow,
+    row: ListingInfo & { ownerUserId: string | null },
+  ): Promise<void> {
+    const driver = confirmed.userId;
+    const owner = row.ownerUserId;
+    await this.queueEmails(tx, confirmed, row, [
+      { kind: 'booking-confirmed', userId: driver, to: 'driver' },
+      ...(owner && (await this.ownerStillHears(tx, driver, owner))
+        ? [{ kind: 'booking-received' as const, userId: owner, to: 'owner' as const }]
+        : []),
+    ]);
+  }
+
+  /**
+   * Starts paying for a held space (Phase 4, #49): the plate is kept, and the booking's one
+   * PaymentIntent made, or found again, for the Payment Element. Only while the hold runs, as the
+   * stand-in Confirm (#37). The booking is confirmed when Stripe says the money is in
+   * (`settlePayment`), whenever that is (#3).
+   */
+  async pay(userId: string, id: string, input: BookingConfirmInput): Promise<BookingPayment> {
+    const gateway = this.payments;
+    if (!gateway) throw conflict('BOOKING_UNAVAILABLE');
+    if (!UUID.test(id)) throw notFound('BOOKING_NOT_FOUND');
+    const vehiclePlate = normalizeVehiclePlate(input.vehiclePlate);
+    const held = await this.db.transaction(async (tx) => {
+      const { current } = await this.lockHold(tx, userId, id);
+      // Booked already: nothing is left to pay.
+      if (current.status === 'confirmed') throw conflict('BOOKING_NOT_ACTIVE');
+      // Paying takes minutes (a card typed, a bank's check): a hold with less than half its time
+      // left is kept for a full HOLD_MINUTES again, as one of its extensions (decision #37), so
+      // the time limit doesn't fall in the middle of paying (WCAG 2.2.1).
+      const low =
+        current.holdExpiresAt.getTime() - Date.now() < (HOLD_MINUTES * MINUTE_MS) / 2 &&
+        current.holdExtensions < HOLD_MAX_EXTENSIONS;
+      const [kept] = await tx
+        .update(booking)
+        .set({
+          vehiclePlate,
+          ...(low
+            ? {
+                holdExpiresAt: sql`now() + make_interval(mins => ${HOLD_MINUTES})`,
+                holdExtensions: current.holdExtensions + 1,
+              }
+            : {}),
+        })
+        .where(eq(booking.id, id))
+        .returning();
+      if (!kept) throw notFound('BOOKING_NOT_FOUND');
+      return kept;
+    });
+    // Stripe outside the locks: its answer can take a second, and the owner's saves wait on them.
+    let state: PaymentState;
+    try {
+      state = held.paymentIntentId
+        ? await gateway.payment(held.paymentIntentId)
+        : await gateway.createPayment({
+            bookingId: held.id,
+            reference: held.reference,
+            amountMinor: held.totalMinor,
+            currency: held.currency,
+          });
+    } catch (error) {
+      if (error instanceof PaymentProviderError) throw providerFailed();
+      throw error;
+    }
+    if (!held.paymentIntentId) {
+      // Two presses at once made one PaymentIntent (the idempotency key): the first write stands.
+      await this.db
+        .update(booking)
+        .set({ paymentIntentId: state.id, paymentStatus: state.status })
+        .where(and(eq(booking.id, held.id), isNull(booking.paymentIntentId)));
+    }
+    return BookingPaymentSchema.parse({ clientSecret: state.clientSecret, status: state.status });
+  }
+
+  /**
+   * The driver's page asks how their payment went, after paying or coming back from their bank:
+   * the booking brought in line with Stripe (`settlePayment`), without waiting for the webhook.
+   */
+  async settle(userId: string, id: string): Promise<Booking> {
+    if (!this.payments) throw conflict('BOOKING_UNAVAILABLE');
+    if (!UUID.test(id)) throw notFound('BOOKING_NOT_FOUND');
+    const [mine] = await this.db
+      .select({
+        paymentIntentId: booking.paymentIntentId,
+        paymentStatus: booking.paymentStatus,
+        confirmedAt: booking.confirmedAt,
+      })
+      .from(booking)
+      .where(and(eq(booking.id, id), eq(booking.userId, userId)));
+    if (!mine) throw notFound('BOOKING_NOT_FOUND');
+    // Settled for good (booked and paid, or refunded): nothing Stripe says would change it, and
+    // a page asking again and again mustn't spend the platform's Stripe rate limit.
+    const settled =
+      mine.paymentStatus === 'refunded' ||
+      (mine.confirmedAt !== null && mine.paymentStatus === 'succeeded');
+    if (mine.paymentIntentId && !settled) {
+      try {
+        await this.settlePayment(mine.paymentIntentId);
+      } catch (error) {
+        if (error instanceof PaymentProviderError) throw providerFailed();
+        throw error;
+      }
+    }
+    return this.get(userId, id);
+  }
+
+  /**
+   * Brings a booking in line with its payment as Stripe has it, from a webhook or the driver's
+   * page. Safe to repeat, and to run twice at once: the booking's lock takes turns, and Stripe's
+   * refund has an idempotency key. Paid for a hold never booked, it becomes a booking if it still
+   * can, a late payment included while the space is free (#3); if it can't (the space taken, the
+   * stay begun, the listing closed, the hold let go, the money not all there), all of it goes back.
+   * A booking made once (confirmed, cancelled since) keeps its money: its refunds are its
+   * cancellation's, by its policy, never this.
+   */
+  async settlePayment(paymentIntentId: string): Promise<void> {
+    const gateway = this.payments;
+    if (!gateway) return;
+    const state = await gateway.payment(paymentIntentId);
+    // Another app's payment on the same Stripe account is none of ours.
+    if (!state.bookingId || !UUID.test(state.bookingId)) return;
+    const mine = or(
+      eq(booking.paymentIntentId, state.id),
+      and(eq(booking.id, state.bookingId), isNull(booking.paymentIntentId)),
+    );
+    if (state.status !== 'succeeded') {
+      await this.db
+        .update(booking)
+        .set({ paymentIntentId: state.id, paymentStatus: state.status })
+        .where(
+          and(
+            mine,
+            or(
+              isNull(booking.paymentStatus),
+              sql`${booking.paymentStatus} in ('pending', 'processing')`,
+            ),
+            // The same word again changes nothing, and writes nothing.
+            sql`${booking.paymentStatus} is distinct from ${state.status}`,
+          ),
+        );
+      return;
+    }
+    const settled = await this.confirmPaid(state, mine);
+    if (settled !== 'refund') return;
+    // Decided and recorded under the booking's lock (`refunding`) before Stripe is asked: a failure
+    // here is finished by the next look (Stripe retries its webhook), as one refund. Refunded at
+    // Stripe already (our write lost after its answer, perhaps past its idempotency key's day):
+    // only the record is left to make, and asking again would be refused.
+    const refundedAlready = state.receivedMinor > 0 && state.refundedMinor >= state.receivedMinor;
+    if (!refundedAlready) await gateway.refundPayment(state.id, 'not_bookable');
+    await this.db
+      .update(booking)
+      .set({ paymentStatus: 'refunded' })
+      .where(and(eq(booking.paymentIntentId, state.id), eq(booking.paymentStatus, 'refunding')));
+  }
+
+  /**
+   * The paid hold made a booking, under the listing's lock and the booking's, or the refund
+   * recorded (`refunding`) in the same turn of the lock, so nothing can confirm it in between.
+   */
+  private async confirmPaid(state: PaymentState, mine: SQL | undefined): Promise<Settled> {
+    return this.db.transaction(async (tx): Promise<Settled> => {
+      const [row] = await tx
+        .select(bookableColumns)
+        .from(listing)
+        .leftJoin(profile, eq(profile.id, listing.ownerId))
+        .where(eq(listing.id, sql`(select ${booking.locationId} from ${booking} where ${mine})`))
+        .for('share', { of: listing });
+      // A booking this database doesn't have: another environment's on the same Stripe account
+      // (staging and a local run), not ours to refund. Ours are never deleted once paid for.
+      if (!row) return 'ignore';
+      const [locked] = await tx
+        .select({ current: booking, activeSpaceId: space.id })
+        .from(booking)
+        .leftJoin(space, and(eq(space.id, booking.spaceId), sql`${space.isActive}`))
+        .where(mine)
+        .for('update', { of: booking });
+      if (!locked) return 'ignore';
+      const { current } = locked;
+      // A refund decided already: finish it if it failed half way; done, nothing more.
+      if (current.paymentStatus === 'refunding') return 'refund';
+      if (current.paymentStatus === 'refunded') return 'done';
+      // Booked once: the money is the booking's, whatever happened to it since.
+      if (current.confirmedAt !== null) {
+        if (current.paymentStatus !== 'succeeded') {
+          await tx
+            .update(booking)
+            .set({ paymentIntentId: state.id, paymentStatus: 'succeeded' })
+            .where(eq(booking.id, current.id));
+        }
+        return 'done';
+      }
+      const now = new Date();
+      const bookable =
+        (current.status === 'held' || current.status === 'expired') &&
+        // All of it in, none of it back: Stripe's word, not the event's.
+        state.amountMinor === current.totalMinor &&
+        state.receivedMinor === current.totalMinor &&
+        state.refundedMinor === 0 &&
+        state.currency === current.currency &&
+        // A stay begun or over can't be booked now: a late payment for it goes back.
+        current.startsAt > now &&
+        row.status === 'published' &&
+        current.spaceId !== null &&
+        locked.activeSpaceId !== null &&
+        current.vehiclePlate !== null;
+      if (bookable && (await this.isOpen(tx, row, current))) {
+        try {
+          // A savepoint: a clash rolls back this update alone, and the refund is recorded below.
+          const confirmed = await tx.transaction(async (point) => {
+            const [made] = await point
+              .update(booking)
+              .set({
+                status: 'confirmed',
+                confirmedAt: now,
+                paymentIntentId: state.id,
+                paymentStatus: 'succeeded',
+              })
+              .where(eq(booking.id, current.id))
+              .returning();
+            return made;
+          });
+          if (confirmed) {
+            await this.queueConfirmedEmails(tx, confirmed, row);
+            return 'confirmed';
+          }
+        } catch (error) {
+          // An expired hold taken back: someone else has the space now (#3).
+          if (!violates(error, '23P01', 'bookings_space_no_overlap')) throw error;
+        }
+      }
+      // A hold still running is let go; the plate was only ever for a booking.
+      const [refunding] = await tx
+        .update(booking)
+        .set({
+          paymentIntentId: state.id,
+          paymentStatus: 'refunding',
+          vehiclePlate: null,
+          status: sql`case when ${booking.status} = 'held' then 'released' else ${booking.status} end`,
+        })
+        .where(eq(booking.id, current.id))
+        .returning();
+      // The driver may have left the page: they hear of it, as of a booking.
+      if (refunding) {
+        await this.queueEmails(
+          tx,
+          refunding,
+          row,
+          [{ kind: 'booking-payment-refunded', userId: current.userId, to: 'driver' }],
+          'refunded',
+        );
+      }
+      return 'refund';
+    });
+  }
+
+  /** Open for the whole stay, or not; anything but the listing's answer is thrown on. */
+  private async isOpen(
+    tx: Transaction,
+    row: { id: string; timeZone: string },
+    { startsAt, endsAt }: { startsAt: Date; endsAt: Date },
+  ): Promise<boolean> {
+    try {
+      await this.assertOpen(tx, row, { start: startsAt, end: endsAt });
+      return true;
+    } catch (error) {
+      if (error instanceof ConflictException) return false;
       throw error;
     }
   }
@@ -399,7 +736,7 @@ export class BookingsService {
    * exclusion constraint has nothing new to check but the gap after the end, which doesn't move.
    */
   async extend(userId: string, id: string): Promise<Booking> {
-    this.assertBookable();
+    this.assertBooking();
     if (!UUID.test(id)) throw notFound('BOOKING_NOT_FOUND');
     return this.db.transaction(async (tx) => {
       const [current] = await tx
@@ -409,7 +746,7 @@ export class BookingsService {
         .for('update');
       if (!current) throw notFound('BOOKING_NOT_FOUND');
       if (current.status === 'confirmed')
-        return view(current, await this.listingOf(tx, current.locationId));
+        return this.view(current, await this.listingOf(tx, current.locationId));
       if (current.status !== 'held' || current.holdExpiresAt <= new Date()) {
         throw conflict('BOOKING_NOT_ACTIVE');
       }
@@ -423,7 +760,7 @@ export class BookingsService {
         .where(eq(booking.id, id))
         .returning();
       if (!kept) throw notFound('BOOKING_NOT_FOUND');
-      return view(kept, await this.listingOf(tx, kept.locationId));
+      return this.view(kept, await this.listingOf(tx, kept.locationId));
     });
   }
 
@@ -453,9 +790,9 @@ export class BookingsService {
           .set({ status: 'released' })
           .where(eq(booking.id, id))
           .returning();
-        return view(released ?? current, info, now);
+        return this.view(released ?? current, info, now);
       }
-      if (current.status !== 'confirmed') return view(current, info, now);
+      if (current.status !== 'confirmed') return this.view(current, info, now);
       if (current.startsAt <= now) throw conflict('BOOKING_STARTED');
       const refund = refundMinor({
         policy: current.cancellationPolicy,
@@ -487,7 +824,7 @@ export class BookingsService {
             ]
           : []),
       ]);
-      return view(cancelled, info, now);
+      return this.view(cancelled, info, now);
     });
   }
 
@@ -499,7 +836,7 @@ export class BookingsService {
       .innerJoin(listing, eq(listing.id, booking.locationId))
       .where(and(eq(booking.id, id), eq(booking.userId, userId)));
     if (!row) throw notFound('BOOKING_NOT_FOUND');
-    return view(row.booking, row.info);
+    return this.view(row.booking, row.info);
   }
 
   /**
@@ -531,7 +868,9 @@ export class BookingsService {
       .limit(BOOKINGS_PAGE_SIZE + 1)
       .offset((page - 1) * BOOKINGS_PAGE_SIZE);
     return BookingListSchema.parse({
-      bookings: rows.slice(0, BOOKINGS_PAGE_SIZE).map((row) => view(row.booking, row.info, now)),
+      bookings: rows
+        .slice(0, BOOKINGS_PAGE_SIZE)
+        .map((row) => this.view(row.booking, row.info, now)),
       page,
       hasMore: rows.length > BOOKINGS_PAGE_SIZE,
     });
@@ -744,9 +1083,11 @@ export class BookingsService {
     row: BookingRow,
     info: ListingInfo,
     emails: { kind: OutboxKind; userId: string; to: 'driver' | 'owner' }[],
+    event: 'confirmed' | 'cancelled' | 'refunded' = row.status === 'cancelled'
+      ? 'cancelled'
+      : 'confirmed',
   ) {
     if (emails.length === 0) return;
-    const event = row.status === 'cancelled' ? 'cancelled' : 'confirmed';
     await tx
       .insert(outbox)
       .values(

@@ -20,6 +20,7 @@ export const BOOKING_CODES = [
   'BOOKING_STARTED',
   'REFUND_CHANGED',
   'HOLD_LIMIT_REACHED',
+  'PAYMENT_PROVIDER_ERROR',
 ] as const;
 type BookingCode = (typeof BOOKING_CODES)[number];
 

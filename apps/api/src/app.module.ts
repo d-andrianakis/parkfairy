@@ -15,6 +15,7 @@ import type { Env } from './config/env.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { OwnerModule } from './owner/owner.module.js';
+import { PaymentsGatewayModule, PaymentsModule } from './payments/payments.module.js';
 import { PlacesModule } from './places/places.module.js';
 import { ParkingModule } from './parking/parking.module.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
@@ -65,7 +66,9 @@ const REQUEST_ID_PATTERN = /^[\w-]{1,128}$/;
     StorageModule,
     ParkingModule,
     OwnerModule,
+    PaymentsGatewayModule,
     BookingsModule,
+    PaymentsModule,
     PlacesModule,
   ],
   providers: [

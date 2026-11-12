@@ -248,6 +248,33 @@ describe('bookings', () => {
     await app.close();
   });
 
+  it('without Stripe: books on this machine by the stand-in, refuses paying, and has no payouts', async () => {
+    const user = await driver();
+    const held = BookingSchema.parse(
+      (await hold(user, garage, 'A1', stayOn(freshDay())).expect(201)).body,
+    );
+    expect(held).toMatchObject({ checkout: 'confirm', payment: null });
+    const refused = await api(user, 'post', `/bookings/${held.id}/payment`)
+      .send({ vehiclePlate: 'IKB1234' })
+      .expect(409);
+    expect(refused.body).toMatchObject({ code: 'BOOKING_UNAVAILABLE' });
+    expect(
+      (await api(user, 'post', `/bookings/${held.id}/payment/settle`).expect(409)).body,
+    ).toMatchObject({ code: 'BOOKING_UNAVAILABLE' });
+    expect((await api(owner, 'get', '/owner/payouts').expect(200)).body).toEqual({
+      available: false,
+      status: 'none',
+    });
+    expect(
+      (await api(owner, 'post', '/owner/payouts/onboarding').send({ locale: 'en' }).expect(503))
+        .body,
+    ).toMatchObject({ code: 'PAYMENTS_UNAVAILABLE' });
+    expect((await api(owner, 'post', '/owner/payouts/dashboard').expect(503)).body).toMatchObject({
+      code: 'PAYMENTS_UNAVAILABLE',
+    });
+    await cancel(user, held.id).expect(200);
+  });
+
   describe('who can reach what', () => {
     it.each([
       ['post', '/bookings'],
@@ -985,6 +1012,7 @@ describe('bookings', () => {
             totalMinor: 200,
             currency: 'EUR',
             cancellationPolicy: 'oneDay' as const,
+            commissionBps: 1000,
             vehiclePlate: 'IKB1234',
             confirmedAt: new Date(),
             cancelledAt: new Date(),
@@ -1099,6 +1127,7 @@ describe('bookings', () => {
               totalMinor: 200,
               currency: 'EUR',
               cancellationPolicy: 'oneDay' as const,
+              commissionBps: 1000,
               vehiclePlate: 'IKB1234',
               confirmedAt: new Date(),
             };
@@ -1381,6 +1410,7 @@ describe('bookings', () => {
           totalMinor: 400,
           currency: 'EUR',
           cancellationPolicy: 'oneDay' as const,
+          commissionBps: 1000,
           vehiclePlate: 'IKB1234',
           confirmedAt: new Date(),
         })),

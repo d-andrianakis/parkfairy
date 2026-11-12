@@ -1,0 +1,97 @@
+import { z } from 'zod';
+import { LocaleSchema } from './i18n.js';
+import { contractsRegistry } from './registry.js';
+
+/**
+ * Payments (Phase 4), in Stripe's test mode until #18 and #19 are answered (memory.md #46). The
+ * driver pays in full at booking (decision #3), on the platform's account; the owner is paid by a
+ * transfer to their Express account after the stay (#4, #6, #48).
+ */
+
+/**
+ * How a held booking becomes a booking: `payment` in Stripe's Payment Element (#49); `confirm` by
+ * the stand-in press that charges nothing, on a local run without Stripe (#33, #47).
+ */
+export const CHECKOUT_KINDS = ['payment', 'confirm'] as const;
+export const CheckoutKindSchema = z.enum(CHECKOUT_KINDS).register(contractsRegistry, {
+  id: 'CheckoutKind',
+});
+export type CheckoutKind = z.infer<typeof CheckoutKindSchema>;
+
+/**
+ * Where a booking's payment stands, as Stripe last told us. `pending`: asked for, not paid yet (or
+ * a card declined, which the driver may try again); `processing`: paid, the bank still deciding;
+ * `succeeded`: the money is in; `refunding`: it goes back, decided and Stripe being asked (kept so
+ * a refund that failed half way is finished, and nothing confirms the booking meanwhile);
+ * `refunded`: all of it went back (a late payment for a space taken meanwhile, decision #3).
+ */
+export const PAYMENT_STATUSES = [
+  'pending',
+  'processing',
+  'succeeded',
+  'refunding',
+  'refunded',
+] as const;
+export const PaymentStatusSchema = z.enum(PAYMENT_STATUSES).register(contractsRegistry, {
+  id: 'PaymentStatus',
+});
+export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
+
+/** What the booking page needs to take the payment. */
+export const BookingPaymentSchema = z
+  .object({
+    /**
+     * For the Payment Element, which confirms the payment from the browser. A secret for this one
+     * payment: never logged, cached or stored by us.
+     */
+    clientSecret: z.string().regex(/^pi_[A-Za-z0-9]+_secret_[A-Za-z0-9]+$/),
+    /** Asked again after paying: not `pending`, and the page settles it instead of paying twice. */
+    status: PaymentStatusSchema,
+  })
+  .register(contractsRegistry, { id: 'BookingPayment' });
+export type BookingPayment = z.infer<typeof BookingPaymentSchema>;
+
+/**
+ * An owner's payout account, an Express account at Stripe (#48). `none`: not started; `pending`:
+ * details sent, Stripe still checking; `restricted`: Stripe needs more from the owner; `active`:
+ * transfers can be paid to it, and drivers can book the owner's listings.
+ */
+export const PAYOUT_STATUSES = ['none', 'pending', 'restricted', 'active'] as const;
+export const PayoutStatusSchema = z.enum(PAYOUT_STATUSES).register(contractsRegistry, {
+  id: 'PayoutStatus',
+});
+export type PayoutStatus = z.infer<typeof PayoutStatusSchema>;
+
+export const OwnerPayoutsSchema = z
+  .object({
+    /** Whether payouts can be set up here at all: Stripe is configured (#47). */
+    available: z.boolean(),
+    status: PayoutStatusSchema,
+  })
+  .register(contractsRegistry, { id: 'OwnerPayouts' });
+export type OwnerPayouts = z.infer<typeof OwnerPayoutsSchema>;
+
+/** The language the owner's pages are in, for where Stripe sends them back to. */
+export const PayoutLinkInputSchema = z
+  .object({ locale: LocaleSchema })
+  .register(contractsRegistry, { id: 'PayoutLinkInput' });
+export type PayoutLinkInput = z.infer<typeof PayoutLinkInputSchema>;
+
+/** A one-time link to Stripe: onboarding, or the owner's Express dashboard. */
+export const PayoutLinkSchema = z
+  .object({ url: z.url({ protocol: /^https$/ }) })
+  .register(contractsRegistry, { id: 'PayoutLink' });
+export type PayoutLink = z.infer<typeof PayoutLinkSchema>;
+
+/** Every `code` a payment or payout route answers with, for clients to translate. */
+export const PAYMENT_ERROR_CODES = [
+  /** Stripe isn't configured here (#47). */
+  'PAYMENTS_UNAVAILABLE',
+  /** Payouts need the owner's profile first: who they are decides the account's kind. */
+  'PROFILE_REQUIRED',
+  /** The dashboard link needs an account that finished onboarding. */
+  'PAYOUTS_NOT_STARTED',
+  /** Stripe failed or was too slow; nothing was charged. */
+  'PAYMENT_PROVIDER_ERROR',
+] as const;
+export type PaymentErrorCode = (typeof PAYMENT_ERROR_CODES)[number];

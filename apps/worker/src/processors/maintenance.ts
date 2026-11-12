@@ -3,6 +3,7 @@ import {
   deleteStaleHolds,
   deleteUnconfirmedAccounts,
   expireLapsedHolds,
+  purgeStripeEvents,
 } from '@parkfairy/database';
 import { sql } from 'drizzle-orm';
 import { QUEUES, type QueueProcessor } from '../queues.js';
@@ -16,6 +17,8 @@ export const UNCONFIRMED_ACCOUNT_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Long enough to look into a complaint about a hold; it says who looked at which space when. */
 export const STALE_HOLD_DAYS = 7;
+/** Stripe retries an event for three days; past a week its record spares nothing. */
+export const STRIPE_EVENT_DAYS = 7;
 
 export const maintenanceProcessor: QueueProcessor = {
   queue: QUEUES.maintenance,
@@ -29,6 +32,7 @@ export const maintenanceProcessor: QueueProcessor = {
     // so a confirmation after the hold (decision #3) sees the space as it is.
     { id: 'expire-lapsed-holds', everyMs: 60_000 },
     { id: 'delete-stale-holds', everyMs: DAY_MS / 24 },
+    { id: 'purge-stripe-events', everyMs: DAY_MS },
   ],
   async process(job, { db, logger }) {
     switch (job.name) {
@@ -58,6 +62,14 @@ export const maintenanceProcessor: QueueProcessor = {
         const deleted = await deleteStaleHolds(db, new Date(Date.now() - STALE_HOLD_DAYS * DAY_MS));
         logger.info({ deleted }, 'stale holds deleted');
         return { deleted };
+      }
+      case 'purge-stripe-events': {
+        const purged = await purgeStripeEvents(
+          db,
+          new Date(Date.now() - STRIPE_EVENT_DAYS * DAY_MS),
+        );
+        if (purged > 0) logger.info({ purged }, 'old Stripe events purged');
+        return { purged };
       }
       default:
         throw new Error(`Unknown maintenance job "${job.name}"`);

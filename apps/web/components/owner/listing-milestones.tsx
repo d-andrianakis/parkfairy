@@ -3,6 +3,7 @@ import {
   photoUrl,
   PHOTO_WIDTHS,
   type OwnerListingProgress,
+  type PayoutStatus,
 } from '@parkfairy/contracts';
 import { Badge } from '@parkfairy/ui/components/badge';
 import { Alert, AlertDescription, AlertTitle } from '@parkfairy/ui/components/alert';
@@ -25,8 +26,17 @@ import { DeleteDraftButton } from './listing-actions';
 import { StepLink } from './navigation';
 import { STEP_LINK, StepRow } from './step-state';
 
-/** What happens after the owner's part; nothing here can be pressed yet. */
-function AfterSubmission({ listing }: { listing: OwnerListingProgress }) {
+/**
+ * What happens after the owner's part; nothing here can be pressed yet. Payouts are the owner's
+ * (decision #48), shown as they stand where they can be set up at all.
+ */
+function AfterSubmission({
+  listing,
+  payouts,
+}: {
+  listing: OwnerListingProgress;
+  payouts: PayoutStatus | null;
+}) {
   const t = useTranslations('Owner.dashboard');
   const reviewed = listing.status === 'published';
   const reviewing = listing.status === 'in_review';
@@ -42,16 +52,31 @@ function AfterSubmission({ listing }: { listing: OwnerListingProgress }) {
         <li className="flex items-center gap-2 py-1 text-sm">
           <StepRow done={reviewed}>{t('checks.live')}</StepRow>
         </li>
-        <li className="flex items-center gap-2 py-1 text-sm text-muted-foreground">
-          <StepRow done={false}>{t('checks.payouts')}</StepRow>
-        </li>
+        {payouts === null ? (
+          <li className="flex items-center gap-2 py-1 text-sm text-muted-foreground">
+            <StepRow done={false}>{t('checks.payouts')}</StepRow>
+          </li>
+        ) : (
+          <li className="flex items-center gap-2 py-1 text-sm">
+            <StepRow done={payouts === 'active'}>
+              {payouts === 'active' ? t('checks.payoutsReady') : t('checks.payoutsNeeded')}
+            </StepRow>
+          </li>
+        )}
       </ul>
     </div>
   );
 }
 
 /** One listing's journey: its milestones, each with the steps inside it. */
-export function ListingMilestones({ listing }: { listing: OwnerListingProgress }) {
+export function ListingMilestones({
+  listing,
+  payouts = null,
+}: {
+  listing: OwnerListingProgress;
+  /** Where the owner's payouts stand; null where they can't be set up here (#47). */
+  payouts?: PayoutStatus | null;
+}) {
   const t = useTranslations('Owner');
   const locale = useLocale();
   const name = listing.name ?? t('dashboard.untitled');
@@ -138,7 +163,7 @@ export function ListingMilestones({ listing }: { listing: OwnerListingProgress }
               </div>
             );
           })}
-          <AfterSubmission listing={listing} />
+          <AfterSubmission listing={listing} payouts={payouts} />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">

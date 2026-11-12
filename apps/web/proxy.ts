@@ -1,7 +1,12 @@
 import createIntlMiddleware from 'next-intl/middleware';
 import { NextRequest } from 'next/server';
 import { routing } from './i18n/routing';
-import { allowsMaps, buildContentSecurityPolicy, createNonce } from './lib/security/csp';
+import {
+  allowsMaps,
+  allowsPayments,
+  buildContentSecurityPolicy,
+  createNonce,
+} from './lib/security/csp';
 
 const handleI18nRouting = createIntlMiddleware(routing);
 
@@ -18,6 +23,7 @@ export default function proxy(request: NextRequest) {
     upgradeInsecureRequests:
       request.nextUrl.protocol === 'https:' || request.headers.get('x-forwarded-proto') === 'https',
     maps: allowsMaps(request.nextUrl.pathname),
+    payments: allowsPayments(request.nextUrl.pathname),
   });
 
   const requestHeaders = new Headers(request.headers);

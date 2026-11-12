@@ -6,6 +6,7 @@ import {
   isListingSlug,
   MoneySchema,
 } from './parking.js';
+import { CheckoutKindSchema, PaymentStatusSchema } from './payments.js';
 import { contractsRegistry } from './registry.js';
 import { isVehiclePlate } from './plates.js';
 import { message, NAME_MAX_LENGTH } from './validation.js';
@@ -118,6 +119,10 @@ export const BookingSchema = z
     refund: MoneySchema.nullable(),
     /** Confirmed and not started: what cancelling now would give back. Null otherwise. */
     refundIfCancelled: MoneySchema.nullable(),
+    /** How a hold becomes a booking here: paying, or the stand-in press of a local run (#33). */
+    checkout: CheckoutKindSchema,
+    /** Its payment, once one was asked for: null before, and always where nothing is paid. */
+    payment: PaymentStatusSchema.nullable(),
   })
   .register(contractsRegistry, { id: 'Booking' });
 export type Booking = z.infer<typeof BookingSchema>;
@@ -235,5 +240,7 @@ export const BOOKING_ERROR_CODES = [
   'BOOKING_STARTED',
   'REFUND_CHANGED',
   'HOLD_LIMIT_REACHED',
+  /** Stripe failed or was too slow paying for a hold; nothing was charged (Phase 4). */
+  'PAYMENT_PROVIDER_ERROR',
 ] as const;
 export type BookingErrorCode = (typeof BOOKING_ERROR_CODES)[number];

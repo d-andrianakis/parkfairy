@@ -36,6 +36,9 @@ export default defineConfig({
       REDIS_URL: '',
       // Uploads from tests stay out of the demo data's folder.
       OBJECT_STORE_DIR: join(tmpdir(), 'parkfairy-test-uploads'),
+      // Never the developer's Stripe keys: suites fake Stripe (decision #47) where they need it.
+      STRIPE_SECRET_KEY: '',
+      STRIPE_WEBHOOK_SECRET: '',
       TEST_REDIS_URL: process.env.TEST_REDIS_URL ?? redisDatabase(process.env.REDIS_URL, 15),
     },
     // Integration suites share one database.

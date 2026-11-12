@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { Database } from '@parkfairy/database';
 import { describe, expect, it } from 'vitest';
+import type { PaymentsGateway } from '../payments/stripe-gateway.js';
 import { BookingsService } from './bookings.service.js';
 
 /** A database that fails the test if anything reaches it. */
@@ -32,7 +33,7 @@ async function refusal(promise: Promise<unknown>): Promise<{ status: number; cod
 }
 
 describe('BookingsService where no payment can be taken (decision #33)', () => {
-  const service = new BookingsService(untouched, { bookingWithoutPayment: false });
+  const service = new BookingsService(untouched, { bookingWithoutPayment: false }, null);
 
   it('holds nothing and confirms nothing, before touching the database', async () => {
     expect(await refusal(service.hold('user', hold))).toMatchObject({
@@ -46,11 +47,47 @@ describe('BookingsService where no payment can be taken (decision #33)', () => {
       status: 409,
       code: 'BOOKING_UNAVAILABLE',
     });
+    // Nor pays nor settles: there is no Stripe here.
+    expect(
+      await refusal(service.pay('user', hold.spaceId, { vehiclePlate: 'IKB1234' })),
+    ).toMatchObject({ status: 409, code: 'BOOKING_UNAVAILABLE' });
+    expect(await refusal(service.settle('user', hold.spaceId))).toMatchObject({
+      status: 409,
+      code: 'BOOKING_UNAVAILABLE',
+    });
+  });
+});
+
+describe('BookingsService with Stripe (decisions #47, #49)', () => {
+  const stripe = {} as PaymentsGateway;
+
+  it('lets holds and extensions past the gate, and never the stand-in, even on this machine', async () => {
+    for (const standIn of [false, true]) {
+      const service = new BookingsService(untouched, { bookingWithoutPayment: standIn }, stripe);
+      // Past the gate: the next thing is the database.
+      await expect(service.hold('user', hold)).rejects.toThrow('database used');
+      await expect(service.extend('user', hold.spaceId)).rejects.toThrow('database used');
+      expect(
+        await refusal(service.confirm('user', hold.spaceId, { vehiclePlate: 'IKB1234' })),
+      ).toMatchObject({ status: 409, code: 'BOOKING_UNAVAILABLE' });
+    }
+  });
+
+  it('answers a payment for an id that cannot exist with a 404, without a query', async () => {
+    const service = new BookingsService(untouched, { bookingWithoutPayment: false }, stripe);
+    expect(await refusal(service.pay('user', '..', { vehiclePlate: 'IKB1234' }))).toMatchObject({
+      status: 404,
+      code: 'BOOKING_NOT_FOUND',
+    });
+    expect(await refusal(service.settle('user', "1' or '1'='1"))).toMatchObject({
+      status: 404,
+      code: 'BOOKING_NOT_FOUND',
+    });
   });
 });
 
 describe('BookingsService with ids that cannot exist', () => {
-  const service = new BookingsService(untouched, { bookingWithoutPayment: true });
+  const service = new BookingsService(untouched, { bookingWithoutPayment: true }, null);
 
   it.each([
     ['get', (s: BookingsService) => s.get('user', 'B1')],

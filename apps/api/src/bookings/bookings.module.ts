@@ -6,5 +6,7 @@ import { OwnerBookingsController } from './owner-bookings.controller.js';
 @Module({
   controllers: [BookingsController, OwnerBookingsController],
   providers: [BookingsService],
+  // Stripe's webhook settles payments through it.
+  exports: [BookingsService],
 })
 export class BookingsModule {}

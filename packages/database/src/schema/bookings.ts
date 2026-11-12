@@ -14,12 +14,14 @@ import {
   CANCELLATION_POLICIES,
   CURRENCIES,
   HOLD_MAX_EXTENSIONS,
+  PAYMENT_STATUSES,
   SUPPORTED_LOCALES,
   VEHICLE_PLATE_LIMITS,
   type BookingCanceller,
   type BookingStatus,
   type CancellationPolicy,
   type Locale,
+  type PaymentStatus,
 } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import {
@@ -90,6 +92,15 @@ export const bookings = pgTable(
     cancelledBy: text('cancelled_by').$type<BookingCanceller>(),
     /** Owed to the driver after a cancellation; paid out from Phase 4. */
     refundMinor: integer('refund_minor'),
+    /**
+     * Parkfairy's share, in basis points, from `platform_settings` when the space was held (#15):
+     * a later change of rate never reaches this booking or its payout.
+     */
+    commissionBps: integer('commission_bps').notNull(),
+    /** Stripe's PaymentIntent (`pi_…`), one per booking, once the driver went to pay (Phase 4). */
+    paymentIntentId: text('payment_intent_id').unique(),
+    /** Where that payment stands, as Stripe last told us; null before one was asked for. */
+    paymentStatus: text('payment_status').$type<PaymentStatus>(),
     createdAt: instant('created_at').defaultNow().notNull(),
     updatedAt: instant('updated_at')
       .defaultNow()
@@ -114,9 +125,10 @@ export const bookings = pgTable(
       .on(t.holdExpiresAt)
       .where(sql`${t.status} = 'held'`),
     // And its deletion of holds that never became bookings, a week on.
+    // Holds a payment was asked for are kept (Phase 4), so they stay out of it too.
     index('bookings_stale_holds_idx')
       .on(t.updatedAt)
-      .where(sql`${t.status} in ('expired', 'released')`),
+      .where(sql`${t.status} in ('expired', 'released') and ${t.paymentIntentId} is null`),
     check('bookings_status_check', sql`${t.status} in (${sqlList(BOOKING_STATUSES)})`),
     check(
       'bookings_reference_check',
@@ -157,6 +169,16 @@ export const bookings = pgTable(
     check(
       'bookings_refund_check',
       sql`${t.refundMinor} is null or ${t.refundMinor} between 0 and ${t.totalMinor}`,
+    ),
+    check('bookings_commission_check', sql`${t.commissionBps} between 0 and 10000`),
+    // A payment's state and its PaymentIntent come together.
+    check(
+      'bookings_payment_check',
+      sql`(${t.paymentIntentId} is null) = (${t.paymentStatus} is null) and (${t.paymentStatus} is null or ${t.paymentStatus} in (${sqlList(PAYMENT_STATUSES)}))`,
+    ),
+    check(
+      'bookings_payment_intent_check',
+      sql`${t.paymentIntentId} is null or ${t.paymentIntentId} ~ '^pi_[A-Za-z0-9]+$'`,
     ),
   ],
 );

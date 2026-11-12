@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowsMaps, buildContentSecurityPolicy, createNonce } from './csp';
+import { allowsMaps, allowsPayments, buildContentSecurityPolicy, createNonce } from './csp';
 
 function directives(policy: string): Map<string, string[]> {
   return new Map(
@@ -36,6 +36,24 @@ describe('allowsMaps', () => {
   });
 });
 
+describe('allowsPayments', () => {
+  it('allows Stripe on a booking’s page only, in both languages (decision #49)', () => {
+    for (const path of ['/el/bookings/6f1c0a52-8c1e-4f0e-9b7a-2d3e4f5a6b7c', '/en/bookings/x/']) {
+      expect(allowsPayments(path)).toBe(true);
+    }
+    for (const path of [
+      '/en/bookings',
+      '/en/bookings/',
+      '/en/bookings/x/y',
+      '/en/parking/x',
+      '/bookings/x',
+      '/el/owner',
+    ]) {
+      expect(allowsPayments(path)).toBe(false);
+    }
+  });
+});
+
 describe('buildContentSecurityPolicy', () => {
   const production = directives(
     buildContentSecurityPolicy({ nonce: 'abc', isDev: false, upgradeInsecureRequests: true }),
@@ -62,6 +80,38 @@ describe('buildContentSecurityPolicy', () => {
     // The map gains origins to talk to, never a looser way to run code.
     expect(maps.get('script-src')).toEqual(production.get('script-src'));
     expect(maps.get('img-src')).toEqual(production.get('img-src'));
+  });
+
+  it('reaches Stripe only where a page pays, and frames nothing else new', () => {
+    expect(production.get('frame-src')).toEqual(["'self'"]);
+    const paying = directives(
+      buildContentSecurityPolicy({
+        nonce: 'abc',
+        isDev: false,
+        upgradeInsecureRequests: true,
+        payments: true,
+      }),
+    );
+    expect(paying.get('connect-src')).toEqual([
+      "'self'",
+      'https://api.stripe.com',
+      'https://merchant-ui-api.stripe.com',
+    ]);
+    expect(paying.get('frame-src')).toEqual([
+      "'self'",
+      'https://js.stripe.com',
+      'https://*.js.stripe.com',
+      'https://hooks.stripe.com',
+    ]);
+    // Still only our nonce'd code runs scripts: Stripe's hosts serve browsers without strict-dynamic.
+    expect(paying.get('script-src')).toEqual([
+      ...(production.get('script-src') ?? []),
+      'https://js.stripe.com',
+      'https://*.js.stripe.com',
+    ]);
+    expect(paying.get('script-src')).toContain("'strict-dynamic'");
+    expect(paying.get('script-src')).not.toContain("'unsafe-inline'");
+    expect(paying.get('frame-ancestors')).toEqual(["'none'"]);
   });
 
   it('only runs scripts carrying this response nonce', () => {

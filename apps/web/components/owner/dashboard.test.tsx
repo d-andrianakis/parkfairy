@@ -166,6 +166,18 @@ describe('ListingMilestones', () => {
     expect(screen.getByText('Χρειάζεται καλύτερη φωτογραφία.')).not.toHaveAttribute('lang');
   });
 
+  it('says where payouts stand among the checks, where they can be set up', () => {
+    const sent = progressFixture({ status: 'in_review', nextStep: null });
+    const none = renderInSubtree(<ListingMilestones listing={sent} />);
+    expect(screen.getByText('Payouts: coming later')).toBeInTheDocument();
+    none.unmount();
+    const needed = renderInSubtree(<ListingMilestones listing={sent} payouts="restricted" />);
+    expect(screen.getByText('Set up payouts')).toBeInTheDocument();
+    needed.unmount();
+    renderInSubtree(<ListingMilestones listing={sent} payouts="active" />, { locale: 'el' });
+    expect(screen.getByText('Μπορείτε να πληρώνεστε')).toBeInTheDocument();
+  });
+
   it('shows where a listing with staff has got to', () => {
     renderInSubtree(
       <ListingMilestones listing={progressFixture({ status: 'in_review', nextStep: null })} />,

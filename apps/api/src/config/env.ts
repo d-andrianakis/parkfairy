@@ -51,6 +51,32 @@ const EnvSchema = z
         .optional(),
     ),
     /**
+     * Payments (Phase 4), in Stripe's test mode until #18 and #19 are answered (memory.md #46):
+     * the secret key and the webhook endpoint's signing secret, both or neither. Without them,
+     * owners can't set up payouts and only a local run books, without paying (#33, #47).
+     */
+    STRIPE_SECRET_KEY: z.preprocess(
+      emptyToUndefined,
+      z
+        .string()
+        .regex(/^(sk|rk)_(test|live)_[A-Za-z0-9]+$/, 'STRIPE_SECRET_KEY is not a Stripe secret key')
+        .optional(),
+    ),
+    /**
+     * The webhook endpoints' signing secrets, comma-separated: the platform's events and the
+     * Connect endpoint's (owners' accounts) come from two endpoints, each with its own.
+     */
+    STRIPE_WEBHOOK_SECRET: z.preprocess(
+      emptyToUndefined,
+      z
+        .string()
+        .regex(
+          /^whsec_[A-Za-z0-9]+(,whsec_[A-Za-z0-9]+)*$/,
+          'STRIPE_WEBHOOK_SECRET is not a signing secret (or a comma-separated list of them)',
+        )
+        .optional(),
+    ),
+    /**
      * Address search (decision #40), from the server. A token without URL restrictions: Mapbox
      * refuses restricted ones without a browser's Referer. On this machine MAPBOX_PUBLIC_TOKEN
      * stands in; elsewhere never, as it reaches every visitor's browser, and making it work from a
@@ -91,6 +117,16 @@ const EnvSchema = z
       path: ['MAPBOX_SEARCH_TOKEN'],
     },
   )
+  .refine((env) => !env.STRIPE_SECRET_KEY === !env.STRIPE_WEBHOOK_SECRET, {
+    // A key without its webhook secret would take money it could never hear back about.
+    message: 'STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET go together',
+    path: ['STRIPE_WEBHOOK_SECRET'],
+  })
+  .refine((env) => !env.STRIPE_SECRET_KEY?.includes('_live_'), {
+    // Real money waits for the adviser (#18) and Stripe (#19): memory.md #46.
+    message: 'Live Stripe keys are refused until #18 and #19 are answered (memory.md #46)',
+    path: ['STRIPE_SECRET_KEY'],
+  })
   .refine((env) => env.NODE_ENV !== 'production' || env.REDIS_URL, {
     message: 'REDIS_URL is required in production (rate limits must be shared across instances)',
     path: ['REDIS_URL'],
@@ -122,12 +158,22 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env) {
     corsOrigins: parseOrigins(env.API_CORS_ORIGINS),
     trustProxy: parseTrustProxy(env.TRUST_PROXY ?? 'loopback'),
     objectStoreDir: env.OBJECT_STORE_DIR ?? DEFAULT_OBJECT_STORE_DIR,
+    /** The web app's origin: where Stripe sends an owner back to after onboarding. */
+    webOrigin: authOrigin,
+    stripe:
+      env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET
+        ? {
+            secretKey: env.STRIPE_SECRET_KEY,
+            webhookSecrets: env.STRIPE_WEBHOOK_SECRET.split(','),
+          }
+        : null,
     /**
-     * Until payments exist (Phase 4), a hold is confirmed without paying, and only on this machine
-     * (decision #33): keyed on the origin, as files for uploads are, so staging and production
-     * offer no booking until Stripe takes the money.
+     * Without Stripe, a hold is confirmed without paying, and only on this machine (decision #33,
+     * #47): keyed on the origin, as files for uploads are, so staging and production offer no
+     * booking until Stripe takes the money. With Stripe, every booking is paid for.
      */
-    bookingWithoutPayment: isLoopback(env.BETTER_AUTH_URL),
+    bookingWithoutPayment:
+      isLoopback(env.BETTER_AUTH_URL) && !(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET),
     mapboxSearchToken:
       env.MAPBOX_SEARCH_TOKEN ??
       (isLoopback(env.BETTER_AUTH_URL) ? env.MAPBOX_PUBLIC_TOKEN : undefined) ??

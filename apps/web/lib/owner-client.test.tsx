@@ -138,3 +138,17 @@ describe('uploadFile', () => {
     await expect(result).resolves.toEqual({ ok: false, failure: {} });
   });
 });
+
+describe('payout refusals', () => {
+  it('are each translated, in both languages', async () => {
+    const { PAYMENT_ERROR_CODES } = await import('@parkfairy/contracts');
+    const [en, el] = await Promise.all([
+      import('@/messages/en.json'),
+      import('@/messages/el.json'),
+    ]);
+    for (const code of PAYMENT_ERROR_CODES) {
+      expect(en.default.Owner.errors, code).toHaveProperty(code);
+      expect(el.default.Owner.errors, code).toHaveProperty(code);
+    }
+  });
+});

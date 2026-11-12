@@ -8,10 +8,11 @@ import { ContinueCard } from '@/components/owner/continue-card';
 import { NewListingButton } from '@/components/owner/listing-actions';
 import { ListingMilestones } from '@/components/owner/listing-milestones';
 import { OwnerLanding, SignedOutActions } from '@/components/owner/owner-landing';
+import { PayoutsCard } from '@/components/owner/payouts-card';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { nextOwnerAction, setupProgress } from '@/lib/owner';
-import { loadOwnerOnboarding } from '@/lib/owner.server';
+import { loadOwnerOnboarding, loadOwnerPayouts } from '@/lib/owner.server';
 import { getSession } from '@/lib/session';
 
 export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
@@ -30,7 +31,9 @@ export default async function OwnerPage({ params }: LocaleParams) {
 
   if (!session) return <OwnerLanding action={<SignedOutActions />} />;
 
-  const onboarding = await loadOwnerOnboarding();
+  // Together: the payouts card is no second wait.
+  const [onboarding, payouts] = await Promise.all([loadOwnerOnboarding(), loadOwnerPayouts()]);
+  const payoutStatus = payouts?.available ? payouts.status : null;
   if (!onboarding) {
     return (
       <div className="mx-auto grid max-w-xl gap-4 px-4 py-16">
@@ -75,8 +78,9 @@ export default async function OwnerPage({ params }: LocaleParams) {
       </div>
       <ContinueCard action={action} progress={setupProgress(onboarding.doneAccountSteps, focus)} />
       <AccountChecklist done={onboarding.doneAccountSteps} />
+      <PayoutsCard locale={locale} payouts={payouts} />
       {onboarding.listings.map((listing) => (
-        <ListingMilestones key={listing.id} listing={listing} />
+        <ListingMilestones key={listing.id} listing={listing} payouts={payoutStatus} />
       ))}
       {onboarding.listings.length > 0 ? (
         <NewListingButton label={t('dashboard.addAnother')} />

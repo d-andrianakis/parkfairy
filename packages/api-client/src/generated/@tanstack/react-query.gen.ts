@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { cancelListingBooking, cancelMyBooking, confirmMyBooking, copyListingHours, copyListingHoursExceptions, createOwnerListing, deleteListingPhoto, deleteListingProof, deleteOwnerListing, downloadListingProof, extendMyHold, findPlaces, getFeaturedParking, getListingBookings, getListingHoursExceptions, getListingPhoto, getLiveness, getMe, getMyBooking, getMyBookings, getOtherOwnerListings, getOwnerListing, getOwnerOnboarding, getOwnerProfile, getParkingListing, getPlaceSuggestions, getReadiness, holdParkingSpace, type Options, reorderListingPhotos, retrievePlace, saveListingHours, saveListingHoursExceptions, saveListingLocation, saveListingPrices, saveListingProofDetails, saveListingSpaces, saveOwnerTaxDetails, searchParking, submitOwnerListing, updateListingPhoto, updateOwnerProfile, uploadListingPhoto, uploadListingProof } from '../sdk.gen';
-import type { CancelListingBookingData, CancelListingBookingError, CancelListingBookingResponse, CancelMyBookingData, CancelMyBookingError, CancelMyBookingResponse, ConfirmMyBookingData, ConfirmMyBookingError, ConfirmMyBookingResponse, CopyListingHoursData, CopyListingHoursError, CopyListingHoursExceptionsData, CopyListingHoursExceptionsError, CopyListingHoursExceptionsResponse, CopyListingHoursResponse, CreateOwnerListingData, CreateOwnerListingError, CreateOwnerListingResponse, DeleteListingPhotoData, DeleteListingPhotoError, DeleteListingPhotoResponse, DeleteListingProofData, DeleteListingProofError, DeleteListingProofResponse, DeleteOwnerListingData, DeleteOwnerListingError, DeleteOwnerListingResponse, DownloadListingProofData, DownloadListingProofError, DownloadListingProofResponse, ExtendMyHoldData, ExtendMyHoldError, ExtendMyHoldResponse, FindPlacesData, FindPlacesError, FindPlacesResponse, GetFeaturedParkingData, GetFeaturedParkingResponse, GetListingBookingsData, GetListingBookingsError, GetListingBookingsResponse, GetListingHoursExceptionsData, GetListingHoursExceptionsError, GetListingHoursExceptionsResponse, GetListingPhotoData, GetListingPhotoError, GetListingPhotoResponse, GetLivenessData, GetLivenessResponse, GetMeData, GetMeError, GetMeResponse, GetMyBookingData, GetMyBookingError, GetMyBookingResponse, GetMyBookingsData, GetMyBookingsError, GetMyBookingsResponse, GetOtherOwnerListingsData, GetOtherOwnerListingsError, GetOtherOwnerListingsResponse, GetOwnerListingData, GetOwnerListingError, GetOwnerListingResponse, GetOwnerOnboardingData, GetOwnerOnboardingError, GetOwnerOnboardingResponse, GetOwnerProfileData, GetOwnerProfileError, GetOwnerProfileResponse, GetParkingListingData, GetParkingListingError, GetParkingListingResponse, GetPlaceSuggestionsData, GetPlaceSuggestionsError, GetPlaceSuggestionsResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, HoldParkingSpaceData, HoldParkingSpaceError, HoldParkingSpaceResponse, ReorderListingPhotosData, ReorderListingPhotosError, ReorderListingPhotosResponse, RetrievePlaceData, RetrievePlaceError, RetrievePlaceResponse, SaveListingHoursData, SaveListingHoursError, SaveListingHoursExceptionsData, SaveListingHoursExceptionsError, SaveListingHoursExceptionsResponse, SaveListingHoursResponse, SaveListingLocationData, SaveListingLocationError, SaveListingLocationResponse, SaveListingPricesData, SaveListingPricesError, SaveListingPricesResponse, SaveListingProofDetailsData, SaveListingProofDetailsError, SaveListingProofDetailsResponse, SaveListingSpacesData, SaveListingSpacesError, SaveListingSpacesResponse, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsError, SaveOwnerTaxDetailsResponse, SearchParkingData, SearchParkingError, SearchParkingResponse, SubmitOwnerListingData, SubmitOwnerListingError, SubmitOwnerListingResponse, UpdateListingPhotoData, UpdateListingPhotoError, UpdateListingPhotoResponse, UpdateOwnerProfileData, UpdateOwnerProfileError, UpdateOwnerProfileResponse, UploadListingPhotoData, UploadListingPhotoError, UploadListingPhotoResponse, UploadListingProofData, UploadListingProofError, UploadListingProofResponse } from '../types.gen';
+import { cancelListingBooking, cancelMyBooking, confirmMyBooking, copyListingHours, copyListingHoursExceptions, createOwnerListing, deleteListingPhoto, deleteListingProof, deleteOwnerListing, downloadListingProof, extendMyHold, findPlaces, getFeaturedParking, getListingBookings, getListingHoursExceptions, getListingPhoto, getLiveness, getMe, getMyBooking, getMyBookings, getOtherOwnerListings, getOwnerListing, getOwnerOnboarding, getOwnerPayouts, getOwnerProfile, getParkingListing, getPlaceSuggestions, getReadiness, holdParkingSpace, openPayoutDashboard, type Options, payForMyBooking, reorderListingPhotos, retrievePlace, saveListingHours, saveListingHoursExceptions, saveListingLocation, saveListingPrices, saveListingProofDetails, saveListingSpaces, saveOwnerTaxDetails, searchParking, settleMyPayment, startPayoutOnboarding, submitOwnerListing, updateListingPhoto, updateOwnerProfile, uploadListingPhoto, uploadListingProof } from '../sdk.gen';
+import type { CancelListingBookingData, CancelListingBookingError, CancelListingBookingResponse, CancelMyBookingData, CancelMyBookingError, CancelMyBookingResponse, ConfirmMyBookingData, ConfirmMyBookingError, ConfirmMyBookingResponse, CopyListingHoursData, CopyListingHoursError, CopyListingHoursExceptionsData, CopyListingHoursExceptionsError, CopyListingHoursExceptionsResponse, CopyListingHoursResponse, CreateOwnerListingData, CreateOwnerListingError, CreateOwnerListingResponse, DeleteListingPhotoData, DeleteListingPhotoError, DeleteListingPhotoResponse, DeleteListingProofData, DeleteListingProofError, DeleteListingProofResponse, DeleteOwnerListingData, DeleteOwnerListingError, DeleteOwnerListingResponse, DownloadListingProofData, DownloadListingProofError, DownloadListingProofResponse, ExtendMyHoldData, ExtendMyHoldError, ExtendMyHoldResponse, FindPlacesData, FindPlacesError, FindPlacesResponse, GetFeaturedParkingData, GetFeaturedParkingResponse, GetListingBookingsData, GetListingBookingsError, GetListingBookingsResponse, GetListingHoursExceptionsData, GetListingHoursExceptionsError, GetListingHoursExceptionsResponse, GetListingPhotoData, GetListingPhotoError, GetListingPhotoResponse, GetLivenessData, GetLivenessResponse, GetMeData, GetMeError, GetMeResponse, GetMyBookingData, GetMyBookingError, GetMyBookingResponse, GetMyBookingsData, GetMyBookingsError, GetMyBookingsResponse, GetOtherOwnerListingsData, GetOtherOwnerListingsError, GetOtherOwnerListingsResponse, GetOwnerListingData, GetOwnerListingError, GetOwnerListingResponse, GetOwnerOnboardingData, GetOwnerOnboardingError, GetOwnerOnboardingResponse, GetOwnerPayoutsData, GetOwnerPayoutsError, GetOwnerPayoutsResponse, GetOwnerProfileData, GetOwnerProfileError, GetOwnerProfileResponse, GetParkingListingData, GetParkingListingError, GetParkingListingResponse, GetPlaceSuggestionsData, GetPlaceSuggestionsError, GetPlaceSuggestionsResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, HoldParkingSpaceData, HoldParkingSpaceError, HoldParkingSpaceResponse, OpenPayoutDashboardData, OpenPayoutDashboardError, OpenPayoutDashboardResponse, PayForMyBookingData, PayForMyBookingError, PayForMyBookingResponse, ReorderListingPhotosData, ReorderListingPhotosError, ReorderListingPhotosResponse, RetrievePlaceData, RetrievePlaceError, RetrievePlaceResponse, SaveListingHoursData, SaveListingHoursError, SaveListingHoursExceptionsData, SaveListingHoursExceptionsError, SaveListingHoursExceptionsResponse, SaveListingHoursResponse, SaveListingLocationData, SaveListingLocationError, SaveListingLocationResponse, SaveListingPricesData, SaveListingPricesError, SaveListingPricesResponse, SaveListingProofDetailsData, SaveListingProofDetailsError, SaveListingProofDetailsResponse, SaveListingSpacesData, SaveListingSpacesError, SaveListingSpacesResponse, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsError, SaveOwnerTaxDetailsResponse, SearchParkingData, SearchParkingError, SearchParkingResponse, SettleMyPaymentData, SettleMyPaymentError, SettleMyPaymentResponse, StartPayoutOnboardingData, StartPayoutOnboardingError, StartPayoutOnboardingResponse, SubmitOwnerListingData, SubmitOwnerListingError, SubmitOwnerListingResponse, UpdateListingPhotoData, UpdateListingPhotoError, UpdateListingPhotoResponse, UpdateOwnerProfileData, UpdateOwnerProfileError, UpdateOwnerProfileResponse, UploadListingPhotoData, UploadListingPhotoError, UploadListingPhotoResponse, UploadListingProofData, UploadListingProofError, UploadListingProofResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -668,6 +668,34 @@ export const confirmMyBookingMutation = (options?: Partial<Options<ConfirmMyBook
     return mutationOptions;
 };
 
+export const payForMyBookingMutation = (options?: Partial<Options<PayForMyBookingData>>): UseMutationOptions<PayForMyBookingResponse, PayForMyBookingError, Options<PayForMyBookingData>> => {
+    const mutationOptions: UseMutationOptions<PayForMyBookingResponse, PayForMyBookingError, Options<PayForMyBookingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await payForMyBooking({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const settleMyPaymentMutation = (options?: Partial<Options<SettleMyPaymentData>>): UseMutationOptions<SettleMyPaymentResponse, SettleMyPaymentError, Options<SettleMyPaymentData>> => {
+    const mutationOptions: UseMutationOptions<SettleMyPaymentResponse, SettleMyPaymentError, Options<SettleMyPaymentData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await settleMyPayment({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const extendMyHoldMutation = (options?: Partial<Options<ExtendMyHoldData>>): UseMutationOptions<ExtendMyHoldResponse, ExtendMyHoldError, Options<ExtendMyHoldData>> => {
     const mutationOptions: UseMutationOptions<ExtendMyHoldResponse, ExtendMyHoldError, Options<ExtendMyHoldData>> = {
         mutationFn: async (fnOptions) => {
@@ -742,6 +770,49 @@ export const cancelListingBookingMutation = (options?: Partial<Options<CancelLis
     const mutationOptions: UseMutationOptions<CancelListingBookingResponse, CancelListingBookingError, Options<CancelListingBookingData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await cancelListingBooking({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getOwnerPayoutsQueryKey = (options?: Options<GetOwnerPayoutsData>) => createQueryKey('getOwnerPayouts', options);
+
+export const getOwnerPayoutsOptions = (options?: Options<GetOwnerPayoutsData>) => queryOptions<GetOwnerPayoutsResponse, GetOwnerPayoutsError, GetOwnerPayoutsResponse, ReturnType<typeof getOwnerPayoutsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getOwnerPayouts({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getOwnerPayoutsQueryKey(options)
+});
+
+export const startPayoutOnboardingMutation = (options?: Partial<Options<StartPayoutOnboardingData>>): UseMutationOptions<StartPayoutOnboardingResponse, StartPayoutOnboardingError, Options<StartPayoutOnboardingData>> => {
+    const mutationOptions: UseMutationOptions<StartPayoutOnboardingResponse, StartPayoutOnboardingError, Options<StartPayoutOnboardingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await startPayoutOnboarding({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const openPayoutDashboardMutation = (options?: Partial<Options<OpenPayoutDashboardData>>): UseMutationOptions<OpenPayoutDashboardResponse, OpenPayoutDashboardError, Options<OpenPayoutDashboardData>> => {
+    const mutationOptions: UseMutationOptions<OpenPayoutDashboardResponse, OpenPayoutDashboardError, Options<OpenPayoutDashboardData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await openPayoutDashboard({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

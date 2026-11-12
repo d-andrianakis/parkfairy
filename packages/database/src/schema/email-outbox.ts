@@ -18,6 +18,7 @@ export const OUTBOX_EMAIL_KINDS = [
   // To the driver.
   'booking-confirmed',
   'booking-cancelled',
+  'booking-payment-refunded',
   // To the listing's owner.
   'booking-received',
   'booking-cancelled-by-driver',

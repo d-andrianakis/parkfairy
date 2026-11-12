@@ -94,7 +94,7 @@ test('a driver books a space, the owner sees who is coming, and closing that day
     await driver.getByRole('button', { name: 'Book this space' }).click();
     await expect(driver).toHaveURL(/\/en\/bookings\/[0-9a-f-]{36}$/);
     const bookingUrl = new URL(driver.url()).pathname;
-    await expect(driver.getByRole('heading', { level: 1 })).toHaveText('Confirm your booking');
+    await expect(driver.getByRole('heading', { level: 1 })).toHaveText('Complete your booking');
     await expect(driver.getByText(/We’re keeping space K1 for you until/)).toBeVisible();
     await expectAccessible(driver);
     // More time, at a press (WCAG 2.2.1): confirming works only while the hold runs (#37).
@@ -312,9 +312,7 @@ test('a space taken meanwhile is said so, a driver cancels by the terms, and Gre
     await expectAccessible(slow);
     await slow.getByRole('button', { name: 'Κράτηση αυτής της θέσης' }).click();
     await expect(slow).toHaveURL(/\/el\/bookings\/[0-9a-f-]{36}$/);
-    await expect(slow.getByRole('heading', { level: 1 })).toHaveText(
-      'Επιβεβαιώστε την κράτησή σας',
-    );
+    await expect(slow.getByRole('heading', { level: 1 })).toHaveText('Ολοκληρώστε την κράτησή σας');
     expect(await slow.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       320,
     );

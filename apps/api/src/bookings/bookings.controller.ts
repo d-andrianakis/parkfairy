@@ -8,6 +8,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiQuery,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -20,10 +21,12 @@ import {
   BookingHoldInputSchema,
   BookingListQuerySchema,
   BookingListSchema,
+  BookingPaymentSchema,
   BookingSchema,
   ErrorResponseSchema,
   type Booking,
   type BookingList,
+  type BookingPayment,
 } from '@parkfairy/contracts';
 import { CurrentUser } from '../auth/auth.decorators.js';
 import { parseOrThrow } from '../common/validation.js';
@@ -96,6 +99,45 @@ export class BookingsController {
     @Body() body: unknown,
   ): Promise<Booking> {
     return this.bookings.confirm(user.id, id, parseOrThrow(BookingConfirmInputSchema, body));
+  }
+
+  /**
+   * Starts paying for a held space (Phase 4): keeps the plate and answers what the Payment Element
+   * needs. Only while the hold runs (`BOOKING_NOT_ACTIVE` after); `BOOKING_UNAVAILABLE` where
+   * nothing is paid; `PAYMENT_PROVIDER_ERROR` when Stripe failed, nothing charged.
+   */
+  @Post(':id/payment')
+  @HttpCode(200)
+  @Throttle(HOLD_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiBody({ schema: schemaRef(BookingConfirmInputSchema) })
+  @ApiOkResponse({ schema: schemaRef(BookingPaymentSchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiServiceUnavailableResponse({ schema: schemaRef(ErrorResponseSchema) })
+  payForMyBooking(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<BookingPayment> {
+    return this.bookings.pay(user.id, id, parseOrThrow(BookingConfirmInputSchema, body));
+  }
+
+  /**
+   * How the payment went, asked of Stripe after paying or coming back from the bank: the booking
+   * confirmed when the money is in, or refunded when it came too late for the space (#3).
+   */
+  @Post(':id/payment/settle')
+  @HttpCode(200)
+  @Throttle(HOLD_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiOkResponse({ schema: schemaRef(BookingSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiServiceUnavailableResponse({ schema: schemaRef(ErrorResponseSchema) })
+  settleMyPayment(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<Booking> {
+    return this.bookings.settle(user.id, id);
   }
 
   /**

@@ -35,6 +35,21 @@ const ServerEnvSchema = z
     EMAIL_OUTBOX_DIR: z.preprocess(emptyToUndefined, z.string().optional()),
     /** Goes to owners' browsers, so a secret token pasted here would be published. */
     MAPBOX_PUBLIC_TOKEN: z.preprocess(emptyToUndefined, z.string().startsWith('pk.').optional()),
+    /**
+     * Stripe's publishable key, for the Payment Element (decision #49). It goes to drivers'
+     * browsers: a secret key here would be published, so only `pk_` keys, and test mode only
+     * until #18 and #19 are answered (memory.md #46).
+     */
+    STRIPE_PUBLISHABLE_KEY: z.preprocess(
+      emptyToUndefined,
+      z
+        .string()
+        .regex(
+          /^pk_test_[A-Za-z0-9]+$/,
+          'STRIPE_PUBLISHABLE_KEY must be a test-mode publishable key',
+        )
+        .optional(),
+    ),
   })
   .refine((env) => env.RESEND_API_KEY || isLoopback(env.BETTER_AUTH_URL), {
     // Keyed on the origin, not NODE_ENV: staging must not write live reset links to disk either.

@@ -12,6 +12,7 @@ import { useAnnouncer } from '@/components/use-announcer';
 import { timeOptions } from '@/i18n/formats';
 import { useRouter } from '@/i18n/navigation';
 import { attempt, useBookingError } from '@/lib/booking-client';
+import { isPaying } from '@/lib/payment-progress';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 
 /** How long before the hold ends the driver is warned: well past WCAG's 20 seconds. */
@@ -28,10 +29,13 @@ export function HoldTimer({
   id,
   expiresAt,
   extensionsLeft,
+  checkout = 'confirm',
 }: {
   id: string;
   expiresAt: string;
   extensionsLeft: number;
+  /** Whether the driver confirms or pays: what the last word before the end says to do. */
+  checkout?: 'payment' | 'confirm';
 }) {
   const t = useTranslations('Booking');
   const locale = useLocale();
@@ -46,11 +50,27 @@ export function HoldTimer({
   const [failure, setFailure] = useState<string | null>(null);
   const time = format.dateTime(new Date(until), timeOptions(locale));
 
+  // The server kept it longer (going to pay renews a hold running low): its time is the one,
+  // taken as it changes (React's way to follow a prop, without an effect's extra render).
+  const [given, setGiven] = useState(expiresAt);
+  if (given !== expiresAt) {
+    setGiven(expiresAt);
+    setUntil(Date.parse(expiresAt));
+    setLeft(extensionsLeft);
+    setWarning(false);
+  }
+
   useEffect(() => {
     const now = Date.now();
     const warn = setTimeout(() => setWarning(true), Math.max(0, until - HOLD_WARNING_MS - now));
-    // Ended: the server's page says so, and offers to choose again.
-    const end = setTimeout(() => router.refresh(), Math.max(0, until - now));
+    let end: ReturnType<typeof setTimeout>;
+    // Ended: the server's page says so, and offers to choose again. Not in the middle of a
+    // payment (a card sent, a bank's check open): what it comes to says what happens next.
+    const ended = () => {
+      if (isPaying()) end = setTimeout(ended, 15_000);
+      else router.refresh();
+    };
+    end = setTimeout(ended, Math.max(0, until - now));
     return () => {
       clearTimeout(warn);
       clearTimeout(end);
@@ -100,7 +120,7 @@ export function HoldTimer({
           </Button>
         </div>
       ) : (
-        <p className="text-sm">{t('holdLimit', { time })}</p>
+        <p className="text-sm">{t('holdLimit', { time, checkout })}</p>
       )}
     </div>
   );

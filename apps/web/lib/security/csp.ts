@@ -8,6 +8,8 @@ export interface CspOptions {
   upgradeInsecureRequests: boolean;
   /** Pages with a Mapbox map (`allowsMaps`). Nothing else gets these origins. */
   maps?: boolean;
+  /** Pages that take a payment (`allowsPayments`). Nothing else gets Stripe's origins. */
+  payments?: boolean;
 }
 
 /**
@@ -23,6 +25,30 @@ export function allowsMaps(pathname: string): boolean {
   return MAP_PAGES.test(pathname);
 }
 
+/**
+ * The page that takes a payment: a booking's (decision #49). Links into it load a real page
+ * (`BookingLink`, and the redirect after a hold), as a client navigation keeps the policy of the
+ * page it started from.
+ */
+const PAYMENT_PAGES = new RegExp(`^/(?:${SUPPORTED_LOCALES.join('|')})/bookings/[^/]+/?$`);
+
+export function allowsPayments(pathname: string): boolean {
+  return PAYMENT_PAGES.test(pathname);
+}
+
+/**
+ * Stripe.js and the Payment Element's frames (Stripe's documented list); 3-D Secure challenges
+ * frame `hooks.stripe.com`. Under `strict-dynamic` the script hosts matter only to browsers without
+ * it: Stripe.js is loaded by our nonce'd code.
+ */
+const STRIPE_SCRIPTS = ['https://js.stripe.com', 'https://*.js.stripe.com'];
+const STRIPE_FRAMES = [
+  'https://js.stripe.com',
+  'https://*.js.stripe.com',
+  'https://hooks.stripe.com',
+];
+const STRIPE_API = ['https://api.stripe.com', 'https://merchant-ui-api.stripe.com'];
+
 /** Tiles, styles, fonts and search come from the first; the second is its usage telemetry. */
 const MAPBOX_ORIGINS = ['https://api.mapbox.com', 'https://events.mapbox.com'];
 
@@ -36,6 +62,7 @@ export function buildContentSecurityPolicy({
   isDev,
   upgradeInsecureRequests,
   maps = false,
+  payments = false,
 }: CspOptions): string {
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
@@ -44,13 +71,16 @@ export function buildContentSecurityPolicy({
       `'nonce-${nonce}'`,
       "'strict-dynamic'",
       ...(isDev ? ["'unsafe-eval'"] : []),
+      ...(payments ? STRIPE_SCRIPTS : []),
     ],
     // React `style` attributes cannot carry nonces, so inline styles stay allowed; this is
     // the accepted residual risk (style injection), scripts remain locked down.
     'style-src': ["'self'", "'unsafe-inline'"],
     'img-src': ["'self'", 'blob:', 'data:'],
     'font-src': ["'self'"],
-    'connect-src': ["'self'", ...(maps ? MAPBOX_ORIGINS : [])],
+    'connect-src': ["'self'", ...(maps ? MAPBOX_ORIGINS : []), ...(payments ? STRIPE_API : [])],
+    // What default-src gave frames before, and Stripe's fields on the page that pays.
+    'frame-src': ["'self'", ...(payments ? STRIPE_FRAMES : [])],
     // Falling back to script-src would refuse the map's worker: strict-dynamic ignores 'self'.
     ...(maps ? { 'worker-src': ["'self'"] } : {}),
     'object-src': ["'none'"],

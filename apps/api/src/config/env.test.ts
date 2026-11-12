@@ -28,6 +28,43 @@ describe('loadEnv', () => {
     ).toBe(false);
   });
 
+  it('takes Stripe’s test keys as a pair, and then never the stand-in (decisions #46, #47)', () => {
+    const keys = { STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_def456' };
+    const local = { ...base, BETTER_AUTH_URL: 'http://localhost:3000' };
+    expect(loadEnv({ ...base }).stripe).toBeNull();
+    expect(loadEnv({ ...local, ...keys })).toMatchObject({
+      stripe: { secretKey: 'sk_test_abc123', webhookSecrets: ['whsec_def456'] },
+      bookingWithoutPayment: false,
+      webOrigin: 'http://localhost:3000',
+    });
+    // The platform's endpoint and the Connect endpoint each sign with their own.
+    expect(
+      loadEnv({ ...base, ...keys, STRIPE_WEBHOOK_SECRET: 'whsec_def456,whsec_ghi789' }).stripe
+        ?.webhookSecrets,
+    ).toEqual(['whsec_def456', 'whsec_ghi789']);
+    expect(() =>
+      loadEnv({ ...base, ...keys, STRIPE_WEBHOOK_SECRET: 'whsec_def456,sk_test_x' }),
+    ).toThrow(/STRIPE_WEBHOOK_SECRET/);
+    // Empty is unset, as elsewhere.
+    expect(
+      loadEnv({ ...base, STRIPE_SECRET_KEY: '', STRIPE_WEBHOOK_SECRET: '' }).stripe,
+    ).toBeNull();
+    // A key without its webhook secret could take money it never hears back about.
+    expect(() => loadEnv({ ...base, STRIPE_SECRET_KEY: 'sk_test_abc123' })).toThrow(
+      /STRIPE_WEBHOOK_SECRET/,
+    );
+    expect(() => loadEnv({ ...base, STRIPE_WEBHOOK_SECRET: 'whsec_def456' })).toThrow(
+      /STRIPE_WEBHOOK_SECRET/,
+    );
+    // Real money waits for #18 and #19.
+    expect(() => loadEnv({ ...base, ...keys, STRIPE_SECRET_KEY: 'sk_live_abc123' })).toThrow(
+      /Live Stripe keys/,
+    );
+    expect(() => loadEnv({ ...base, ...keys, STRIPE_SECRET_KEY: 'pk_test_abc123' })).toThrow(
+      /STRIPE_SECRET_KEY/,
+    );
+  });
+
   it('searches addresses with its own Mapbox token, else the public one on this machine only', () => {
     const local = { ...base, BETTER_AUTH_URL: 'http://localhost:3000' };
     expect(loadEnv({ ...base }).mapboxSearchToken).toBeNull();

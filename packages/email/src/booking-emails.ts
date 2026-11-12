@@ -6,6 +6,8 @@ import type { OutgoingEmail } from './transport.js';
 export const BOOKING_EMAIL_KINDS = [
   'booking-confirmed',
   'booking-cancelled',
+  // A payment that couldn't book the space (too late for it, or for a hold let go: #3).
+  'booking-payment-refunded',
   'booking-received',
   'booking-cancelled-by-driver',
 ] as const;
@@ -100,6 +102,14 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         action: 'Δείτε την κράτηση',
         note: 'Λυπούμαστε για την αναστάτωση. Μπορείτε να αναζητήσετε άλλον χώρο στο Parkfairy.',
       },
+      'booking-payment-refunded': {
+        subject: (reference) => `Τα χρήματά σας επιστρέφονται (${reference})`,
+        heading: 'Τα χρήματά σας επιστρέφονται',
+        body: (listing) =>
+          `Δεν ήταν δυνατό να γίνει η κράτηση στον χώρο «${listing}» με αυτή την πληρωμή, γι’ αυτό σας επιστρέφεται ολόκληρο το ποσό.`,
+        action: 'Δείτε την κράτηση',
+        note: 'Μπορεί να χρειαστούν μερικές ημέρες για να φανεί στην κίνηση της κάρτας ή της τράπεζάς σας.',
+      },
       'booking-received': {
         subject: (_reference, listing) => `Νέα κράτηση για τον χώρο «${listing}»`,
         heading: 'Έχετε νέα κράτηση',
@@ -153,6 +163,14 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         action: 'See your booking',
         note: 'We’re sorry for the trouble. You can look for another space on Parkfairy.',
       },
+      'booking-payment-refunded': {
+        subject: (reference) => `Your payment is being refunded (${reference})`,
+        heading: 'Your payment is being refunded',
+        body: (listing) =>
+          `We couldn’t book your space at “${listing}” with this payment, so all of it is going back to you.`,
+        action: 'See your booking',
+        note: 'It can take a few days to show on your card or bank statement.',
+      },
       'booking-received': {
         subject: (_reference, listing) => `New booking for “${listing}”`,
         heading: 'You have a new booking',
@@ -199,7 +217,11 @@ export interface BookingEmail {
   booking: BookingEmailFacts;
 }
 
-const DRIVER_KINDS = new Set<BookingEmailKind>(['booking-confirmed', 'booking-cancelled']);
+const DRIVER_KINDS = new Set<BookingEmailKind>([
+  'booking-confirmed',
+  'booking-cancelled',
+  'booking-payment-refunded',
+]);
 
 export function renderBookingEmail({
   kind,

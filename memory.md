@@ -147,6 +147,21 @@ Answered by the product owner on 2026-11-10, after the reviews:
     (a way back without dragging; the list stays the equivalent), and on touch one finger scrolls the
     page while two move the map, with the hints in both languages.
 
+Answered by the product owner on 2026-11-11, to start Phase 4:
+
+46. Phase 4 starts **in Stripe's test mode before #18 and #19 are answered.** What they decide (VAT
+    on the commission, who issues the driver's receipt, the withdrawal right, how long funds may be
+    held and so the booking horizon) stays configurable, and nothing takes real money until both
+    are answered.
+47. Built **without Stripe keys**, as the address search was (#42): tests mock Stripe, the smoke
+    suite runs without keys (local runs keep the stand-in Confirm of #33 when Stripe isn't
+    configured), and a "try with the real thing" list waits for test keys.
+48. Owners get **Express** connected accounts: Stripe hosts the identity checks and bank details,
+    and the platform keeps control of when transfers go (24 hours after the stay, #4).
+49. Drivers pay in **an embedded Payment Element** on the booking page, not a redirect to Checkout.
+    So the booking page's CSP allows Stripe's scripts and frames, and its accessibility and Greek
+    are ours to check.
+
 Our readings (2026-11-08), not asked; change any that are wrong:
 
 - **One hold per driver.** A new hold lets the driver's earlier ones go, so one account can't sit
@@ -820,6 +835,54 @@ locked`) in one statement. The two sets are kept apart (`user_id <> $user`) beca
     replaces its `innerHTML`. A Greek `customAttribution` would need another look.
   - **The owner's address search** asks Mapbox in the listing's language, not the page's, since
     that is the language the address is saved and shown in.
+
+- **2026-11-11 · Payments (Phase 4.1) go through one gateway, and Stripe decides nothing alone.**
+  - **`PaymentsGateway`** (`apps/api/src/payments/stripe-gateway.ts`) is the only place the SDK is
+    called; tests inject a fake through the `PAYMENTS` token (null without keys). Stripe's error
+    messages can carry a person's details: a failure becomes `PaymentProviderError` with Stripe's
+    type and code only.
+  - **A booking is confirmed by asking Stripe**, never by an event's body: the webhook and the
+    page's `settle` both retrieve the PaymentIntent, then `settlePayment` decides under the
+    listing's lock and the booking's. Paid and still bookable: confirmed (an expired hold goes back
+    to `confirmed` and the exclusion constraint decides whether the space is free). Not: refunded
+    in full, with an idempotency key per PaymentIntent.
+  - **Stripe is called outside transactions**: `pay` checks and keeps the plate under the locks,
+    commits, then makes the PaymentIntent (idempotency key per booking) and stores it where
+    `payment_intent_id is null`. A PaymentIntent made but not stored is still found by its
+    metadata's booking id.
+  - **The webhook's raw body** is kept by `express.raw` on its path in `configureApp`, before the
+    JSON parser; the origin guard already lets cookie-less requests through to their own check.
+    Events are recorded in `stripe_events` after they are handled, so one that failed half way is
+    handled again on Stripe's retry.
+  - **Drizzle leaves a lone table's columns unqualified**: a subquery in a single-table select
+    rendered `where "owner_id" = "owner_id"` and compared the subquery's table with itself. Join
+    instead, or qualify by hand.
+  - **Payout accounts have a table of their own**: `owner_profiles.updated_at` is the owner's last
+    change, which the reminder reads; Stripe's updates aren't the owner's.
+  - **The Payment Element needs the booking page's CSP**, and a client navigation keeps the policy
+    of the page it started from: every way into a booking's page loads a real page while Stripe is
+    configured (`BookingLink`, `loadPage` after a hold), as maps do (`SearchLink`).
+  - **The stand-in Confirm never runs beside Stripe**, even on this machine.
+  - **(After the reviews) A refund is recorded before Stripe is asked**: `refunding`, under the
+    booking's lock, in the same transaction that decides it (the confirming update in a savepoint,
+    so a clash with another booking still ends in that write). Stripe after commit, then
+    `refunded`. A `refunding` row is finished by the next look. Deciding and refunding in two
+    steps let a second settle confirm the booking in between, refunded and booked.
+  - **A booking confirmed once keeps its money** (`confirmed_at` set: cancelled since, too). Its
+    refunds are its cancellation's, by its policy (4.2); settle refunding it would skip the policy.
+  - **Only what Stripe took books**: the amount, `amount_received`, nothing refunded on the latest
+    charge, and a stay not begun. Cards only (`allowed_payment_method_types`, this API version's
+    name), as a method that settles days later lands after the ten-minute hold.
+  - **A payment for a booking this database doesn't have is left alone**: two environments on one
+    Stripe test account would otherwise refund each other's. So a booking with a PaymentIntent is
+    never deleted (the stale-hold sweep skips them); erasing an account must anonymise them.
+  - **A refund Stripe made but we never recorded** (`refunding` after a crash) is recorded at the
+    next look from the charge's `amount_refunded`, without asking Stripe again: past the
+    idempotency key's 24 hours a second refund is refused.
+  - **The payment page**: the hold timer never ends the page while a payment is under way
+    (`payment-progress`), going to pay renews a hold with less than half its time left (as an
+    extension), the return from the bank is settled at once, and the Element is themed from our
+    tokens in hex (`stripe-appearance.ts`, held to globals.css by tokens.test.ts).
 
 ## Conventions
 

@@ -5,11 +5,12 @@ import { HOLD_MINUTES } from '@parkfairy/contracts/validation';
 import { Button } from '@parkfairy/ui/components/button';
 import { Label } from '@parkfairy/ui/components/label';
 import { RadioGroup, RadioGroupItem } from '@parkfairy/ui/components/radio-group';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { FormError } from '@/components/form-error';
-import { useRouter } from '@/i18n/navigation';
+import { getPathname, useRouter } from '@/i18n/navigation';
 import { attempt, useBookingError } from '@/lib/booking-client';
+import { loadPage } from '@/lib/load-page';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 
 export interface SpaceOption {
@@ -47,6 +48,7 @@ export function BookSpaceForm({
 }) {
   const t = useTranslations('BookSpace');
   const router = useRouter();
+  const locale = useLocale();
   const bookingError = useBookingError();
   const firstRadio = useRef<HTMLButtonElement>(null);
   const [picked, setPicked] = useState(initial);
@@ -74,7 +76,11 @@ export function BookSpaceForm({
       holdParkingSpace({ body: { listing, spaceId, start, end } }),
     );
     if (outcome.ok && outcome.data) {
-      router.push(`/bookings/${outcome.data.id}`);
+      if (outcome.data.checkout === 'payment') {
+        loadPage(getPathname({ href: `/bookings/${outcome.data.id}`, locale }));
+      } else {
+        router.push(`/bookings/${outcome.data.id}`);
+      }
       return;
     }
     const refusal = outcome.ok ? {} : outcome.failure;

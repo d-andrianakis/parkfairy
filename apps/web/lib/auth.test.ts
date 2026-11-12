@@ -27,6 +27,20 @@ describe('parseServerEnv', () => {
     expect(env.trustedProxies).toEqual([]);
   });
 
+  it('takes a test-mode publishable key only: never a secret or a live one (#46)', () => {
+    expect(
+      parseServerEnv({ ...base, STRIPE_PUBLISHABLE_KEY: 'pk_test_abc123' }).STRIPE_PUBLISHABLE_KEY,
+    ).toBe('pk_test_abc123');
+    expect(
+      parseServerEnv({ ...base, STRIPE_PUBLISHABLE_KEY: '' }).STRIPE_PUBLISHABLE_KEY,
+    ).toBeUndefined();
+    for (const key of ['sk_test_abc123', 'pk_live_abc123', 'rk_test_abc', 'whsec_x']) {
+      expect(() => parseServerEnv({ ...base, STRIPE_PUBLISHABLE_KEY: key }), key).toThrow(
+        /STRIPE_PUBLISHABLE_KEY/,
+      );
+    }
+  });
+
   it('splits and trims the trusted proxy list; "none" means none', () => {
     expect(
       parseServerEnv({ ...base, TRUSTED_PROXIES: ' 10.0.0.0/8, 192.0.2.10 ' }).trustedProxies,

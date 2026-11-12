@@ -152,7 +152,7 @@ describe('the listing page’s booking', () => {
     await show(listing({ bookingOpen: false }), true);
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Sign in to book' })).not.toBeInTheDocument();
-    expect(screen.getByText('Online booking is coming soon.')).toBeInTheDocument();
+    expect(screen.getByText('This parking can’t be booked online yet.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Spaces' })).toBeVisible();
   });
 

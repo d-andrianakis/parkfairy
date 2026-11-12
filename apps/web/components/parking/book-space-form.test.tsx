@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
+import { loadPage } from '@/lib/load-page';
 import { answer, refusal } from '@/test/owner-fixtures';
 import { routerMock } from '@/test/navigation-mock';
 import { rendererFor, renderWithProviders } from '@/test/render';
@@ -14,6 +15,7 @@ vi.mock('@parkfairy/api-client', () => ({
   client: { setConfig: vi.fn() },
   holdParkingSpace: vi.fn(),
 }));
+vi.mock('@/lib/load-page', () => ({ loadPage: vi.fn() }));
 const hold = vi.mocked(holdParkingSpace);
 const renderInSubtree = rendererFor(CLIENT_NAMESPACES.bookSpace);
 
@@ -54,7 +56,7 @@ describe('BookSpaceForm', () => {
     expect(screen.queryByRole('group')).not.toBeInTheDocument();
     // The ten minutes are said with the button, before it is pressed.
     expect(screen.getByRole('button', { name: 'Book this space' })).toHaveAccessibleDescription(
-      'We keep the space for you for 10 minutes while you confirm.',
+      'We keep the space for you for 10 minutes while you book.',
     );
     const first = screen.getByRole('radio', { name: 'Α1' });
     expect(first).toBeChecked();
@@ -72,6 +74,15 @@ describe('BookSpaceForm', () => {
     expect(hold).toHaveBeenCalledWith({
       body: { listing: 'ermou-garage', spaceId: A2, ...stay },
     });
+  });
+
+  it('loads the booking’s page as a page of its own when it is paid for (decision #49)', async () => {
+    hold.mockResolvedValue(answer({ id: 'b1', checkout: 'payment' }) as never);
+    show(SPACES, 'el');
+    await userEvent.click(screen.getByRole('button', { name: /^Κράτηση/ }));
+    // Its CSP is the one that lets Stripe in: a client navigation would keep this page's.
+    await waitFor(() => expect(loadPage).toHaveBeenCalledWith('/el/bookings/b1'));
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 
   it('says when another driver got there first, and reads the list again', async () => {

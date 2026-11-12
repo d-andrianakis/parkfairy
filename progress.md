@@ -1038,6 +1038,126 @@ Left open:
 - [ ] Late-payment and dispute workflows: a payment after the hold keeps the booking if the
       space is still free, otherwise a full refund
 
+Built in Stripe's test mode, without keys, before #18 and #19 (memory.md #46–#49), in rounds:
+
+- **4.1** Owners connect an Express account for payouts; drivers pay in an embedded Payment
+  Element; signed, idempotent webhooks confirm the booking (a late payment kept or refunded, #3);
+  the commission a stored setting kept on each booking. Local runs without Stripe keep #33's
+  stand-in.
+- **4.2** Refunds on cancellation by either side, transfers to owners 24 hours after the stay, the
+  ledger and reconciliation.
+- **4.3** Disputes, and what #18 and #19 answer.
+
+### 4.1 Payouts set up, bookings paid for (2026-11-11)
+
+- [x] **Implemented** (Stripe in test mode, faked in tests; no keys yet):
+  - Owners set up payouts in Stripe's Express onboarding (`/owner/payouts`, a card on the
+    dashboard): one account per owner (`payout_accounts`), its state from Stripe's
+    `account.updated` and a look of our own while not active; the Express dashboard once set up.
+  - A listing is bookable only once its owner can be paid (#5): `bookingOpen` and the hold.
+  - The commission is a stored setting (`platform_settings`, 10%), copied onto each booking at the
+    hold (`bookings.commission_bps`, #15).
+  - Drivers pay in the Payment Element on the booking's page (#49): the plate is kept, the booking's
+    one PaymentIntent made (Stripe outside the locks), and the booking confirmed when the money is
+    in, by Stripe's signed webhook (`/v1/payments/webhook`, raw body, deduplicated in
+    `stripe_events`) or the page asking (`/payment/settle`). A late payment keeps the booking while
+    the space is free and is refunded in full otherwise (#3); so is one for a hold let go or an
+    amount not the booking's. A payment the bank is still deciding on is said so, and looked at
+    again quietly.
+  - The booking page alone lets Stripe's scripts and frames in (CSP), and every way into it loads a
+    real page (`BookingLink`, the hold's redirect).
+  - Without Stripe a local run keeps the stand-in Confirm (#33, #47); with it, never.
+  - Live keys are refused (`sk_live_`, and only `pk_test_` on the web) until #18 and #19.
+- [x] **Unit tests**: the gateway (account and payment states, idempotency keys, errors without
+      Stripe's message, real signatures), env, contracts, the CSP, the hold form's page load, the
+      paying form, the Payment Element step (with Stripe mocked), the pending payment, the payouts
+      button, page and card, the booking page's paying states, `BookingLink`
+- [x] **Integration tests** (`payments.integration.test.ts`, a fake Stripe in memory): payouts end
+      to end, the webhook's signature and ordering, paying, confirming once, settling, late
+      payments kept and refunded, refunds for a released hold or a wrong amount, Stripe failing,
+      another driver kept out, the stale-hold sweep keeping paid-for holds
+- [x] **Smoke test** (`payments.smoke.ts`): without Stripe, the payouts page in both languages and
+      the webhook's 404; the CSP on the booking page only. A key-gated run (pay with 4242 in the
+      Payment Element, booked) is written and skipped until test keys exist
+- [x] **Security** review: two highs found and fixed, and confirmed closed by a re-check (with
+      both mediums), which found one new low, fixed as far as it can be before 4.2 (N1 below).
+  - H1: settling a paid booking cancelled since refunded it in full, past its policy. A booking
+    once confirmed now keeps its money; its refunds are its cancellation's (4.2).
+  - H2: a refund decided in one transaction and made after it let a second settle confirm the
+    booking in between. The refund is now recorded (`refunding`) under the booking's lock before
+    Stripe is asked, the confirming update runs in a savepoint, and a refund that fails half way is
+    finished by the next look.
+  - Fixed too: a late payment for a stay already begun is refunded; payments are cards only (no
+    method that settles days later); `GET /owner/payouts` throttled per account and asking Stripe
+    at most once a minute; answers parsed through their contracts and Stripe links only followed;
+    both webhook secrets accepted (the platform's and Connect's); the plate cleared on a refund;
+    `stripe_events` purged after a week; Stripe's parameters taken out of the address back from
+    the bank; a payment for a booking another environment made left alone.
+- [x] **Performance** review: nothing high. Fixed: the page's looks at a payment (backed off,
+      paused while hidden, under the route's limit), a settle that asks Stripe nothing once settled
+      and writes nothing unchanged, the dashboard reading payouts beside the onboarding, the
+      payouts status from the database within a minute, `@stripe/stripe-js/pure` and the step's
+      code fetched while the plate is typed, links to bookings made staying client navigations,
+      the stale-holds index without paid-for holds, ignored webhook events not recorded, the
+      payouts page in the budget tests. Open below
+- [x] **Accessibility** review: nothing above serious. Fixed:
+  - Stripe's fields in our colours (hex held to the tokens), dark with the system's dark;
+  - the hold renewed when going to pay with little left, and never ended mid-payment;
+  - the return from the bank settled at once, and a payment not made said so;
+  - the payment heading through `FocusHeading`, a loading status, Pay once ready, a load failure
+    said with a retry;
+  - the pending payment: quiet looks, a press that says what it found, a refusal that moves on;
+  - the plate changeable before paying, letting go held back while paying;
+  - titles and badges by what the booking is about (paying, refunded).
+- [x] **i18n** review: no blocker. Fixed: Pay or Confirm by how the hold is completed ("Complete
+      your booking"), "nothing was charged" only where true, a driver email for a refund, the
+      payouts checks and wording (Stripe can't pay you yet; once live), Greek wording (κράτηση
+      rather than θέση "closing", the card's statement, «Πληρωμές προς εσάς»), the return URL
+      built by the router
+- [x] **Test** review: no test would pass broken. Fixed: the suite run as production has it (no
+      stand-in beside Stripe), Stripe's keys blanked in tests, failure and retry, concurrency, the
+      metadata fallback, the gates without and with Stripe, the payment states through the
+      webhook, unknown bookings, the stale-hold control row, web env, error codes in both
+      catalogs, Greek amounts
+- [x] **Contracts & docs**: OpenAPI and client regenerated, migration 0021 reviewed (a default
+      backfilled then dropped, the settings row seeded), `.env.example`, memory.md
+
+Left open:
+
+- [ ] Cancelling a paid booking records the refund but sends no money back until 4.2; transfers
+      to owners and the ledger are 4.2 too
+- [ ] The PaymentIntents of holds that lapsed unpaid aren't cancelled at Stripe (4.2, with the
+      worker able to call Stripe); until then their rows are kept, with the plate cleared only
+      on a refund. Retention of these rows and of Stripe's data: Phase 6 (#18)
+- [ ] The webhook asks Stripe for the PaymentIntent before answering; under a burst, a queue job
+      would answer faster (perf M3)
+- [ ] A booking left `refunding` because Stripe failed and nobody came back is retried only while
+      Stripe retries its webhook (3 days): a worker sweep with an alert, in 4.2 (N1). One refunded
+      at Stripe with our write lost is recorded at the next look, without asking Stripe again
+- [ ] Erasing an account (Phase 6) must anonymise bookings with a PaymentIntent, never delete
+      them: a payment for a booking this database doesn't have is left alone, not refunded
+- [ ] Stripe's own decline messages are shown for cards; check they come in Greek on `/el`, and map
+      the common codes to ours if not
+- [ ] Native speaker: the payment and payouts copy (Booking.continueToPayment … paymentRefunded,
+      Owner.payouts.*, the refund email), «η Stripe», a word for payouts apart from drivers'
+      payments (πληρωμές προς εσάς / εκκαθαρίσεις / εισπράξεις), «Πληρωμή 4,00 €» on the button
+
+**Try with the real thing** (needs Stripe test keys, decision #47):
+
+- [ ] The key-gated smoke run, and `stripe listen --forward-to localhost:4000/v1/payments/webhook`
+      (and the Connect endpoint's secret beside the platform's in `STRIPE_WEBHOOK_SECRET`)
+- [ ] An Express onboarding in test mode, back to `/owner/payouts`, both languages; whose language
+      Stripe's onboarding speaks with a Greek page and an English browser
+- [ ] Test cards: 4242 (paid), 4000 0025 0000 3155 (3-D Secure, complete, fail and close the
+      frame), 4000 0000 0000 0002 (declined), 9995 (funds), 0069 (expired), 0127 (CVC), 0119
+      (processing error), on `/el` and `/en`, light, dark and the system's dark
+- [ ] Screen readers (NVDA with Chrome and Firefox and a Greek voice, JAWS, VoiceOver on macOS and
+      iOS, TalkBack): Continue to payment, the Element's fields and errors, a decline, the 3-D
+      Secure dialog, the hold warning while paying, the pending payment's looks, the refund
+      notice, the payouts buttons and the return from Stripe
+- [ ] Contrast measured inside Stripe's frame, a Windows contrast theme, 320 px, 200% zoom,
+      reduced motion
+
 ## Phase 5: Owner and admin dashboards
 
 - [~] 2FA enrolment UI done (1.3); admin MFA enforced end to end once admin routes exist

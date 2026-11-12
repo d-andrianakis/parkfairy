@@ -1,4 +1,4 @@
-import { BOOKINGS_MAX_PAGE } from '@parkfairy/contracts';
+import { BOOKINGS_MAX_PAGE, type Booking } from '@parkfairy/contracts';
 import { Alert, AlertDescription } from '@parkfairy/ui/components/alert';
 import { Badge } from '@parkfairy/ui/components/badge';
 import { Button } from '@parkfairy/ui/components/button';
@@ -12,6 +12,7 @@ import {
 import { CircleAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import { BookingLink } from '@/components/bookings/booking-link';
 import { PlaceWords } from '@/components/parking/place-words';
 import { StayRange } from '@/components/parking/stay-range';
 import { SearchLink } from '@/components/parking/search-link';
@@ -36,6 +37,13 @@ export async function generateMetadata({ params }: BookingsPageProps): Promise<M
 }
 
 /** The driver's bookings, upcoming or past, a page at a time; each links to its own page. */
+/** What a booking's badge says: the booking, or its money where that says more. */
+function badgeOf({ status, payment }: Booking) {
+  if (payment === 'refunded' || payment === 'refunding') return 'refunded' as const;
+  if (payment === 'processing' && status !== 'confirmed') return 'processing' as const;
+  return status;
+}
+
 export default async function BookingsPage({ params, searchParams }: BookingsPageProps) {
   const locale = await localeFromParams(params);
   await requireSession('/bookings');
@@ -96,8 +104,9 @@ export default async function BookingsPage({ params, searchParams }: BookingsPag
                 <CardHeader>
                   <CardTitle className="leading-snug">
                     <h2>
-                      <Link
-                        href={`/bookings/${booking.id}`}
+                      <BookingLink
+                        id={booking.id}
+                        paying={booking.status === 'held'}
                         aria-describedby={`stay-${booking.id}`}
                         className="underline underline-offset-4 hover:decoration-2"
                       >
@@ -113,7 +122,7 @@ export default async function BookingsPage({ params, searchParams }: BookingsPag
                             tBooking('unnamed')
                           )}
                         </span>
-                      </Link>
+                      </BookingLink>
                     </h2>
                   </CardTitle>
                   {/* Describes the link: two bookings at one place read apart. */}
@@ -122,7 +131,7 @@ export default async function BookingsPage({ params, searchParams }: BookingsPag
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-                  <Badge variant="outline">{tBooking(`status.${booking.status}`)}</Badge>
+                  <Badge variant="outline">{tBooking(`status.${badgeOf(booking)}`)}</Badge>
                   <span>
                     {t.rich('space', {
                       label: booking.spaceLabel,

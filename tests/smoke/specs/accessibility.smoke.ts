@@ -147,6 +147,7 @@ test.describe('signed in', () => {
       '/owner',
       '/owner/profile',
       '/owner/tax',
+      '/owner/payouts',
       '/bookings',
       '/bookings?when=past',
     ]) {

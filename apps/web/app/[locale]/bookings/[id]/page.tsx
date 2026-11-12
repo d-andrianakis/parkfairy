@@ -11,6 +11,8 @@ import { BookingFacts } from '@/components/bookings/booking-facts';
 import { CancelBooking } from '@/components/bookings/cancel-booking';
 import { ConfirmBooking } from '@/components/bookings/confirm-booking';
 import { HoldTimer } from '@/components/bookings/hold-timer';
+import { PaymentPending } from '@/components/bookings/payment-pending';
+import { TidyPaymentReturn } from '@/components/bookings/tidy-payment-return';
 import { ClientMessages } from '@/components/client-messages';
 import { FocusHeading } from '@/components/focus-heading';
 import { placeTag } from '@/components/parking/place-words';
@@ -20,6 +22,7 @@ import { Link } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { listingStayHref } from '@/lib/booking-links';
 import { loadBooking } from '@/lib/bookings.server';
+import { stripePublishableKey } from '@/lib/payments.server';
 import { requireSession } from '@/lib/session';
 
 interface BookingPageProps {
@@ -73,14 +76,28 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
   const clock = (instant: number) => format.dateTime(new Date(instant), timeOptions(locale));
   const again = listingStayHref(booking.listing.slug, booking.start, booking.end);
   const notice =
-    done === 'confirmed' && booking.status === 'confirmed'
+    (done === 'confirmed' || done === 'paid') && booking.status === 'confirmed'
       ? { heading: t('confirmed'), lead: t('confirmedLead') }
       : done === 'cancelled' && booking.status === 'cancelled'
         ? { heading: t('cancelledNotice'), lead: null }
         : null;
+  // Paid, and the bank still deciding: whether or not the hold runs, the money is on its way. Or
+  // back from the bank before Stripe's webhook: what happened is asked at once.
+  const returned = done === 'paid' && booking.payment === 'pending';
+  const processing =
+    (booking.payment === 'processing' || returned) && booking.status !== 'confirmed';
+  const refunded = booking.payment === 'refunded' || booking.payment === 'refunding';
+  /** What the page is about: the booking, or the money where that says more. */
+  const state = refunded
+    ? ('refunded' as const)
+    : processing
+      ? ('processing' as const)
+      : booking.status;
+  const unpaid = done === 'unpaid' && booking.payment === 'pending' && booking.status === 'held';
 
   return (
     <div className="mx-auto grid w-full max-w-2xl content-start gap-6 px-4 py-10">
+      {done === 'paid' ? <TidyPaymentReturn /> : null}
       <Link
         href="/bookings"
         className="flex w-fit items-center gap-1 text-sm text-primary underline underline-offset-4 hover:decoration-2"
@@ -90,16 +107,16 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
       </Link>
       <div className="grid gap-2">
         <div>
-          <Badge variant="outline">{t(`status.${booking.status}`)}</Badge>
+          <Badge variant="outline">{t(`status.${state}`)}</Badge>
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight">{t(`title.${booking.status}`)}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{t(`title.${state}`)}</h1>
       </div>
       {notice ? (
         // Page content that replaced the form, not an interruption: no role="alert". After the
         // page's heading, so the headings read in order; it takes the focus all the same. Keyed:
         // a page whose query alone changes keeps its components, and a reused heading wouldn't
         // take the focus or say anything for the next thing done.
-        <Alert key={done === 'confirmed' ? 'confirmed' : 'cancelled'} role={undefined}>
+        <Alert key={done === 'cancelled' ? 'cancelled' : 'confirmed'} role={undefined}>
           <CircleCheck aria-hidden />
           <div className="col-start-2 grid gap-1">
             <FocusHeading>{notice.heading}</FocusHeading>
@@ -113,7 +130,37 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
         </CardContent>
       </Card>
 
-      {pending && ended ? (
+      {refunded ? (
+        // A payment that came too late for the space, or for a hold let go (decision #3).
+        <Alert key="refunded" role={undefined}>
+          <CircleAlert aria-hidden />
+          <div className="col-start-2 grid gap-1">
+            {done === 'paid' ? (
+              <FocusHeading>
+                {booking.payment === 'refunded' ? t('paymentRefunded') : t('paymentRefunding')}
+              </FocusHeading>
+            ) : (
+              <h2 className="font-medium">
+                {booking.payment === 'refunded' ? t('paymentRefunded') : t('paymentRefunding')}
+              </h2>
+            )}
+            <AlertDescription>{t('paymentRefundedLead')}</AlertDescription>
+          </div>
+        </Alert>
+      ) : null}
+      {refunded && booking.status !== 'confirmed' ? (
+        <div>
+          <Button asChild variant="outline">
+            <Link href={again}>{t('chooseAnother')}</Link>
+          </Button>
+        </div>
+      ) : null}
+
+      {processing ? (
+        <ClientMessages namespaces={CLIENT_NAMESPACES.booking}>
+          <PaymentPending id={booking.id} focus={done === 'paid'} now={returned} />
+        </ClientMessages>
+      ) : pending && ended && !refunded ? (
         // What replaces the form when the hold runs out while the page is open: it takes the
         // focus the form had.
         <div className="grid gap-3">
@@ -125,27 +172,47 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
             </Button>
           </div>
         </div>
-      ) : pending ? (
+      ) : pending && !refunded ? (
         <div className="grid gap-4">
+          {unpaid ? (
+            // Back from the bank, not paid after all: said, and the form is there to pay again.
+            <Alert key="unpaid" role={undefined} variant="destructive">
+              <CircleAlert aria-hidden />
+              <div className="col-start-2 grid gap-1">
+                <FocusHeading>{t('paymentUnpaid')}</FocusHeading>
+                <AlertDescription>{t('paymentUnpaidLead')}</AlertDescription>
+              </div>
+            </Alert>
+          ) : null}
           <p>
             {t.rich('heldUntil', {
               space: placeTag(booking.spaceLabel, booking.listing.contentLocale),
               time: clock(heldUntil),
               minutes: HOLD_MINUTES,
+              checkout: booking.checkout,
             })}
           </p>
-          <p className="text-sm text-muted-foreground">{t('noPayment')}</p>
+          {booking.checkout === 'confirm' ? (
+            <p className="text-sm text-muted-foreground">{t('noPayment')}</p>
+          ) : null}
           <ClientMessages namespaces={CLIENT_NAMESPACES.booking}>
             <ConfirmBooking
               id={booking.id}
               chooseAgainHref={again}
               space={booking.spaceLabel}
               spaceLocale={booking.listing.contentLocale}
+              checkout={booking.checkout}
+              payment={
+                booking.checkout === 'payment'
+                  ? { publishableKey: stripePublishableKey(), amount: money(booking.total) }
+                  : null
+              }
             />
             <HoldTimer
               id={booking.id}
               expiresAt={booking.holdExpiresAt}
               extensionsLeft={booking.holdExtensionsLeft}
+              checkout={booking.checkout}
             />
           </ClientMessages>
         </div>
@@ -173,7 +240,7 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
         </p>
       ) : null}
 
-      {booking.status === 'released' ? (
+      {booking.status === 'released' && !refunded && !processing ? (
         <div className="grid gap-3">
           <p>{t('releasedLead')}</p>
           <div>

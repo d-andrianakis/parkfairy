@@ -11,6 +11,7 @@ import BookingsPage from './page';
 
 vi.mock('@/lib/bookings.server', () => ({ loadBooking: vi.fn(), loadBookings: vi.fn() }));
 vi.mock('@/lib/session', () => ({ requireSession: vi.fn(() => Promise.resolve()) }));
+vi.mock('@/lib/payments.server', () => ({ stripePublishableKey: vi.fn(() => 'pk_test_1') }));
 vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
     throw new Error('not found');
@@ -59,6 +60,8 @@ const booking = (overrides: Partial<Booking> = {}): Booking => ({
   cancelledBy: null,
   refund: null,
   refundIfCancelled: null,
+  checkout: 'confirm',
+  payment: null,
   ...overrides,
 });
 const confirmed = (overrides: Partial<Booking> = {}) =>
@@ -102,7 +105,7 @@ describe('a booking’s page', () => {
 
   it('asks a held booking for the car, saying until when the space is kept', async () => {
     const { container } = await showBooking(booking());
-    expect(screen.getByRole('heading', { level: 1, name: 'Confirm your booking' })).toBeVisible();
+    expect(screen.getByRole('heading', { level: 1, name: 'Complete your booking' })).toBeVisible();
     expect(screen.getByText('Held for you')).toBeInTheDocument();
     // In Greek time, said so, and the owner's label in their language inside the sentence.
     expect(document.body).toHaveTextContent(
@@ -263,7 +266,7 @@ describe('a booking’s page', () => {
   it('speaks Greek on a 24-hour clock', async () => {
     await showBooking(booking(), undefined, 'el');
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Επιβεβαιώστε την κράτησή σας' }),
+      screen.getByRole('heading', { level: 1, name: 'Ολοκληρώστε την κράτησή σας' }),
     ).toBeVisible();
     expect(document.body).toHaveTextContent(/έως τις 12:10 \(ώρα Ελλάδας\)/);
   });
@@ -275,6 +278,102 @@ describe('a booking’s page', () => {
       searchParams: Promise.resolve({}),
     });
     expect(metadata.title).toBe('Your booking');
+  });
+});
+
+describe('a booking’s page, paying (decisions #3, #49)', () => {
+  const paying = (overrides: Partial<Booking> = {}) =>
+    booking({ checkout: 'payment', ...overrides });
+
+  it('asks for the car and then the payment, with nothing said of a test site', async () => {
+    const { container } = await showBooking(paying());
+    expect(screen.getByRole('textbox', { name: 'Number plate' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue to payment' })).toBeInTheDocument();
+    expect(screen.queryByText(/takes no payment/)).not.toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+
+  it('says the bank is still deciding, in place of the form, focused just after paying', async () => {
+    const { container } = await showBooking(paying({ payment: 'processing' }), 'paid');
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'We’re confirming your payment' }),
+    ).toHaveFocus();
+    expect(screen.queryByRole('textbox', { name: 'Number plate' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+
+  it('keeps saying so for a late payment, after the hold ran out', async () => {
+    await showBooking(paying({ status: 'expired', payment: 'processing' }));
+    expect(
+      screen.getByRole('heading', { name: 'We’re confirming your payment' }),
+    ).not.toHaveFocus();
+    expect(screen.queryByText('Your hold has ended')).not.toBeInTheDocument();
+  });
+
+  it('says the booking is made when paid', async () => {
+    await showBooking(confirmed({ checkout: 'payment', payment: 'succeeded' }), 'paid');
+    expect(screen.getByRole('heading', { level: 2, name: 'Booking confirmed' })).toHaveFocus();
+  });
+
+  it('says a payment too late for the space goes back, with the way to choose again', async () => {
+    const { container } = await showBooking(
+      paying({ status: 'expired', payment: 'refunded' }),
+      'paid',
+    );
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Your payment has been refunded' }),
+    ).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Choose another space' })).toBeInTheDocument();
+    expect(screen.queryByText('Your hold has ended')).not.toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+
+  it('back from the bank before the webhook, asks how it went rather than for a payment again', async () => {
+    await showBooking(paying({ payment: 'pending' }), 'paid');
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'We’re confirming your payment' }),
+    ).toHaveFocus();
+    expect(screen.getByRole('heading', { level: 1, name: 'Payment in progress' })).toBeVisible();
+    expect(screen.getByText('Paying')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continue to payment' })).not.toBeInTheDocument();
+  });
+
+  it('says a payment that didn’t go through, with the form there to pay again', async () => {
+    const { container } = await showBooking(paying({ payment: 'pending' }), 'unpaid');
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'The payment didn’t go through' }),
+    ).toHaveFocus();
+    expect(screen.getByText(/^Nothing was charged/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue to payment' })).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+
+  it('is titled and badged by its money when that says more', async () => {
+    await showBooking(paying({ status: 'released', payment: 'refunding' }));
+    expect(screen.getByRole('heading', { level: 1, name: 'Not booked' })).toBeVisible();
+    expect(screen.getByText('Refunded')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Your payment is being refunded' }),
+    ).toBeInTheDocument();
+    // Not "you let this space go": the driver let nothing go.
+    expect(screen.queryByText(/You let this space go/)).not.toBeInTheDocument();
+  });
+
+  it('takes Stripe’s parameters out of the address back from the bank', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/en/bookings/${ID}?done=paid&payment_intent=pi_1&payment_intent_client_secret=pi_1_secret_2&redirect_status=succeeded`,
+    );
+    await showBooking(confirmed({ checkout: 'payment', payment: 'succeeded' }), 'paid');
+    expect(window.location.search).toBe('?done=paid');
+  });
+
+  it('says it for a hold let go and paid for, in Greek too', async () => {
+    await showBooking(paying({ status: 'released', payment: 'refunded' }), undefined, 'el');
+    expect(screen.getByRole('heading', { name: 'Τα χρήματά σας επιστράφηκαν' })).not.toHaveFocus();
+    expect(screen.getAllByRole('link', { name: 'Επιλέξτε άλλη θέση' })).toHaveLength(1);
   });
 });
 
@@ -332,6 +431,14 @@ describe('the bookings list', () => {
     await show({}, list([confirmed({ listing: unnamed })]));
     const link = screen.getByRole('link', { name: 'Unnamed parking' });
     expect(link.querySelector('[lang]')).toBeNull();
+  });
+
+  it('badges a booking by its money where that says more', async () => {
+    await show(
+      {},
+      list([booking({ id: 'r', status: 'expired', checkout: 'payment', payment: 'refunded' })]),
+    );
+    expect(screen.getByText('Refunded')).toBeInTheDocument();
   });
 
   it('pages through the past, and keeps a made-up page in range', async () => {

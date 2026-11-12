@@ -149,7 +149,7 @@
     "noWindow": "Choose your dates to see availability and the total price.",
     "chooseDates": "Choose dates",
     "changeDates": "Change dates",
-    "bookingSoon": "Online booking is coming soon.",
+    "bookingSoon": "This parking can’t be booked online yet.",
     "unavailableTitle": "Parking details unavailable",
     "unavailable": "This parking can’t be shown right now. Please try again in a moment.",
     "perHourFrom": "From {price} an hour",
@@ -521,7 +521,9 @@
         "review": "We check it",
         "reviewing": "We’re checking it now",
         "live": "It goes live",
-        "payouts": "Payouts: coming later"
+        "payouts": "Payouts: coming later",
+        "payoutsReady": "You can be paid",
+        "payoutsNeeded": "Set up payouts"
       },
       "status": {
         "draft": "Draft",
@@ -535,7 +537,9 @@
       "deleted": "Draft deleted",
       "closures": "Closures and special hours for “<listing>{name}</listing>”",
       "untitledNumber": "Unnamed listing {number}",
-      "bookings": "Bookings for “<listing>{name}</listing>”"
+      "bookings": "Bookings for “<listing>{name}</listing>”",
+      "payoutsSetUp": "Set up payouts",
+      "payoutsSee": "See payouts"
     },
     "state": {
       "done": "Done",
@@ -885,7 +889,11 @@
       "LISTING_BOOKED": "{count, plural, one {A booking falls} other {# bookings fall}} in the time you’re closing. Cancel {count, plural, one {it} other {them}} first, so nobody arrives at a closed gate.",
       "BOOKING_STARTED": "This stay has already begun, so it can’t be cancelled.",
       "BOOKING_NOT_FOUND": "We can’t find that booking.",
-      "SPACES_BOOKED": "{count, plural, one {A driver has booked a space you’re removing} other {Drivers have # bookings on spaces you’re removing}}. Cancel {count, plural, one {it} other {them}} first, or keep those spaces."
+      "SPACES_BOOKED": "{count, plural, one {A driver has booked a space you’re removing} other {Drivers have # bookings on spaces you’re removing}}. Cancel {count, plural, one {it} other {them}} first, or keep those spaces.",
+      "PAYMENTS_UNAVAILABLE": "Payouts can’t be set up here yet.",
+      "PAYMENT_PROVIDER_ERROR": "Stripe couldn’t do that just now. Try again in a moment.",
+      "PAYOUTS_NOT_STARTED": "Finish setting up payouts with Stripe first.",
+      "PROFILE_REQUIRED": "Fill in your details first: Stripe needs to know whether you rent as an individual or a business."
     },
     "bookings": {
       "metaTitle": "Bookings for “{name}”",
@@ -912,18 +920,35 @@
       "seeBookings": "See the bookings",
       "unavailable": "The bookings can’t be shown right now. Please try again in a moment.",
       "closuresLink": "Closures and special hours"
+    },
+    "payouts": {
+      "metaTitle": "Payouts",
+      "title": "Getting paid",
+      "lead": "Drivers pay when they book. Once a stay has ended, 24 hours on, your share goes to your bank account through Stripe, our payment provider.",
+      "status": {
+        "none": "You haven’t set up payouts yet. Drivers can book your parking once you have, and once it’s live.",
+        "restricted": "Stripe can’t pay you yet. Continue with Stripe to see what it needs.",
+        "pending": "Stripe is checking your details. This usually takes a few minutes, sometimes a day or two.",
+        "active": "Payouts are set up. Drivers can book your parking once it’s live."
+      },
+      "start": "Set up payouts with Stripe",
+      "continue": "Continue with Stripe",
+      "dashboard": "Open your Stripe dashboard",
+      "opening": "Opening Stripe…",
+      "returned": "Welcome back from Stripe",
+      "expired": "That link to Stripe has expired."
     }
   },
   "BookSpace": {
     "book": "Book this space",
     "booking": "Holding the space…",
-    "holdHint": "We keep the space for you for {minutes, plural, one {# minute} other {# minutes}} while you confirm.",
+    "holdHint": "We keep the space for you for {minutes, plural, one {# minute} other {# minutes}} while you book.",
     "noneLeft": "Someone else has just booked the last free space for those times. Choose other times.",
     "pickOne": "Choose a space first."
   },
   "BookingErrors": {
     "generic": "Something went wrong. Check your connection and try again.",
-    "BOOKING_UNAVAILABLE": "Online booking is coming soon.",
+    "BOOKING_UNAVAILABLE": "This parking can’t be booked online yet.",
     "LISTING_NOT_FOUND": "This parking can no longer be booked.",
     "SPACE_NOT_FOUND": "That space can no longer be booked. Choose another one.",
     "SPACE_TAKEN": "Someone else has just booked this space for those times. Choose another space.",
@@ -933,23 +958,28 @@
     "BOOKING_NOT_ACTIVE": "This hold has ended. Choose the space again to book it.",
     "BOOKING_STARTED": "This stay has already begun, so it can’t be cancelled here.",
     "REFUND_CHANGED": "The refund has changed, because your arrival is nearer now. Check it and cancel again.",
-    "HOLD_LIMIT_REACHED": "This space can’t be kept any longer. Confirm now, or let it go."
+    "HOLD_LIMIT_REACHED": "This space can’t be kept any longer. Book it now, or let it go.",
+    "PAYMENT_PROVIDER_ERROR": "Payments aren’t available right now. Try again in a moment."
   },
   "Booking": {
     "metaTitle": "Your booking",
     "title": {
-      "held": "Confirm your booking",
-      "expired": "Confirm your booking",
+      "held": "Complete your booking",
+      "expired": "Complete your booking",
       "confirmed": "Your booking",
       "cancelled": "Cancelled booking",
-      "released": "Space released"
+      "released": "Space released",
+      "processing": "Payment in progress",
+      "refunded": "Not booked"
     },
     "status": {
       "held": "Held for you",
       "expired": "Hold ended",
       "confirmed": "Confirmed",
       "cancelled": "Cancelled",
-      "released": "Released"
+      "released": "Released",
+      "processing": "Paying",
+      "refunded": "Refunded"
     },
     "parking": "Parking",
     "address": "Address",
@@ -959,7 +989,7 @@
     "reference": "Booking reference",
     "plate": "Number plate",
     "cancellation": "Cancellation",
-    "heldUntil": "We’re keeping space <space>{space}</space> for you until {time} (Greek time). Confirm by then; if you need longer, keep it for another {minutes, plural, one {# minute} other {# minutes}}.",
+    "heldUntil": "We’re keeping space <space>{space}</space> for you until {time} (Greek time). {checkout, select, payment {Pay} other {Confirm}} by then; if you need longer, keep it for another {minutes, plural, one {# minute} other {# minutes}}.",
     "plateLabel": "Number plate",
     "plateHint": "The car’s registration, for example IKB-1234. The owner sees it, so they know your car.",
     "confirm": "Confirm booking",
@@ -993,10 +1023,34 @@
     "keeping": "Keeping it…",
     "kept": "Kept for you until {time} (Greek time).",
     "holdWarning": "Your hold on this space ends at {time} (Greek time). Need more time? Keep it for longer below.",
-    "holdLimit": "This space has been kept as long as it can be. Confirm before {time} (Greek time), or let it go.",
+    "holdLimit": "This space has been kept as long as it can be. {checkout, select, payment {Pay} other {Confirm}} before {time} (Greek time), or let it go.",
     "releaseQuestion": "Let space <space>{space}</space> go? Someone else can book it straight away.",
     "releaseConfirm": "Yes, let it go",
-    "releaseKeep": "No, keep it"
+    "releaseKeep": "No, keep it",
+    "continueToPayment": "Continue to payment",
+    "continuing": "Preparing the payment…",
+    "paymentHeading": "Payment",
+    "paymentLead": "You pay {amount} now. Your booking is confirmed as soon as the payment goes through.",
+    "pay": "Pay {amount}",
+    "paying": "Paying…",
+    "paymentLoading": "Loading the payment form…",
+    "paymentFailed": "The payment didn’t go through. Try again, or use another card.",
+    "paymentUnavailable": "Payments aren’t available right now. Nothing was charged; try again in a moment.",
+    "paymentProcessing": "We’re confirming your payment",
+    "paymentProcessingLead": "Your bank is still confirming it. We’ll email you once it’s settled: your booking, or all your money back if the space was taken meanwhile.",
+    "checkAgain": "Check again",
+    "paymentRefunded": "Your payment has been refunded",
+    "paymentRefundedLead": "We couldn’t book the space with this payment, so all of it goes back to you. It can take a few days to show on your card or bank statement.",
+    "paymentUncertain": "We couldn’t tell whether your payment went through. Don’t pay again yet: check this booking in a moment.",
+    "paymentLoadFailed": "The payment form couldn’t load. Check your connection, or turn off anything that blocks scripts, then try again.",
+    "paymentRetry": "Try again",
+    "paymentStillChecking": "Still with your bank (checked at {time}).",
+    "paymentChecksStopped": "We’ve stopped checking on this page. Use Check again, or wait for our email.",
+    "paymentUnpaid": "The payment didn’t go through",
+    "paymentUnpaidLead": "Nothing was charged. You can pay again below, with the same card or another.",
+    "paymentRefunding": "Your payment is being refunded",
+    "plateKept": "Kept with this payment.",
+    "changePlate": "Change the number plate"
   },
   "Bookings": {
     "metaTitle": "Your bookings",

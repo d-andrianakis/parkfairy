@@ -1102,7 +1102,8 @@ describe('owner onboarding', () => {
         if (after.status === 'in_review') expect(after.photos).toHaveLength(1);
         else expect(after.status).toBe('draft');
       }
-    });
+      // Five rounds of a race: 2 s alone, more while every package's tests run at once.
+    }, 20_000);
 
     it('gives two listings with one name different URLs', async () => {
       const one = await readyListing(submitter);
