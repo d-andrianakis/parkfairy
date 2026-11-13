@@ -11,15 +11,32 @@ import {
   zonedTimeToUtc,
   type Booking,
 } from '@parkfairy/contracts';
-import { deleteStaleHolds, expireLapsedHolds, schema, type Database } from '@parkfairy/database';
-import { eq, inArray, like, sql } from 'drizzle-orm';
+import {
+  deleteStaleHolds,
+  expireLapsedHolds,
+  lapsedPayments,
+  ledgerMismatches,
+  markTransferSending,
+  noteMoneyRetry,
+  recordCancelRefund,
+  recordCharge,
+  recordPaymentCanceled,
+  recordTransfer,
+  refundsOwed,
+  schema,
+  transfersDue,
+  transfersWaiting,
+  type Database,
+} from '@parkfairy/database';
+import { Logger } from '@nestjs/common';
+import { and, eq, inArray, like, sql } from 'drizzle-orm';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ENV } from '../src/config/config.module.js';
 import { loadEnv } from '../src/config/env.js';
 import { DB } from '../src/database/database.module.js';
 import { PAYMENTS } from '../src/payments/payments.tokens.js';
-import { PaymentProviderError } from '../src/payments/stripe-gateway.js';
+import { PaymentProviderError, sharesOf } from '@parkfairy/payments';
 import { accountObject, fakeStripe, signedEvent } from './fake-stripe.js';
 import { createTestApp, signUpUser, type TestApp, type TestUser } from './test-app.js';
 
@@ -34,6 +51,8 @@ const today = zonedParts(new Date(), zone).date;
 let nextOffset = 5;
 const freshDay = () => addDays(today, nextOffset++);
 const at = (day: string, time: string) => zonedTimeToUtc(day, time, zone)?.toISOString() ?? '';
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
 const stayOn = (day: string) => ({ start: at(day, '10:00'), end: at(day, '12:00') });
 
 describe('payments (Stripe in test mode, faked: decision #47)', () => {
@@ -158,6 +177,18 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
       .where(like(schema.parkingLocations.slug, `${PREFIX}%`));
     const ids = ours.map((found) => found.id);
     if (ids.length === 0) return;
+    // A financial record: it never cascades, so it goes first, by hand.
+    await db
+      .delete(schema.ledgerEntries)
+      .where(
+        inArray(
+          schema.ledgerEntries.bookingId,
+          db
+            .select({ id: schema.bookings.id })
+            .from(schema.bookings)
+            .where(inArray(schema.bookings.locationId, ids)),
+        ),
+      );
     await db.delete(schema.bookings).where(inArray(schema.bookings.locationId, ids));
     await db.delete(schema.parkingLocations).where(inArray(schema.parkingLocations.id, ids));
   }
@@ -815,6 +846,664 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
       expect(
         await db.select().from(schema.bookings).where(eq(schema.bookings.id, plain.id)),
       ).toEqual([]);
+    });
+  });
+  describe('refunds, transfers and the ledger (4.2: decisions #4, #50, #51, #52)', () => {
+    let pastDays = 3;
+
+    /** A driver's booking on a listing, paid for and confirmed. */
+    async function paidBooking(listing = paidListing) {
+      const driver = await person();
+      const held = BookingSchema.parse((await hold(driver, listing, freshDay()).expect(201)).body);
+      await pay(driver, held.id).expect(200);
+      const intent = (await row(held.id)).paymentIntentId ?? '';
+      stripe.setPayment(intent, { status: 'succeeded' });
+      expect(BookingSchema.parse((await settle(driver, held.id).expect(200)).body).status).toBe(
+        'confirmed',
+      );
+      return { driver, held, intent, total: held.total.amountMinor };
+    }
+
+    /** The stay moved back to days ago, each its own day: its transfer is due a day on. */
+    async function endedDaysAgo(id: string) {
+      const days = pastDays++;
+      await db
+        .update(schema.bookings)
+        .set({
+          startsAt: sql`now() - make_interval(days => ${days}, hours => 2)`,
+          endsAt: sql`now() - make_interval(days => ${days})`,
+          blockedUntil: sql`now() - make_interval(days => ${days})`,
+        })
+        .where(eq(schema.bookings.id, id));
+    }
+
+    const cancel = (driver: TestUser, id: string) =>
+      api(driver, 'post', `/bookings/${id}/cancel`).send({});
+    const inLedger = async (id: string) =>
+      Object.fromEntries(
+        (
+          await db
+            .select({ kind: schema.ledgerEntries.kind, amount: schema.ledgerEntries.amountMinor })
+            .from(schema.ledgerEntries)
+            .where(eq(schema.ledgerEntries.bookingId, id))
+        ).map(({ kind, amount }) => [kind, amount]),
+      );
+    const dueIds = async (now = new Date()) => (await transfersDue(db, now)).map(({ id }) => id);
+    const soon = () => new Date(Date.now() + 60_000);
+    const recently = () => new Date(Date.now() - 60_000);
+    /** A ledger entry made wrong for a moment, put back after. */
+    async function tamper(
+      bookingId: string,
+      kind: 'refund' | 'commission',
+      amountMinor: number,
+      check: () => Promise<void>,
+    ) {
+      const entry = and(
+        eq(schema.ledgerEntries.bookingId, bookingId),
+        eq(schema.ledgerEntries.kind, kind),
+      );
+      const [was] = await db
+        .select({ amount: schema.ledgerEntries.amountMinor })
+        .from(schema.ledgerEntries)
+        .where(entry);
+      await db.update(schema.ledgerEntries).set({ amountMinor }).where(entry);
+      try {
+        await check();
+      } finally {
+        await db
+          .update(schema.ledgerEntries)
+          .set({ amountMinor: was?.amount ?? 0 })
+          .where(entry);
+      }
+    }
+    /** An owner, active, with a listing of their own under the policy given. */
+    async function ownListing(name: string, policy: 'oneDay' | 'oneDayThenHalf' = 'oneDay') {
+      const { user, profileId } = await owner('active');
+      const listing = await listingOf(profileId, name);
+      if (policy !== 'oneDay') {
+        await db
+          .update(schema.parkingLocations)
+          .set({ cancellationPolicy: policy })
+          .where(eq(schema.parkingLocations.id, listing.id));
+      }
+      return { user, profileId, listing };
+    }
+    /** The stay moved to start within the day: a cancellation now falls under its late terms. */
+    const startingSoon = (id: string) =>
+      db
+        .update(schema.bookings)
+        .set({
+          startsAt: sql`now() + interval '2 hours'`,
+          endsAt: sql`now() + interval '4 hours'`,
+          blockedUntil: sql`now() + interval '4 hours'`,
+        })
+        .where(eq(schema.bookings.id, id));
+
+    it('enters the payment that booked, with the charge it came by', async () => {
+      const { held, intent, total } = await paidBooking();
+      const stored = await row(held.id);
+      expect(stored.stripeChargeId).toBe(`ch_${intent.slice(3)}`);
+      const entries = await db
+        .select({
+          kind: schema.ledgerEntries.kind,
+          amountMinor: schema.ledgerEntries.amountMinor,
+          currency: schema.ledgerEntries.currency,
+          stripeId: schema.ledgerEntries.stripeId,
+        })
+        .from(schema.ledgerEntries)
+        .where(eq(schema.ledgerEntries.bookingId, held.id));
+      expect(entries).toEqual([
+        { kind: 'charge', amountMinor: total, currency: 'EUR', stripeId: stored.stripeChargeId },
+      ]);
+      // Settled again: one entry still.
+      await deliver(
+        signedEvent('payment_intent.succeeded', { id: intent, object: 'payment_intent' }),
+      ).expect(200);
+      expect(await inLedger(held.id)).toEqual({ charge: total });
+    });
+
+    it('gives back what a driver’s cancellation gives, once, and enters it', async () => {
+      const { driver, held, intent, total } = await paidBooking();
+      const cancelled = BookingSchema.parse((await cancel(driver, held.id).expect(200)).body);
+      // A week ahead under “a day before”: all of it.
+      expect(cancelled).toMatchObject({ status: 'cancelled', refund: held.total });
+      const stored = await row(held.id);
+      expect(stored).toMatchObject({ refundStatus: 'sent', refundMinor: total });
+      // One short try while the driver waits; the worker sends it otherwise.
+      expect(stripe.gateway.refundCancelled).toHaveBeenCalledWith(
+        { paymentIntentId: intent, bookingId: held.id, amountMinor: total },
+        { quick: true },
+      );
+      expect(stripe.cancellationRefunds.get(held.id)).toMatchObject({
+        id: stored.stripeRefundId,
+        amountMinor: total,
+      });
+      // Asked again: as it is, and Stripe isn't asked twice.
+      await cancel(driver, held.id).expect(200);
+      expect(stripe.gateway.refundCancelled).toHaveBeenCalledOnce();
+      expect(await inLedger(held.id)).toEqual({ charge: total, refund: total });
+      // The day's check finds a refund entered that isn't the one the booking gives.
+      await tamper(held.id, 'refund', total - 1, async () => {
+        expect(await ledgerMismatches(db, recently())).toContain(held.id);
+      });
+      expect(await ledgerMismatches(db, recently())).not.toContain(held.id);
+      // All of it went back: nothing for the owner, ever.
+      await endedDaysAgo(held.id);
+      expect(await dueIds()).not.toContain(held.id);
+    });
+
+    it('gives all of it back when the owner calls the booking off', async () => {
+      const { user: ownerUser, profileId } = await owner('active');
+      const listing = await listingOf(profileId, 'owner-cancels');
+      const { held, total } = await paidBooking(listing);
+      await api(ownerUser, 'post', `/owner/listings/${listing.id}/bookings/${held.id}/cancel`)
+        .send({})
+        .expect(204);
+      expect(await row(held.id)).toMatchObject({
+        status: 'cancelled',
+        cancelledBy: 'owner',
+        refundMinor: total,
+        refundStatus: 'sent',
+      });
+      expect(stripe.cancellationRefunds.get(held.id)?.amountMinor).toBe(total);
+      expect(await inLedger(held.id)).toEqual({ charge: total, refund: total });
+    });
+
+    it('keeps the cancellation when Stripe fails, the refund owed until it is sent', async () => {
+      const { driver, held, intent, total } = await paidBooking();
+      const warned = vi.spyOn(Logger.prototype, 'warn');
+      stripe.gateway.refundCancelled.mockRejectedValueOnce(
+        new TypeError('card for maria@example.gr refused'),
+      );
+      expect(BookingSchema.parse((await cancel(driver, held.id).expect(200)).body)).toMatchObject({
+        status: 'cancelled',
+        refund: held.total,
+      });
+      // Its kind only: Stripe's words can name the driver.
+      expect(warned).toHaveBeenCalledWith(
+        { bookingId: held.id, detail: 'TypeError' },
+        'cancellation refund left for the worker',
+      );
+      expect(JSON.stringify(warned.mock.calls)).not.toContain('maria');
+      warned.mockRestore();
+      expect(await row(held.id)).toMatchObject({ refundStatus: 'owed', stripeRefundId: null });
+      expect(await inLedger(held.id)).toEqual({ charge: total });
+
+      // Left alone while the API's own try may still be on its way; then owed, all of it.
+      const owedIds = async (before: Date) => (await refundsOwed(db, before)).map(({ id }) => id);
+      expect(await owedIds(new Date(Date.now() - 60_000))).not.toContain(held.id);
+      expect((await refundsOwed(db, soon())).find(({ id }) => id === held.id)).toMatchObject({
+        kind: 'cancelled',
+        paymentIntentId: intent,
+        amountMinor: total,
+      });
+
+      // As the worker sends it: recorded once, whatever comes after.
+      const refundId = await stripe.gateway.refundCancelled({
+        paymentIntentId: intent,
+        bookingId: held.id,
+        amountMinor: total,
+      });
+      await recordCancelRefund(db, held.id, refundId);
+      await recordCancelRefund(db, held.id, 're_someOtherOne');
+      expect(await row(held.id)).toMatchObject({ refundStatus: 'sent', stripeRefundId: refundId });
+      expect(await inLedger(held.id)).toEqual({ charge: total, refund: total });
+      expect(await owedIds(soon())).not.toContain(held.id);
+    });
+
+    it('sends the owner 90% of what’s kept a day after the stay, once, and it adds up', async () => {
+      const { profileId } = await owner('active');
+      const [account] = await db
+        .select({ id: schema.payoutAccounts.stripeAccountId })
+        .from(schema.payoutAccounts)
+        .where(eq(schema.payoutAccounts.ownerId, profileId));
+      const listing = await listingOf(profileId, 'half-back');
+      await db
+        .update(schema.parkingLocations)
+        .set({ cancellationPolicy: 'oneDayThenHalf' })
+        .where(eq(schema.parkingLocations.id, listing.id));
+      const { driver, held, total } = await paidBooking(listing);
+      expect(total).toBe(400);
+      // Called off with the stay hours away: half back (#16), half kept.
+      await db
+        .update(schema.bookings)
+        .set({
+          cancellationPolicy: 'oneDayThenHalf',
+          startsAt: sql`now() + interval '2 hours'`,
+          endsAt: sql`now() + interval '4 hours'`,
+          blockedUntil: sql`now() + interval '4 hours'`,
+        })
+        .where(eq(schema.bookings.id, held.id));
+      await cancel(driver, held.id).expect(200);
+      expect(await row(held.id)).toMatchObject({ refundMinor: 200, refundStatus: 'sent' });
+
+      // Not until a day after the stay (#4): it ends in four hours.
+      expect(await dueIds()).not.toContain(held.id);
+      expect(await dueIds(new Date(Date.now() + 27 * HOUR_MS))).not.toContain(held.id);
+      expect(await dueIds(new Date(Date.now() + 29 * HOUR_MS))).toContain(held.id);
+      await endedDaysAgo(held.id);
+      const due = (await transfersDue(db, new Date())).find(({ id }) => id === held.id);
+      expect(due).toMatchObject({
+        totalMinor: 400,
+        refundMinor: 200,
+        commissionBps: 1000,
+        accountId: account?.id,
+        sending: null,
+      });
+      expect(due?.chargeId).toMatch(/^ch_/);
+
+      // 10% of what's kept to Parkfairy, the rest to the owner (#50, #51): €0.20 and €1.80.
+      const shares = sharesOf({ totalMinor: 400, refundMinor: 200, commissionBps: 1000 });
+      expect(shares).toEqual({ keptMinor: 200, commissionMinor: 20, ownerMinor: 180 });
+      const amounts = { transferMinor: shares.ownerMinor, commissionMinor: shares.commissionMinor };
+      await markTransferSending(db, held.id, amounts);
+      // A second worker's sums never replace the first's.
+      await markTransferSending(db, held.id, { transferMinor: 1, commissionMinor: 0 });
+      expect(
+        (await transfersDue(db, new Date())).find(({ id }) => id === held.id)?.sending,
+      ).toMatchObject(amounts);
+      const transferId = await stripe.gateway.transfer({
+        bookingId: held.id,
+        accountId: due?.accountId ?? '',
+        amountMinor: amounts.transferMinor,
+        currency: 'EUR',
+        chargeId: due?.chargeId ?? '',
+      });
+      await recordTransfer(db, held.id, transferId);
+      await recordTransfer(db, held.id, 'tr_someOtherOne');
+      const sent = await row(held.id);
+      expect(sent).toMatchObject({
+        transferStatus: 'sent',
+        transferMinor: 180,
+        commissionMinor: 20,
+        stripeTransferId: transferId,
+      });
+      expect(sent.transferredAt).toBeInstanceOf(Date);
+      expect(await dueIds()).not.toContain(held.id);
+      expect(await inLedger(held.id)).toEqual({
+        charge: 400,
+        refund: 200,
+        transfer: 180,
+        commission: 20,
+      });
+
+      // The day's check finds it adds up, and finds it when it doesn't.
+      const since = new Date(Date.now() - 60_000);
+      expect(await ledgerMismatches(db, since)).not.toContain(held.id);
+      const commission = and(
+        eq(schema.ledgerEntries.bookingId, held.id),
+        eq(schema.ledgerEntries.kind, 'commission'),
+      );
+      await db.update(schema.ledgerEntries).set({ amountMinor: 21 }).where(commission);
+      expect(await ledgerMismatches(db, since)).toContain(held.id);
+      await db.update(schema.ledgerEntries).set({ amountMinor: 20 }).where(commission);
+      // Entered long before the window: not read again.
+      expect(await ledgerMismatches(db, soon())).not.toContain(held.id);
+    });
+
+    it('keeps a restricted owner’s transfers waiting, counted for support, until active (#52)', async () => {
+      const { profileId } = await owner('active');
+      const listing = await listingOf(profileId, 'restricted');
+      const { held } = await paidBooking(listing);
+      await endedDaysAgo(held.id);
+      const restricted = eq(schema.payoutAccounts.ownerId, profileId);
+      await db.update(schema.payoutAccounts).set({ status: 'restricted' }).where(restricted);
+
+      expect(await dueIds()).not.toContain(held.id);
+      const waiting = await transfersWaiting(db, new Date());
+      expect(waiting.bookings).toBeGreaterThanOrEqual(1);
+      expect(waiting.owners).toBeGreaterThanOrEqual(1);
+      // Due for a day or two only: not past the alert's days yet.
+      const longer = await transfersWaiting(db, new Date(Date.now() - 30 * 86_400_000));
+      expect(longer.bookings).toBeLessThan(waiting.bookings);
+
+      // Active again: it goes on the next run.
+      await db.update(schema.payoutAccounts).set({ status: 'active' }).where(restricted);
+      expect(await dueIds()).toContain(held.id);
+    });
+
+    it('enters a paid hold’s money both ways when it all goes back', async () => {
+      const driver = await person();
+      const { held, intent } = await heldAndPaying(driver);
+      await cancel(driver, held.id).expect(200);
+      stripe.setPayment(intent, { status: 'succeeded' });
+      stripe.gateway.refundPayment.mockRejectedValueOnce(new PaymentProviderError('api_error'));
+      await settle(driver, held.id).expect(503);
+      // Decided, not yet with Stripe: owed, all of it.
+      expect((await refundsOwed(db, soon())).find(({ id }) => id === held.id)).toMatchObject({
+        kind: 'unbooked',
+        paymentIntentId: intent,
+        amountMinor: held.total.amountMinor,
+      });
+      await settle(driver, held.id).expect(200);
+      expect(await row(held.id)).toMatchObject({ paymentStatus: 'refunded' });
+      const total = held.total.amountMinor;
+      expect(await inLedger(held.id)).toEqual({ charge: total, refund: total });
+      expect(await ledgerMismatches(db, recently())).not.toContain(held.id);
+      await tamper(held.id, 'refund', total - 1, async () => {
+        expect(await ledgerMismatches(db, recently())).toContain(held.id);
+      });
+      // Money entered: the stale-hold sweep never takes it (nor fails on it).
+      await expect(deleteStaleHolds(db, new Date(Date.now() + DAY_MS))).resolves.toBeTypeOf(
+        'number',
+      );
+      expect((await row(held.id)).paymentStatus).toBe('refunded');
+    });
+
+    it('calls off the payment of a hold that lapsed unpaid, and lets the row go', async () => {
+      const driver = await person();
+      const { held, intent } = await heldAndPaying(driver);
+      await cancel(driver, held.id).expect(200);
+      const lapsedIds = async (before: Date, cursor?: { at: string; id: string }) =>
+        (await lapsedPayments(db, before, cursor)).map(({ id }) => id);
+      // A late payment has its hour first (#3).
+      expect(await lapsedIds(new Date(Date.now() - 3_600_000))).not.toContain(held.id);
+      const lapsed = (await lapsedPayments(db, soon())).find(({ id }) => id === held.id);
+      expect(lapsed).toMatchObject({ paymentIntentId: intent });
+      // The next page starts after it.
+      expect(await lapsedIds(soon(), lapsed?.cursor)).not.toContain(held.id);
+
+      expect((await stripe.gateway.cancelPayment(intent)).status).toBe('canceled');
+      await recordPaymentCanceled(db, held.id);
+      expect(await row(held.id)).toMatchObject({
+        status: 'released',
+        paymentStatus: 'canceled',
+        vehiclePlate: null,
+      });
+      expect(await lapsedIds(soon())).not.toContain(held.id);
+      // The driver's page says so, and the row goes like any lapsed hold.
+      expect(
+        BookingSchema.parse((await api(driver, 'get', `/bookings/${held.id}`).expect(200)).body),
+      ).toMatchObject({ status: 'released', payment: 'canceled' });
+      await deleteStaleHolds(db, new Date(Date.now() + 86_400_000));
+      expect(
+        await db.select().from(schema.bookings).where(eq(schema.bookings.id, held.id)),
+      ).toEqual([]);
+    });
+
+    it('holds the owner’s transfer while a partial refund is owed, even one Stripe refuses for good', async () => {
+      const { listing } = await ownListing('owed-holds', 'oneDayThenHalf');
+      const { driver, held, intent } = await paidBooking(listing);
+      await startingSoon(held.id);
+      stripe.gateway.refundCancelled.mockRejectedValueOnce(
+        new PaymentProviderError('invalid_request_error charge_disputed'),
+      );
+      await cancel(driver, held.id).expect(200);
+      expect(await row(held.id)).toMatchObject({ refundStatus: 'owed', refundMinor: 200 });
+      await endedDaysAgo(held.id);
+      // What's kept isn't final until the refund is with Stripe: nothing for the owner yet.
+      expect(await dueIds()).not.toContain(held.id);
+      expect(
+        await markTransferSending(db, held.id, { transferMinor: 180, commissionMinor: 20 }),
+      ).toBe(false);
+      expect((await refundsOwed(db, soon())).find(({ id }) => id === held.id)).toMatchObject({
+        kind: 'cancelled',
+        paymentIntentId: intent,
+        amountMinor: 200,
+      });
+      await recordCancelRefund(db, held.id, 're_supportMadeIt');
+      expect(await dueIds()).toContain(held.id);
+    });
+
+    it('refunds once when the driver and the owner cancel at the same moment', async () => {
+      const { user: ownerUser, listing } = await ownListing('both-cancel');
+      const { driver, held, total } = await paidBooking(listing);
+      await Promise.all([
+        cancel(driver, held.id).expect(200),
+        api(ownerUser, 'post', `/owner/listings/${listing.id}/bookings/${held.id}/cancel`)
+          .send({})
+          .expect(204),
+      ]);
+      expect(stripe.gateway.refundCancelled).toHaveBeenCalledOnce();
+      const stored = await row(held.id);
+      expect(stored).toMatchObject({ status: 'cancelled', refundStatus: 'sent' });
+      expect(await inLedger(held.id)).toEqual({ charge: total, refund: stored.refundMinor });
+    });
+
+    it('lets no owner cancel, and so refund, another owner’s booking through their own listing', async () => {
+      const { held } = await paidBooking();
+      const { user: stranger, listing: theirs } = await ownListing('stranger');
+      expect(
+        (
+          await api(stranger, 'post', `/owner/listings/${theirs.id}/bookings/${held.id}/cancel`)
+            .send({})
+            .expect(404)
+        ).body,
+      ).toMatchObject({ code: 'BOOKING_NOT_FOUND' });
+      expect(stripe.gateway.refundCancelled).not.toHaveBeenCalled();
+      expect((await row(held.id)).status).toBe('confirmed');
+    });
+
+    it('keeps all of a booking cancelled too late for a refund, and pays the owner 90% of it', async () => {
+      const { listing } = await ownListing('too-late');
+      const { driver, held, total } = await paidBooking(listing);
+      await startingSoon(held.id);
+      expect(BookingSchema.parse((await cancel(driver, held.id).expect(200)).body).refund).toEqual({
+        amountMinor: 0,
+        currency: 'EUR',
+      });
+      expect(await row(held.id)).toMatchObject({ refundMinor: 0, refundStatus: null });
+      expect(stripe.gateway.refundCancelled).not.toHaveBeenCalled();
+      expect(await inLedger(held.id)).toEqual({ charge: total });
+      await endedDaysAgo(held.id);
+      const due = (await transfersDue(db, new Date())).find(({ id }) => id === held.id);
+      expect(due).toMatchObject({ totalMinor: 400, refundMinor: 0 });
+      expect(sharesOf({ totalMinor: 400, refundMinor: 0, commissionBps: 1000 })).toMatchObject({
+        commissionMinor: 40,
+        ownerMinor: 360,
+      });
+    });
+
+    it('enters what Stripe received for a paid hold given back, not the booking’s total', async () => {
+      const driver = await person();
+      const odd = await heldAndPaying(driver);
+      const received = odd.held.total.amountMinor - 1;
+      stripe.setPayment(odd.intent, { status: 'succeeded', amountMinor: received });
+      expect(
+        BookingSchema.parse((await settle(driver, odd.held.id).expect(200)).body).payment,
+      ).toBe('refunded');
+      expect(await inLedger(odd.held.id)).toEqual({ charge: received, refund: received });
+      expect(await ledgerMismatches(db, recently())).not.toContain(odd.held.id);
+    });
+
+    it('keeps the charge Stripe names late, entering the payment once', async () => {
+      const driver = await person();
+      const { held, intent } = await heldAndPaying(driver);
+      stripe.setPayment(intent, { status: 'succeeded', chargeId: null });
+      await settle(driver, held.id).expect(200);
+      const total = held.total.amountMinor;
+      expect((await row(held.id)).stripeChargeId).toBeNull();
+      expect(await inLedger(held.id)).toEqual({ charge: total });
+      await recordCharge(db, held.id, { amountMinor: total, chargeId: 'ch_late' });
+      await recordCharge(db, held.id, { amountMinor: total, chargeId: 'ch_other' });
+      expect((await row(held.id)).stripeChargeId).toBe('ch_late');
+      expect(
+        await db
+          .select({
+            stripeId: schema.ledgerEntries.stripeId,
+            amount: schema.ledgerEntries.amountMinor,
+          })
+          .from(schema.ledgerEntries)
+          .where(eq(schema.ledgerEntries.bookingId, held.id)),
+      ).toEqual([{ stripeId: 'ch_late', amount: total }]);
+    });
+
+    it('pages transfers due by their end and then their id, equal ends included', async () => {
+      const ours = [];
+      for (const name of ['page-a', 'page-b', 'page-c']) {
+        const { listing } = await ownListing(name);
+        ours.push((await paidBooking(listing)).held.id);
+      }
+      const [first, second, third] = ours as [string, string, string];
+      // Stays ending at the very same microsecond, and one a microsecond on.
+      const end = '2025-01-15 12:00:00.123456+00';
+      const later = '2025-01-15 12:00:00.123457+00';
+      for (const [id, ends] of [
+        [first, end],
+        [second, end],
+        [third, later],
+      ] as const) {
+        await db.execute(sql`
+          update bookings set starts_at = ${ends}::timestamptz - interval '2 hours',
+            ends_at = ${ends}::timestamptz, blocked_until = ${ends}::timestamptz
+          where id = ${id}
+        `);
+      }
+      const [low, high] = [first, second].sort() as [string, string];
+      const page = (cursor?: { at: string; id: string }) =>
+        transfersDue(db, new Date(), cursor).then((rows) => rows.map(({ id }) => id));
+      const all = await page();
+      expect(all.indexOf(low)).toBeLessThan(all.indexOf(high));
+      expect(all.indexOf(high)).toBeLessThan(all.indexOf(third));
+      const atLow = (await transfersDue(db, new Date())).find(({ id }) => id === low)?.cursor;
+      expect(atLow?.at).toMatch(/\.123456/);
+      const afterLow = await page(atLow);
+      expect(afterLow).not.toContain(low);
+      expect(afterLow).toEqual(expect.arrayContaining([high, third]));
+      const afterHigh = await page({ at: atLow?.at ?? '', id: high });
+      expect(afterHigh).not.toContain(high);
+      expect(afterHigh).toContain(third);
+    });
+
+    it('pages refunds owed by when they were decided, equal times included', async () => {
+      const ids = [];
+      for (let n = 0; n < 2; n++) {
+        const { driver, held } = await paidBooking();
+        stripe.gateway.refundCancelled.mockRejectedValueOnce(new PaymentProviderError('api_error'));
+        await cancel(driver, held.id).expect(200);
+        ids.push(held.id);
+      }
+      const at = '2025-02-01 08:00:00.654321+00';
+      await db.execute(
+        sql`update bookings set updated_at = ${at}::timestamptz where id in (${ids[0]}, ${ids[1]})`,
+      );
+      const [low, high] = [...ids].sort() as [string, string];
+      const owed = await refundsOwed(db, soon());
+      const atLow = owed.find(({ id }) => id === low)?.cursor;
+      expect(atLow?.id).toBe(low);
+      expect(atLow?.at).toMatch(/\.654321/);
+      const next = (await refundsOwed(db, soon(), atLow)).map(({ id }) => id);
+      expect(next).toContain(high);
+      expect(next).not.toContain(low);
+    });
+
+    it('backs a refused refund off, without making it look newly owed', async () => {
+      const { driver, held } = await paidBooking();
+      stripe.gateway.refundCancelled.mockRejectedValueOnce(new PaymentProviderError('api_error'));
+      await cancel(driver, held.id).expect(200);
+      const decided = (await row(held.id)).updatedAt;
+      await noteMoneyRetry(db, held.id);
+      const waiting = await row(held.id);
+      expect(waiting.moneyAttempts).toBe(1);
+      expect(waiting.moneyRetryAt?.getTime()).toBeGreaterThan(Date.now() + 4 * 60_000);
+      expect(waiting.updatedAt).toEqual(decided);
+      expect((await refundsOwed(db, soon())).map(({ id }) => id)).not.toContain(held.id);
+      // Twice as long the next time, six hours at most.
+      for (let n = 0; n < 12; n++) await noteMoneyRetry(db, held.id);
+      const longest = (await row(held.id)).moneyRetryAt?.getTime() ?? 0;
+      expect(longest).toBeLessThanOrEqual(Date.now() + 6 * HOUR_MS + 60_000);
+      // Once sent, back to none.
+      await recordCancelRefund(db, held.id, 're_atLast');
+      expect(await row(held.id)).toMatchObject({ moneyAttempts: 0, moneyRetryAt: null });
+    });
+
+    it('takes a refund that failed after Stripe took it out of the ledger, and tells support', async () => {
+      const { driver, held, total } = await paidBooking();
+      await cancel(driver, held.id).expect(200);
+      const refundId = (await row(held.id)).stripeRefundId ?? '';
+      // Still fine: an update that isn't a failure changes nothing.
+      await deliver(signedEvent('refund.updated', { id: refundId, object: 'refund' })).expect(200);
+      expect(await row(held.id)).toMatchObject({ refundStatus: 'sent' });
+
+      const told = vi.spyOn(Logger.prototype, 'error');
+      stripe.failRefund(held.id);
+      const failed = signedEvent('refund.failed', { id: refundId, object: 'refund' });
+      await deliver(failed).expect(200);
+      expect(await row(held.id)).toMatchObject({
+        refundStatus: 'failed',
+        stripeRefundId: refundId,
+      });
+      expect(await inLedger(held.id)).toEqual({ charge: total });
+      expect(told).toHaveBeenCalledWith(
+        expect.objectContaining({ bookingId: held.id, refundId, status: 'failed' }),
+        'refund failed at Stripe',
+      );
+      told.mockRestore();
+      // Delivered again: handled once.
+      await deliver(failed).expect(200);
+      expect(stripe.gateway.refund).toHaveBeenCalledTimes(2);
+    });
+
+    it('never calls off the payment of a hold still held, or one the bank is deciding', async () => {
+      const driver = await person();
+      const { held } = await heldAndPaying(driver);
+      await db.execute(
+        sql`update bookings set updated_at = now() - interval '2 hours' where id = ${held.id}`,
+      );
+      const lapsedIds = async () => (await lapsedPayments(db, soon())).map(({ id }) => id);
+      expect(await lapsedIds()).not.toContain(held.id);
+
+      const other = await person();
+      const deciding = await heldAndPaying(other);
+      await cancel(other, deciding.held.id).expect(200);
+      await db
+        .update(schema.bookings)
+        .set({ paymentStatus: 'processing' })
+        .where(eq(schema.bookings.id, deciding.held.id));
+      expect(await lapsedIds()).not.toContain(deciding.held.id);
+
+      // Run out, though: it lapsed, and is called off an hour on.
+      await db
+        .update(schema.bookings)
+        .set({ holdExpiresAt: sql`now() - interval '1 minute'` })
+        .where(eq(schema.bookings.id, held.id));
+      await expireLapsedHolds(db, new Date());
+      expect(await lapsedIds()).toContain(held.id);
+    });
+
+    it('says a payment called off at Stripe is canceled when asked, and the hold still goes', async () => {
+      const driver = await person();
+      const { held, intent } = await heldAndPaying(driver);
+      await cancel(driver, held.id).expect(200);
+      await stripe.gateway.cancelPayment(intent);
+      expect(BookingSchema.parse((await settle(driver, held.id).expect(200)).body)).toMatchObject({
+        status: 'released',
+        payment: 'canceled',
+      });
+      expect((await row(held.id)).vehiclePlate).toBeNull();
+      expect((await lapsedPayments(db, soon())).map(({ id }) => id)).not.toContain(held.id);
+      await deleteStaleHolds(db, new Date(Date.now() + DAY_MS));
+      expect(
+        await db.select().from(schema.bookings).where(eq(schema.bookings.id, held.id)),
+      ).toEqual([]);
+    });
+
+    it('counts a transfer as waiting only once due for the alert’s days', async () => {
+      const { profileId, listing } = await ownListing('waiting-count');
+      const { held } = await paidBooking(listing);
+      await endedDaysAgo(held.id);
+      await db
+        .update(schema.payoutAccounts)
+        .set({ status: 'restricted' })
+        .where(eq(schema.payoutAccounts.ownerId, profileId));
+      const dueAt = (await row(held.id)).endsAt.getTime() + DAY_MS;
+      const before = await transfersWaiting(db, new Date(dueAt - 1_000));
+      const after = await transfersWaiting(db, new Date(dueAt + 1_000));
+      expect(after.bookings - before.bookings).toBe(1);
+    });
+
+    it('leaves a lapsed hold paid meanwhile to its webhook', async () => {
+      const driver = await person();
+      const { held, intent } = await heldAndPaying(driver);
+      await cancel(driver, held.id).expect(200);
+      stripe.setPayment(intent, { status: 'succeeded' });
+      expect((await stripe.gateway.cancelPayment(intent)).status).toBe('succeeded');
+      // Not called off, so the worker records nothing: the webhook gives it back (#3).
+      expect(await row(held.id)).toMatchObject({ paymentStatus: 'pending' });
+      await deliver(
+        signedEvent('payment_intent.succeeded', { id: intent, object: 'payment_intent' }),
+      ).expect(200);
+      expect(await row(held.id)).toMatchObject({ paymentStatus: 'refunded' });
     });
   });
 });

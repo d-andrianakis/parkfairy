@@ -1045,8 +1045,83 @@ Built in Stripe's test mode, without keys, before #18 and #19 (memory.md #46–#
   the commission a stored setting kept on each booking. Local runs without Stripe keep #33's
   stand-in.
 - **4.2** Refunds on cancellation by either side, transfers to owners 24 hours after the stay, the
-  ledger and reconciliation.
+  ledger and its daily check (done 2026-11-13).
 - **4.3** Disputes, and what #18 and #19 answer.
+
+### 4.2 Refunds, transfers, the ledger (2026-11-13)
+
+Decisions #50–#52. The money moves the worker makes, so the Stripe gateway moved into a package
+both the API and the worker use (`@parkfairy/payments`, with `sharesOf`).
+
+- [x] **Implemented** (Stripe in test mode, faked in tests):
+  - Refunds when a paid booking is cancelled, by the driver (by its policy) or the owner (in
+    full): `owed` in the cancel's transaction, one short try at Stripe after it, `sent` with its id;
+    what's left owed the worker sends. A refund that fails at Stripe after it was taken (`refund.*`
+    events, checked with Stripe) leaves the ledger, says `failed`, and support is told.
+  - Transfers to owners 24 hours after the stay (#4): 90% of what's kept (#50, #51), the sums kept
+    before Stripe is asked so a retry sends the same, from the charge (`source_transaction`), only
+    to active accounts; restricted owners' wait (#52) and are counted for support after 3 days.
+    The owner's payouts page says payouts and bookings wait meanwhile.
+  - A ledger (`ledger_entries`: charge, refund, commission, transfer) written with each move, and a
+    daily `check-money`: the ledger adds up, no refund owed a day, no transfer waiting for days.
+  - The worker's `payments` queue: refunds owed (every 5 min), transfers (15 min), lapsed holds'
+    PaymentIntents called off an hour on (15 min, 4.1's open item), the day's check; page by page,
+    each run time-limited, stopping when Stripe looks down, a refused row backed off up to 6 hours.
+  - The booking page says a cancelled payment charged nothing, and where a refund goes and how long
+    it takes; so do the cancellation emails.
+- [x] **Unit tests**: the gateway (refunds, transfers, what was made, a refund's state, the quick
+      try, a PaymentIntent paid before it's called off, refund events), `sharesOf`, the worker's
+      processor (every job, paging, run limit, outage stop, backoff, the key's day, alert levels)
+      and its Stripe set-up, env (live keys refused), the booking page, payment step and pending
+      payment with a cancelled payment, the payouts page, the emails
+- [x] **Integration tests** (`payments.integration.test.ts`, real Postgres, Stripe faked; 58):
+      charges entered, refunds for both cancels and a too-late one, Stripe failing (owed, sent
+      once), a refund failing later, both sides cancelling at once, another owner kept out, the
+      24-hour wait to the minute, a partial refund owed holding the transfer, 90% of what's kept
+      adding up and a tampered ledger found, restricted owners waiting and counted, what Stripe
+      received entered, a charge named late, keyset pages with equal microseconds, the backoff,
+      lapsed payments called off (never a held one or one the bank is deciding), cancelled
+      payments' rows deleted, the stale-hold sweep sparing rows with money
+- [~] **Smoke test**: the key-gated run now cancels the paid booking and checks the refund at
+  Stripe and the ledger, in both languages; skipped until test keys exist (#47). Without keys,
+  a cancel of an unpaid booking enters nothing (`booking.smoke.ts`), and the worker's
+  readiness covers the payments queue. Transfers have no end-to-end run
+- [x] **Security** review: nothing critical or high. Fixed: a refund failing after Stripe took it
+      (M1: the refund events), CHECKs stating their nulls and holding a transfer to what's kept
+      and to a settled refund (L1), a transfer marked only while still due (L2), refunds owed a day
+      reported with or without Stripe (L3), lapsed paid holds backed off (L4)
+- [x] **Performance** review: nothing high. Fixed: refunded-in-full bookings out of the transfers
+      index, each sweep time-limited with an outage stop and one network retry, the cancel's
+      Stripe try capped at 3 s, transfers every 15 minutes, "what was made" asked only past the
+      key's day and split in two, refused rows backed off, the ledger check driven by recent
+      entries, the stale-hold sweep guarded against ledgered rows
+- [x] **Accessibility** review: nothing serious. Fixed: a payment cancelled at Stripe goes to the
+      page that says the hold ended (never "try again"), says nothing was charged, and a let-go
+      hold's page gets a heading to land on; the smoke run waits for the title and checks Greek
+- [x] **i18n** review: fixed the cancelled payment's message, where a refund goes and how long
+      (page and emails), the payout statuses (bookings and payouts wait while Stripe checks or
+      can't pay) and the lead (Stripe pays the bank on its schedule), «Επιλέξτε την ξανά»
+- [x] **Test** review: the three highs (the 24-hour wait, a refund owed holding the transfer, the
+      race) and the mediums and lows added, but the worker against a real database (M12)
+- [x] **Contracts & docs**: migrations 0022–0024 reviewed, OpenAPI and client regenerated (the
+      `canceled` payment status), `.env.example` (the worker's key), memory.md
+
+Left open:
+
+- [ ] The worker's sweeps run against a real database only through the API suite's calls of the
+      same functions: an end-to-end worker suite (test review M12)
+- [ ] Owner's email about a driver's cancellation could say the owner is still paid their share
+      of what's kept (i18n m6, product's call)
+- [ ] The Stripe endpoint must send `refund.updated`, `refund.failed` and `charge.refund.updated`
+      (with `payment_intent.*` and `account.updated`) once keys exist; a restricted key for the
+      worker (refunds, transfers, PaymentIntents)
+- [ ] A refund that failed is support's to settle: no screen for it yet (Phase 5), and the
+      driver's page still reads as refunded
+- [ ] Reconciliation against Stripe's balance transactions, disputes, Dashboard refunds: 4.3
+- [ ] Migrations lock `bookings` while CHECKs validate and indexes build: fine at today's size,
+      `NOT VALID`/`CONCURRENTLY` once there is real data (perf L7)
+- [ ] Native speaker: Owner.payouts.lead and status.*, Booking.paymentCanceled, refundToCard, the
+      cancellation emails' refund sentences
 
 ### 4.1 Payouts set up, bookings paid for (2026-11-11)
 
@@ -1124,16 +1199,18 @@ Built in Stripe's test mode, without keys, before #18 and #19 (memory.md #46–#
 
 Left open:
 
-- [ ] Cancelling a paid booking records the refund but sends no money back until 4.2; transfers
-      to owners and the ledger are 4.2 too
-- [ ] The PaymentIntents of holds that lapsed unpaid aren't cancelled at Stripe (4.2, with the
+- [x] Cancelling a paid booking records the refund but sends no money back until 4.2; transfers
+      to owners and the ledger are 4.2 too (done in 4.2)
+- [x] The PaymentIntents of holds that lapsed unpaid aren't cancelled at Stripe (4.2, with the
       worker able to call Stripe); until then their rows are kept, with the plate cleared only
-      on a refund. Retention of these rows and of Stripe's data: Phase 6 (#18)
+      on a refund (done in 4.2: called off an hour on, the plate cleared, the row then goes).
+      Retention of Stripe's data: Phase 6 (#18)
 - [ ] The webhook asks Stripe for the PaymentIntent before answering; under a burst, a queue job
       would answer faster (perf M3)
-- [ ] A booking left `refunding` because Stripe failed and nobody came back is retried only while
+- [x] A booking left `refunding` because Stripe failed and nobody came back is retried only while
       Stripe retries its webhook (3 days): a worker sweep with an alert, in 4.2 (N1). One refunded
       at Stripe with our write lost is recorded at the next look, without asking Stripe again
+      (done in 4.2: `send-refunds`, and `check-money` reports one owed a day)
 - [ ] Erasing an account (Phase 6) must anonymise bookings with a PaymentIntent, never delete
       them: a payment for a booking this database doesn't have is left alone, not refunded
 - [ ] Stripe's own decline messages are shown for cards; check they come in Greek on `/el`, and map

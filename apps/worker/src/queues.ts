@@ -1,5 +1,6 @@
 import type { Database } from '@parkfairy/database';
 import type { EmailTransport } from '@parkfairy/email';
+import type { PaymentsGateway } from '@parkfairy/payments';
 import type { Job, Queue } from 'bullmq';
 import type { Logger } from 'pino';
 
@@ -9,6 +10,8 @@ export const QUEUES = {
   maintenance: 'maintenance',
   /** Emails owed to people: outbox sweeps and the sender. */
   email: 'email',
+  /** Money Stripe moves: refunds owed, owners' transfers, lapsed payments, the ledger's check. */
+  payments: 'payments',
 } as const;
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 
@@ -21,6 +24,8 @@ export interface ProcessorContext {
     /** The transport's pace, which sizes the sender's claims to the time it has. */
     sendsPerSecond: number;
   };
+  /** Stripe, where configured (the `payments` queue); without it nothing was paid for. */
+  payments?: PaymentsGateway | null | undefined;
   /**
    * Aborted when the worker shuts down (BullMQ's `cancelAllJobs`). A long job stops at its next
    * safe point and leaves the rest for the next run, so the platform's stop timeout is enough.

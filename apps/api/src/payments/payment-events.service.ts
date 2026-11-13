@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { BookingsService } from '../bookings/bookings.service.js';
 import { DB } from '../database/database.module.js';
 import { PayoutsService } from './payouts.service.js';
-import { PaymentProviderError, type PaymentsEvent } from './stripe-gateway.js';
+import { PaymentProviderError, type PaymentsEvent } from '@parkfairy/payments';
 
 const events = schema.stripeEvents;
 
@@ -31,9 +31,10 @@ export class PaymentEventsService {
       .from(events)
       .where(eq(events.stripeEventId, event.id));
     if (seen) return;
-    if (event.kind === 'payment') {
+    if (event.kind === 'payment' || event.kind === 'refund') {
       try {
-        await this.bookings.settlePayment(event.paymentIntentId);
+        if (event.kind === 'payment') await this.bookings.settlePayment(event.paymentIntentId);
+        else await this.bookings.settleRefund(event.refundId);
       } catch (error) {
         // Stripe retries the delivery; what failed is worth a line (its type and code only).
         if (error instanceof PaymentProviderError) {

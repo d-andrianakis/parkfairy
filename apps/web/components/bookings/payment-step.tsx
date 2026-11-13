@@ -203,9 +203,16 @@ function PayForm({
     // Paid, or not known: the API asks Stripe, and the page says what it found.
     const settled = await attempt(() => settleMyPayment({ path: { id } }));
     if (error) {
-      const paid = settled.ok && settled.data && settled.data.payment !== 'pending';
+      const payment = settled.ok ? settled.data?.payment : undefined;
+      const paid = payment !== undefined && payment !== 'pending' && payment !== 'canceled';
       if (!paid) {
         paying(false);
+        // Called off at Stripe (the hold ended an hour ago): paying again can't work, so the
+        // page says what happened instead of offering another try.
+        if (payment === 'canceled') {
+          router.replace(`/bookings/${id}?done=unpaid`);
+          return;
+        }
         setFailure(settled.ok ? t('paymentFailed') : t('paymentUncertain'));
         return;
       }

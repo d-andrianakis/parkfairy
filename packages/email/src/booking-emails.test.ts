@@ -218,6 +218,8 @@ describe('cancellations in Greek', () => {
     });
     expect(byOwner.text).toContain('Ο ιδιοκτήτης ακύρωσε την κράτησή σας');
     expect(byOwner.text).toContain('Επιστροφή χρημάτων: 12,50');
+    // Where it goes, and how long it takes (4.2: refunded at Stripe as it is cancelled).
+    expect(byOwner.text).toContain('επιστρέφονται στην κάρτα με την οποία πληρώσατε');
     const byDriver = renderBookingEmail({
       ...base,
       locale: 'el',
@@ -227,6 +229,7 @@ describe('cancellations in Greek', () => {
     });
     expect(byDriver.text).toContain('Ακυρώσατε την κράτησή σας');
     expect(byDriver.text).toContain('Επιστροφή χρημάτων: 0,00');
+    expect(byDriver.text).toContain('Τυχόν επιστροφή χρημάτων γίνεται στην κάρτα');
   });
 
   it('tell the owner a booking went, without guessing the driver’s gender', () => {

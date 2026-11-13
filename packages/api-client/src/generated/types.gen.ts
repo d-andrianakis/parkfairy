@@ -487,7 +487,7 @@ export type OwnerListingCreated = {
 
 export type CheckoutKind = 'payment' | 'confirm';
 
-export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'refunding' | 'refunded';
+export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'refunding' | 'refunded' | 'canceled';
 
 export type BookingPayment = {
     clientSecret: string;

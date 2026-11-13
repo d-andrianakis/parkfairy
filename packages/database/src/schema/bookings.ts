@@ -15,13 +15,17 @@ import {
   CURRENCIES,
   HOLD_MAX_EXTENSIONS,
   PAYMENT_STATUSES,
+  REFUND_STATUSES,
   SUPPORTED_LOCALES,
+  TRANSFER_STATUSES,
   VEHICLE_PLATE_LIMITS,
   type BookingCanceller,
   type BookingStatus,
   type CancellationPolicy,
   type Locale,
   type PaymentStatus,
+  type RefundStatus,
+  type TransferStatus,
 } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import {
@@ -101,6 +105,28 @@ export const bookings = pgTable(
     paymentIntentId: text('payment_intent_id').unique(),
     /** Where that payment stands, as Stripe last told us; null before one was asked for. */
     paymentStatus: text('payment_status').$type<PaymentStatus>(),
+    /** The charge that took the money (`ch_…`), once paid: the owner's transfer is tied to it. */
+    stripeChargeId: text('stripe_charge_id'),
+    /** A cancellation's refund at Stripe (4.2): owed in the cancel's transaction, then sent. */
+    refundStatus: text('refund_status').$type<RefundStatus>(),
+    stripeRefundId: text('stripe_refund_id'),
+    /**
+     * The owner's share (#4, #50, #51), worked out when it goes, 24 hours after the stay: what's
+     * kept less Parkfairy's commission, both kept here as sent.
+     */
+    transferStatus: text('transfer_status').$type<TransferStatus>(),
+    transferMinor: integer('transfer_minor'),
+    commissionMinor: integer('commission_minor'),
+    stripeTransferId: text('stripe_transfer_id'),
+    transferredAt: instant('transferred_at'),
+    /**
+     * The worker's tries at the money this booking owes (a refund, a transfer, a payment to call
+     * off) that Stripe refused, and when to try again: each wait twice the last, six hours at
+     * most, so one that keeps failing costs little and keeps nothing waiting. Back to none once
+     * it went.
+     */
+    moneyAttempts: integer('money_attempts').default(0).notNull(),
+    moneyRetryAt: instant('money_retry_at'),
     createdAt: instant('created_at').defaultNow().notNull(),
     updatedAt: instant('updated_at')
       .defaultNow()
@@ -124,11 +150,27 @@ export const bookings = pgTable(
     index('bookings_hold_expiry_idx')
       .on(t.holdExpiresAt)
       .where(sql`${t.status} = 'held'`),
+    // The money the worker moves: refunds owed (a cancellation's, or a paid hold's finishing)…
+    index('bookings_refunds_owed_idx')
+      .on(t.updatedAt)
+      .where(sql`${t.refundStatus} = 'owed' or ${t.paymentStatus} = 'refunding'`),
+    // …transfers coming due, 24 hours after each paid stay…
+    index('bookings_transfers_due_idx')
+      .on(t.endsAt)
+      .where(
+        sql`${t.paymentStatus} = 'succeeded' and ${t.status} in ('confirmed', 'cancelled') and (${t.transferStatus} is null or ${t.transferStatus} = 'sending') and (${t.refundMinor} is null or ${t.refundMinor} < ${t.totalMinor})`,
+      ),
+    // …and PaymentIntents of holds that lapsed unpaid, to call off.
+    index('bookings_lapsed_payments_idx')
+      .on(t.updatedAt)
+      .where(sql`${t.paymentStatus} = 'pending' and ${t.status} in ('expired', 'released')`),
     // And its deletion of holds that never became bookings, a week on.
     // Holds a payment was asked for are kept (Phase 4), so they stay out of it too.
     index('bookings_stale_holds_idx')
       .on(t.updatedAt)
-      .where(sql`${t.status} in ('expired', 'released') and ${t.paymentIntentId} is null`),
+      .where(
+        sql`${t.status} in ('expired', 'released') and (${t.paymentIntentId} is null or ${t.paymentStatus} = 'canceled')`,
+      ),
     check('bookings_status_check', sql`${t.status} in (${sqlList(BOOKING_STATUSES)})`),
     check(
       'bookings_reference_check',
@@ -171,6 +213,18 @@ export const bookings = pgTable(
       sql`${t.refundMinor} is null or ${t.refundMinor} between 0 and ${t.totalMinor}`,
     ),
     check('bookings_commission_check', sql`${t.commissionBps} between 0 and 10000`),
+    // A cancellation's refund: paid, cancelled, something to give back; sent with Stripe's id.
+    check(
+      'bookings_refund_status_check',
+      sql`${t.refundStatus} is null or (${t.refundStatus} in (${sqlList(REFUND_STATUSES)}) and ${t.status} = 'cancelled' and ${t.paymentStatus} = 'succeeded' and ${t.refundMinor} is not null and ${t.refundMinor} > 0 and (${t.refundStatus} in ('sent', 'failed')) = (${t.stripeRefundId} is not null))`,
+    ),
+    // A transfer: paid for, its refund settled, its amounts worked out and adding up to what's
+    // kept (#50), sent with Stripe's id and its time. Nulls stated: a CHECK passes on null.
+    check(
+      'bookings_transfer_check',
+      sql`${t.transferStatus} is null or (${t.transferStatus} in (${sqlList(TRANSFER_STATUSES)}) and ${t.paymentStatus} = 'succeeded' and ${t.refundStatus} is distinct from 'owed' and ${t.transferMinor} is not null and ${t.commissionMinor} is not null and ${t.transferMinor} > 0 and ${t.commissionMinor} >= 0 and ${t.transferMinor} + ${t.commissionMinor} = ${t.totalMinor} - coalesce(${t.refundMinor}, 0) and (${t.transferStatus} = 'sent') = (${t.stripeTransferId} is not null and ${t.transferredAt} is not null))`,
+    ),
+    check('bookings_money_attempts_check', sql`${t.moneyAttempts} >= 0`),
     // A payment's state and its PaymentIntent come together.
     check(
       'bookings_payment_check',

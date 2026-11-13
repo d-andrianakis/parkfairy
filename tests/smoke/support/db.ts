@@ -8,14 +8,32 @@ const DATABASE_URL = process.env.SMOKE_WEB_URL
 
 export const HAS_DATABASE = Boolean(DATABASE_URL);
 
-async function run(sql: string, values: unknown[]): Promise<void> {
+async function run<Row extends object = object>(sql: string, values: unknown[]): Promise<Row[]> {
   const client = new Client({ connectionString: DATABASE_URL });
   await client.connect();
   try {
-    await client.query(sql, values);
+    return (await client.query<Row>(sql, values)).rows;
   } finally {
     await client.end();
   }
+}
+
+/** A cancelled booking's refund at Stripe (4.2), and what its ledger has: kinds and amounts. */
+export async function refundOf(
+  bookingId: string,
+): Promise<{ refundStatus: string | null; ledger: Record<string, number> }> {
+  const [booking] = await run<{ refund_status: string | null }>(
+    `select refund_status from bookings where id = $1`,
+    [bookingId],
+  );
+  const entries = await run<{ kind: string; amount_minor: number }>(
+    `select kind, amount_minor from ledger_entries where booking_id = $1`,
+    [bookingId],
+  );
+  return {
+    refundStatus: booking?.refund_status ?? null,
+    ledger: Object.fromEntries(entries.map((entry) => [entry.kind, entry.amount_minor])),
+  };
 }
 
 /** What staff do by hand until the admin screen (Phase 5); see GETTING_STARTED.md. */

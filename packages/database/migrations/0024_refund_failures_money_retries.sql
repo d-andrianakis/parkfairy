@@ -1,0 +1,13 @@
+-- Phase 4.2, after review: a cancellation's refund that failed at Stripe after it was taken
+-- (`failed`); the worker's retries backed off per booking (`money_attempts`, `money_retry_at`);
+-- the CHECKs state their nulls and hold a transfer to what's kept; a booking refunded in full
+-- leaves the transfers index. No paid booking exists yet, so nothing is rewritten.
+ALTER TABLE "bookings" DROP CONSTRAINT "bookings_refund_status_check";--> statement-breakpoint
+ALTER TABLE "bookings" DROP CONSTRAINT "bookings_transfer_check";--> statement-breakpoint
+DROP INDEX "bookings_transfers_due_idx";--> statement-breakpoint
+ALTER TABLE "bookings" ADD COLUMN "money_attempts" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "bookings" ADD COLUMN "money_retry_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "bookings_transfers_due_idx" ON "bookings" USING btree ("ends_at") WHERE "bookings"."payment_status" = 'succeeded' and "bookings"."status" in ('confirmed', 'cancelled') and ("bookings"."transfer_status" is null or "bookings"."transfer_status" = 'sending') and ("bookings"."refund_minor" is null or "bookings"."refund_minor" < "bookings"."total_minor");--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_money_attempts_check" CHECK ("bookings"."money_attempts" >= 0);--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_refund_status_check" CHECK ("bookings"."refund_status" is null or ("bookings"."refund_status" in ('owed', 'sent', 'failed') and "bookings"."status" = 'cancelled' and "bookings"."payment_status" = 'succeeded' and "bookings"."refund_minor" is not null and "bookings"."refund_minor" > 0 and ("bookings"."refund_status" in ('sent', 'failed')) = ("bookings"."stripe_refund_id" is not null)));--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_transfer_check" CHECK ("bookings"."transfer_status" is null or ("bookings"."transfer_status" in ('sending', 'sent') and "bookings"."payment_status" = 'succeeded' and "bookings"."refund_status" is distinct from 'owed' and "bookings"."transfer_minor" is not null and "bookings"."commission_minor" is not null and "bookings"."transfer_minor" > 0 and "bookings"."commission_minor" >= 0 and "bookings"."transfer_minor" + "bookings"."commission_minor" = "bookings"."total_minor" - coalesce("bookings"."refund_minor", 0) and ("bookings"."transfer_status" = 'sent') = ("bookings"."stripe_transfer_id" is not null and "bookings"."transferred_at" is not null)));

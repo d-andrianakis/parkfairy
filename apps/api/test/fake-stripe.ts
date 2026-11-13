@@ -6,15 +6,17 @@ import {
   type AccountStatus,
   type PaymentState,
   type PaymentsGateway,
-} from '../src/payments/stripe-gateway.js';
+  type RefundState,
+} from '@parkfairy/payments';
 
 /** The fake endpoint's signing secret: events are signed with it as Stripe would. */
 export const WEBHOOK_SECRET = 'whsec_parkfairyTestSecret';
 
 /**
- * Stripe in memory, for tests without keys (decision #47): accounts, PaymentIntents and refunds in
- * maps, with Stripe's idempotency where we lean on it (one account per owner, one PaymentIntent
- * per booking). Webhook events go through the real SDK's signature check.
+ * Stripe in memory, for tests without keys (decision #47): accounts, PaymentIntents, refunds and
+ * transfers in maps, with Stripe's idempotency where we lean on it (one account per owner, one
+ * PaymentIntent, cancellation refund and transfer per booking). Webhook events go through the real
+ * SDK's signature check.
  */
 export function fakeStripe() {
   const accounts = new Map<string, AccountStatus>();
@@ -22,6 +24,16 @@ export function fakeStripe() {
   const intents = new Map<string, PaymentState>();
   const intentsByBooking = new Map<string, string>();
   const refunds: string[] = [];
+  /** A cancellation's refund per booking: its id and amount. */
+  const cancellationRefunds = new Map<
+    string,
+    { id: string; amountMinor: number; paymentIntentId: string; status: RefundState['status'] }
+  >();
+  /** The owner's transfer per booking. */
+  const transfers = new Map<
+    string,
+    { id: string; accountId: string; amountMinor: number; chargeId: string }
+  >();
   let next = 0;
   const real = stripeGateway(
     { secretKey: 'sk_test_fake', webhookSecrets: ['whsec_otherEndpoint', WEBHOOK_SECRET] },
@@ -58,6 +70,7 @@ export function fakeStripe() {
           amountMinor,
           receivedMinor: 0,
           refundedMinor: 0,
+          chargeId: null,
           currency,
           bookingId,
         };
@@ -90,6 +103,84 @@ export function fakeStripe() {
       if (state) intents.set(id, { ...state, refundedMinor: state.receivedMinor });
       return Promise.resolve();
     }),
+    refundCancelled: vi.fn<PaymentsGateway['refundCancelled']>(
+      ({ paymentIntentId, bookingId, amountMinor }) => {
+        const known = cancellationRefunds.get(bookingId);
+        if (known) return Promise.resolve(known.id);
+        const state = intents.get(paymentIntentId);
+        if (!state || state.status !== 'succeeded') {
+          return Promise.reject(new PaymentProviderError('invalid_request_error resource_missing'));
+        }
+        // As Stripe: never more back than came in.
+        if (state.refundedMinor + amountMinor > state.receivedMinor) {
+          return Promise.reject(new PaymentProviderError('invalid_request_error amount_too_large'));
+        }
+        const id = `re_${(++next).toString().padStart(6, '0')}Fake`;
+        cancellationRefunds.set(bookingId, {
+          id,
+          amountMinor,
+          paymentIntentId,
+          status: 'succeeded',
+        });
+        intents.set(paymentIntentId, {
+          ...state,
+          refundedMinor: state.refundedMinor + amountMinor,
+        });
+        return Promise.resolve(id);
+      },
+    ),
+    transfer: vi.fn<PaymentsGateway['transfer']>(
+      ({ bookingId, accountId, amountMinor, chargeId }) => {
+        const known = transfers.get(bookingId);
+        if (known) return Promise.resolve(known.id);
+        if (accounts.get(accountId) !== 'active') {
+          return Promise.reject(
+            new PaymentProviderError(
+              'invalid_request_error insufficient_capabilities_for_transfer',
+            ),
+          );
+        }
+        const id = `tr_${(++next).toString().padStart(6, '0')}Fake`;
+        transfers.set(bookingId, { id, accountId, amountMinor, chargeId });
+        return Promise.resolve(id);
+      },
+    ),
+    refund: vi.fn<PaymentsGateway['refund']>((refundId) => {
+      for (const [bookingId, made] of cancellationRefunds) {
+        if (made.id === refundId) {
+          return Promise.resolve({
+            id: made.id,
+            status: made.status,
+            paymentIntentId: made.paymentIntentId,
+            reason: 'cancelled' as const,
+            bookingId,
+          });
+        }
+      }
+      return Promise.reject(new PaymentProviderError('invalid_request_error resource_missing'));
+    }),
+    refundMadeFor: vi.fn<PaymentsGateway['refundMadeFor']>((paymentIntentId) => {
+      for (const made of cancellationRefunds.values()) {
+        if (made.paymentIntentId === paymentIntentId && made.status !== 'failed') {
+          return Promise.resolve(made.id);
+        }
+      }
+      return Promise.resolve(null);
+    }),
+    transferMadeFor: vi.fn<PaymentsGateway['transferMadeFor']>((bookingId) =>
+      Promise.resolve(transfers.get(bookingId)?.id ?? null),
+    ),
+    cancelPayment: vi.fn<PaymentsGateway['cancelPayment']>((id) => {
+      const state = intents.get(id);
+      if (!state) {
+        return Promise.reject(new PaymentProviderError('invalid_request_error resource_missing'));
+      }
+      // As the gateway: one paid (or being paid) meanwhile is left as it is.
+      if (state.status !== 'pending') return Promise.resolve({ ...state });
+      const canceled = { ...state, status: 'canceled' as const };
+      intents.set(id, canceled);
+      return Promise.resolve({ ...canceled });
+    }),
     parseEvent: (rawBody: Buffer, signature: string) => real.parseEvent(rawBody, signature),
   } satisfies PaymentsGateway;
 
@@ -98,6 +189,22 @@ export function fakeStripe() {
     accounts,
     intents,
     refunds,
+    cancellationRefunds,
+    transfers,
+    /** A cancellation's refund Stripe took and that failed after (a closed card, say). */
+    failRefund(bookingId: string) {
+      const made = cancellationRefunds.get(bookingId);
+      if (!made) throw new Error(`No refund for ${bookingId}`);
+      made.status = 'failed';
+      const state = intents.get(made.paymentIntentId);
+      if (state) {
+        intents.set(made.paymentIntentId, {
+          ...state,
+          refundedMinor: state.refundedMinor - made.amountMinor,
+        });
+      }
+      return made.id;
+    },
     /** What the driver's bank and card did: the PaymentIntent moves on; paid, all of it in. */
     setPayment(id: string, change: Partial<PaymentState>) {
       const state = intents.get(id);
@@ -105,6 +212,9 @@ export function fakeStripe() {
       const next = { ...state, ...change };
       if (change.status === 'succeeded' && change.receivedMinor === undefined) {
         next.receivedMinor = next.amountMinor;
+      }
+      if (change.status === 'succeeded' && change.chargeId === undefined) {
+        next.chargeId = next.chargeId ?? `ch_${id.slice(3)}`;
       }
       intents.set(id, next);
     },
@@ -118,6 +228,7 @@ export function fakeStripe() {
         amountMinor: 999,
         receivedMinor: 999,
         refundedMinor: 0,
+        chargeId: `ch_${id.slice(3)}`,
         currency: 'EUR',
         bookingId: null,
       });

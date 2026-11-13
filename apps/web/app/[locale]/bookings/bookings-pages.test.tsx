@@ -253,6 +253,36 @@ describe('a booking’s page', () => {
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Cancelled booking' })).toBeVisible();
     expect(screen.getByText(/The owner had to cancel this booking/)).toHaveTextContent('€4.00');
+    // Paid without Stripe (a local run): no card to speak of.
+    expect(screen.queryByText(/back to the card you paid with/)).not.toBeInTheDocument();
+  });
+
+  it('says where a refund at Stripe goes and how long it takes, in Greek too (4.2)', async () => {
+    const cancelled = (refundMinor: number) =>
+      confirmed({
+        status: 'cancelled',
+        cancelledBy: 'driver',
+        cancelledAt: '2099-12-02T10:00:00.000Z',
+        refund: { amountMinor: refundMinor, currency: 'EUR' },
+        refundIfCancelled: null,
+        checkout: 'payment',
+        payment: 'succeeded',
+      });
+    const view = await showBooking(cancelled(400));
+    expect(
+      screen.getByText(
+        'It goes back to the card you paid with and can take a few days to show on your card or bank statement.',
+      ),
+    ).toBeInTheDocument();
+    view.unmount();
+    const greek = await showBooking(cancelled(400), undefined, 'el');
+    expect(
+      screen.getByText(/^Επιστρέφεται στην κάρτα με την οποία πληρώσατε\./),
+    ).toBeInTheDocument();
+    greek.unmount();
+    // Nothing back under the terms: nothing to say about a card.
+    await showBooking(cancelled(0));
+    expect(screen.queryByText(/back to the card you paid with/)).not.toBeInTheDocument();
   });
 
   it('sends a driver who let the space go back to the listing for the same times', async () => {
@@ -346,6 +376,43 @@ describe('a booking’s page, paying (decisions #3, #49)', () => {
     ).toHaveFocus();
     expect(screen.getByText(/^Nothing was charged/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue to payment' })).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+
+  it('says a payment called off after the hold ended charged nothing, and offers no payment', async () => {
+    for (const locale of ['en', 'el'] as const) {
+      const view = await showBooking(
+        paying({ status: 'expired', payment: 'canceled' }),
+        'unpaid',
+        locale,
+      );
+      const english = locale === 'en';
+      expect(
+        screen.getByRole('heading', {
+          level: 2,
+          name: english ? 'Your hold has ended' : 'Η δέσμευση της θέσης έληξε',
+        }),
+      ).toHaveFocus();
+      expect(
+        screen.getByText(english ? /^Nothing was charged: / : /^Δεν έγινε καμία χρέωση: /),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Continue to payment' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      await expectNoAxeViolations(view.container);
+      view.unmount();
+    }
+  });
+
+  it('says so too for a hold let go, with a heading where the payment was', async () => {
+    const { container } = await showBooking(
+      paying({ status: 'released', payment: 'canceled' }),
+      'unpaid',
+    );
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'The payment didn’t go through' }),
+    ).toHaveFocus();
+    expect(screen.getByText(/^Nothing was charged: /)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Choose another space' })).toBeInTheDocument();
     await expectNoAxeViolations(container);
   });
 

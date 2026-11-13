@@ -106,6 +106,14 @@ describe('PaymentPending', () => {
     );
   });
 
+  it('says a payment called off at Stripe is not made', async () => {
+    settle.mockResolvedValue(answer({ status: 'expired', payment: 'canceled' }) as never);
+    renderInSubtree(<PaymentPending id={ID} focus now />);
+    await waitFor(() =>
+      expect(routerMock.replace).toHaveBeenCalledWith(`/bookings/${ID}?done=unpaid`),
+    );
+  });
+
   it('moves on to the refund too, on a press, the focus going with it', async () => {
     settle.mockResolvedValue(answer({ status: 'expired', payment: 'refunding' }) as never);
     renderInSubtree(<PaymentPending id={ID} focus={false} />);

@@ -17,7 +17,7 @@ import {
   PaymentProviderError,
   type AccountStatus,
   type PaymentsGateway,
-} from './stripe-gateway.js';
+} from '@parkfairy/payments';
 
 /** How long Stripe's last word stands before a page asks again: the webhook keeps it current. */
 const FRESH_MS = 60_000;

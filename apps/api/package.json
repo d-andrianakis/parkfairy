@@ -24,6 +24,7 @@
     "@parkfairy/auth": "workspace:*",
     "@parkfairy/contracts": "workspace:*",
     "@parkfairy/database": "workspace:*",
+    "@parkfairy/payments": "workspace:*",
     "better-auth": "1.7.14",
     "drizzle-orm": "0.45.4",
     "express": "5.3.0",

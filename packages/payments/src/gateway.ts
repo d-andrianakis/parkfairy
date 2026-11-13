@@ -22,14 +22,27 @@ export interface PaymentState {
   /** What Stripe actually took, and what of it went back since: only all-in, none-back books. */
   receivedMinor: number;
   refundedMinor: number;
+  /** The charge that took the money (`ch_…`): an owner's transfer is tied to it. */
+  chargeId: string | null;
   currency: string;
   /** From the PaymentIntent's metadata: which booking it pays for. */
+  bookingId: string | null;
+}
+
+/** A refund as Stripe has it now: one it accepted can still fail later (a closed card). */
+export interface RefundState {
+  id: string;
+  status: 'pending' | 'requires_action' | 'succeeded' | 'failed' | 'canceled';
+  paymentIntentId: string | null;
+  /** From our metadata: a cancellation's (`cancelled`) or a paid hold's (`not_bookable`). */
+  reason: 'cancelled' | 'not_bookable' | null;
   bookingId: string | null;
 }
 
 /** A webhook event, verified, narrowed to what we act on. */
 export type PaymentsEvent =
   | { id: string; type: string; kind: 'payment'; paymentIntentId: string }
+  | { id: string; type: string; kind: 'refund'; refundId: string }
   | {
       id: string;
       type: string;
@@ -67,6 +80,40 @@ export interface PaymentsGateway {
   payment(paymentIntentId: string): Promise<PaymentState>;
   /** All of it back to the driver; asked again, the same refund (idempotency key). */
   refundPayment(paymentIntentId: string, reason: 'not_bookable'): Promise<void>;
+  /**
+   * What a cancellation gives back, by its policy (4.2): part or all of the payment. Asked again,
+   * the same refund (idempotency key, a day long; past it, `refundMadeFor` says whether it was
+   * made). `quick`: one try, three seconds at most, for a request a person waits on; the worker
+   * sends it otherwise.
+   */
+  refundCancelled(
+    input: { paymentIntentId: string; bookingId: string; amountMinor: number },
+    options?: { quick?: boolean },
+  ): Promise<string>;
+  /** A refund as it stands now, to check one Stripe says changed. */
+  refund(refundId: string): Promise<RefundState>;
+  /**
+   * The owner's share to their Express account (#4, #6), tied to the charge so it waits for the
+   * money to be there. Asked again, the same transfer (idempotency key).
+   */
+  transfer(input: {
+    bookingId: string;
+    accountId: string;
+    amountMinor: number;
+    currency: string;
+    chargeId: string;
+  }): Promise<string>;
+  /**
+   * What Stripe already made for a booking, past an idempotency key's day (inside it the key is
+   * enough): its cancellation refund, its transfer, so a retry never makes a second one.
+   */
+  refundMadeFor(paymentIntentId: string): Promise<string | null>;
+  transferMadeFor(bookingId: string): Promise<string | null>;
+  /**
+   * A PaymentIntent nobody will pay any more (its hold lapsed): it can't be paid after this. One
+   * paid or called off meanwhile is left as it is, and its state returned.
+   */
+  cancelPayment(paymentIntentId: string): Promise<PaymentState>;
   /** Verifies the signature (`InvalidSignatureError` if it doesn't hold) and narrows the event. */
   parseEvent(rawBody: Buffer, signature: string): PaymentsEvent;
 }
@@ -109,9 +156,13 @@ export function accountStatusOf(
 export function paymentStatusOf(status: Stripe.PaymentIntent.Status): PaymentState['status'] {
   if (status === 'succeeded') return 'succeeded';
   if (status === 'processing') return 'processing';
-  // Not paid yet: waiting for a card, a declined one to be replaced, 3-D Secure, or cancelled.
+  if (status === 'canceled') return 'canceled';
+  // Not paid yet: waiting for a card, a declined one to be replaced, or 3-D Secure.
   return 'pending';
 }
+
+/** A refund that changed: one that failed after Stripe took it is ours to hear of (4.2). */
+const REFUND_EVENTS = new Set(['refund.updated', 'refund.failed', 'charge.refund.updated']);
 
 const PAYMENT_EVENTS = new Set([
   'payment_intent.succeeded',
@@ -149,15 +200,44 @@ function stateOf(intent: Stripe.PaymentIntent): PaymentState {
     amountMinor: intent.amount,
     receivedMinor: intent.amount_received,
     refundedMinor: charge?.amount_refunded ?? 0,
+    chargeId:
+      charge?.id ?? (typeof intent.latest_charge === 'string' ? intent.latest_charge : null),
     currency: intent.currency.toUpperCase(),
     bookingId: intent.metadata.bookingId ?? null,
   };
 }
 
+function refundStateOf(refund: Stripe.Refund): RefundState {
+  const reason = refund.metadata?.reason;
+  return {
+    id: refund.id,
+    status: (['pending', 'requires_action', 'succeeded', 'failed', 'canceled'] as const).includes(
+      refund.status as RefundState['status'],
+    )
+      ? (refund.status as RefundState['status'])
+      : 'pending',
+    paymentIntentId:
+      typeof refund.payment_intent === 'string'
+        ? refund.payment_intent
+        : (refund.payment_intent?.id ?? null),
+    reason: reason === 'cancelled' || reason === 'not_bookable' ? reason : null,
+    bookingId: refund.metadata?.bookingId ?? null,
+  };
+}
+
 export function stripeGateway(
-  { secretKey, webhookSecrets }: { secretKey: string; webhookSecrets: string[] },
+  {
+    secretKey,
+    webhookSecrets,
+    maxNetworkRetries = 2,
+  }: {
+    secretKey: string;
+    webhookSecrets: string[];
+    /** The worker tries again on its next run: one retry is enough there. */
+    maxNetworkRetries?: number;
+  },
   client: Stripe = new Stripe(secretKey, {
-    maxNetworkRetries: 2,
+    maxNetworkRetries,
     timeout: 10_000,
     telemetry: false,
     appInfo: { name: 'Parkfairy' },
@@ -234,6 +314,75 @@ export function stripeGateway(
           { idempotencyKey: `refund-unbooked-${paymentIntentId}` },
         );
       }),
+    refundCancelled: ({ paymentIntentId, bookingId, amountMinor }, options) =>
+      call(async () => {
+        const refund = await client.refunds.create(
+          {
+            payment_intent: paymentIntentId,
+            amount: amountMinor,
+            metadata: { bookingId, reason: 'cancelled' },
+          },
+          {
+            idempotencyKey: `refund-cancelled-${bookingId}`,
+            ...(options?.quick ? { timeout: 3_000, maxNetworkRetries: 0 } : {}),
+          },
+        );
+        return refund.id;
+      }),
+    refund: (refundId) => call(async () => refundStateOf(await client.refunds.retrieve(refundId))),
+    transfer: ({ bookingId, accountId, amountMinor, currency, chargeId }) =>
+      call(async () => {
+        const made = await client.transfers.create(
+          {
+            amount: amountMinor,
+            currency: currency.toLowerCase(),
+            destination: accountId,
+            // Paid out of this charge: the transfer waits for its money to be available.
+            source_transaction: chargeId,
+            transfer_group: `booking_${bookingId}`,
+            metadata: { bookingId },
+          },
+          { idempotencyKey: `transfer-${bookingId}` },
+        );
+        return made.id;
+      }),
+    refundMadeFor: (paymentIntentId) =>
+      call(async () => {
+        const refunds = await client.refunds.list({ payment_intent: paymentIntentId, limit: 10 });
+        const made = refunds.data.find(
+          (refund) =>
+            refund.metadata?.reason === 'cancelled' &&
+            refund.status !== 'failed' &&
+            refund.status !== 'canceled',
+        );
+        return made?.id ?? null;
+      }),
+    transferMadeFor: (bookingId) =>
+      call(async () => {
+        const transfers = await client.transfers.list({
+          transfer_group: `booking_${bookingId}`,
+          limit: 10,
+        });
+        return transfers.data.find((made) => made.metadata.bookingId === bookingId)?.id ?? null;
+      }),
+    cancelPayment: (paymentIntentId) =>
+      call(async () => {
+        try {
+          return stateOf(await client.paymentIntents.cancel(paymentIntentId));
+        } catch (error) {
+          // Paid (or being paid, or called off) since we last looked: it is as it is, and the
+          // caller learns how.
+          if (
+            error instanceof Stripe.errors.StripeError &&
+            error.code === 'payment_intent_unexpected_state'
+          ) {
+            return stateOf(
+              await client.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] }),
+            );
+          }
+          throw error;
+        }
+      }),
     parseEvent(rawBody, signature) {
       // The platform's endpoint and the Connect one (owners' accounts) sign with their own
       // secrets: either verifies.
@@ -247,6 +396,10 @@ export function stripeGateway(
         }
       }
       if (!event) throw new InvalidSignatureError();
+      if (REFUND_EVENTS.has(event.type)) {
+        const refund = event.data.object as Stripe.Refund;
+        return { id: event.id, type: event.type, kind: 'refund', refundId: refund.id };
+      }
       if (PAYMENT_EVENTS.has(event.type)) {
         const intent = event.data.object as Stripe.PaymentIntent;
         return { id: event.id, type: event.type, kind: 'payment', paymentIntentId: intent.id };

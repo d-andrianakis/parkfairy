@@ -162,6 +162,16 @@ Answered by the product owner on 2026-11-11, to start Phase 4:
     So the booking page's CSP allows Stripe's scripts and frames, and its accessibility and Greek
     are ours to check.
 
+Answered by the product owner on 2026-11-12, for refunds and transfers (4.2):
+
+50. On a partial refund, **the commission is 10% of what's kept**, and the owner gets the rest of
+    it (a €20 booking, €10 refunded: €1 to Parkfairy, €9 to the owner).
+51. **Parkfairy bears Stripe's processing fee, from its cut**: owners get exactly 90% of what's
+    kept. On a very small booking the margin can go negative.
+52. A transfer due to an owner whose account Stripe has restricted since **waits and is retried**
+    once the account is active again, with support alerted when it has waited a few days; the
+    owner's pages say payouts are on hold until Stripe has what it needs.
+
 Our readings (2026-11-08), not asked; change any that are wrong:
 
 - **One hold per driver.** A new hold lets the driver's earlier ones go, so one account can't sit
@@ -883,6 +893,41 @@ locked`) in one statement. The two sets are kept apart (`user_id <> $user`) beca
     (`payment-progress`), going to pay renews a hold with less than half its time left (as an
     extension), the return from the bank is settled at once, and the Element is themed from our
     tokens in hex (`stripe-appearance.ts`, held to globals.css by tokens.test.ts).
+- **Refunds, transfers and the ledger (Phase 4.2, 2026-11-13).** Stripe is called by the API and
+  the worker, so the gateway is a package of its own (`@parkfairy/payments`), with the shares
+  (`sharesOf`: 10% of what's kept, half up, #50; the owner the rest, Stripe's fee from ours, #51).
+  - **Owed, then sent**: a cancellation's refund is `owed` in the cancel's own transaction, asked
+    of Stripe after commit (one 3-second try while the person waits, `quick`), and `sent` with its
+    id and its ledger entry. A failure leaves it owed for the worker: the cancellation stands.
+    The driver's and the owner's cancel can race; the booking's lock makes one of them the cancel,
+    and only that one refunds.
+  - **Stripe's idempotency key lasts a day**: inside it, asking again is the same refund or
+    transfer; past it (23 h, `KEY_DAY_MS`) the worker first asks Stripe what it made
+    (`refundMadeFor`, `transferMadeFor`, failed and canceled refunds not counted). Stripe also keeps
+    an error under a key for that day: a transfer refused while an account was restricted fails
+    the same way until the day is out.
+  - **A transfer's sums are kept before Stripe is asked** (`sending`, with `transfer_minor` and
+    `commission_minor`, and only while the booking is still due as it was read): every retry sends
+    the same. Due 24 hours after the stay (#4), to active accounts only, so a restricted owner's
+    bookings never fill a sweep's page; `check-money` counts those waiting over three days (#52).
+    A refund still owed holds the transfer back (what's kept isn't final till then).
+  - **A refund can fail after Stripe took it** (a closed card): `refund.updated`, `refund.failed`
+    and `charge.refund.updated` are read and checked with Stripe; a failed one leaves the ledger,
+    a cancellation's says `failed`, and support is told. Asking again would fail the same way.
+    The Stripe endpoint must send those events (with `payment_intent.*` and `account.updated`).
+  - **The worker's sweeps** (queue `payments`, one run at a time over every process) page by
+    `(time, id)` with the time as Postgres text (microseconds; a JS Date has milliseconds and a row
+    a few microseconds past a cursor would come back every page), stop at their run's time limit or
+    after three Stripe outages in a row, and back a refused row off (`money_retry_at`, five minutes
+    doubling to six hours) without touching `updated_at`, which says how long it has been owed.
+  - **Lapsed holds' PaymentIntents are called off an hour on** (a late payment's time, #3); one
+    paid meanwhile is the webhook's to settle, and a day on support is told.
+  - **The ledger** (`ledger_entries`: charge, refund, commission, transfer; one of each per booking,
+    no cascade) is checked daily against the bookings for what was entered in the last two days. It
+    is checked against itself, not Stripe: disputes and Dashboard refunds need 4.3's reconciliation
+    against balance transactions.
+  - **Alerts are error logs** with fixed messages ("refund owed for over a day", "ledger does not
+    add up", "transfers waiting over 3 days", "refund failed at Stripe") until monitoring exists.
 
 ## Conventions
 
@@ -1173,6 +1218,14 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   it used to return undefined, so plain `<a href={getPathname(…)}>` links had no href in tests.
 - **A bash heredoc with nested quotes can break the shell** ("unexpected EOF while looking for
   matching"), besides mangling non-ASCII: put such scripts in a file.
+- **A CHECK passes when it comes out null** (2026-11-13): `transfer_minor > 0` on a null column is
+  null, and Postgres accepts the row. State `is not null` in every CHECK that means it.
+- **`ledger_entries` restricts deleting a booking**: test clean-ups delete a suite's ledger rows
+  first, and the stale-hold sweep skips any booking with one (one would fail the whole batch).
+- **Drizzle's `$onUpdate` sets `updated_at` on every `.update()`**: a write that mustn't move it
+  (the money backoff) goes through `db.execute` instead.
+- **Agent reviews can stop on the account's usage limit** (2026-11-12): a review agent cut off
+  part way is resumed with a message, not started again.
 
 ## Performance baselines
 

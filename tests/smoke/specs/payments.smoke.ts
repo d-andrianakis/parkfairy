@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { expect, request as http, test, type Page } from '@playwright/test';
-import { activatePayouts, HAS_DATABASE, publishListing, unpublishListing } from '../support/db';
+import {
+  activatePayouts,
+  HAS_DATABASE,
+  publishListing,
+  refundOf,
+  unpublishListing,
+} from '../support/db';
 import { EMAIL_OUTBOX, WEB_URL } from '../support/env';
 import { expectAccessible, ownVisitor, registerAndSignIn, uniqueEmail } from '../support/fixtures';
 import { athensDay, listingWithStaff } from '../support/listings';
@@ -9,7 +15,8 @@ import { athensDay, listingWithStaff } from '../support/listings';
 // payouts in Stripe's Express onboarding; drivers pay in the Payment Element on the booking's page,
 // the one page whose CSP lets Stripe in; Stripe's signed webhook settles the booking. Without
 // Stripe's keys (#47) owners are told payouts can't be set up, and only a local run books, without
-// paying: what runs here until test keys exist.
+// paying: what runs here until test keys exist. Round 4.2: a paid booking called off is refunded
+// at Stripe at once, by its terms, and the ledger has both the charge and the refund.
 
 test.use(ownVisitor);
 
@@ -75,7 +82,7 @@ test('only a booking’s page lets Stripe’s scripts and frames in', async ({ p
   }
 });
 
-test('with Stripe’s test keys: a driver pays in the Payment Element and is booked', async ({
+test('with Stripe’s test keys: a driver pays, is booked, cancels and is refunded', async ({
   browser,
   page,
 }) => {
@@ -113,6 +120,29 @@ test('with Stripe’s test keys: a driver pays in the Payment Element and is boo
     await expect(driver.getByRole('heading', { level: 2, name: 'Booking confirmed' })).toBeFocused({
       timeout: 60_000,
     });
+    const bookingId = /bookings\/([0-9a-f-]{36})/.exec(driver.url())?.[1] ?? '';
+
+    // Called off sixteen days ahead: all of it back, sent to Stripe as it is cancelled (4.2).
+    await driver.getByRole('button', { name: 'Cancel booking' }).click();
+    await driver.getByRole('button', { name: 'Yes, cancel it' }).click();
+    await expect(
+      driver.getByRole('heading', { level: 2, name: 'Booking cancelled' }),
+    ).toBeFocused();
+    const back = driver.getByText(/^You cancelled this booking\. €[\d.]+ comes back to you\.$/);
+    await expect(back).toBeVisible();
+    const { refundStatus, ledger } = await refundOf(bookingId);
+    expect(refundStatus).toBe('sent');
+    expect(ledger.refund).toBeGreaterThan(0);
+    expect(ledger.refund).toBe(ledger.charge);
+    await expect(driver).toHaveTitle(/^Cancelled booking/);
+    await expectAccessible(driver);
+    // And in Greek, a page of its own.
+    await driver.goto(`/el/bookings/${bookingId}`);
+    await expect(driver.getByRole('heading', { level: 1 })).toHaveText('Ακυρωμένη κράτηση');
+    await expect(
+      driver.getByText(/^Ακυρώσατε αυτή την κράτηση\. Θα σας επιστραφεί ποσό \d+,\d{2}\s€\.$/),
+    ).toBeVisible();
+    await expectAccessible(driver);
   } finally {
     await context.close();
     await unpublishListing(id);

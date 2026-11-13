@@ -5818,7 +5818,8 @@
           "processing",
           "succeeded",
           "refunding",
-          "refunded"
+          "refunded",
+          "canceled"
         ]
       },
       "BookingPayment": {

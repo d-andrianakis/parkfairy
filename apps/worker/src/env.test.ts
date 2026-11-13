@@ -27,6 +27,22 @@ describe('worker loadEnv', () => {
     }
   });
 
+  it('moves money only with a Stripe test key, and none by default (memory.md #46)', () => {
+    expect(loadEnv(base).stripe).toBeNull();
+    expect(loadEnv({ ...base, STRIPE_SECRET_KEY: '' }).stripe).toBeNull();
+    for (const key of ['sk_test_abc123', 'rk_test_abc123']) {
+      expect(loadEnv({ ...base, STRIPE_SECRET_KEY: key }).stripe).toEqual({ secretKey: key });
+    }
+    for (const key of ['sk_live_abc123', 'rk_live_abc123']) {
+      expect(() => loadEnv({ ...base, STRIPE_SECRET_KEY: key }), key).toThrow(
+        /Live Stripe keys are refused/,
+      );
+    }
+    for (const key of ['pk_test_abc123', 'whsec_abc', 'sk_test_']) {
+      expect(() => loadEnv({ ...base, STRIPE_SECRET_KEY: key }), key).toThrow(/STRIPE_SECRET_KEY/);
+    }
+  });
+
   it('points links at this machine by default', () => {
     expect(loadEnv(base).webUrl).toBe('http://localhost:3000');
     expect(

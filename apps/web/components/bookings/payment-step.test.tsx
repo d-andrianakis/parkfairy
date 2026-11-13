@@ -210,6 +210,18 @@ describe('PaymentStep', () => {
     );
     expect(screen.getByRole('alert')).not.toHaveTextContent('Internal detail');
 
+    // Called off at Stripe (the hold lapsed an hour ago): no point trying again, so the page
+    // says what happened.
+    stripe.confirmPayment.mockResolvedValueOnce({
+      error: { type: 'invalid_request_error', code: 'payment_intent_unexpected_state' },
+    });
+    settle.mockResolvedValueOnce(answer({ status: 'expired', payment: 'canceled' }) as never);
+    await userEvent.click(payButton());
+    await waitFor(() =>
+      expect(routerMock.replace).toHaveBeenCalledWith(`/bookings/${ID}?done=unpaid`),
+    );
+    routerMock.replace.mockClear();
+
     // The API can't say either: don't pay again yet.
     stripe.confirmPayment.mockResolvedValueOnce({ error: { type: 'api_error' } });
     settle.mockResolvedValueOnce(refusal('PAYMENT_PROVIDER_ERROR', 503) as never);

@@ -924,11 +924,11 @@
     "payouts": {
       "metaTitle": "Payouts",
       "title": "Getting paid",
-      "lead": "Drivers pay when they book. Once a stay has ended, 24 hours on, your share goes to your bank account through Stripe, our payment provider.",
+      "lead": "Drivers pay when they book. 24 hours after each stay ends, we send your share to Stripe, our payment provider, which pays it into your bank account on its usual schedule.",
       "status": {
         "none": "You haven’t set up payouts yet. Drivers can book your parking once you have, and once it’s live.",
-        "restricted": "Stripe can’t pay you yet. Continue with Stripe to see what it needs.",
-        "pending": "Stripe is checking your details. This usually takes a few minutes, sometimes a day or two.",
+        "restricted": "Stripe can’t pay you at the moment. Until it can, drivers can’t book your parking, and any payouts due to you wait. Continue with Stripe to see what it needs.",
+        "pending": "Stripe is checking your details. This usually takes a few minutes, sometimes a day or two. Until then, drivers can’t book your parking and payouts wait.",
         "active": "Payouts are set up. Drivers can book your parking once it’s live."
       },
       "start": "Set up payouts with Stripe",
@@ -1048,6 +1048,8 @@
     "paymentChecksStopped": "We’ve stopped checking on this page. Use Check again, or wait for our email.",
     "paymentUnpaid": "The payment didn’t go through",
     "paymentUnpaidLead": "Nothing was charged. You can pay again below, with the same card or another.",
+    "paymentCanceled": "Nothing was charged: the payment was called off once your hold had ended.",
+    "refundToCard": "It goes back to the card you paid with and can take a few days to show on your card or bank statement.",
     "paymentRefunding": "Your payment is being refunded",
     "plateKept": "Kept with this payment.",
     "changePlate": "Change the number plate"

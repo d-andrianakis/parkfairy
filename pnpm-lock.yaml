@@ -50,6 +50,9 @@ importers:
       '@parkfairy/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@parkfairy/payments':
+        specifier: workspace:*
+        version: link:../../packages/payments
       better-auth:
         specifier: 1.7.14
         version: 1.7.14(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1))(next@16.4.3(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.5(@types/node@24.19.2)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)))
@@ -250,6 +253,9 @@ importers:
       '@parkfairy/email':
         specifier: workspace:*
         version: link:../../packages/email
+      '@parkfairy/payments':
+        specifier: workspace:*
+        version: link:../../packages/payments
       bullmq:
         specifier: 6.5.0
         version: 6.5.0(ioredis@6.0.0)(pg@8.23.1)
@@ -422,6 +428,31 @@ importers:
       '@parkfairy/contracts':
         specifier: workspace:*
         version: link:../contracts
+    devDependencies:
+      '@parkfairy/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/payments:
+    dependencies:
+      '@parkfairy/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      stripe:
+        specifier: 23.0.1
+        version: 23.0.1(@types/node@24.19.2)
     devDependencies:
       '@parkfairy/config':
         specifier: workspace:*

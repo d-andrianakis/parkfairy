@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { addBookings, HAS_DATABASE, publishListing, unpublishListing } from '../support/db';
+import {
+  addBookings,
+  HAS_DATABASE,
+  publishListing,
+  refundOf,
+  unpublishListing,
+} from '../support/db';
 import { waitForEmail } from '../support/email';
 import { EMAIL_OUTBOX, SIGNED_IN_STATE, visitorAddress, WEB_URL } from '../support/env';
 import {
@@ -297,6 +303,8 @@ test('a space taken meanwhile is said so, a driver cancels by the terms, and Gre
     await expect(
       quick.getByText('You cancelled this booking. €4.00 comes back to you.'),
     ).toBeVisible();
+    // Booked here without paying (no Stripe on this run): nothing owed at Stripe, nothing entered.
+    if (HAS_DATABASE) expect(await refundOf(bookingId)).toEqual({ refundStatus: null, ledger: {} });
     await quick.goto('/en/bookings?when=past');
     await expect(quick.getByRole('link', { name })).toBeVisible();
     await expectAccessible(quick);

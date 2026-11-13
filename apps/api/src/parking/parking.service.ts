@@ -26,7 +26,7 @@ import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { DB } from '../database/database.module.js';
 import { PAYMENTS } from '../payments/payments.tokens.js';
-import type { PaymentsGateway } from '../payments/stripe-gateway.js';
+import type { PaymentsGateway } from '@parkfairy/payments';
 import { takenSpaceIds } from './availability.js';
 import { hoursExceptionsOf, openingHoursOf, priceRulesOf, utcDay } from './listing-data.js';
 import { hoursOf, isOpenThroughout, wallTime, weekNeeded } from './opening-hours.js';

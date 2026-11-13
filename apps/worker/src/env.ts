@@ -27,6 +27,14 @@ const EnvSchema = z
      * app's account emails (password resets, which nobody can ask for again), which go at one a
      * second: 1 leaves them the other half of Resend's default 2 a second. Raise both together.
      */
+    /** Stripe (4.2): the worker sends refunds owed and owners' transfers. As the API's key. */
+    STRIPE_SECRET_KEY: z.preprocess(
+      emptyToUndefined,
+      z
+        .string()
+        .regex(/^(sk|rk)_(test|live)_[A-Za-z0-9]+$/, 'STRIPE_SECRET_KEY is not a Stripe secret key')
+        .optional(),
+    ),
     EMAIL_SENDS_PER_SECOND: z.preprocess(
       emptyToUndefined,
       // At least one send in a run's 25 s: below that the sender would claim nothing, silently.
@@ -42,6 +50,11 @@ const EnvSchema = z
     message: 'EMAIL_FROM is required with RESEND_API_KEY',
     path: ['EMAIL_FROM'],
   })
+  .refine((env) => !env.STRIPE_SECRET_KEY?.includes('_live_'), {
+    // Real money waits for the adviser (#18) and Stripe (#19): memory.md #46.
+    message: 'Live Stripe keys are refused until #18 and #19 are answered (memory.md #46)',
+    path: ['STRIPE_SECRET_KEY'],
+  })
   .refine((env) => env.NODE_ENV !== 'production' || env.BETTER_AUTH_URL, {
     message: 'BETTER_AUTH_URL is required in production (links in emails need the real origin)',
     path: ['BETTER_AUTH_URL'],
@@ -54,5 +67,9 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env) {
   if (!parsed.success) {
     throw new Error(`Invalid worker environment:\n${z.prettifyError(parsed.error)}`);
   }
-  return { ...parsed.data, webUrl: parsed.data.BETTER_AUTH_URL ?? LOCAL_WEB_URL };
+  return {
+    ...parsed.data,
+    webUrl: parsed.data.BETTER_AUTH_URL ?? LOCAL_WEB_URL,
+    stripe: parsed.data.STRIPE_SECRET_KEY ? { secretKey: parsed.data.STRIPE_SECRET_KEY } : null,
+  };
 }

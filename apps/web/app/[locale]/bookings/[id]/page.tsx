@@ -94,6 +94,8 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
       ? ('processing' as const)
       : booking.status;
   const unpaid = done === 'unpaid' && booking.payment === 'pending' && booking.status === 'held';
+  // Called off at Stripe an hour after the hold ended (4.2): said, so nobody wonders if it went.
+  const canceledNote = booking.payment === 'canceled' ? <p>{t('paymentCanceled')}</p> : null;
 
   return (
     <div className="mx-auto grid w-full max-w-2xl content-start gap-6 px-4 py-10">
@@ -165,6 +167,7 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
         // focus the form had.
         <div className="grid gap-3">
           <FocusHeading>{t('heldEndedTitle')}</FocusHeading>
+          {canceledNote}
           <p>{t('heldEnded')}</p>
           <div>
             <Button asChild variant="outline">
@@ -231,17 +234,28 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
       ) : null}
 
       {booking.status === 'cancelled' && booking.refund ? (
-        <p>
-          {booking.cancelledBy === 'owner'
-            ? t('cancelledByOwner', { refund: money(booking.refund) })
-            : booking.refund.amountMinor > 0
-              ? t('cancelledByDriver', { refund: money(booking.refund) })
-              : t('cancelledByDriverNoRefund')}
-        </p>
+        <div className="grid gap-2">
+          <p>
+            {booking.cancelledBy === 'owner'
+              ? t('cancelledByOwner', { refund: money(booking.refund) })
+              : booking.refund.amountMinor > 0
+                ? t('cancelledByDriver', { refund: money(booking.refund) })
+                : t('cancelledByDriverNoRefund')}
+          </p>
+          {/* Sent to Stripe as it was cancelled (4.2): where it goes, and how long it takes. */}
+          {booking.payment === 'succeeded' && booking.refund.amountMinor > 0 ? (
+            <p className="text-sm text-muted-foreground">{t('refundToCard')}</p>
+          ) : null}
+        </div>
       ) : null}
 
       {booking.status === 'released' && !refunded && !processing ? (
         <div className="grid gap-3">
+          {done === 'unpaid' ? (
+            // Back from a payment that didn't go: what replaced the page's own heading, focused.
+            <FocusHeading>{t('paymentUnpaid')}</FocusHeading>
+          ) : null}
+          {canceledNote}
           <p>{t('releasedLead')}</p>
           <div>
             <Button asChild variant="outline">

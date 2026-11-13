@@ -61,7 +61,12 @@ describe('the payouts page (decision #48)', () => {
 
   it.each([
     ['none', 'You haven’t set up payouts yet.', 'Set up payouts with Stripe'],
-    ['restricted', 'Stripe can’t pay you yet.', 'Continue with Stripe'],
+    // What's owed waits for the account (#52), bookings too, and the owner is told.
+    [
+      'restricted',
+      'Stripe can’t pay you at the moment. Until it can, drivers can’t book your parking, and any payouts due to you wait.',
+      'Continue with Stripe',
+    ],
     ['active', 'Payouts are set up.', 'Open your Stripe dashboard'],
   ] as const)('says where %s payouts stand, with the way on', async (status, text, button) => {
     const { container } = await show({ available: true, status });
@@ -86,6 +91,10 @@ describe('the payouts page (decision #48)', () => {
       }),
     ).toHaveFocus();
     expect(screen.getByRole('button', { name: 'Συνέχεια στη Stripe' })).toBeInTheDocument();
+    // What waits meanwhile (#52), in Greek too.
+    expect(
+      screen.getByText(/^Η Stripe δεν μπορεί να σας πληρώσει προς το παρόν\. Μέχρι τότε,/),
+    ).toBeInTheDocument();
   });
 
   it('says payouts can’t be set up where Stripe isn’t, and when the API can’t say', async () => {

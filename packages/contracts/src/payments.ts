@@ -23,7 +23,8 @@ export type CheckoutKind = z.infer<typeof CheckoutKindSchema>;
  * a card declined, which the driver may try again); `processing`: paid, the bank still deciding;
  * `succeeded`: the money is in; `refunding`: it goes back, decided and Stripe being asked (kept so
  * a refund that failed half way is finished, and nothing confirms the booking meanwhile);
- * `refunded`: all of it went back (a late payment for a space taken meanwhile, decision #3).
+ * `refunded`: all of it went back (a late payment for a space taken meanwhile, decision #3);
+ * `canceled`: never paid, and called off at Stripe once its hold lapsed, so it can't be now.
  */
 export const PAYMENT_STATUSES = [
   'pending',
@@ -31,11 +32,27 @@ export const PAYMENT_STATUSES = [
   'succeeded',
   'refunding',
   'refunded',
+  'canceled',
 ] as const;
 export const PaymentStatusSchema = z.enum(PAYMENT_STATUSES).register(contractsRegistry, {
   id: 'PaymentStatus',
 });
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
+
+/**
+ * A cancellation's refund at Stripe (4.2): `owed` in the cancel's own transaction, `sent` once
+ * Stripe has it. The worker sends what is still owed. `failed`: Stripe took it and it failed later
+ * (a closed card, say), the money back with the platform; support's to settle with the driver.
+ */
+export const REFUND_STATUSES = ['owed', 'sent', 'failed'] as const;
+export type RefundStatus = (typeof REFUND_STATUSES)[number];
+
+/**
+ * The owner's share at Stripe (#4): `sending` once worked out and asked for, `sent` once Stripe
+ * made the transfer. A `sending` one is asked again, never made twice (idempotency, then a look).
+ */
+export const TRANSFER_STATUSES = ['sending', 'sent'] as const;
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
 
 /** What the booking page needs to take the payment. */
 export const BookingPaymentSchema = z

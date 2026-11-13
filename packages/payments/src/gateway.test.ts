@@ -6,7 +6,7 @@ import {
   PaymentProviderError,
   paymentStatusOf,
   stripeGateway,
-} from './stripe-gateway.js';
+} from './gateway.js';
 
 const SECRET = 'whsec_unitTestSecret';
 const signer = new Stripe('sk_test_unit');
@@ -48,8 +48,17 @@ function fakeClient() {
         }),
       ),
       retrieve: vi.fn(),
+      cancel: vi.fn(),
     },
-    refunds: { create: vi.fn(() => Promise.resolve({ id: 're_1' })) },
+    refunds: {
+      create: vi.fn(() => Promise.resolve({ id: 're_1' })),
+      list: vi.fn(() => Promise.resolve({ data: [] as unknown[] })),
+      retrieve: vi.fn(),
+    },
+    transfers: {
+      create: vi.fn(() => Promise.resolve({ id: 'tr_1' })),
+      list: vi.fn(() => Promise.resolve({ data: [] as unknown[] })),
+    },
     webhooks: signer.webhooks,
   };
   return client;
@@ -119,7 +128,7 @@ describe('paymentStatusOf', () => {
     ['processing', 'processing'],
     ['requires_payment_method', 'pending'],
     ['requires_action', 'pending'],
-    ['canceled', 'pending'],
+    ['canceled', 'canceled'],
   ] as const)('reads %s as %s', (stripe, ours) => {
     expect(paymentStatusOf(stripe)).toBe(ours);
   });
@@ -167,6 +176,7 @@ describe('stripeGateway', () => {
       amountMinor: 400,
       receivedMinor: 0,
       refundedMinor: 0,
+      chargeId: null,
       currency: 'EUR',
       bookingId: 'b1',
     });
@@ -226,6 +236,182 @@ describe('stripeGateway', () => {
     expect(String(error)).toBe('PaymentProviderError: Stripe failed: TypeError');
   });
 
+  it('gives back what a cancellation’s policy gives, once per booking', async () => {
+    const client = fakeClient();
+    await expect(
+      gatewayWith(client).refundCancelled({
+        paymentIntentId: 'pi_1',
+        bookingId: 'b1',
+        amountMinor: 250,
+      }),
+    ).resolves.toBe('re_1');
+    expect(client.refunds.create).toHaveBeenCalledWith(
+      { payment_intent: 'pi_1', amount: 250, metadata: { bookingId: 'b1', reason: 'cancelled' } },
+      { idempotencyKey: 'refund-cancelled-b1' },
+    );
+    // Asked while a person waits: one short try, the same refund; the worker does the rest.
+    await gatewayWith(client).refundCancelled(
+      { paymentIntentId: 'pi_1', bookingId: 'b1', amountMinor: 250 },
+      { quick: true },
+    );
+    expect(client.refunds.create).toHaveBeenLastCalledWith(expect.anything(), {
+      idempotencyKey: 'refund-cancelled-b1',
+      timeout: 3_000,
+      maxNetworkRetries: 0,
+    });
+  });
+
+  it('reads a refund as it stands, a failed one included', async () => {
+    const client = fakeClient();
+    client.refunds.retrieve.mockResolvedValueOnce({
+      id: 're_1',
+      status: 'failed',
+      payment_intent: 'pi_1',
+      metadata: { bookingId: 'b1', reason: 'cancelled' },
+    });
+    await expect(gatewayWith(client).refund('re_1')).resolves.toEqual({
+      id: 're_1',
+      status: 'failed',
+      paymentIntentId: 'pi_1',
+      reason: 'cancelled',
+      bookingId: 'b1',
+    });
+    // Another app's refund, expanded or not: no reason of ours.
+    client.refunds.retrieve.mockResolvedValueOnce({
+      id: 're_2',
+      status: 'succeeded',
+      payment_intent: { id: 'pi_9' },
+      metadata: {},
+    });
+    await expect(gatewayWith(client).refund('re_2')).resolves.toEqual({
+      id: 're_2',
+      status: 'succeeded',
+      paymentIntentId: 'pi_9',
+      reason: null,
+      bookingId: null,
+    });
+  });
+
+  it('transfers the owner’s share out of the booking’s charge, once per booking', async () => {
+    const client = fakeClient();
+    await expect(
+      gatewayWith(client).transfer({
+        bookingId: 'b1',
+        accountId: 'acct_1',
+        amountMinor: 1800,
+        currency: 'EUR',
+        chargeId: 'ch_1',
+      }),
+    ).resolves.toBe('tr_1');
+    expect(client.transfers.create).toHaveBeenCalledWith(
+      {
+        amount: 1800,
+        currency: 'eur',
+        destination: 'acct_1',
+        source_transaction: 'ch_1',
+        transfer_group: 'booking_b1',
+        metadata: { bookingId: 'b1' },
+      },
+      { idempotencyKey: 'transfer-b1' },
+    );
+  });
+
+  it('finds what was already made for a booking, so a late retry makes nothing twice', async () => {
+    const client = fakeClient();
+    client.refunds.list.mockResolvedValueOnce({
+      data: [
+        { id: 're_unbooked', metadata: { reason: 'not_bookable' }, status: 'succeeded' },
+        { id: 're_failed', metadata: { reason: 'cancelled' }, status: 'failed' },
+        { id: 're_2', metadata: { reason: 'cancelled' }, status: 'succeeded' },
+      ],
+    });
+    client.transfers.list.mockResolvedValueOnce({
+      data: [
+        { id: 'tr_other', metadata: { bookingId: 'b9' } },
+        { id: 'tr_2', metadata: { bookingId: 'b1' } },
+      ],
+    });
+    await expect(gatewayWith(client).refundMadeFor('pi_1')).resolves.toBe('re_2');
+    await expect(gatewayWith(client).transferMadeFor('b1')).resolves.toBe('tr_2');
+    expect(client.refunds.list).toHaveBeenCalledWith({ payment_intent: 'pi_1', limit: 10 });
+    expect(client.transfers.list).toHaveBeenCalledWith({ transfer_group: 'booking_b1', limit: 10 });
+  });
+
+  it('cancels a PaymentIntent nobody will pay, and reads the charge either way Stripe gives it', async () => {
+    const client = fakeClient();
+    client.paymentIntents.cancel.mockResolvedValueOnce({
+      id: 'pi_1',
+      client_secret: 'pi_1_secret_2',
+      status: 'canceled',
+      amount: 400,
+      amount_received: 0,
+      currency: 'eur',
+      latest_charge: null,
+      metadata: { bookingId: 'b1' },
+    });
+    await expect(gatewayWith(client).cancelPayment('pi_1')).resolves.toMatchObject({
+      status: 'canceled',
+      chargeId: null,
+    });
+    client.paymentIntents.retrieve.mockResolvedValueOnce({
+      id: 'pi_1',
+      client_secret: 'pi_1_secret_2',
+      status: 'succeeded',
+      amount: 400,
+      amount_received: 400,
+      currency: 'eur',
+      latest_charge: 'ch_9',
+      metadata: { bookingId: 'b1' },
+    });
+    await expect(gatewayWith(client).payment('pi_1')).resolves.toMatchObject({ chargeId: 'ch_9' });
+  });
+
+  it('leaves a PaymentIntent paid meanwhile as it is, and says so', async () => {
+    const client = fakeClient();
+    client.paymentIntents.cancel.mockRejectedValueOnce(
+      new Stripe.errors.StripeInvalidRequestError({
+        type: 'invalid_request_error',
+        code: 'payment_intent_unexpected_state',
+        message: 'You cannot cancel this PaymentIntent because it has a status of succeeded.',
+      }),
+    );
+    client.paymentIntents.retrieve.mockResolvedValueOnce({
+      id: 'pi_1',
+      client_secret: 'pi_1_secret_2',
+      status: 'succeeded',
+      amount: 400,
+      amount_received: 400,
+      currency: 'eur',
+      latest_charge: { id: 'ch_1', amount_refunded: 0 },
+      metadata: { bookingId: 'b1' },
+    });
+    await expect(gatewayWith(client).cancelPayment('pi_1')).resolves.toMatchObject({
+      status: 'succeeded',
+      chargeId: 'ch_1',
+    });
+    // Read with its charge, or what went back of it would read as nothing.
+    expect(client.paymentIntents.retrieve).toHaveBeenCalledWith('pi_1', {
+      expand: ['latest_charge'],
+    });
+    // Any other failure is one.
+    client.paymentIntents.cancel.mockRejectedValueOnce(
+      new Stripe.errors.StripeConnectionError({ type: 'api_error', message: 'down' }),
+    );
+    await expect(gatewayWith(client).cancelPayment('pi_1')).rejects.toThrow(PaymentProviderError);
+  });
+
+  it('never counts a cancelled or failed refund as made', async () => {
+    const client = fakeClient();
+    client.refunds.list.mockResolvedValueOnce({
+      data: [
+        { id: 're_canceled', metadata: { reason: 'cancelled' }, status: 'canceled' },
+        { id: 're_failed', metadata: { reason: 'cancelled' }, status: 'failed' },
+      ],
+    });
+    await expect(gatewayWith(client).refundMadeFor('pi_1')).resolves.toBeNull();
+    await expect(gatewayWith(client).transferMadeFor('b1')).resolves.toBeNull();
+  });
+
   it('refunds all of a payment, once', async () => {
     const client = fakeClient();
     await gatewayWith(client).refundPayment('pi_1', 'not_bookable');
@@ -278,6 +464,18 @@ describe('stripeGateway', () => {
         kind: 'payment',
         paymentIntentId: 'pi_9',
       });
+    });
+
+    it('reads a refund that changed as the refund to look at', () => {
+      for (const type of ['refund.updated', 'refund.failed', 'charge.refund.updated']) {
+        const { body, signature } = sign(type, { id: 're_7', object: 'refund' });
+        expect(gatewayWith(fakeClient()).parseEvent(body, signature)).toEqual({
+          id: 'evt_1',
+          type,
+          kind: 'refund',
+          refundId: 're_7',
+        });
+      }
     });
 
     it('reads an account update as its status, when Stripe made it', () => {

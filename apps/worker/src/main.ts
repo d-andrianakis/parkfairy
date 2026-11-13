@@ -4,12 +4,18 @@ import { Queue, Worker, type ConnectionOptions } from 'bullmq';
 import { pino } from 'pino';
 import { chooseEmailTransport } from './email-transport.js';
 import { loadEnv } from './env.js';
+import { paymentsGatewayFor } from './payments-gateway.js';
 import { maintenanceProcessor } from './processors/maintenance.js';
 import { ownerEmailsProcessor } from './processors/owner-emails.js';
+import { paymentsProcessor } from './processors/payments.js';
 import { jobHandler, prepareQueue, type QueueProcessor } from './queues.js';
 import { createShutdown } from './shutdown.js';
 
-const processors: QueueProcessor[] = [maintenanceProcessor, ownerEmailsProcessor];
+const processors: QueueProcessor[] = [
+  maintenanceProcessor,
+  ownerEmailsProcessor,
+  paymentsProcessor,
+];
 
 const env = loadEnv();
 const logger = pino({
@@ -34,6 +40,8 @@ const email = {
   sendsPerSecond: env.EMAIL_SENDS_PER_SECOND,
 };
 
+const payments = paymentsGatewayFor(env);
+
 const queues: Queue[] = [];
 const workers: Worker[] = [];
 /** Aborted on SIGTERM, for jobs BullMQ can't cancel itself. */
@@ -52,6 +60,7 @@ for (const processor of processors) {
         db: database.db,
         logger: logger.child({ queue: processor.queue, job: job.name }),
         email,
+        payments,
       }),
       stopping.signal,
     ),
@@ -75,7 +84,12 @@ const health = createServer((req, res) => {
 });
 health.listen(env.WORKER_HEALTH_PORT, () =>
   logger.info(
-    { queues: processors.map((p) => p.queue), healthPort: env.WORKER_HEALTH_PORT },
+    {
+      queues: processors.map((p) => p.queue),
+      healthPort: env.WORKER_HEALTH_PORT,
+      // Said at start: a worker without Stripe beside an API with it would move no money.
+      payments: payments ? 'stripe' : 'off',
+    },
     'worker started',
   ),
 );

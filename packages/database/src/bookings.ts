@@ -27,9 +27,9 @@ export async function expireLapsedHolds(db: Database, now: Date): Promise<number
  * Deletes holds that never became bookings, once settled before `before`: a lapsed or released hold
  * still says who looked at which space when, and nobody needs that (GDPR). Bookings, confirmed or
  * cancelled, are records and stay, and so does a hold a payment was asked for (Phase 4): money may
- * still arrive for it, or have been refunded. Batch after batch until one comes back short, so a busy day's
- * holds (every second press of Book lets one go) never pile up; `maxBatches` caps one run. Returns
- * how many went.
+ * still arrive for it, or have been refunded. One whose payment was called off at Stripe can go.
+ * Batch after batch until one comes back short, so a busy day's holds (every second press of Book
+ * lets one go) never pile up; `maxBatches` caps one run. Returns how many went.
  */
 export async function deleteStaleHolds(
   db: Database,
@@ -43,7 +43,9 @@ export async function deleteStaleHolds(
       where id in (
         select id from ${bookings}
         where status in ('expired', 'released') and updated_at < ${before.toISOString()}::timestamptz
-          and payment_intent_id is null
+          and (payment_intent_id is null or payment_status = 'canceled')
+          -- Never one with money entered: its ledger keeps it (and would refuse the whole batch).
+          and not exists (select 1 from ledger_entries e where e.booking_id = ${bookings}.id)
         limit ${SWEEP_LIMIT}
         for update skip locked
       )`);

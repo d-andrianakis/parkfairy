@@ -92,7 +92,7 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         heading: 'Η κράτησή σας ακυρώθηκε',
         body: (listing) => `Ακυρώσατε την κράτησή σας στον χώρο «${listing}».`,
         action: 'Δείτε την κράτηση',
-        note: 'Η θέση δεν είναι πλέον κρατημένη για εσάς.',
+        note: 'Η θέση δεν είναι πλέον κρατημένη για εσάς. Τυχόν επιστροφή χρημάτων γίνεται στην κάρτα με την οποία πληρώσατε· μπορεί να χρειαστούν μερικές ημέρες για να φανεί στην κίνηση της κάρτας ή της τράπεζάς σας.',
       },
       'booking-cancelled-by-owner': {
         subject: (reference) => `Η κράτησή σας ακυρώθηκε (${reference})`,
@@ -100,7 +100,7 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         body: (listing) =>
           `Ο ιδιοκτήτης του χώρου «${listing}» αναγκάστηκε να ακυρώσει την κράτησή σας. Θα σας επιστραφεί ολόκληρο το ποσό.`,
         action: 'Δείτε την κράτηση',
-        note: 'Λυπούμαστε για την αναστάτωση. Μπορείτε να αναζητήσετε άλλον χώρο στο Parkfairy.',
+        note: 'Λυπούμαστε για την αναστάτωση. Τα χρήματα επιστρέφονται στην κάρτα με την οποία πληρώσατε· μπορεί να χρειαστούν μερικές ημέρες για να φανούν στην κίνηση της κάρτας ή της τράπεζάς σας. Μπορείτε να αναζητήσετε άλλον χώρο στο Parkfairy.',
       },
       'booking-payment-refunded': {
         subject: (reference) => `Τα χρήματά σας επιστρέφονται (${reference})`,
@@ -153,7 +153,7 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         heading: 'Your booking is cancelled',
         body: (listing) => `You cancelled your booking at “${listing}”.`,
         action: 'See your booking',
-        note: 'The space is no longer held for you.',
+        note: 'The space is no longer held for you. Any refund goes back to the card you paid with and can take a few days to show on your card or bank statement.',
       },
       'booking-cancelled-by-owner': {
         subject: (reference) => `Your booking is cancelled (${reference})`,
@@ -161,7 +161,7 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         body: (listing) =>
           `The owner of “${listing}” had to cancel your booking. You’ll get the full amount back.`,
         action: 'See your booking',
-        note: 'We’re sorry for the trouble. You can look for another space on Parkfairy.',
+        note: 'We’re sorry for the trouble. The money goes back to the card you paid with and can take a few days to show on your card or bank statement. You can look for another space on Parkfairy.',
       },
       'booking-payment-refunded': {
         subject: (reference) => `Your payment is being refunded (${reference})`,

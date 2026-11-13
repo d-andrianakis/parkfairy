@@ -2,6 +2,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -33,7 +34,15 @@ import {
   type OwnerBookingsQuery,
   type OwnerListingBookings,
 } from '@parkfairy/contracts';
-import { schema, type Database, type OutboxBooking } from '@parkfairy/database';
+import {
+  enterCharge,
+  recordCancelRefund,
+  recordRefundFailed,
+  recordUnbookedRefund,
+  schema,
+  type Database,
+  type OutboxBooking,
+} from '@parkfairy/database';
 import { and, asc, desc, eq, gt, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
@@ -43,11 +52,7 @@ import { listingRulesIn, utcDay, type ListingRules, type Reader } from '../parki
 import { isOpenThroughout } from '../parking/opening-hours.js';
 import { NO_PRICE_RULES, quoteStayMinor } from '../parking/pricing.js';
 import { PAYMENTS } from '../payments/payments.tokens.js';
-import {
-  PaymentProviderError,
-  type PaymentState,
-  type PaymentsGateway,
-} from '../payments/stripe-gateway.js';
+import { PaymentProviderError, type PaymentState, type PaymentsGateway } from '@parkfairy/payments';
 import { newBookingReference } from './booking-reference.js';
 import { refundMinor } from './refunds.js';
 
@@ -120,6 +125,16 @@ const money = (amountMinor: number, currency: string): Money => ({
   amountMinor,
   currency: currency as Money['currency'],
 });
+
+/** What came in, for the ledger: Stripe's word on the amount, and the charge that took it. */
+const charged = (state: PaymentState) => ({
+  amountMinor: state.receivedMinor,
+  chargeId: state.chargeId,
+});
+
+/** A cancellation owes a refund at Stripe when the booking was paid there and some goes back. */
+const owesRefund = (row: BookingRow, refund: number) =>
+  row.paymentStatus === 'succeeded' && refund > 0 ? ('owed' as const) : null;
 
 /**
  * The listing as it was when booked (L6): name, address and their language come from the booking,
@@ -240,6 +255,8 @@ async function clearForHold(tx: Transaction, userId: string, spaceId: string) {
  */
 @Injectable()
 export class BookingsService {
+  private readonly logger = new Logger(BookingsService.name);
+
   constructor(
     @Inject(DB) private readonly db: Database,
     @Inject(ENV) private readonly env: Pick<Env, 'bookingWithoutPayment'>,
@@ -586,7 +603,12 @@ export class BookingsService {
     if (state.status !== 'succeeded') {
       await this.db
         .update(booking)
-        .set({ paymentIntentId: state.id, paymentStatus: state.status })
+        .set({
+          paymentIntentId: state.id,
+          paymentStatus: state.status,
+          // Called off: it can't be paid now, and the plate was only ever for a booking.
+          ...(state.status === 'canceled' ? { vehiclePlate: null } : {}),
+        })
         .where(
           and(
             mine,
@@ -608,10 +630,32 @@ export class BookingsService {
     // only the record is left to make, and asking again would be refused.
     const refundedAlready = state.receivedMinor > 0 && state.refundedMinor >= state.receivedMinor;
     if (!refundedAlready) await gateway.refundPayment(state.id, 'not_bookable');
-    await this.db
-      .update(booking)
-      .set({ paymentStatus: 'refunded' })
-      .where(and(eq(booking.paymentIntentId, state.id), eq(booking.paymentStatus, 'refunding')));
+    // All it received went back (the ledger's refund, against its charge).
+    await recordUnbookedRefund(this.db, state.id, state.receivedMinor);
+  }
+
+  /**
+   * A refund Stripe says changed. One that failed after Stripe took it (a closed card, say) is
+   * taken out of the ledger, a cancellation's marked `failed`, and support told: asking again would
+   * fail the same way, and the driver is owed it. Anything else changes nothing; another app's
+   * refund is none of ours.
+   */
+  async settleRefund(refundId: string): Promise<void> {
+    const gateway = this.payments;
+    if (!gateway) return;
+    const refund = await gateway.refund(refundId);
+    if (refund.status !== 'failed' && refund.status !== 'canceled') return;
+    const bookingId = await recordRefundFailed(this.db, {
+      refundId: refund.id,
+      paymentIntentId: refund.paymentIntentId,
+      reason: refund.reason,
+    });
+    if (bookingId) {
+      this.logger.error(
+        { bookingId, refundId, status: refund.status, reason: refund.reason },
+        'refund failed at Stripe',
+      );
+    }
   }
 
   /**
@@ -642,11 +686,16 @@ export class BookingsService {
       if (current.paymentStatus === 'refunded') return 'done';
       // Booked once: the money is the booking's, whatever happened to it since.
       if (current.confirmedAt !== null) {
-        if (current.paymentStatus !== 'succeeded') {
+        if (current.paymentStatus !== 'succeeded' || current.stripeChargeId === null) {
           await tx
             .update(booking)
-            .set({ paymentIntentId: state.id, paymentStatus: 'succeeded' })
+            .set({
+              paymentIntentId: state.id,
+              paymentStatus: 'succeeded',
+              stripeChargeId: current.stripeChargeId ?? state.chargeId,
+            })
             .where(eq(booking.id, current.id));
+          await enterCharge(tx, current, charged(state));
         }
         return 'done';
       }
@@ -675,12 +724,14 @@ export class BookingsService {
                 confirmedAt: now,
                 paymentIntentId: state.id,
                 paymentStatus: 'succeeded',
+                stripeChargeId: state.chargeId,
               })
               .where(eq(booking.id, current.id))
               .returning();
             return made;
           });
           if (confirmed) {
+            await enterCharge(tx, confirmed, charged(state));
             await this.queueConfirmedEmails(tx, confirmed, row);
             return 'confirmed';
           }
@@ -695,6 +746,7 @@ export class BookingsService {
         .set({
           paymentIntentId: state.id,
           paymentStatus: 'refunding',
+          stripeChargeId: state.chargeId,
           vehiclePlate: null,
           status: sql`case when ${booking.status} = 'held' then 'released' else ${booking.status} end`,
         })
@@ -702,6 +754,8 @@ export class BookingsService {
         .returning();
       // The driver may have left the page: they hear of it, as of a booking.
       if (refunding) {
+        // The money came in before it goes back: the ledger has both.
+        await enterCharge(tx, refunding, charged(state));
         await this.queueEmails(
           tx,
           refunding,
@@ -775,7 +829,7 @@ export class BookingsService {
     { expectedRefundMinor }: BookingCancelInput = {},
   ): Promise<Booking> {
     if (!UUID.test(id)) throw notFound('BOOKING_NOT_FOUND');
-    return this.db.transaction(async (tx) => {
+    const { view, owed } = await this.db.transaction(async (tx) => {
       const [current] = await tx
         .select()
         .from(booking)
@@ -790,9 +844,11 @@ export class BookingsService {
           .set({ status: 'released' })
           .where(eq(booking.id, id))
           .returning();
-        return this.view(released ?? current, info, now);
+        return { view: this.view(released ?? current, info, now), owed: null };
       }
-      if (current.status !== 'confirmed') return this.view(current, info, now);
+      if (current.status !== 'confirmed') {
+        return { view: this.view(current, info, now), owed: null };
+      }
       if (current.startsAt <= now) throw conflict('BOOKING_STARTED');
       const refund = refundMinor({
         policy: current.cancellationPolicy,
@@ -807,7 +863,13 @@ export class BookingsService {
 
       const [cancelled] = await tx
         .update(booking)
-        .set({ status: 'cancelled', cancelledAt: now, cancelledBy: 'driver', refundMinor: refund })
+        .set({
+          status: 'cancelled',
+          cancelledAt: now,
+          cancelledBy: 'driver',
+          refundMinor: refund,
+          refundStatus: owesRefund(current, refund),
+        })
         .where(eq(booking.id, id))
         .returning();
       if (!cancelled) throw notFound('BOOKING_NOT_FOUND');
@@ -824,8 +886,40 @@ export class BookingsService {
             ]
           : []),
       ]);
-      return this.view(cancelled, info, now);
+      return { view: this.view(cancelled, info, now), owed: cancelled };
     });
+    await this.sendCancelRefund(owed);
+    return view;
+  }
+
+  /**
+   * A cancellation's refund, recorded `owed` with the cancel and asked of Stripe once that has
+   * committed, never under the booking's lock. The cancellation stands either way: a failure
+   * leaves the refund owed, and the worker sends it (Stripe's idempotency key makes it the same
+   * refund, should this one have reached Stripe after all).
+   */
+  private async sendCancelRefund(row: BookingRow | null): Promise<void> {
+    const gateway = this.payments;
+    if (!gateway || row?.refundStatus !== 'owed' || !row.paymentIntentId || !row.refundMinor) {
+      return;
+    }
+    try {
+      // One short try while the driver waits: past it, the worker sends it (the same refund).
+      const refundId = await gateway.refundCancelled(
+        { paymentIntentId: row.paymentIntentId, bookingId: row.id, amountMinor: row.refundMinor },
+        { quick: true },
+      );
+      await recordCancelRefund(this.db, row.id, refundId);
+    } catch (error) {
+      // Its type and code only: Stripe's message can name the driver.
+      const detail =
+        error instanceof PaymentProviderError
+          ? error.detail
+          : error instanceof Error
+            ? error.name
+            : 'unknown';
+      this.logger.warn({ bookingId: row.id, detail }, 'cancellation refund left for the worker');
+    }
   }
 
   async get(userId: string, id: string): Promise<Booking> {
@@ -990,14 +1084,14 @@ export class BookingsService {
   async cancelForOwner(userId: string, listingId: string, bookingId: string): Promise<void> {
     const owned = await this.ownedListing(userId, listingId);
     if (!UUID.test(bookingId)) throw notFound('BOOKING_NOT_FOUND');
-    await this.db.transaction(async (tx) => {
+    const owed = await this.db.transaction(async (tx) => {
       const [current] = await tx
         .select()
         .from(booking)
         .where(and(eq(booking.id, bookingId), eq(booking.locationId, owned.id)))
         .for('update');
       if (!current) throw notFound('BOOKING_NOT_FOUND');
-      if (current.status === 'cancelled') return;
+      if (current.status === 'cancelled') return null;
       if (current.status !== 'confirmed') throw notFound('BOOKING_NOT_FOUND');
       const now = new Date();
       if (current.startsAt <= now) throw conflict('BOOKING_STARTED');
@@ -1008,6 +1102,7 @@ export class BookingsService {
           cancelledAt: now,
           cancelledBy: 'owner',
           refundMinor: current.totalMinor,
+          refundStatus: owesRefund(current, current.totalMinor),
         })
         .where(eq(booking.id, bookingId))
         .returning();
@@ -1015,7 +1110,9 @@ export class BookingsService {
       await this.queueEmails(tx, cancelled, await this.listingOf(tx, owned.id), [
         { kind: 'booking-cancelled', userId: current.userId, to: 'driver' },
       ]);
+      return cancelled;
     });
+    await this.sendCancelRefund(owed);
   }
 
   /** The listing, if this user owns it; anything else is the same 404. */

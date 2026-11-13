@@ -6,14 +6,17 @@ import { PAYOUT_STATUSES, type PayoutStatus } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  char,
   check,
   index,
   integer,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { bookings } from './bookings.js';
 import { ownerProfiles } from './owners.js';
 
 /** `'a', 'b'` list for CHECK constraints built from trusted constants (never user input). */
@@ -89,4 +92,36 @@ export const stripeEvents = pgTable(
   },
   // For a later purge: Stripe stops retrying an event after three days.
   (t) => [index('stripe_events_handled_idx').on(t.handledAt)],
+);
+
+/**
+ * What moved, booking by booking (4.2): the driver's charge, what went back, Parkfairy's
+ * commission and the owner's transfer. One of each kind at most per booking, so writing one
+ * twice changes nothing. A financial record: nothing cascades into it.
+ */
+export const LEDGER_KINDS = ['charge', 'refund', 'commission', 'transfer'] as const;
+export type LedgerKind = (typeof LEDGER_KINDS)[number];
+
+export const ledgerEntries = pgTable(
+  'ledger_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bookingId: uuid('booking_id')
+      .notNull()
+      .references(() => bookings.id, { onDelete: 'restrict' }),
+    kind: text('kind').$type<LedgerKind>().notNull(),
+    amountMinor: integer('amount_minor').notNull(),
+    currency: char('currency', { length: 3 }).notNull(),
+    /** Stripe's id for what moved (`ch_`, `re_`, `tr_`); none for the commission, which stays. */
+    stripeId: text('stripe_id'),
+    createdAt: instant('created_at').defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('ledger_entries_booking_kind_idx').on(t.bookingId, t.kind),
+    // The daily check reads what was entered since its last run.
+    index('ledger_entries_created_idx').on(t.createdAt),
+    check('ledger_entries_kind_check', sql`${t.kind} in (${sqlList(LEDGER_KINDS)})`),
+    check('ledger_entries_amount_check', sql`${t.amountMinor} > 0`),
+    check('ledger_entries_currency_check', sql`${t.currency} ~ '^[A-Z]{3}$'`),
+  ],
 );

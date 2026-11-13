@@ -56,7 +56,8 @@ export function PaymentPending({
     const { status, payment } = outcome.data;
     if (status === 'confirmed') return 'booked';
     if (payment === 'refunding' || payment === 'refunded') return 'refunded';
-    if (payment === 'pending' || payment === null) return 'unpaid';
+    // Called off at Stripe (the hold lapsed, 4.2): it can't be paid now.
+    if (payment === 'pending' || payment === 'canceled' || payment === null) return 'unpaid';
     return 'waiting';
   }, [id]);
 
