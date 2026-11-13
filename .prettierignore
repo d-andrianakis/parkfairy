@@ -8,3 +8,11 @@ test-results/
 packages/database/migrations/meta/
 packages/api-client/openapi.json
 packages/api-client/src/generated/
+# Vercel's agent skills, as `npx skills` installs them (hashed in skills-lock.json): not ours to
+# reformat. Update them with `npx skills update`.
+.claude/skills/next-dev-loop/
+.claude/skills/turborepo/
+.claude/skills/vercel-composition-patterns/
+.claude/skills/vercel-react-best-practices/
+.claude/skills/web-design-guidelines/
+skills-lock.json

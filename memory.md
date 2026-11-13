@@ -1218,6 +1218,14 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   it used to return undefined, so plain `<a href={getPathname(…)}>` links had no href in tests.
 - **A bash heredoc with nested quotes can break the shell** ("unexpected EOF while looking for
   matching"), besides mangling non-ASCII: put such scripts in a file.
+- **Vercel's agent skills are vendored** (2026-11-13): `vercel-react-best-practices`,
+  `vercel-composition-patterns`, `web-design-guidelines`, `next-dev-loop` and `turborepo` in
+  `.claude/skills/`, copied by `npx skills add … -a claude-code --copy`, hashed in
+  `skills-lock.json`, kept out of Prettier (reformatting them breaks the hashes). Update with
+  `npx skills update -p`. `web-design-guidelines` fetches its rules from Vercel's GitHub each run;
+  `next-dev-loop` needs the `agent-browser` CLI (not installed; the Playwright MCP does the same
+  job here). Left out: deploying to Vercel (hosting isn't decided), Cache Components (every page
+  renders per request for the CSP nonce), the AI SDK, Workflow, Sandbox.
 - **A CHECK passes when it comes out null** (2026-11-13): `transfer_minor > 0` on a null column is
   null, and Postgres accepts the row. State `is not null` in every CHECK that means it.
 - **`ledger_entries` restricts deleting a booking**: test clean-ups delete a suite's ledger rows
