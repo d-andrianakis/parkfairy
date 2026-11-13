@@ -117,7 +117,7 @@ export const bookings = pgTable(
     transferStatus: text('transfer_status').$type<TransferStatus>(),
     transferMinor: integer('transfer_minor'),
     commissionMinor: integer('commission_minor'),
-    stripeTransferId: text('stripe_transfer_id'),
+    /** When every payee's part went (`booking_payees` holds each, with Stripe's ids). */
     transferredAt: instant('transferred_at'),
     /**
      * The worker's tries at the money this booking owes (a refund, a transfer, a payment to call
@@ -222,7 +222,7 @@ export const bookings = pgTable(
     // kept (#50), sent with Stripe's id and its time. Nulls stated: a CHECK passes on null.
     check(
       'bookings_transfer_check',
-      sql`${t.transferStatus} is null or (${t.transferStatus} in (${sqlList(TRANSFER_STATUSES)}) and ${t.paymentStatus} = 'succeeded' and ${t.refundStatus} is distinct from 'owed' and ${t.transferMinor} is not null and ${t.commissionMinor} is not null and ${t.transferMinor} > 0 and ${t.commissionMinor} >= 0 and ${t.transferMinor} + ${t.commissionMinor} = ${t.totalMinor} - coalesce(${t.refundMinor}, 0) and (${t.transferStatus} = 'sent') = (${t.stripeTransferId} is not null and ${t.transferredAt} is not null))`,
+      sql`${t.transferStatus} is null or (${t.transferStatus} in (${sqlList(TRANSFER_STATUSES)}) and ${t.paymentStatus} = 'succeeded' and ${t.refundStatus} is distinct from 'owed' and ${t.transferMinor} is not null and ${t.commissionMinor} is not null and ${t.transferMinor} > 0 and ${t.commissionMinor} >= 0 and ${t.transferMinor} + ${t.commissionMinor} = ${t.totalMinor} - coalesce(${t.refundMinor}, 0) and (${t.transferStatus} = 'sent') = (${t.transferredAt} is not null))`,
     ),
     check('bookings_money_attempts_check', sql`${t.moneyAttempts} >= 0`),
     // A payment's state and its PaymentIntent come together.

@@ -21,7 +21,7 @@ import {
   recordCancelRefund,
   recordCharge,
   recordPaymentCanceled,
-  recordTransfer,
+  recordPayeeTransfer,
   refundsOwed,
   schema,
   transfersDue,
@@ -36,7 +36,7 @@ import { ENV } from '../src/config/config.module.js';
 import { loadEnv } from '../src/config/env.js';
 import { DB } from '../src/database/database.module.js';
 import { PAYMENTS } from '../src/payments/payments.tokens.js';
-import { PaymentProviderError, sharesOf } from '@parkfairy/payments';
+import { PaymentProviderError, sharesOf, splitShares } from '@parkfairy/payments';
 import { accountObject, fakeStripe, signedEvent } from './fake-stripe.js';
 import { createTestApp, signUpUser, type TestApp, type TestUser } from './test-app.js';
 
@@ -127,6 +127,10 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
       })
       .returning({ id: schema.parkingLocations.id });
     const id = row?.id ?? '';
+    // Its owner, as the API makes a listing: the primary, with all of the owners' share (#53).
+    await db
+      .insert(schema.listingOwners)
+      .values({ locationId: id, ownerId: ownerProfileId, role: 'primary', shareBps: 10_000 });
     const [space] = await db
       .insert(schema.parkingSpaces)
       .values({ locationId: id, label: 'A1' })
@@ -183,6 +187,17 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
       .where(
         inArray(
           schema.ledgerEntries.bookingId,
+          db
+            .select({ id: schema.bookings.id })
+            .from(schema.bookings)
+            .where(inArray(schema.bookings.locationId, ids)),
+        ),
+      );
+    await db
+      .delete(schema.bookingPayees)
+      .where(
+        inArray(
+          schema.bookingPayees.bookingId,
           db
             .select({ id: schema.bookings.id })
             .from(schema.bookings)
@@ -1087,8 +1102,19 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
         totalMinor: 400,
         refundMinor: 200,
         commissionBps: 1000,
-        accountId: account?.id,
         sending: null,
+        // Its payee, copied at the hold: the owner, with all of the owners' share (#54).
+        payees: [
+          {
+            ownerId: profileId,
+            shareBps: 10_000,
+            primary: true,
+            accountId: account?.id,
+            active: true,
+            transferMinor: null,
+            sent: false,
+          },
+        ],
       });
       expect(due?.chargeId).toMatch(/^ch_/);
 
@@ -1096,29 +1122,48 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
       const shares = sharesOf({ totalMinor: 400, refundMinor: 200, commissionBps: 1000 });
       expect(shares).toEqual({ keptMinor: 200, commissionMinor: 20, ownerMinor: 180 });
       const amounts = { transferMinor: shares.ownerMinor, commissionMinor: shares.commissionMinor };
-      await markTransferSending(db, held.id, amounts);
+      expect(await markTransferSending(db, held.id, amounts, new Map([[profileId, 180]]))).toBe(
+        true,
+      );
       // A second worker's sums never replace the first's.
-      await markTransferSending(db, held.id, { transferMinor: 1, commissionMinor: 0 });
+      expect(
+        await markTransferSending(
+          db,
+          held.id,
+          { transferMinor: 1, commissionMinor: 0 },
+          new Map([[profileId, 1]]),
+        ),
+      ).toBe(false);
       expect(
         (await transfersDue(db, new Date())).find(({ id }) => id === held.id)?.sending,
       ).toMatchObject(amounts);
       const transferId = await stripe.gateway.transfer({
         bookingId: held.id,
-        accountId: due?.accountId ?? '',
+        ownerId: profileId,
+        accountId: account?.id ?? '',
         amountMinor: amounts.transferMinor,
         currency: 'EUR',
         chargeId: due?.chargeId ?? '',
       });
-      await recordTransfer(db, held.id, transferId);
-      await recordTransfer(db, held.id, 'tr_someOtherOne');
+      await recordPayeeTransfer(db, held.id, profileId, transferId);
+      await recordPayeeTransfer(db, held.id, profileId, 'tr_someOtherOne');
       const sent = await row(held.id);
       expect(sent).toMatchObject({
         transferStatus: 'sent',
         transferMinor: 180,
         commissionMinor: 20,
-        stripeTransferId: transferId,
       });
       expect(sent.transferredAt).toBeInstanceOf(Date);
+      const [paid] = await db
+        .select()
+        .from(schema.bookingPayees)
+        .where(eq(schema.bookingPayees.bookingId, held.id));
+      expect(paid).toMatchObject({
+        ownerId: profileId,
+        transferStatus: 'sent',
+        transferMinor: 180,
+        stripeTransferId: transferId,
+      });
       expect(await dueIds()).not.toContain(held.id);
       expect(await inLedger(held.id)).toEqual({
         charge: 400,
@@ -1234,7 +1279,12 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
       // What's kept isn't final until the refund is with Stripe: nothing for the owner yet.
       expect(await dueIds()).not.toContain(held.id);
       expect(
-        await markTransferSending(db, held.id, { transferMinor: 180, commissionMinor: 20 }),
+        await markTransferSending(
+          db,
+          held.id,
+          { transferMinor: 180, commissionMinor: 20 },
+          new Map(),
+        ),
       ).toBe(false);
       expect((await refundsOwed(db, soon())).find(({ id }) => id === held.id)).toMatchObject({
         kind: 'cancelled',
@@ -1490,6 +1540,163 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
       const before = await transfersWaiting(db, new Date(dueAt - 1_000));
       const after = await transfersWaiting(db, new Date(dueAt + 1_000));
       expect(after.bookings - before.bookings).toBe(1);
+    });
+
+    describe('co-owned listings (#53, #54)', () => {
+      const open = async (slug: string) =>
+        ParkingListingDetailSchema.parse(
+          (await api(null, 'get', `/parking/${slug}`).expect(200)).body,
+        ).bookingOpen;
+      const share = (locationId: string, ownerId: string, shareBps: number) =>
+        db
+          .update(schema.listingOwners)
+          .set({ shareBps })
+          .where(
+            and(
+              eq(schema.listingOwners.locationId, locationId),
+              eq(schema.listingOwners.ownerId, ownerId),
+            ),
+          );
+      const accountOf = async (ownerId: string) => {
+        const [row] = await db
+          .select({ id: schema.payoutAccounts.stripeAccountId })
+          .from(schema.payoutAccounts)
+          .where(eq(schema.payoutAccounts.ownerId, ownerId));
+        return row?.id ?? '';
+      };
+      const payeesOf = (bookingId: string) =>
+        db
+          .select({
+            ownerId: schema.bookingPayees.ownerId,
+            shareBps: schema.bookingPayees.shareBps,
+            transferMinor: schema.bookingPayees.transferMinor,
+            transferStatus: schema.bookingPayees.transferStatus,
+          })
+          .from(schema.bookingPayees)
+          .where(eq(schema.bookingPayees.bookingId, bookingId));
+
+      it('opens only while every owner with a share can be paid, and pays each their part', async () => {
+        const { profileId: primaryId } = await owner('active');
+        const co = await owner(null);
+        const listing = await listingOf(primaryId, 'co-owned');
+        await db
+          .insert(schema.listingOwners)
+          .values({ locationId: listing.id, ownerId: co.profileId, role: 'co_owner', shareBps: 0 });
+        // At 0% a co-owner is paid nothing and needs no account: still open.
+        expect(await open(listing.slug)).toBe(true);
+
+        await share(listing.id, primaryId, 7000);
+        await share(listing.id, co.profileId, 3000);
+        // With a share and no account, drivers can't book it.
+        expect(await open(listing.slug)).toBe(false);
+        expect((await hold(await person(), listing, freshDay()).expect(409)).body).toMatchObject({
+          code: 'BOOKING_UNAVAILABLE',
+        });
+        const coAccount = `acct_it${randomUUID().replaceAll('-', '').slice(0, 12)}`;
+        await db
+          .insert(schema.payoutAccounts)
+          .values({ ownerId: co.profileId, stripeAccountId: coAccount, status: 'active' });
+        stripe.accounts.set(coAccount, 'active');
+        expect(await open(listing.slug)).toBe(true);
+
+        const { held } = await paidBooking(listing);
+        expect(await payeesOf(held.id)).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ ownerId: primaryId, shareBps: 7000 }),
+            expect.objectContaining({ ownerId: co.profileId, shareBps: 3000 }),
+          ]),
+        );
+        await endedDaysAgo(held.id);
+        const due = (await transfersDue(db, new Date())).find(({ id }) => id === held.id);
+        expect(due?.payees).toHaveLength(2);
+
+        // 10% of €4.00 to Parkfairy; the owners' €3.60 split 70/30: €2.52 and €1.08.
+        const shares = sharesOf({ totalMinor: 400, refundMinor: 0, commissionBps: 1000 });
+        const parts = splitShares(shares.ownerMinor, due?.payees ?? []);
+        expect(Object.fromEntries(parts)).toEqual({ [primaryId]: 252, [co.profileId]: 108 });
+        expect(
+          await markTransferSending(
+            db,
+            held.id,
+            { transferMinor: shares.ownerMinor, commissionMinor: shares.commissionMinor },
+            parts,
+          ),
+        ).toBe(true);
+
+        // The co-owner's account restricted since: the primary is paid, the co-owner waits (#52).
+        await db
+          .update(schema.payoutAccounts)
+          .set({ status: 'restricted' })
+          .where(eq(schema.payoutAccounts.ownerId, co.profileId));
+        expect(await dueIds()).toContain(held.id);
+        const toPrimary = await stripe.gateway.transfer({
+          bookingId: held.id,
+          ownerId: primaryId,
+          accountId: await accountOf(primaryId),
+          amountMinor: 252,
+          currency: 'EUR',
+          chargeId: due?.chargeId ?? '',
+        });
+        await recordPayeeTransfer(db, held.id, primaryId, toPrimary);
+        expect((await row(held.id)).transferStatus).toBe('sending');
+        expect(await inLedger(held.id)).toEqual({ charge: 400, transfer: 252 });
+        // Only the restricted one left: not due now, but counted as waiting.
+        expect(await dueIds()).not.toContain(held.id);
+        expect((await transfersWaiting(db, new Date())).owners).toBeGreaterThanOrEqual(1);
+
+        await db
+          .update(schema.payoutAccounts)
+          .set({ status: 'active' })
+          .where(eq(schema.payoutAccounts.ownerId, co.profileId));
+        expect(await dueIds()).toContain(held.id);
+        const toCo = await stripe.gateway.transfer({
+          bookingId: held.id,
+          ownerId: co.profileId,
+          accountId: coAccount,
+          amountMinor: 108,
+          currency: 'EUR',
+          chargeId: due?.chargeId ?? '',
+        });
+        expect(toCo).not.toBe(toPrimary);
+        await recordPayeeTransfer(db, held.id, co.profileId, toCo);
+        expect((await row(held.id)).transferStatus).toBe('sent');
+        expect(await payeesOf(held.id)).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              ownerId: primaryId,
+              transferMinor: 252,
+              transferStatus: 'sent',
+            }),
+            expect.objectContaining({
+              ownerId: co.profileId,
+              transferMinor: 108,
+              transferStatus: 'sent',
+            }),
+          ]),
+        );
+        // Two transfers entered, one each, and the commission once all were paid: it adds up.
+        const transfers = await db
+          .select({
+            ownerId: schema.ledgerEntries.ownerId,
+            amount: schema.ledgerEntries.amountMinor,
+          })
+          .from(schema.ledgerEntries)
+          .where(
+            and(
+              eq(schema.ledgerEntries.bookingId, held.id),
+              eq(schema.ledgerEntries.kind, 'transfer'),
+            ),
+          );
+        expect(transfers).toEqual(
+          expect.arrayContaining([
+            { ownerId: primaryId, amount: 252 },
+            { ownerId: co.profileId, amount: 108 },
+          ]),
+        );
+        expect((await inLedger(held.id)).commission).toBe(40);
+        expect(await ledgerMismatches(db, recently())).not.toContain(held.id);
+        expect(await dueIds()).not.toContain(held.id);
+      });
     });
 
     it('leaves a lapsed hold paid meanwhile to its webhook', async () => {

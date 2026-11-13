@@ -6,8 +6,8 @@ import {
   noteMoneyRetry,
   recordCancelRefund,
   recordCharge,
+  recordPayeeTransfer,
   recordPaymentCanceled,
-  recordTransfer,
   recordUnbookedRefund,
   refundsOwed,
   refundsStuck,
@@ -15,7 +15,12 @@ import {
   transfersWaiting,
   type MoneyCursor,
 } from '@parkfairy/database';
-import { PaymentProviderError, sharesOf, type PaymentsGateway } from '@parkfairy/payments';
+import {
+  PaymentProviderError,
+  sharesOf,
+  splitShares,
+  type PaymentsGateway,
+} from '@parkfairy/payments';
 import { QUEUES, type ProcessorContext, type QueueProcessor } from '../queues.js';
 
 const MINUTE_MS = 60_000;
@@ -145,9 +150,10 @@ async function sendRefunds(payments: PaymentsGateway, ctx: ProcessorContext): Pr
 }
 
 /**
- * Owners' shares, 24 hours after each paid stay (#4): 90% of what's kept (#50, #51), worked out
- * once and kept, so every retry sends the same. Owners Stripe has restricted aren't read: their
- * transfers wait for the account (#52), and `check-money` says when one has waited for days.
+ * Owners' shares, 24 hours after each paid stay (#4): 90% of what's kept (#50, #51), split
+ * between the booking's payees by their shares (#54), worked out once and kept, so every retry
+ * sends the same. Each payee is paid on their own: one whose account Stripe has restricted waits
+ * (#52) while the others are paid, and `check-money` says when one has waited for days.
  */
 async function sendTransfers(payments: PaymentsGateway, ctx: ProcessorContext): Promise<Swept> {
   const { db, logger } = ctx;
@@ -167,17 +173,10 @@ async function sendTransfers(payments: PaymentsGateway, ctx: ProcessorContext): 
         });
         chargeId = state.chargeId;
       }
-      let amounts: { transferMinor: number; commissionMinor: number };
+      if (due.payees.length === 0) throw new Error('A paid booking without payees');
+      let parts: ReadonlyMap<string, number>;
       if (due.sending) {
-        amounts = due.sending;
-        // Asked over a day ago: Stripe may have made it, its key forgotten since.
-        if (due.sending.since.getTime() < now.getTime() - KEY_DAY_MS) {
-          const made = await payments.transferMadeFor(due.id);
-          if (made) {
-            await recordTransfer(db, due.id, made);
-            return true;
-          }
-        }
+        parts = new Map(due.payees.map((payee) => [payee.ownerId, payee.transferMinor ?? 0]));
       } else {
         const shares = sharesOf({
           totalMinor: due.totalMinor,
@@ -190,19 +189,44 @@ async function sendTransfers(payments: PaymentsGateway, ctx: ProcessorContext): 
           await noteMoneyRetry(db, due.id);
           return false;
         }
-        amounts = { transferMinor: shares.ownerMinor, commissionMinor: shares.commissionMinor };
+        // Split between the payees by their shares (#54), worked out once and kept with them.
+        parts = splitShares(shares.ownerMinor, due.payees);
+        const amounts = {
+          transferMinor: shares.ownerMinor,
+          commissionMinor: shares.commissionMinor,
+        };
         // Still due as it was read (another run, a change since): if not, nothing goes.
-        if (!(await markTransferSending(db, due.id, amounts))) return false;
+        if (!(await markTransferSending(db, due.id, amounts, parts))) return false;
       }
-      const transferId = await payments.transfer({
-        bookingId: due.id,
-        accountId: due.accountId,
-        amountMinor: amounts.transferMinor,
-        currency: due.currency,
-        chargeId,
-      });
-      await recordTransfer(db, due.id, transferId);
-      return true;
+      // Asked over a day ago: Stripe may have made one, its key forgotten since.
+      const keyForgotten =
+        due.sending !== null && due.sending.since.getTime() < now.getTime() - KEY_DAY_MS;
+      let paid = 0;
+      for (const payee of due.payees) {
+        if (payee.sent) continue;
+        const part = parts.get(payee.ownerId) ?? 0;
+        if (part > 0 && (!payee.active || !payee.accountId)) {
+          // Their account can't be paid now (#52): theirs waits, the others' go.
+          continue;
+        }
+        const made =
+          part > 0 && keyForgotten ? await payments.transferMadeFor(due.id, payee.ownerId) : null;
+        const transferId =
+          part === 0
+            ? null
+            : (made ??
+              (await payments.transfer({
+                bookingId: due.id,
+                ownerId: payee.ownerId,
+                accountId: payee.accountId ?? '',
+                amountMinor: part,
+                currency: due.currency,
+                chargeId,
+              })));
+        await recordPayeeTransfer(db, due.id, payee.ownerId, transferId);
+        paid++;
+      }
+      return paid > 0;
     },
     ctx,
     { runMs: 12 * MINUTE_MS, failure: () => ({ level: 'warn', message: 'transfer not sent yet' }) },

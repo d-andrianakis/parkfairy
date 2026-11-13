@@ -70,6 +70,8 @@ export const VALIDATION_MESSAGES = [
   'placeTooShort',
   'placeNotFound',
   'placeUnavailable',
+  'shareInvalid',
+  'sharesTotal',
 ] as const;
 export type ValidationMessage = (typeof VALIDATION_MESSAGES)[number];
 

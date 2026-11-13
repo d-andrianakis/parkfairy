@@ -5,8 +5,8 @@ import {
   noteMoneyRetry,
   recordCancelRefund,
   recordCharge,
+  recordPayeeTransfer,
   recordPaymentCanceled,
-  recordTransfer,
   recordUnbookedRefund,
   refundsOwed,
   refundsStuck,
@@ -16,6 +16,7 @@ import {
   type LapsedPayment,
   type RefundOwed,
   type TransferDue,
+  type TransferPayee,
 } from '@parkfairy/database';
 import { PaymentProviderError, type PaymentState, type PaymentsGateway } from '@parkfairy/payments';
 import type { Job } from 'bullmq';
@@ -42,7 +43,7 @@ vi.mock('@parkfairy/database', () => ({
   recordCancelRefund: vi.fn(),
   recordCharge: vi.fn(),
   recordPaymentCanceled: vi.fn(),
-  recordTransfer: vi.fn(),
+  recordPayeeTransfer: vi.fn(),
   recordUnbookedRefund: vi.fn(),
   refundsOwed: vi.fn(),
   refundsStuck: vi.fn(),
@@ -115,6 +116,17 @@ const owedRefund = (overrides: Partial<RefundOwed> = {}): RefundOwed => ({
   ...overrides,
 });
 
+const payee = (overrides: Partial<TransferPayee> = {}): TransferPayee => ({
+  ownerId: 'o1',
+  shareBps: 10_000,
+  primary: true,
+  accountId: 'acct_1',
+  active: true,
+  transferMinor: null,
+  sent: false,
+  ...overrides,
+});
+
 const dueTransfer = (overrides: Partial<TransferDue> = {}): TransferDue => ({
   id: 'b1',
   paymentIntentId: 'pi_1',
@@ -123,7 +135,7 @@ const dueTransfer = (overrides: Partial<TransferDue> = {}): TransferDue => ({
   commissionBps: 1000,
   currency: 'EUR',
   chargeId: 'ch_1',
-  accountId: 'acct_1',
+  payees: [payee()],
   sending: null,
   cursor: cursor(overrides.id ?? 'b1'),
   ...overrides,
@@ -332,22 +344,84 @@ describe('payments processor', () => {
       vi.mocked(transfersDue).mockResolvedValueOnce([dueTransfer()]);
       await expect(run('send-transfers')).resolves.toEqual({ done: 1, failed: 0 });
       expect(transfersDue).toHaveBeenCalledWith(db, NOW, undefined);
-      expect(markTransferSending).toHaveBeenCalledWith(db, 'b1', {
-        transferMinor: 180,
-        commissionMinor: 20,
-      });
+      expect(markTransferSending).toHaveBeenCalledWith(
+        db,
+        'b1',
+        { transferMinor: 180, commissionMinor: 20 },
+        new Map([['o1', 180]]),
+      );
       expect(stripe.transfer).toHaveBeenCalledWith({
         bookingId: 'b1',
+        ownerId: 'o1',
         accountId: 'acct_1',
         amountMinor: 180,
         currency: 'EUR',
         chargeId: 'ch_1',
       });
-      expect(recordTransfer).toHaveBeenCalledWith(db, 'b1', 'tr_new');
+      expect(recordPayeeTransfer).toHaveBeenCalledWith(db, 'b1', 'o1', 'tr_new');
       // The sums were kept before Stripe was asked.
       expect(vi.mocked(markTransferSending).mock.invocationCallOrder[0]).toBeLessThan(
         stripe.transfer.mock.invocationCallOrder[0] ?? 0,
       );
+    });
+
+    it('splits the owners’ part between co-owners by their shares, each paid on their own (#54)', async () => {
+      vi.mocked(transfersDue).mockResolvedValueOnce([
+        dueTransfer({
+          payees: [
+            payee({ ownerId: 'o1', shareBps: 7000 }),
+            payee({ ownerId: 'o2', shareBps: 3000, primary: false, accountId: 'acct_2' }),
+          ],
+        }),
+      ]);
+      await expect(run('send-transfers')).resolves.toEqual({ done: 1, failed: 0 });
+      expect(markTransferSending).toHaveBeenCalledWith(
+        db,
+        'b1',
+        { transferMinor: 180, commissionMinor: 20 },
+        new Map([
+          ['o1', 126],
+          ['o2', 54],
+        ]),
+      );
+      expect(stripe.transfer).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerId: 'o1', accountId: 'acct_1', amountMinor: 126 }),
+      );
+      expect(stripe.transfer).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerId: 'o2', accountId: 'acct_2', amountMinor: 54 }),
+      );
+      expect(recordPayeeTransfer).toHaveBeenCalledTimes(2);
+    });
+
+    it('pays the others while a co-owner’s restricted account waits (#52)', async () => {
+      vi.mocked(transfersDue).mockResolvedValueOnce([
+        dueTransfer({
+          payees: [
+            payee({ ownerId: 'o1', shareBps: 5000 }),
+            payee({ ownerId: 'o2', shareBps: 5000, primary: false, active: false }),
+          ],
+        }),
+      ]);
+      await expect(run('send-transfers')).resolves.toEqual({ done: 1, failed: 0 });
+      expect(stripe.transfer).toHaveBeenCalledOnce();
+      expect(stripe.transfer).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 'o1' }));
+      expect(recordPayeeTransfer).toHaveBeenCalledWith(db, 'b1', 'o1', 'tr_new');
+      expect(recordPayeeTransfer).not.toHaveBeenCalledWith(db, 'b1', 'o2', expect.anything());
+    });
+
+    it('records a part that came to nothing without asking Stripe', async () => {
+      vi.mocked(transfersDue).mockResolvedValueOnce([
+        dueTransfer({
+          sending: { transferMinor: 1, commissionMinor: 0, since: ago(HOUR_MS) },
+          payees: [
+            payee({ ownerId: 'o1', transferMinor: 1 }),
+            payee({ ownerId: 'o2', primary: false, transferMinor: 0, active: false }),
+          ],
+        }),
+      ]);
+      await run('send-transfers');
+      expect(recordPayeeTransfer).toHaveBeenCalledWith(db, 'b1', 'o2', null);
+      expect(stripe.transfer).toHaveBeenCalledOnce();
     });
 
     it('sends nothing for a booking no longer due as it was read', async () => {
@@ -359,19 +433,22 @@ describe('payments processor', () => {
 
     it('sends again what a try before worked out, asking first only past the key’s day', async () => {
       const sending = { transferMinor: 1800, commissionMinor: 200, since: ago(HOUR_MS) };
-      vi.mocked(transfersDue).mockResolvedValueOnce([dueTransfer({ sending })]);
+      const payees = [payee({ transferMinor: 1800 }), payee({ ownerId: 'o2', sent: true })];
+      vi.mocked(transfersDue).mockResolvedValueOnce([dueTransfer({ sending, payees })]);
       await run('send-transfers');
       expect(markTransferSending).not.toHaveBeenCalled();
       expect(stripe.transferMadeFor).not.toHaveBeenCalled();
+      // The one sent before isn't sent again.
+      expect(stripe.transfer).toHaveBeenCalledOnce();
       expect(stripe.transfer).toHaveBeenCalledWith(expect.objectContaining({ amountMinor: 1800 }));
 
       const old = { ...sending, since: ago(KEY_DAY_MS + MINUTE_MS) };
-      vi.mocked(transfersDue).mockResolvedValueOnce([dueTransfer({ sending: old })]);
+      vi.mocked(transfersDue).mockResolvedValueOnce([dueTransfer({ sending: old, payees })]);
       stripe.transferMadeFor.mockResolvedValueOnce('tr_old');
       await run('send-transfers');
-      expect(stripe.transferMadeFor).toHaveBeenCalledWith('b1');
+      expect(stripe.transferMadeFor).toHaveBeenCalledWith('b1', 'o1');
       expect(stripe.transfer).toHaveBeenCalledOnce();
-      expect(recordTransfer).toHaveBeenLastCalledWith(db, 'b1', 'tr_old');
+      expect(recordPayeeTransfer).toHaveBeenLastCalledWith(db, 'b1', 'o1', 'tr_old');
     });
 
     it('asks Stripe for a charge it didn’t have when the payment settled', async () => {
@@ -387,11 +464,14 @@ describe('payments processor', () => {
       );
     });
 
-    it('sends nothing without a charge to take it from, and says so', async () => {
+    it('sends nothing without a charge to take it from, or payees to pay, and says so', async () => {
       vi.mocked(transfersDue).mockResolvedValueOnce([
         dueTransfer({ id: 'b1', chargeId: null }),
         dueTransfer({ id: 'b2', chargeId: null, paymentIntentId: null }),
       ]);
+      // A full page reads on: an empty one ends the first run.
+      vi.mocked(transfersDue).mockResolvedValueOnce([]);
+      vi.mocked(transfersDue).mockResolvedValueOnce([dueTransfer({ id: 'b3', payees: [] })]);
       stripe.payment.mockResolvedValueOnce(paymentState({ chargeId: null }));
       await expect(run('send-transfers')).resolves.toEqual({ done: 0, failed: 2 });
       expect(log.logger.warn).toHaveBeenCalledWith(
@@ -402,11 +482,12 @@ describe('payments processor', () => {
         { bookingId: 'b2', detail: 'Error' },
         'transfer not sent yet',
       );
+      await expect(run('send-transfers')).resolves.toEqual({ done: 0, failed: 1 });
       expect(markTransferSending).not.toHaveBeenCalled();
       expect(stripe.transfer).not.toHaveBeenCalled();
     });
 
-    it('sends nothing where the owner would get nothing, says so, and asks again later', async () => {
+    it('sends nothing where the owners would get nothing, says so, and asks again later', async () => {
       vi.mocked(transfersDue).mockResolvedValueOnce([dueTransfer({ commissionBps: 10_000 })]);
       await expect(run('send-transfers')).resolves.toEqual({ done: 0, failed: 0 });
       expect(stripe.transfer).not.toHaveBeenCalled();
@@ -431,7 +512,7 @@ describe('payments processor', () => {
         'transfer not sent yet',
       );
       expect(noteMoneyRetry).toHaveBeenCalledWith(db, 'b1');
-      expect(recordTransfer).toHaveBeenCalledWith(db, 'b2', 'tr_new');
+      expect(recordPayeeTransfer).toHaveBeenCalledWith(db, 'b2', 'o1', 'tr_new');
     });
   });
 

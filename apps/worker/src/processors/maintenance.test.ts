@@ -3,19 +3,26 @@ import {
   deleteStaleHolds,
   deleteUnconfirmedAccounts,
   expireLapsedHolds,
+  purgeListingInvites,
   type Database,
 } from '@parkfairy/database';
 import type { Job } from 'bullmq';
 import { pino } from 'pino';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QUEUES } from '../queues.js';
-import { maintenanceProcessor, STALE_HOLD_DAYS, UNCONFIRMED_ACCOUNT_DAYS } from './maintenance.js';
+import {
+  LISTING_INVITE_DAYS_KEPT,
+  maintenanceProcessor,
+  STALE_HOLD_DAYS,
+  UNCONFIRMED_ACCOUNT_DAYS,
+} from './maintenance.js';
 
 vi.mock('@parkfairy/database', () => ({
   deleteEndedHoursExceptions: vi.fn(),
   deleteUnconfirmedAccounts: vi.fn(),
   expireLapsedHolds: vi.fn(),
   deleteStaleHolds: vi.fn(),
+  purgeListingInvites: vi.fn(),
 }));
 
 const logger = pino({ level: 'silent' });
@@ -139,6 +146,22 @@ describe('maintenance processor', () => {
     ).resolves.toEqual({ deleted: 5 });
     expect(STALE_HOLD_DAYS).toBe(7);
     expect(deleteStaleHolds).toHaveBeenCalledWith(db, new Date('2026-12-19T09:00:00Z'));
+    vi.useRealTimers();
+  });
+
+  it('forgets invites a month after they were settled or lapsed, daily (#56, GDPR)', async () => {
+    vi.useFakeTimers({ now: new Date('2026-12-31T09:00:00Z'), toFake: ['Date'] });
+    vi.mocked(purgeListingInvites).mockResolvedValue(4);
+    const db = {} as Database;
+    expect(maintenanceProcessor.schedules).toContainEqual({
+      id: 'purge-listing-invites',
+      everyMs: 24 * 60 * 60 * 1000,
+    });
+    await expect(
+      maintenanceProcessor.process(jobNamed('purge-listing-invites'), { db, logger, email }),
+    ).resolves.toEqual({ purged: 4 });
+    expect(LISTING_INVITE_DAYS_KEPT).toBe(30);
+    expect(purgeListingInvites).toHaveBeenCalledWith(db, new Date('2026-12-01T09:00:00Z'));
     vi.useRealTimers();
   });
 

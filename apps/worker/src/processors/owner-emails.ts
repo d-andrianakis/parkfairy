@@ -4,15 +4,19 @@ import {
   countOverdueEmails,
   enqueueListingStatusEmails,
   enqueueOnboardingReminders,
+  hashInviteToken,
   markEmailFailed,
+  mintInviteToken,
   markEmailSent,
   purgeSentEmails,
   releaseEmails,
+  type Database,
 } from '@parkfairy/database';
 import {
   BOOKING_EMAIL_KINDS,
   OWNER_EMAIL_KINDS,
   renderBookingEmail,
+  renderInviteEmail,
   renderOwnerEmail,
   SendStopped,
   type BookingEmailKind,
@@ -74,6 +78,36 @@ function render(row: ClaimedEmail, webUrl: string): OutgoingEmail {
     });
   }
   throw new Error(`Unknown email kind "${row.kind}"`);
+}
+
+/**
+ * An outbox row's message and its idempotency key, or none when there is nothing to send. An
+ * invite's link is made now (#56), so no live link waits in the outbox; each try makes a new one
+ * and is a new email to Resend, never one it refuses for its key with a changed body. A try whose
+ * answer was lost costs a second email, the last one's link the one that works. An invite
+ * accepted or withdrawn since has nothing to send.
+ */
+async function message(
+  db: Database,
+  row: ClaimedEmail,
+  webUrl: string,
+): Promise<{ email: OutgoingEmail; key: string } | null> {
+  if (row.kind !== 'listing-invite') return { email: render(row, webUrl), key: row.id };
+  if (!row.inviteId) throw new Error('An invite email without its invite');
+  const minted = await mintInviteToken(db, row.inviteId);
+  if (!minted) return null;
+  return {
+    email: renderInviteEmail({
+      to: row.to,
+      locale: row.locale as OwnerEmailLocale,
+      webUrl,
+      token: minted.token,
+      listingName: row.payload.listingName,
+      contentLocale: row.payload.contentLocale,
+      inviterName: row.payload.inviterName,
+    }),
+    key: `${row.id}:${hashInviteToken(minted.token).slice(0, 16)}`,
+  };
 }
 
 /**
@@ -141,10 +175,13 @@ export const ownerEmailsProcessor: QueueProcessor = {
                 break;
               }
               try {
-                await email.transport.send(
-                  { ...render(row, email.webUrl), idempotencyKey: row.id },
-                  { signal: stop },
-                );
+                const out = await message(db, row, email.webUrl);
+                if (out) {
+                  await email.transport.send(
+                    { ...out.email, idempotencyKey: out.key },
+                    { signal: stop },
+                  );
+                }
                 await markEmailSent(db, row.id);
                 sentNow++;
               } catch (error) {

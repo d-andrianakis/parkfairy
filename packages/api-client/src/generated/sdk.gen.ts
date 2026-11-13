@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelListingBookingData, CancelListingBookingErrors, CancelListingBookingResponses, CancelMyBookingData, CancelMyBookingErrors, CancelMyBookingResponses, ConfirmMyBookingData, ConfirmMyBookingErrors, ConfirmMyBookingResponses, CopyListingHoursData, CopyListingHoursErrors, CopyListingHoursExceptionsData, CopyListingHoursExceptionsErrors, CopyListingHoursExceptionsResponses, CopyListingHoursResponses, CreateOwnerListingData, CreateOwnerListingErrors, CreateOwnerListingResponses, DeleteListingPhotoData, DeleteListingPhotoErrors, DeleteListingPhotoResponses, DeleteListingProofData, DeleteListingProofErrors, DeleteListingProofResponses, DeleteOwnerListingData, DeleteOwnerListingErrors, DeleteOwnerListingResponses, DownloadListingProofData, DownloadListingProofErrors, DownloadListingProofResponses, ExtendMyHoldData, ExtendMyHoldErrors, ExtendMyHoldResponses, FindPlacesData, FindPlacesErrors, FindPlacesResponses, GetFeaturedParkingData, GetFeaturedParkingResponses, GetListingBookingsData, GetListingBookingsErrors, GetListingBookingsResponses, GetListingHoursExceptionsData, GetListingHoursExceptionsErrors, GetListingHoursExceptionsResponses, GetListingPhotoData, GetListingPhotoErrors, GetListingPhotoResponses, GetLivenessData, GetLivenessResponses, GetMeData, GetMeErrors, GetMeResponses, GetMyBookingData, GetMyBookingErrors, GetMyBookingResponses, GetMyBookingsData, GetMyBookingsErrors, GetMyBookingsResponses, GetOtherOwnerListingsData, GetOtherOwnerListingsErrors, GetOtherOwnerListingsResponses, GetOwnerListingData, GetOwnerListingErrors, GetOwnerListingResponses, GetOwnerOnboardingData, GetOwnerOnboardingErrors, GetOwnerOnboardingResponses, GetOwnerPayoutsData, GetOwnerPayoutsErrors, GetOwnerPayoutsResponses, GetOwnerProfileData, GetOwnerProfileErrors, GetOwnerProfileResponses, GetParkingListingData, GetParkingListingErrors, GetParkingListingResponses, GetPlaceSuggestionsData, GetPlaceSuggestionsErrors, GetPlaceSuggestionsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, HoldParkingSpaceData, HoldParkingSpaceErrors, HoldParkingSpaceResponses, OpenPayoutDashboardData, OpenPayoutDashboardErrors, OpenPayoutDashboardResponses, PayForMyBookingData, PayForMyBookingErrors, PayForMyBookingResponses, ReorderListingPhotosData, ReorderListingPhotosErrors, ReorderListingPhotosResponses, RetrievePlaceData, RetrievePlaceErrors, RetrievePlaceResponses, SaveListingHoursData, SaveListingHoursErrors, SaveListingHoursExceptionsData, SaveListingHoursExceptionsErrors, SaveListingHoursExceptionsResponses, SaveListingHoursResponses, SaveListingLocationData, SaveListingLocationErrors, SaveListingLocationResponses, SaveListingPricesData, SaveListingPricesErrors, SaveListingPricesResponses, SaveListingProofDetailsData, SaveListingProofDetailsErrors, SaveListingProofDetailsResponses, SaveListingSpacesData, SaveListingSpacesErrors, SaveListingSpacesResponses, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsErrors, SaveOwnerTaxDetailsResponses, SearchParkingData, SearchParkingErrors, SearchParkingResponses, SettleMyPaymentData, SettleMyPaymentErrors, SettleMyPaymentResponses, StartPayoutOnboardingData, StartPayoutOnboardingErrors, StartPayoutOnboardingResponses, SubmitOwnerListingData, SubmitOwnerListingErrors, SubmitOwnerListingResponses, UpdateListingPhotoData, UpdateListingPhotoErrors, UpdateListingPhotoResponses, UpdateOwnerProfileData, UpdateOwnerProfileErrors, UpdateOwnerProfileResponses, UploadListingPhotoData, UploadListingPhotoErrors, UploadListingPhotoResponses, UploadListingProofData, UploadListingProofErrors, UploadListingProofResponses } from './types.gen';
+import type { AcceptListingInviteData, AcceptListingInviteErrors, AcceptListingInviteResponses, CancelListingBookingData, CancelListingBookingErrors, CancelListingBookingResponses, CancelMyBookingData, CancelMyBookingErrors, CancelMyBookingResponses, ConfirmMyBookingData, ConfirmMyBookingErrors, ConfirmMyBookingResponses, CopyListingHoursData, CopyListingHoursErrors, CopyListingHoursExceptionsData, CopyListingHoursExceptionsErrors, CopyListingHoursExceptionsResponses, CopyListingHoursResponses, CreateOwnerListingData, CreateOwnerListingErrors, CreateOwnerListingResponses, DeleteListingPhotoData, DeleteListingPhotoErrors, DeleteListingPhotoResponses, DeleteListingProofData, DeleteListingProofErrors, DeleteListingProofResponses, DeleteOwnerListingData, DeleteOwnerListingErrors, DeleteOwnerListingResponses, DownloadListingProofData, DownloadListingProofErrors, DownloadListingProofResponses, ExtendMyHoldData, ExtendMyHoldErrors, ExtendMyHoldResponses, FindPlacesData, FindPlacesErrors, FindPlacesResponses, GetFeaturedParkingData, GetFeaturedParkingResponses, GetListingBookingsData, GetListingBookingsErrors, GetListingBookingsResponses, GetListingHoursExceptionsData, GetListingHoursExceptionsErrors, GetListingHoursExceptionsResponses, GetListingOwnersData, GetListingOwnersErrors, GetListingOwnersResponses, GetListingPhotoData, GetListingPhotoErrors, GetListingPhotoResponses, GetLivenessData, GetLivenessResponses, GetMeData, GetMeErrors, GetMeResponses, GetMyBookingData, GetMyBookingErrors, GetMyBookingResponses, GetMyBookingsData, GetMyBookingsErrors, GetMyBookingsResponses, GetOtherOwnerListingsData, GetOtherOwnerListingsErrors, GetOtherOwnerListingsResponses, GetOwnerListingData, GetOwnerListingErrors, GetOwnerListingResponses, GetOwnerOnboardingData, GetOwnerOnboardingErrors, GetOwnerOnboardingResponses, GetOwnerPayoutsData, GetOwnerPayoutsErrors, GetOwnerPayoutsResponses, GetOwnerProfileData, GetOwnerProfileErrors, GetOwnerProfileResponses, GetParkingListingData, GetParkingListingErrors, GetParkingListingResponses, GetPlaceSuggestionsData, GetPlaceSuggestionsErrors, GetPlaceSuggestionsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, HoldParkingSpaceData, HoldParkingSpaceErrors, HoldParkingSpaceResponses, InviteListingOwnerData, InviteListingOwnerErrors, InviteListingOwnerResponses, LeaveListingData, LeaveListingErrors, LeaveListingResponses, OpenPayoutDashboardData, OpenPayoutDashboardErrors, OpenPayoutDashboardResponses, PayForMyBookingData, PayForMyBookingErrors, PayForMyBookingResponses, PreviewListingInviteData, PreviewListingInviteErrors, PreviewListingInviteResponses, RemoveListingOwnerData, RemoveListingOwnerErrors, RemoveListingOwnerResponses, ReorderListingPhotosData, ReorderListingPhotosErrors, ReorderListingPhotosResponses, RetrievePlaceData, RetrievePlaceErrors, RetrievePlaceResponses, SaveListingHoursData, SaveListingHoursErrors, SaveListingHoursExceptionsData, SaveListingHoursExceptionsErrors, SaveListingHoursExceptionsResponses, SaveListingHoursResponses, SaveListingLocationData, SaveListingLocationErrors, SaveListingLocationResponses, SaveListingPricesData, SaveListingPricesErrors, SaveListingPricesResponses, SaveListingProofDetailsData, SaveListingProofDetailsErrors, SaveListingProofDetailsResponses, SaveListingSpacesData, SaveListingSpacesErrors, SaveListingSpacesResponses, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsErrors, SaveOwnerTaxDetailsResponses, SearchParkingData, SearchParkingErrors, SearchParkingResponses, SetListingSharesData, SetListingSharesErrors, SetListingSharesResponses, SettleMyPaymentData, SettleMyPaymentErrors, SettleMyPaymentResponses, StartPayoutOnboardingData, StartPayoutOnboardingErrors, StartPayoutOnboardingResponses, SubmitOwnerListingData, SubmitOwnerListingErrors, SubmitOwnerListingResponses, UpdateListingPhotoData, UpdateListingPhotoErrors, UpdateListingPhotoResponses, UpdateOwnerProfileData, UpdateOwnerProfileErrors, UpdateOwnerProfileResponses, UploadListingPhotoData, UploadListingPhotoErrors, UploadListingPhotoResponses, UploadListingProofData, UploadListingProofErrors, UploadListingProofResponses, WithdrawListingInviteData, WithdrawListingInviteErrors, WithdrawListingInviteResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -345,6 +345,102 @@ export const submitOwnerListing = <ThrowOnError extends boolean = false>(options
             type: 'apiKey'
         }],
     url: '/v1/owner/listings/{id}/submit',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getListingOwners = <ThrowOnError extends boolean = false>(options: Options<GetListingOwnersData, ThrowOnError>): RequestResult<GetListingOwnersResponses, GetListingOwnersErrors, ThrowOnError> => (options.client ?? client).get<GetListingOwnersResponses, GetListingOwnersErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/owners',
+    ...options
+});
+
+export const inviteListingOwner = <ThrowOnError extends boolean = false>(options: Options<InviteListingOwnerData, ThrowOnError>): RequestResult<InviteListingOwnerResponses, InviteListingOwnerErrors, ThrowOnError> => (options.client ?? client).post<InviteListingOwnerResponses, InviteListingOwnerErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/invites',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const withdrawListingInvite = <ThrowOnError extends boolean = false>(options: Options<WithdrawListingInviteData, ThrowOnError>): RequestResult<WithdrawListingInviteResponses, WithdrawListingInviteErrors, ThrowOnError> => (options.client ?? client).delete<WithdrawListingInviteResponses, WithdrawListingInviteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/invites/{inviteId}',
+    ...options
+});
+
+export const setListingShares = <ThrowOnError extends boolean = false>(options: Options<SetListingSharesData, ThrowOnError>): RequestResult<SetListingSharesResponses, SetListingSharesErrors, ThrowOnError> => (options.client ?? client).put<SetListingSharesResponses, SetListingSharesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/shares',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const removeListingOwner = <ThrowOnError extends boolean = false>(options: Options<RemoveListingOwnerData, ThrowOnError>): RequestResult<RemoveListingOwnerResponses, RemoveListingOwnerErrors, ThrowOnError> => (options.client ?? client).delete<RemoveListingOwnerResponses, RemoveListingOwnerErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/owners/{ownerId}',
+    ...options
+});
+
+export const leaveListing = <ThrowOnError extends boolean = false>(options: Options<LeaveListingData, ThrowOnError>): RequestResult<LeaveListingResponses, LeaveListingErrors, ThrowOnError> => (options.client ?? client).post<LeaveListingResponses, LeaveListingErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/listings/{id}/leave',
+    ...options
+});
+
+export const previewListingInvite = <ThrowOnError extends boolean = false>(options: Options<PreviewListingInviteData, ThrowOnError>): RequestResult<PreviewListingInviteResponses, PreviewListingInviteErrors, ThrowOnError> => (options.client ?? client).post<PreviewListingInviteResponses, PreviewListingInviteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/invites/preview',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const acceptListingInvite = <ThrowOnError extends boolean = false>(options: Options<AcceptListingInviteData, ThrowOnError>): RequestResult<AcceptListingInviteResponses, AcceptListingInviteErrors, ThrowOnError> => (options.client ?? client).post<AcceptListingInviteResponses, AcceptListingInviteErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/owner/invites/accept',
     ...options,
     headers: {
         'Content-Type': 'application/json',

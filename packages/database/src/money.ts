@@ -1,6 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import { bookings } from './schema/bookings.js';
+import { bookingPayees } from './schema/listing-owners.js';
 import { ledgerEntries, type LedgerKind } from './schema/payments.js';
 
 /**
@@ -51,14 +52,16 @@ async function enter(
     amountMinor: number;
     currency: string;
     stripeId?: string | null;
+    /** A transfer's payee; nothing else names one. */
+    ownerId?: string | null;
   },
 ): Promise<void> {
   if (entry.amountMinor <= 0) return;
   await tx
     .insert(ledgerEntries)
-    .values({ ...entry, stripeId: entry.stripeId ?? null })
+    .values({ ...entry, stripeId: entry.stripeId ?? null, ownerId: entry.ownerId ?? null })
     .onConflictDoUpdate({
-      target: [ledgerEntries.bookingId, ledgerEntries.kind],
+      target: [ledgerEntries.bookingId, ledgerEntries.kind, ledgerEntries.ownerId],
       set: { stripeId: sql`coalesce(${ledgerEntries.stripeId}, excluded.stripe_id)` },
     });
 }
@@ -264,6 +267,19 @@ export async function recordRefundFailed(
   });
 }
 
+/** One of a booking's payees as a transfer sees them (co-ownership, #54). */
+export interface TransferPayee {
+  ownerId: string;
+  shareBps: number;
+  primary: boolean;
+  /** Their Express account, if they have one, and whether Stripe can pay it now. */
+  accountId: string | null;
+  active: boolean;
+  /** Their part, once worked out; and whether it went. */
+  transferMinor: number | null;
+  sent: boolean;
+}
+
 export interface TransferDue {
   id: string;
   paymentIntentId: string | null;
@@ -272,7 +288,7 @@ export interface TransferDue {
   commissionBps: number;
   currency: string;
   chargeId: string | null;
-  accountId: string;
+  payees: TransferPayee[];
   /** Set when a try was made before: the amounts it worked out, to send the same again. */
   sending: { transferMinor: number; commissionMinor: number; since: Date } | null;
   cursor: MoneyCursor;
@@ -291,9 +307,19 @@ const dueWhere = (dueBefore: Date) => sql`
   and (b.refund_minor is null or b.refund_minor < b.total_minor)
 `;
 
+/** A payee still to be paid, who can be now: Stripe can pay them, or their part came to nothing. */
+const payableNow = sql`
+  exists (
+    select 1 from booking_payees p
+    left join payout_accounts pa on pa.owner_id = p.owner_id
+    where p.booking_id = b.id and p.transfer_status is distinct from 'sent'
+      and (pa.status = 'active' or p.transfer_minor = 0)
+  )
+`;
+
 /**
- * Paid stays over for 24 hours (#4) whose owner hasn't had their share and can be paid now. An
- * owner whose account Stripe has restricted waits (#52): `transfersWaiting` counts them.
+ * Paid stays over for 24 hours (#4) with a payee still to be paid who can be paid now. A payee
+ * whose account Stripe has restricted waits alone (#52): `transfersWaiting` counts the bookings.
  */
 export async function transfersDue(
   db: Database,
@@ -309,20 +335,38 @@ export async function transfersDue(
     commission_bps: number;
     currency: string;
     stripe_charge_id: string | null;
-    stripe_account_id: string;
     transfer_status: string | null;
     transfer_minor: number | null;
     commission_minor: number | null;
     updated_at: string;
     ends_at: string;
+    payees: {
+      ownerId: string;
+      shareBps: number;
+      primary: boolean;
+      accountId: string | null;
+      active: boolean | null;
+      transferMinor: number | null;
+      status: string | null;
+    }[];
   }>(sql`
     select b.id, b.payment_intent_id, b.total_minor, b.refund_minor, b.commission_bps, b.currency,
-      b.stripe_charge_id, pa.stripe_account_id, b.transfer_status, b.transfer_minor,
-      b.commission_minor, b.updated_at::text as updated_at, b.ends_at::text as ends_at
+      b.stripe_charge_id, b.transfer_status, b.transfer_minor, b.commission_minor,
+      b.updated_at::text as updated_at, b.ends_at::text as ends_at,
+      (
+        select json_agg(json_build_object(
+          'ownerId', p.owner_id, 'shareBps', p.share_bps, 'primary', p.owner_id = l.owner_id,
+          'accountId', pa.stripe_account_id, 'active', pa.status = 'active',
+          'transferMinor', p.transfer_minor, 'status', p.transfer_status
+        ) order by p.owner_id)
+        from booking_payees p
+        left join payout_accounts pa on pa.owner_id = p.owner_id
+        where p.booking_id = b.id
+      ) as payees
     from bookings b
     join parking_locations l on l.id = b.location_id
-    join payout_accounts pa on pa.owner_id = l.owner_id and pa.status = 'active'
     where ${dueWhere(dueBefore)}
+      and ${payableNow}
       ${ready}
       ${after('ends_at', cursor)}
     order by b.ends_at, b.id
@@ -336,7 +380,15 @@ export async function transfersDue(
     commissionBps: Number(row.commission_bps),
     currency: row.currency,
     chargeId: row.stripe_charge_id,
-    accountId: row.stripe_account_id,
+    payees: (row.payees ?? []).map((payee) => ({
+      ownerId: payee.ownerId,
+      shareBps: Number(payee.shareBps),
+      primary: payee.primary,
+      accountId: payee.accountId,
+      active: payee.active === true,
+      transferMinor: payee.transferMinor === null ? null : Number(payee.transferMinor),
+      sent: payee.status === 'sent',
+    })),
     sending:
       row.transfer_status === 'sending' &&
       row.transfer_minor !== null &&
@@ -352,8 +404,8 @@ export async function transfersDue(
 }
 
 /**
- * Transfers due since before `dueSince` and still not sent: mostly an owner's account Stripe has
- * restricted (#52), for support to look into. How many, and for how many owners.
+ * Transfers due since before `dueSince` and still not all sent: mostly a payee's account Stripe
+ * has restricted (#52), for support to look into. How many bookings, and how many owners waiting.
  */
 export async function transfersWaiting(
   db: Database,
@@ -361,9 +413,9 @@ export async function transfersWaiting(
 ): Promise<{ bookings: number; owners: number }> {
   const endedBefore = new Date(dueSince.getTime() - TRANSFER_AFTER_HOURS * HOUR_MS);
   const rows = await db.execute<{ bookings: number; owners: number }>(sql`
-    select count(*)::int as bookings, count(distinct l.owner_id)::int as owners
+    select count(distinct b.id)::int as bookings, count(distinct p.owner_id)::int as owners
     from bookings b
-    join parking_locations l on l.id = b.location_id
+    join booking_payees p on p.booking_id = b.id and p.transfer_status is distinct from 'sent'
     where ${dueWhere(endedBefore)}
   `);
   const [row] = rows.rows;
@@ -371,59 +423,99 @@ export async function transfersWaiting(
 }
 
 /**
- * The amounts worked out and about to be sent: kept, so a retry sends the same (#50, #51). Only
- * while the transfer is still due as it was read; false if it no longer is (then nothing goes).
+ * The amounts worked out and about to be sent, the booking's and each payee's part: kept, so a
+ * retry sends the same (#50, #51, #54). Only while the transfer is still due as it was read; false
+ * if it no longer is (then nothing goes).
  */
 export async function markTransferSending(
   db: Database,
   bookingId: string,
   { transferMinor, commissionMinor }: { transferMinor: number; commissionMinor: number },
+  parts: ReadonlyMap<string, number>,
 ): Promise<boolean> {
-  const rows = await db.execute(sql`
-    update ${bookings} b
-    set transfer_status = 'sending', transfer_minor = ${transferMinor},
-      commission_minor = ${commissionMinor}, updated_at = now()
-    where b.id = ${bookingId} and b.transfer_status is null
-      and ${dueWhere(new Date(Date.now() - TRANSFER_AFTER_HOURS * HOUR_MS))}
-    returning b.id
-  `);
-  return rows.rows.length === 1;
+  return db.transaction(async (tx) => {
+    const rows = await tx.execute(sql`
+      update ${bookings} b
+      set transfer_status = 'sending', transfer_minor = ${transferMinor},
+        commission_minor = ${commissionMinor}, updated_at = now()
+      where b.id = ${bookingId} and b.transfer_status is null
+        and ${dueWhere(new Date(Date.now() - TRANSFER_AFTER_HOURS * HOUR_MS))}
+      returning b.id
+    `);
+    if (rows.rows.length !== 1) return false;
+    for (const [ownerId, part] of parts) {
+      await tx
+        .update(bookingPayees)
+        .set({ transferStatus: 'sending', transferMinor: part })
+        .where(and(eq(bookingPayees.bookingId, bookingId), eq(bookingPayees.ownerId, ownerId)));
+    }
+    return true;
+  });
 }
 
-/** The transfer Stripe made: recorded, and entered with Parkfairy's commission. */
-export async function recordTransfer(
+/**
+ * A payee's part sent: by Stripe (its transfer's id), or nothing to send (a part rounded to 0).
+ * Entered; and once every payee's went, the booking's transfer is done, with Parkfairy's
+ * commission entered.
+ */
+export async function recordPayeeTransfer(
   db: Database,
   bookingId: string,
-  transferId: string,
+  ownerId: string,
+  transferId: string | null,
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(bookings)
-      .set({
-        transferStatus: 'sent',
-        stripeTransferId: transferId,
-        transferredAt: new Date(),
-        ...settled,
-      })
-      .where(and(eq(bookings.id, bookingId), eq(bookings.transferStatus, 'sending')))
-      .returning({
-        transferMinor: bookings.transferMinor,
-        commissionMinor: bookings.commissionMinor,
+    // The booking first, as every writer of it does: then its payees.
+    const [booking] = await tx
+      .select({
         currency: bookings.currency,
-      });
-    if (!row) return;
+        commissionMinor: bookings.commissionMinor,
+        transferStatus: bookings.transferStatus,
+      })
+      .from(bookings)
+      .where(eq(bookings.id, bookingId))
+      .for('update');
+    if (booking?.transferStatus !== 'sending') return;
+    const [payee] = await tx
+      .update(bookingPayees)
+      .set({ transferStatus: 'sent', stripeTransferId: transferId, transferredAt: new Date() })
+      .where(
+        and(
+          eq(bookingPayees.bookingId, bookingId),
+          eq(bookingPayees.ownerId, ownerId),
+          eq(bookingPayees.transferStatus, 'sending'),
+        ),
+      )
+      .returning({ transferMinor: bookingPayees.transferMinor });
+    if (!payee) return;
     await enter(tx, {
       bookingId,
       kind: 'transfer',
-      amountMinor: row.transferMinor ?? 0,
-      currency: row.currency,
+      ownerId,
+      amountMinor: payee.transferMinor ?? 0,
+      currency: booking.currency,
       stripeId: transferId,
     });
+    const [left] = await tx
+      .select({ id: bookingPayees.id })
+      .from(bookingPayees)
+      .where(
+        and(
+          eq(bookingPayees.bookingId, bookingId),
+          sql`${bookingPayees.transferStatus} is distinct from 'sent'`,
+        ),
+      )
+      .limit(1);
+    if (left) return;
+    await tx
+      .update(bookings)
+      .set({ transferStatus: 'sent', transferredAt: new Date(), ...settled })
+      .where(eq(bookings.id, bookingId));
     await enter(tx, {
       bookingId,
       kind: 'commission',
-      amountMinor: row.commissionMinor ?? 0,
-      currency: row.currency,
+      amountMinor: booking.commissionMinor ?? 0,
+      currency: booking.currency,
     });
   });
 }

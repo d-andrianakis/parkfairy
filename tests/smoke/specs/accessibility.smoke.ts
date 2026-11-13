@@ -18,6 +18,8 @@ const publicPages = [
   '/verify-email?token=not-a-real-token',
   '/no-such-page',
   '/owner',
+  // An invitation to co-own a listing, opened signed out (#56).
+  '/owner/invite',
   // Public catalogue (demo listings from pnpm db:seed).
   ...(DEMO_DATA ? ['/search?area=syntagma', '/parking/syntagma-square-garage'] : []),
 ];

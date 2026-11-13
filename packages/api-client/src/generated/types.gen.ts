@@ -615,6 +615,65 @@ export type PlaceList = {
     places: Array<Place>;
 };
 
+export type ListingOwnerRole = 'primary' | 'co_owner';
+
+export type ListingOwner = {
+    id: string;
+    name: string | null;
+    email: string;
+    role: ListingOwnerRole;
+    sharePercent: number;
+    payouts: PayoutStatus;
+    you: boolean;
+};
+
+export type ListingInvite = {
+    id: string;
+    email: string;
+    invitedBy: string | null;
+    expiresAt: string | null;
+    canWithdraw: boolean;
+};
+
+export type ListingOwners = {
+    listingId: string;
+    name: string | null;
+    contentLocale: Locale;
+    role: ListingOwnerRole;
+    owners: Array<ListingOwner>;
+    invites: Array<ListingInvite>;
+    payable: boolean;
+    room: number;
+};
+
+export type ListingInviteInput = {
+    email: string;
+    locale: Locale;
+};
+
+export type ListingSharesInput = {
+    shares: Array<{
+        ownerId: string;
+        percent: number;
+    }>;
+};
+
+export type InviteTokenInput = {
+    token: string;
+};
+
+export type InvitePreview = {
+    state: 'open' | 'expired' | 'used';
+    listingName: string | null;
+    contentLocale: Locale;
+    invitedBy: string | null;
+    forYou: boolean;
+};
+
+export type InviteAccepted = {
+    listingId: string;
+};
+
 export type GetLivenessData = {
     body?: never;
     path?: never;
@@ -1338,6 +1397,192 @@ export type SubmitOwnerListingResponses = {
 };
 
 export type SubmitOwnerListingResponse = SubmitOwnerListingResponses[keyof SubmitOwnerListingResponses];
+
+export type GetListingOwnersData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/owners';
+};
+
+export type GetListingOwnersErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type GetListingOwnersError = GetListingOwnersErrors[keyof GetListingOwnersErrors];
+
+export type GetListingOwnersResponses = {
+    200: ListingOwners;
+};
+
+export type GetListingOwnersResponse = GetListingOwnersResponses[keyof GetListingOwnersResponses];
+
+export type InviteListingOwnerData = {
+    body: ListingInviteInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/invites';
+};
+
+export type InviteListingOwnerErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type InviteListingOwnerError = InviteListingOwnerErrors[keyof InviteListingOwnerErrors];
+
+export type InviteListingOwnerResponses = {
+    200: ListingOwners;
+};
+
+export type InviteListingOwnerResponse = InviteListingOwnerResponses[keyof InviteListingOwnerResponses];
+
+export type WithdrawListingInviteData = {
+    body?: never;
+    path: {
+        id: string;
+        inviteId: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/invites/{inviteId}';
+};
+
+export type WithdrawListingInviteErrors = {
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type WithdrawListingInviteError = WithdrawListingInviteErrors[keyof WithdrawListingInviteErrors];
+
+export type WithdrawListingInviteResponses = {
+    200: ListingOwners;
+};
+
+export type WithdrawListingInviteResponse = WithdrawListingInviteResponses[keyof WithdrawListingInviteResponses];
+
+export type SetListingSharesData = {
+    body: ListingSharesInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/shares';
+};
+
+export type SetListingSharesErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SetListingSharesError = SetListingSharesErrors[keyof SetListingSharesErrors];
+
+export type SetListingSharesResponses = {
+    200: ListingOwners;
+};
+
+export type SetListingSharesResponse = SetListingSharesResponses[keyof SetListingSharesResponses];
+
+export type RemoveListingOwnerData = {
+    body?: never;
+    path: {
+        id: string;
+        ownerId: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/owners/{ownerId}';
+};
+
+export type RemoveListingOwnerErrors = {
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type RemoveListingOwnerError = RemoveListingOwnerErrors[keyof RemoveListingOwnerErrors];
+
+export type RemoveListingOwnerResponses = {
+    200: ListingOwners;
+};
+
+export type RemoveListingOwnerResponse = RemoveListingOwnerResponses[keyof RemoveListingOwnerResponses];
+
+export type LeaveListingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/leave';
+};
+
+export type LeaveListingErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type LeaveListingError = LeaveListingErrors[keyof LeaveListingErrors];
+
+export type LeaveListingResponses = {
+    204: void;
+};
+
+export type LeaveListingResponse = LeaveListingResponses[keyof LeaveListingResponses];
+
+export type PreviewListingInviteData = {
+    body: InviteTokenInput;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/invites/preview';
+};
+
+export type PreviewListingInviteErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type PreviewListingInviteError = PreviewListingInviteErrors[keyof PreviewListingInviteErrors];
+
+export type PreviewListingInviteResponses = {
+    200: InvitePreview;
+};
+
+export type PreviewListingInviteResponse = PreviewListingInviteResponses[keyof PreviewListingInviteResponses];
+
+export type AcceptListingInviteData = {
+    body: InviteTokenInput;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/invites/accept';
+};
+
+export type AcceptListingInviteErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type AcceptListingInviteError = AcceptListingInviteErrors[keyof AcceptListingInviteErrors];
+
+export type AcceptListingInviteResponses = {
+    200: InviteAccepted;
+};
+
+export type AcceptListingInviteResponse = AcceptListingInviteResponses[keyof AcceptListingInviteResponses];
 
 export type GetMyBookingsData = {
     body?: never;

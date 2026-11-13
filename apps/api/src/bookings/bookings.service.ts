@@ -35,7 +35,10 @@ import {
   type OwnerListingBookings,
 } from '@parkfairy/contracts';
 import {
+  copyPayees,
   enterCharge,
+  ownedByUser,
+  payableListing,
   recordCancelRefund,
   recordRefundFailed,
   recordUnbookedRefund,
@@ -62,7 +65,7 @@ const space = schema.parkingSpaces;
 const profile = schema.ownerProfiles;
 const users = schema.users;
 const outbox = schema.emailOutbox;
-const payout = schema.payoutAccounts;
+const owners = schema.listingOwners;
 const settings = schema.platformSettings;
 
 type BookingRow = typeof booking.$inferSelect;
@@ -310,11 +313,12 @@ export class BookingsService {
       .select({
         ...bookableColumns,
         spot: { id: space.id, label: space.label, ownRate: space.hourlyRateMinor },
-        payoutStatus: payout.status,
+        // Co-ownership (#54): every owner with a share can be paid; this driver isn't one.
+        payable: sql<boolean>`${payableListing}`,
+        mine: sql<boolean>`${ownedByUser(userId)}`,
       })
       .from(listing)
       .leftJoin(profile, eq(profile.id, listing.ownerId))
-      .leftJoin(payout, eq(payout.ownerId, listing.ownerId))
       .leftJoin(
         space,
         and(eq(space.id, input.spaceId), eq(space.locationId, listing.id), sql`${space.isActive}`),
@@ -323,9 +327,9 @@ export class BookingsService {
       .for('share', { of: listing });
     if (!row || row.hourlyRateMinor === null) throw notFound('LISTING_NOT_FOUND');
     // A booking of one's own would be a payout to oneself (Phase 4) and tells nobody anything.
-    if (row.ownerUserId === userId) throw conflict('OWN_LISTING');
-    // Paying needs somewhere for the owner's share to go (#5): their payout account, active.
-    if (this.payments && row.payoutStatus !== 'active') throw conflict('BOOKING_UNAVAILABLE');
+    if (row.mine) throw conflict('OWN_LISTING');
+    // Paying needs somewhere for the owners' share to go (#5, #54): each one's account, active.
+    if (this.payments && !row.payable) throw conflict('BOOKING_UNAVAILABLE');
     const { spot } = row;
     if (!spot) throw notFound('SPACE_NOT_FOUND');
     const { prices } = await this.assertOpen(tx, row, stay, { prices: true });
@@ -471,20 +475,40 @@ export class BookingsService {
     }
   }
 
-  /** Both sides hear of a new booking: the driver, and the owner unless this driver used it up. */
+  /**
+   * A booking made, in the transaction that made it. Who is paid for it is kept with it, as the
+   * owners' shares are now (#54), as its commission was at the hold (#15): a hold that never books
+   * keeps none, and goes like any lapsed hold. Then both sides hear of it: the driver, and each of
+   * the listing's owners unless this driver used them up.
+   */
   private async queueConfirmedEmails(
     tx: Transaction,
     confirmed: BookingRow,
-    row: ListingInfo & { ownerUserId: string | null },
+    row: ListingInfo,
   ): Promise<void> {
+    await copyPayees(tx, confirmed.id, confirmed.locationId);
     const driver = confirmed.userId;
-    const owner = row.ownerUserId;
     await this.queueEmails(tx, confirmed, row, [
       { kind: 'booking-confirmed', userId: driver, to: 'driver' },
-      ...(owner && (await this.ownerStillHears(tx, driver, owner))
-        ? [{ kind: 'booking-received' as const, userId: owner, to: 'owner' as const }]
-        : []),
+      ...(await this.ownersHearing(tx, driver, confirmed.locationId, 'booking-received')),
     ]);
+  }
+
+  /** The listing's owners this driver may still email today (L3), every one of them (#53). */
+  private async ownersHearing<Kind extends 'booking-received' | 'booking-cancelled-by-driver'>(
+    tx: Transaction,
+    driverId: string,
+    locationId: string,
+    kind: Kind,
+  ): Promise<{ kind: Kind; userId: string; to: 'owner' }[]> {
+    const heard: { kind: Kind; userId: string; to: 'owner' }[] = [];
+    for (const ownerUserId of await this.ownerUsersOf(tx, locationId)) {
+      if (ownerUserId === driverId) continue;
+      if (await this.ownerStillHears(tx, driverId, ownerUserId)) {
+        heard.push({ kind, userId: ownerUserId, to: 'owner' });
+      }
+    }
+    return heard;
   }
 
   /**
@@ -873,18 +897,14 @@ export class BookingsService {
         .where(eq(booking.id, id))
         .returning();
       if (!cancelled) throw notFound('BOOKING_NOT_FOUND');
-      const ownerUserId = await this.ownerUserOf(tx, current.locationId);
       await this.queueEmails(tx, cancelled, info, [
         { kind: 'booking-cancelled', userId, to: 'driver' },
-        ...(ownerUserId && (await this.ownerStillHears(tx, userId, ownerUserId))
-          ? [
-              {
-                kind: 'booking-cancelled-by-driver' as const,
-                userId: ownerUserId,
-                to: 'owner' as const,
-              },
-            ]
-          : []),
+        ...(await this.ownersHearing(
+          tx,
+          userId,
+          current.locationId,
+          'booking-cancelled-by-driver',
+        )),
       ]);
       return { view: this.view(cancelled, info, now), owed: cancelled };
     });
@@ -1115,13 +1135,14 @@ export class BookingsService {
     await this.sendCancelRefund(owed);
   }
 
-  /** The listing, if this user owns it; anything else is the same 404. */
+  /** The listing, if this user is one of its owners (#53); anything else is the same 404. */
   private async ownedListing(userId: string, listingId: string) {
     if (!UUID.test(listingId)) throw listingNotFound();
     const [owned] = await this.db
       .select({ id: listing.id, name: listing.name, contentLocale: listing.contentLocale })
       .from(listing)
-      .innerJoin(profile, eq(profile.id, listing.ownerId))
+      .innerJoin(owners, eq(owners.locationId, listing.id))
+      .innerJoin(profile, eq(profile.id, owners.ownerId))
       .where(and(eq(listing.id, listingId), eq(profile.userId, userId)));
     if (!owned) throw listingNotFound();
     return owned;
@@ -1147,8 +1168,8 @@ export class BookingsService {
           + count(*) filter (where ${booking.cancelledBy} = 'driver' and ${booking.cancelledAt} > ${since}))::int`,
       })
       .from(booking)
-      .innerJoin(listing, eq(listing.id, booking.locationId))
-      .innerJoin(profile, eq(profile.id, listing.ownerId))
+      .innerJoin(owners, eq(owners.locationId, booking.locationId))
+      .innerJoin(profile, eq(profile.id, owners.ownerId))
       .where(
         and(
           eq(booking.userId, driverId),
@@ -1161,13 +1182,15 @@ export class BookingsService {
     return (row?.events ?? 0) <= OWNER_EMAILS_PER_DRIVER_DAY;
   }
 
-  private async ownerUserOf(db: Reader, locationId: string): Promise<string | null> {
-    const [row] = await db
+  /** The accounts of every owner of the listing, the primary first. */
+  private async ownerUsersOf(db: Reader, locationId: string): Promise<string[]> {
+    const rows = await db
       .select({ userId: profile.userId })
-      .from(listing)
-      .innerJoin(profile, eq(profile.id, listing.ownerId))
-      .where(eq(listing.id, locationId));
-    return row?.userId ?? null;
+      .from(owners)
+      .innerJoin(profile, eq(profile.id, owners.ownerId))
+      .where(eq(owners.locationId, locationId))
+      .orderBy(sql`${owners.role} = 'primary' desc`, asc(owners.createdAt));
+    return rows.map((row) => row.userId);
   }
 
   /**
@@ -1192,7 +1215,8 @@ export class BookingsService {
           kind,
           userId,
           payload: { listingName: row.listingName ?? undefined, booking: outboxBooking(row, info) },
-          dedupeKey: `booking:${row.id}:${event}:${to}`,
+          // Each owner their own (#53): a co-owned listing's owners each hear of it once.
+          dedupeKey: `booking:${row.id}:${event}:${to === 'owner' ? `owner:${userId}` : to}`,
         })),
       )
       .onConflictDoNothing({ target: outbox.dedupeKey });

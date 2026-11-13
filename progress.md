@@ -1235,6 +1235,52 @@ Left open:
 - [ ] Contrast measured inside Stripe's frame, a Windows contrast theme, 320 px, 200% zoom,
       reduced motion
 
+## Co-ownership (2026-11-13)
+
+Decisions #53–#56 and the readings under them (memory.md). Added at the product owner's request
+between 4.2 and 4.3.
+
+- [x] **Implemented**:
+  - `listing_owners` (the primary, the listing's `owner_id`, and co-owners, each with a share) and
+    `listing_invites`; every ownership check reads them, so co-owners run the listing (edit it, its
+    hours, prices and closures, see and cancel its bookings, invite); the primary alone removes
+    owners, sets the shares and deletes (403 `PRIMARY_ONLY`). Co-owners can leave; a leaving or
+    removed owner's share goes back to the primary. Ten owners and open invites at most.
+  - Invites by email: the worker makes the link's token as it sends (only its hash kept, a new
+    idempotency key for each), the token after `#`; accepted only by the account with that
+    verified address, which gets an owner profile if it has none; 7 days; withdrawn by the
+    inviter or the primary; purged a month after.
+  - Payees copied when a booking is confirmed, by share; transfers split by largest remainder,
+    each payee paid on their own (a restricted one waits alone), the ledger per payee.
+  - Bookable only while someone is paid and every owner with a share can be; every owner hears
+    of bookings, each under the per-driver cap.
+  - Web: the listing's owners page (shares, invite, invitations, remove, leave), the invite page
+    (signed out it keeps the token for the tab and asks to sign in), the dashboard's way there.
+- [x] **Unit tests**: contracts, `splitShares`, the gateway's per-payee transfer, the invite
+      email, the worker (invite email minted per send, nothing for a closed invite, per-payee
+      transfers with a restricted co-owner and a part of 0, the purge), the owners panel, the
+      invite page and its token, both pages
+- [x] **Integration tests** (`listing-owners.integration.test.ts`, 16; `payments` co-owned): the
+      primary at 100%, invite → minted → preview → accepted by the right account only, rights of
+      each role, shares, leave and remove, the limits and a lapsed invite, strangers, the
+      dashboard, bookings telling every owner with payees copied by share; with Stripe, bookable
+      only when every owner with a share can be paid, and each paid their part
+- [x] **Smoke test** (`co-ownership.smoke.ts`): invite by email through the worker, the link
+      opened signed out, sign in, accept, shares, Greek, axe; `/owner/invite` in the a11y list
+- [ ] **Security** review (stopped by the usage limit: to run again)
+- [ ] **Performance** review (stopped by the usage limit: to run again)
+- [ ] **Accessibility** review (stopped by the usage limit: to run again)
+- [ ] **i18n** review (stopped by the usage limit: to run again)
+- [ ] **Test** review (stopped by the usage limit: to run again)
+- [x] **Contracts & docs**: migration 0025 reviewed (backfills: every listing's owner its primary,
+      every confirmed booking's payee), OpenAPI and client regenerated, memory.md
+
+Left open:
+
+- [ ] Handing the primary role to a co-owner; listing status emails go to the primary alone
+- [ ] Native speaker: Owner.owners._, Owner.invite._, the invite email, «Κύρια ιδιοκτησία» and
+      «Συνιδιοκτησία» as role names
+
 ## Phase 5: Owner and admin dashboards
 
 - [~] 2FA enrolment UI done (1.3); admin MFA enforced end to end once admin routes exist

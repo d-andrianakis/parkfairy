@@ -20,7 +20,7 @@ import {
   type ParkingSearchQuery,
   type ParkingSearchResult,
 } from '@parkfairy/contracts';
-import { schema, type Database, type GeoPoint } from '@parkfairy/database';
+import { payableListing, schema, type Database, type GeoPoint } from '@parkfairy/database';
 import { and, asc, eq, exists, inArray, not, or, sql } from 'drizzle-orm';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
@@ -346,18 +346,17 @@ export class ParkingService {
         location: listing.location,
         cancellationPolicy: listing.cancellationPolicy,
         bookingGapMinutes: listing.bookingGapMinutes,
-        // Where the owner's share would go: drivers pay only for listings whose owner can be paid.
-        // A join, not a subquery: Drizzle leaves a lone table's columns unqualified.
-        payoutStatus: schema.payoutAccounts.status,
+        // Where the owners' share would go: drivers pay only for listings whose owners with a
+        // share can all be paid (#5, #54). The fragment names the table, so it holds here.
+        payable: sql<boolean>`${payableListing}`,
       })
       .from(listing)
-      .leftJoin(schema.payoutAccounts, eq(schema.payoutAccounts.ownerId, listing.ownerId))
       .where(and(published, eq(listing.slug, slug)))) as (ListingRow & {
       description: string | null;
       location: GeoPoint;
       cancellationPolicy: string | null;
       bookingGapMinutes: number;
-      payoutStatus: string | null;
+      payable: boolean;
     })[];
     if (!row) return null;
 
@@ -456,7 +455,7 @@ export class ParkingService {
         : null,
       // Paid for through Stripe once the owner's payouts are set up (#5), or on a local run
       // without Stripe by the stand-in (#33).
-      bookingOpen: this.payments ? row.payoutStatus === 'active' : this.env.bookingWithoutPayment,
+      bookingOpen: this.payments ? row.payable : this.env.bookingWithoutPayment,
     });
   }
 

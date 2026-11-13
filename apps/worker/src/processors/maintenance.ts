@@ -3,6 +3,7 @@ import {
   deleteStaleHolds,
   deleteUnconfirmedAccounts,
   expireLapsedHolds,
+  purgeListingInvites,
   purgeStripeEvents,
 } from '@parkfairy/database';
 import { sql } from 'drizzle-orm';
@@ -19,6 +20,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const STALE_HOLD_DAYS = 7;
 /** Stripe retries an event for three days; past a week its record spares nothing. */
 export const STRIPE_EVENT_DAYS = 7;
+/**
+ * Invites settled or lapsed this long ago go (#56): they hold an address that may be no account's
+ * (GDPR); a month is enough to answer "who invited me, and when".
+ */
+export const LISTING_INVITE_DAYS_KEPT = 30;
 
 export const maintenanceProcessor: QueueProcessor = {
   queue: QUEUES.maintenance,
@@ -33,6 +39,7 @@ export const maintenanceProcessor: QueueProcessor = {
     { id: 'expire-lapsed-holds', everyMs: 60_000 },
     { id: 'delete-stale-holds', everyMs: DAY_MS / 24 },
     { id: 'purge-stripe-events', everyMs: DAY_MS },
+    { id: 'purge-listing-invites', everyMs: DAY_MS },
   ],
   async process(job, { db, logger }) {
     switch (job.name) {
@@ -69,6 +76,14 @@ export const maintenanceProcessor: QueueProcessor = {
           new Date(Date.now() - STRIPE_EVENT_DAYS * DAY_MS),
         );
         if (purged > 0) logger.info({ purged }, 'old Stripe events purged');
+        return { purged };
+      }
+      case 'purge-listing-invites': {
+        const purged = await purgeListingInvites(
+          db,
+          new Date(Date.now() - LISTING_INVITE_DAYS_KEPT * DAY_MS),
+        );
+        if (purged > 0) logger.info({ purged }, 'old listing invites purged');
         return { purged };
       }
       default:

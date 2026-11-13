@@ -36,6 +36,7 @@ import {
   type OwnerOnboarding,
   type OwnerPhoto,
   type OwnerPrices,
+  type ListingOwnerRole,
   type OwnerProof,
   type ParkingFeature,
   type ProofKind,
@@ -60,12 +61,13 @@ import {
   missingForSubmit,
   nextListingStep,
 } from './onboarding-progress.js';
-import { badUpload, conflict, listingNotFound } from './owner.errors.js';
+import { badUpload, conflict, listingNotFound, primaryOnly } from './owner.errors.js';
 import { OwnerProfileService, profileFacts } from './owner-profile.service.js';
 import { slugFromName } from './slug.js';
 
 const listing = schema.parkingLocations;
 const profile = schema.ownerProfiles;
+const owners = schema.listingOwners;
 const space = schema.parkingSpaces;
 const hours = schema.parkingOpeningHours;
 const exception = schema.parkingHoursExceptions;
@@ -181,7 +183,7 @@ export class OwnerListingsService {
     const rows = await this.db
       .select()
       .from(listing)
-      .where(eq(listing.ownerId, owner.id))
+      .where(inArray(listing.id, this.listingsOf(owner.id)))
       .orderBy(desc(listing.updatedAt))
       .limit(OWNER_LISTINGS_MAX);
     const progress = await this.progressOf(rows);
@@ -208,6 +210,10 @@ export class OwnerListingsService {
       if ((existing?.value ?? 0) >= OWNER_LISTINGS_MAX) throw conflict('TOO_MANY_LISTINGS');
       const id = randomUUID();
       await tx.insert(listing).values({ id, ownerId: owner.id, slug: `draft-${id}` });
+      // Its maker is its primary owner, with all of the owners' share (#53).
+      await tx
+        .insert(owners)
+        .values({ locationId: id, ownerId: owner.id, role: 'primary', shareBps: 10_000 });
       return { id };
     });
   }
@@ -294,8 +300,9 @@ export class OwnerListingsService {
    */
   async others(userId: string, id: string): Promise<OwnerOtherListings> {
     const row = await this.owned(userId, id);
-    // `owned` joined the owner's profile, so the listing has an owner.
-    const rows = row.ownerId
+    // `owned` found the account among the listing's owners, so it has a profile.
+    const owner = await this.profiles.find(userId);
+    const rows = owner
       ? await this.db
           .select({
             id: listing.id,
@@ -304,7 +311,7 @@ export class OwnerListingsService {
             status: listing.status,
           })
           .from(listing)
-          .where(and(eq(listing.ownerId, row.ownerId), ne(listing.id, row.id)))
+          .where(and(inArray(listing.id, this.listingsOf(owner.id)), ne(listing.id, row.id)))
           .orderBy(desc(listing.updatedAt))
           .limit(OWNER_LISTINGS_MAX)
       : [];
@@ -318,6 +325,7 @@ export class OwnerListingsService {
   }
 
   async remove(userId: string, id: string): Promise<void> {
+    if ((await this.roleOf(userId, id)) !== 'primary') throw primaryOnly();
     const { keys, storageKeys } = await this.edit(userId, id, async (tx, row) => {
       if (row.status !== 'draft') throw conflict('LISTING_LOCKED');
       // Only a listing staff took back from live can have them; bookings are records to keep.
@@ -514,7 +522,8 @@ export class OwnerListingsService {
       const locked = await tx
         .select({ id: listing.id, status: listing.status })
         .from(listing)
-        .innerJoin(profile, eq(profile.id, listing.ownerId))
+        .innerJoin(owners, eq(owners.locationId, listing.id))
+        .innerJoin(profile, eq(profile.id, owners.ownerId))
         .where(and(inArray(listing.id, targets), eq(profile.userId, userId)))
         .orderBy(asc(listing.id))
         .for('no key update', { of: listing });
@@ -621,7 +630,8 @@ export class OwnerListingsService {
       const locked = await tx
         .select({ id: listing.id, status: listing.status })
         .from(listing)
-        .innerJoin(profile, eq(profile.id, listing.ownerId))
+        .innerJoin(owners, eq(owners.locationId, listing.id))
+        .innerJoin(profile, eq(profile.id, owners.ownerId))
         .where(and(inArray(listing.id, targets), eq(profile.userId, userId)))
         .orderBy(asc(listing.id))
         .for('no key update', { of: listing });
@@ -1189,16 +1199,40 @@ export class OwnerListingsService {
     if (stranded) throw conflict('LISTING_BOOKED', { bookings: stranded });
   }
 
-  /** The listing, if this user owns it. Anything else is the same 404. */
+  /**
+   * The listing, if this user is one of its owners, primary or co-owner (#53, #55: each may run
+   * it). Anything else is the same 404.
+   */
   private async owned(userId: string, id: string): Promise<ListingRow> {
     if (!UUID.test(id)) throw listingNotFound();
     const [row] = await this.db
       .select({ listing })
       .from(listing)
-      .innerJoin(profile, eq(profile.id, listing.ownerId))
+      .innerJoin(owners, eq(owners.locationId, listing.id))
+      .innerJoin(profile, eq(profile.id, owners.ownerId))
       .where(and(eq(listing.id, id), eq(profile.userId, userId)));
     if (!row) throw listingNotFound();
     return row.listing;
+  }
+
+  /** This user's role among the listing's owners; none is the same 404. */
+  private async roleOf(userId: string, id: string): Promise<ListingOwnerRole> {
+    if (!UUID.test(id)) throw listingNotFound();
+    const [row] = await this.db
+      .select({ role: owners.role })
+      .from(owners)
+      .innerJoin(profile, eq(profile.id, owners.ownerId))
+      .where(and(eq(owners.locationId, id), eq(profile.userId, userId)));
+    if (!row) throw listingNotFound();
+    return row.role;
+  }
+
+  /** The listings an owner profile owns or co-owns, as a subquery. */
+  private listingsOf(ownerId: string) {
+    return this.db
+      .select({ id: owners.locationId })
+      .from(owners)
+      .where(eq(owners.ownerId, ownerId));
   }
 
   /**

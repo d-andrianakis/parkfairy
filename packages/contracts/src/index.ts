@@ -11,3 +11,4 @@ export * from './owner.js';
 export * from './payments.js';
 export * from './bookings.js';
 export * from './places.js';
+export * from './listing-owners.js';

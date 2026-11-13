@@ -1,0 +1,154 @@
+import { z } from 'zod';
+import { LocaleSchema } from './i18n.js';
+import { PayoutStatusSchema } from './payments.js';
+import { contractsRegistry } from './registry.js';
+import { message } from './validation.js';
+
+/**
+ * Co-ownership of a listing (#53–#56): the primary owner (the listing's `owner_id`) and co-owners,
+ * each with a share of the owners' payouts, and email invites to join.
+ */
+export const LISTING_OWNER_ROLES = ['primary', 'co_owner'] as const;
+export const ListingOwnerRoleSchema = z.enum(LISTING_OWNER_ROLES).register(contractsRegistry, {
+  id: 'ListingOwnerRole',
+});
+export type ListingOwnerRole = z.infer<typeof ListingOwnerRoleSchema>;
+
+/** Owners and pending invites together, per listing. */
+export const LISTING_OWNERS_MAX = 10;
+/** How long an invite's link works, from when it was sent (#56). */
+export const LISTING_INVITE_DAYS = 7;
+/** Shares are whole percentages; stored as basis points (100 = 1%). */
+export const SHARE_BPS_PER_PERCENT = 100;
+
+/** An invite link's token: 32 random bytes, base64url. Only its hash is kept. */
+export const INVITE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+export const ListingOwnerSchema = z
+  .object({
+    /** The owner's profile id: what shares and removal refer to. */
+    id: z.uuid(),
+    name: z.string().nullable(),
+    email: z.string(),
+    role: ListingOwnerRoleSchema,
+    /** Their share of the owners' payouts, in whole percent. */
+    sharePercent: z.number().int().min(0).max(100),
+    /** Whether Stripe can pay them: one with a share and no active account keeps bookings shut. */
+    payouts: PayoutStatusSchema,
+    /** The account asking. */
+    you: z.boolean(),
+  })
+  .register(contractsRegistry, { id: 'ListingOwner' });
+export type ListingOwner = z.infer<typeof ListingOwnerSchema>;
+
+export const ListingInviteSchema = z
+  .object({
+    id: z.uuid(),
+    email: z.string(),
+    /** Who sent it, by name; null if they have since left. */
+    invitedBy: z.string().nullable(),
+    /** Until when its link works; null while the email is still on its way. */
+    expiresAt: z.iso.datetime({ offset: true }).nullable(),
+    /** The asking owner may withdraw it: theirs, or any if they're the primary. */
+    canWithdraw: z.boolean(),
+  })
+  .register(contractsRegistry, { id: 'ListingInvite' });
+export type ListingInvite = z.infer<typeof ListingInviteSchema>;
+
+export const ListingOwnersSchema = z
+  .object({
+    listingId: z.uuid(),
+    name: z.string().nullable(),
+    contentLocale: LocaleSchema,
+    /** The asking owner's role: only the primary removes owners and sets shares (#55). */
+    role: ListingOwnerRoleSchema,
+    owners: z.array(ListingOwnerSchema),
+    invites: z.array(ListingInviteSchema),
+    /** Every owner with a share can be paid, so drivers can book (#54). */
+    payable: z.boolean(),
+    /** Owners and pending invites left before the limit. */
+    room: z.number().int().min(0),
+  })
+  .register(contractsRegistry, { id: 'ListingOwners' });
+export type ListingOwners = z.infer<typeof ListingOwnersSchema>;
+
+export const ListingInviteInputSchema = z
+  .object({
+    email: z.email(message('emailInvalid')).max(254, message('emailInvalid')),
+    /** The language the invite email is written in: the inviter's, as they write it. */
+    locale: LocaleSchema,
+  })
+  .register(contractsRegistry, { id: 'ListingInviteInput' });
+export type ListingInviteInput = z.infer<typeof ListingInviteInputSchema>;
+
+export const ListingSharesInputSchema = z
+  .object({
+    shares: z
+      .array(
+        z.object({
+          ownerId: z.uuid(),
+          percent: z
+            .number(message('shareInvalid'))
+            .int(message('shareInvalid'))
+            .min(0, message('shareInvalid'))
+            .max(100, message('shareInvalid')),
+        }),
+      )
+      .min(1)
+      .max(LISTING_OWNERS_MAX)
+      .refine(
+        (shares) => new Set(shares.map((share) => share.ownerId)).size === shares.length,
+        message('invalid'),
+      )
+      .refine(
+        (shares) => shares.reduce((sum, share) => sum + share.percent, 0) === 100,
+        message('sharesTotal'),
+      ),
+  })
+  .register(contractsRegistry, { id: 'ListingSharesInput' });
+export type ListingSharesInput = z.infer<typeof ListingSharesInputSchema>;
+
+export const InviteTokenInputSchema = z
+  .object({ token: z.string().regex(INVITE_TOKEN_PATTERN) })
+  .register(contractsRegistry, { id: 'InviteTokenInput' });
+export type InviteTokenInput = z.infer<typeof InviteTokenInputSchema>;
+
+/** What the invite page shows before accepting: never the listing's owners or its address. */
+export const INVITE_STATES = ['open', 'expired', 'used'] as const;
+export const InvitePreviewSchema = z
+  .object({
+    state: z.enum(INVITE_STATES),
+    listingName: z.string().nullable(),
+    contentLocale: LocaleSchema,
+    invitedBy: z.string().nullable(),
+    /** Whether the signed-in account is the one invited (its verified address). */
+    forYou: z.boolean(),
+  })
+  .register(contractsRegistry, { id: 'InvitePreview' });
+export type InvitePreview = z.infer<typeof InvitePreviewSchema>;
+
+export const InviteAcceptedSchema = z
+  .object({ listingId: z.uuid() })
+  .register(contractsRegistry, { id: 'InviteAccepted' });
+export type InviteAccepted = z.infer<typeof InviteAcceptedSchema>;
+
+/** Every `code` a co-ownership route answers with, for clients to translate. */
+export const LISTING_OWNER_ERROR_CODES = [
+  'LISTING_NOT_FOUND',
+  /** Only the primary owner may do this (#55). */
+  'PRIMARY_ONLY',
+  /** The primary can't leave their own listing. */
+  'PRIMARY_CANNOT_LEAVE',
+  'TOO_MANY_OWNERS',
+  /** Already an owner, or already invited and the invite still open. */
+  'ALREADY_OWNER',
+  'ALREADY_INVITED',
+  'OWNER_NOT_FOUND',
+  'INVITE_NOT_FOUND',
+  'INVITE_EXPIRED',
+  /** Signed in with another address than the one invited, or one not confirmed yet. */
+  'INVITE_FOR_ANOTHER_ACCOUNT',
+  /** The shares named aren't the listing's owners, each once. */
+  'SHARES_MISMATCH',
+] as const;
+export type ListingOwnerErrorCode = (typeof LISTING_OWNER_ERROR_CODES)[number];

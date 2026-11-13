@@ -15,12 +15,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@parkfairy/ui/components/card';
-import { CalendarCheck, CalendarX, CircleAlert, ImageOff } from 'lucide-react';
+import { CalendarCheck, CalendarX, CircleAlert, ImageOff, Users } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { PlaceWords, placeTag } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
-import { closuresHref, ownerBookingsHref } from '@/lib/owner-href';
+import { closuresHref, ownerBookingsHref, ownersHref } from '@/lib/owner-href';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 import { DeleteDraftButton } from './listing-actions';
 import { StepLink } from './navigation';
@@ -200,6 +200,15 @@ export function ListingMilestones({
                     // The owner's name for it, read in the language they wrote it in.
                     listing: placeTag(name, nameLang),
                   })}
+                </span>
+              </Link>
+            </Button>
+            {/* Whatever the status: its owners and their shares (#53–#56). */}
+            <Button asChild variant="outline" size="sm" className={WRAPPING_BUTTON}>
+              <Link href={ownersHref(listing.id)}>
+                <Users aria-hidden />
+                <span>
+                  {t.rich('dashboard.owners', { name, listing: placeTag(name, nameLang) })}
                 </span>
               </Link>
             </Button>

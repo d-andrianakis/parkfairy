@@ -130,8 +130,10 @@ export function fakeStripe() {
       },
     ),
     transfer: vi.fn<PaymentsGateway['transfer']>(
-      ({ bookingId, accountId, amountMinor, chargeId }) => {
-        const known = transfers.get(bookingId);
+      ({ bookingId, ownerId, accountId, amountMinor, chargeId }) => {
+        // One per booking and payee, as the gateway's idempotency key has it.
+        const key = `${bookingId}:${ownerId}`;
+        const known = transfers.get(key);
         if (known) return Promise.resolve(known.id);
         if (accounts.get(accountId) !== 'active') {
           return Promise.reject(
@@ -141,7 +143,7 @@ export function fakeStripe() {
           );
         }
         const id = `tr_${(++next).toString().padStart(6, '0')}Fake`;
-        transfers.set(bookingId, { id, accountId, amountMinor, chargeId });
+        transfers.set(key, { id, accountId, amountMinor, chargeId });
         return Promise.resolve(id);
       },
     ),
@@ -167,8 +169,8 @@ export function fakeStripe() {
       }
       return Promise.resolve(null);
     }),
-    transferMadeFor: vi.fn<PaymentsGateway['transferMadeFor']>((bookingId) =>
-      Promise.resolve(transfers.get(bookingId)?.id ?? null),
+    transferMadeFor: vi.fn<PaymentsGateway['transferMadeFor']>((bookingId, ownerId) =>
+      Promise.resolve(transfers.get(`${bookingId}:${ownerId}`)?.id ?? null),
     ),
     cancelPayment: vi.fn<PaymentsGateway['cancelPayment']>((id) => {
       const state = intents.get(id);

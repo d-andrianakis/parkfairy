@@ -5,6 +5,7 @@ import {
   enqueueOnboardingReminders,
   markEmailFailed,
   markEmailSent,
+  mintInviteToken,
   purgeSentEmails,
   releaseEmails,
   type ClaimedEmail,
@@ -29,6 +30,9 @@ vi.mock('@parkfairy/database', () => ({
   enqueueOnboardingReminders: vi.fn(),
   markEmailFailed: vi.fn(),
   markEmailSent: vi.fn(),
+  mintInviteToken: vi.fn(),
+  // The real hash: the key it makes is what the test reads.
+  hashInviteToken: (token: string) => `hash-of-${token}-padding-padding`,
   purgeSentEmails: vi.fn(),
   releaseEmails: vi.fn(),
 }));
@@ -52,6 +56,7 @@ const row = (overrides: Partial<ClaimedEmail> = {}): ClaimedEmail => ({
   payload: { listingName: 'Γκαράζ' },
   to: 'owner@example.gr',
   locale: 'el',
+  inviteId: null,
   ...overrides,
 });
 
@@ -453,6 +458,58 @@ describe('owner emails processor', () => {
       expect.objectContaining({ id: 'email-1' }),
       'Email "booking-confirmed" has no booking',
     );
+  });
+
+  describe('an invite to own a listing (#56)', () => {
+    const invite = (overrides: Partial<ClaimedEmail> = {}) =>
+      row({
+        id: 'email-9',
+        kind: 'listing-invite',
+        inviteId: 'invite-1',
+        to: 'eleni@example.gr',
+        locale: 'en',
+        payload: { listingName: 'Ermou Garage', contentLocale: 'en', inviterName: 'Maria' },
+        ...overrides,
+      });
+
+    it('makes its link as it sends, with a key of its own for each link', async () => {
+      const token = 'T'.repeat(43);
+      vi.mocked(mintInviteToken).mockResolvedValue({ token, expiresAt: new Date() });
+      vi.mocked(claimDueEmails).mockResolvedValue([invite()]);
+      await expect(run('send-owner-emails')).resolves.toEqual({
+        sent: 1,
+        failed: 0,
+        handedBack: 0,
+      });
+      expect(mintInviteToken).toHaveBeenCalledWith(db, 'invite-1');
+      const email = send.mock.calls[0]?.[0];
+      expect(email?.to).toBe('eleni@example.gr');
+      expect(email?.text).toContain(`https://parkfairy.example/en/owner/invite#${token}`);
+      expect(email?.text).toContain('Maria invites you to own “Ermou Garage”');
+      // A new link is a new email to Resend: never refused for a changed body under one key.
+      expect(email?.idempotencyKey).toBe(`email-9:hash-of-${'T'.repeat(8)}`);
+      expect(markEmailSent).toHaveBeenCalledWith(db, 'email-9');
+    });
+
+    it('sends nothing for an invite accepted or withdrawn since, and is done with it', async () => {
+      vi.mocked(mintInviteToken).mockResolvedValue(null);
+      vi.mocked(claimDueEmails).mockResolvedValue([invite()]);
+      await run('send-owner-emails');
+      expect(send).not.toHaveBeenCalled();
+      expect(markEmailSent).toHaveBeenCalledWith(db, 'email-9');
+    });
+
+    it('refuses an invite email without its invite, without losing the rest', async () => {
+      vi.mocked(claimDueEmails).mockResolvedValue([
+        invite({ inviteId: null }),
+        row({ id: 'email-2' }),
+      ]);
+      await expect(run('send-owner-emails')).resolves.toEqual({
+        sent: 1,
+        failed: 1,
+        handedBack: 0,
+      });
+    });
   });
 
   it('refuses a kind it has no template for, without losing the rest', async () => {

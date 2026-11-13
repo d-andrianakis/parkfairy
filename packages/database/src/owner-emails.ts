@@ -2,6 +2,7 @@ import { and, asc, eq, lte, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import { users } from './schema/auth.js';
 import { emailOutbox, type OutboxEmailKind, type OutboxPayload } from './schema/email-outbox.js';
+import { listingInvites } from './schema/listing-owners.js';
 
 /** Per sweep, so one run never holds locks on much of a table. */
 const SWEEP_LIMIT = 200;
@@ -97,6 +98,8 @@ export interface ClaimedEmail {
   payload: OutboxPayload;
   to: string;
   locale: string;
+  /** An invite's email (#56): its link is made as it is sent. */
+  inviteId: string | null;
 }
 
 /**
@@ -124,11 +127,14 @@ export async function claimDueEmails(db: Database, limit: number): Promise<Claim
       kind: emailOutbox.kind,
       attempts: emailOutbox.attempts,
       payload: emailOutbox.payload,
-      to: users.email,
-      locale: users.locale,
+      // An account's address and language, or an invite's (who may have no account yet).
+      to: sql<string>`coalesce(${users.email}, ${listingInvites.email})`,
+      locale: sql<string>`coalesce(${users.locale}, ${listingInvites.locale})`,
+      inviteId: emailOutbox.inviteId,
     })
     .from(emailOutbox)
-    .innerJoin(users, eq(users.id, emailOutbox.userId))
+    .leftJoin(users, eq(users.id, emailOutbox.userId))
+    .leftJoin(listingInvites, eq(listingInvites.id, emailOutbox.inviteId))
     .where(sql`${emailOutbox.id} in ${ids}`)
     .orderBy(asc(emailOutbox.createdAt));
 }

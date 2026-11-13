@@ -3,12 +3,14 @@ import {
   createClient,
   createConfig,
   getListingHoursExceptions,
+  getListingOwners,
   getOtherOwnerListings,
   getOwnerListing,
   getOwnerOnboarding,
   getOwnerPayouts,
   getOwnerProfile,
   type OwnerListing,
+  type ListingOwners,
   type OwnerListingClosures,
   type OwnerOnboarding,
   type OwnerOtherListings,
@@ -95,6 +97,19 @@ export const loadOwnerClosures = cache(
         ...(await request()),
         path: { id },
       });
+      if (data) return data;
+      return response?.status === 404 ? 'not-found' : 'unavailable';
+    } catch {
+      return 'unavailable';
+    }
+  },
+);
+
+/** A listing's owners, shares and open invites, as the asking owner may see them; or why not. */
+export const loadListingOwners = cache(
+  async (id: string): Promise<ListingOwners | 'not-found' | 'unavailable'> => {
+    try {
+      const { data, response } = await getListingOwners({ ...(await request()), path: { id } });
       if (data) return data;
       return response?.status === 404 ? 'not-found' : 'unavailable';
     } catch {

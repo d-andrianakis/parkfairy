@@ -297,6 +297,7 @@ describe('stripeGateway', () => {
     await expect(
       gatewayWith(client).transfer({
         bookingId: 'b1',
+        ownerId: 'o1',
         accountId: 'acct_1',
         amountMinor: 1800,
         currency: 'EUR',
@@ -310,9 +311,10 @@ describe('stripeGateway', () => {
         destination: 'acct_1',
         source_transaction: 'ch_1',
         transfer_group: 'booking_b1',
-        metadata: { bookingId: 'b1' },
+        metadata: { bookingId: 'b1', ownerId: 'o1' },
       },
-      { idempotencyKey: 'transfer-b1' },
+      // Per booking and payee: co-owners each get theirs (#54).
+      { idempotencyKey: 'transfer-b1-o1' },
     );
   });
 
@@ -327,12 +329,13 @@ describe('stripeGateway', () => {
     });
     client.transfers.list.mockResolvedValueOnce({
       data: [
-        { id: 'tr_other', metadata: { bookingId: 'b9' } },
-        { id: 'tr_2', metadata: { bookingId: 'b1' } },
+        { id: 'tr_other', metadata: { bookingId: 'b9', ownerId: 'o1' } },
+        { id: 'tr_coOwner', metadata: { bookingId: 'b1', ownerId: 'o2' } },
+        { id: 'tr_2', metadata: { bookingId: 'b1', ownerId: 'o1' } },
       ],
     });
     await expect(gatewayWith(client).refundMadeFor('pi_1')).resolves.toBe('re_2');
-    await expect(gatewayWith(client).transferMadeFor('b1')).resolves.toBe('tr_2');
+    await expect(gatewayWith(client).transferMadeFor('b1', 'o1')).resolves.toBe('tr_2');
     expect(client.refunds.list).toHaveBeenCalledWith({ payment_intent: 'pi_1', limit: 10 });
     expect(client.transfers.list).toHaveBeenCalledWith({ transfer_group: 'booking_b1', limit: 10 });
   });
@@ -409,7 +412,7 @@ describe('stripeGateway', () => {
       ],
     });
     await expect(gatewayWith(client).refundMadeFor('pi_1')).resolves.toBeNull();
-    await expect(gatewayWith(client).transferMadeFor('b1')).resolves.toBeNull();
+    await expect(gatewayWith(client).transferMadeFor('b1', 'o1')).resolves.toBeNull();
   });
 
   it('refunds all of a payment, once', async () => {

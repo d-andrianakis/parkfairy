@@ -9,6 +9,7 @@
 import { sql } from 'drizzle-orm';
 import { check, index, jsonb, pgTable, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { users } from './auth.js';
+import { listingInvites } from './listing-owners.js';
 
 export const OUTBOX_EMAIL_KINDS = [
   'listing-submitted',
@@ -22,6 +23,8 @@ export const OUTBOX_EMAIL_KINDS = [
   // To the listing's owner.
   'booking-received',
   'booking-cancelled-by-driver',
+  // To someone invited to own a listing (#56), who may have no account yet.
+  'listing-invite',
 ] as const;
 export type OutboxEmailKind = (typeof OUTBOX_EMAIL_KINDS)[number];
 
@@ -57,6 +60,8 @@ export interface OutboxPayload {
   /** The language the listing is written in, for `lang` on its name (rows from 2026-11-11 on). */
   contentLocale?: string;
   booking?: OutboxBooking;
+  /** An invite's (#56): who sent it, by their account's name, shown to the person invited. */
+  inviterName?: string;
 }
 
 export const emailOutbox = pgTable(
@@ -64,9 +69,9 @@ export const emailOutbox = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     kind: text('kind').$type<OutboxEmailKind>().notNull(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The account it goes to; or, for an invite, the invite (its address, its language). */
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    inviteId: uuid('invite_id').references(() => listingInvites.id, { onDelete: 'cascade' }),
     payload: jsonb('payload').$type<OutboxPayload>().notNull().default({}),
     /** One email per event, however many sweeps see it. */
     dedupeKey: text('dedupe_key').notNull().unique(),
@@ -82,6 +87,11 @@ export const emailOutbox = pgTable(
   (t) => [
     // The cascade from `users` would otherwise scan the table for every deleted account.
     index('email_outbox_user_idx').on(t.userId),
+    index('email_outbox_invite_idx').on(t.inviteId),
+    check(
+      'email_outbox_recipient_check',
+      sql`(${t.userId} is null) <> (${t.inviteId} is null) and (${t.inviteId} is null) = (${t.kind} <> 'listing-invite')`,
+    ),
     index('email_outbox_due_idx')
       .on(t.nextAttemptAt)
       .where(sql`${t.status} = 'pending'`),

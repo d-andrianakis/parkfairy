@@ -172,6 +172,38 @@ Answered by the product owner on 2026-11-12, for refunds and transfers (4.2):
     once the account is active again, with support alerted when it has waited a few days; the
     owner's pages say payouts are on hold until Stripe has what it needs.
 
+Answered by the product owner on 2026-11-13, for co-ownership:
+
+53. **A whole listing is co-owned**, with all of its spaces: not single spaces.
+54. **Payouts are split by shares**: each co-owner has a percentage and a Stripe payout account of
+    their own, and each stay's transfer is split between them. Bookings wait until every co-owner
+    with a share can be paid.
+55. **A co-owner can do everything but remove**: edit the listing, prices, hours and closures, see
+    and cancel bookings, invite others. Only the primary owner removes co-owners, sets the shares
+    and deletes the listing.
+56. **Co-owners are added by email invite**: the person signs in or signs up, and accepts. Invites
+    expire after 7 days and can be withdrawn.
+
+Our readings for co-ownership (2026-11-13), not asked; change any that are wrong:
+
+- **The primary owner is the listing's `owner_id`**, as before; every owner, the primary too, has a
+  row in `listing_owners` with a share. The primary starts at 100%.
+- **Shares are whole percentages adding up to 100**, set by the primary for everyone at once. A new
+  co-owner joins at 0%: they help run the listing, and are paid once the primary gives them a share.
+- **A booking's payees are copied at the hold**, as its commission is (#15): a share changed, an
+  owner joining or leaving, changes only bookings made after.
+- **Each payee is paid on their own**, 24 hours after the stay: one whose account is restricted
+  waits alone (#52). The owners' 90% is split by largest remainder, the primary first on a tie.
+- **A listing is bookable while every owner with a share can be paid**; an owner at 0% needs no
+  payout account.
+- **Every owner hears of bookings** (new and cancelled), each under the per-driver cap (L3).
+- **An invite is accepted only by an account with that verified address**, so a forwarded link
+  is no use to anyone else. Accepting makes an owner profile if the person has none. At most 10
+  owners and pending invites together per listing; one live invite per address per listing.
+- **Co-owners can leave**; the primary can't (they would delete the listing, or hand it over
+  later). Any owner may withdraw an invite they sent; the primary, any invite.
+- **A co-owner sees the listing's bookings and its drivers' names and plates**, as the primary does.
+
 Our readings (2026-11-08), not asked; change any that are wrong:
 
 - **One hold per driver.** A new hold lets the driver's earlier ones go, so one account can't sit
@@ -928,6 +960,29 @@ locked`) in one statement. The two sets are kept apart (`user_id <> $user`) beca
     against balance transactions.
   - **Alerts are error logs** with fixed messages ("refund owed for over a day", "ledger does not
     add up", "transfers waiting over 3 days", "refund failed at Stripe") until monitoring exists.
+- **Co-ownership (2026-11-13, #53–#56).** `listing_owners` holds every owner of a listing, the
+  primary too, with a share in basis points; the listing's `owner_id` stays the primary, so what
+  needs "the" owner (status emails, the listing cap) is unchanged.
+  - **Every ownership check goes through `listing_owners`** (`owned`, `ownedListing`, copies, the
+    dashboard); only removing owners, shares and deleting ask for the primary (403 `PRIMARY_ONLY`).
+    Changes to a listing's owners and invites take the listing's row lock first, accepting too.
+  - **Payees are copied when a booking is confirmed**, not at the hold: a hold that never books has
+    none and is deleted like any lapsed hold (`booking_payees` restricts deleting a booking).
+  - **Each payee is paid on their own** (`transfer-${booking}-${owner}`), split by largest
+    remainder; the booking's transfer is `sent` when the last payee's is, and the commission is
+    entered then. The ledger keeps one transfer entry per payee (a unique key with NULLS NOT
+    DISTINCT over booking, kind and owner).
+  - **Bookable needs someone paid**: an owner with a share, and every such owner active. A listing
+    with no owners (the demo's) would otherwise pass a "nobody unpaid" check.
+  - **Booking emails go to every owner**, each under the per-driver cap; the outbox's dedupe key
+    names the owner (`booking:<id>:<event>:owner:<user>`), or the second owner's would be dropped.
+  - **An invite's link is made by the worker as it sends** (no live link waits in the outbox), its
+    token after `#` so no server or log sees it, only its hash kept. Each try makes a new token, so
+    Resend gets a new idempotency key for it (`<outbox id>:<hash prefix>`): one key with a changed
+    body would be refused, and the email that did go would carry a dead link. Accepting needs the
+    account's verified address to be the one invited.
+  - **The invite page keeps the token for the tab** (`sessionStorage`) and takes it out of the
+    address: signing in on the way loses the `#`.
 
 ## Conventions
 
@@ -1232,6 +1287,8 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   first, and the stale-hold sweep skips any booking with one (one would fail the whole batch).
 - **Drizzle's `$onUpdate` sets `updated_at` on every `.update()`**: a write that mustn't move it
   (the money backoff) goes through `db.execute` instead.
+- **Supertest can't hold several requests built before any is sent** (2026-11-13): "Cannot read
+  properties of null (reading 'address')". Build each where it is awaited.
 - **Agent reviews can stop on the account's usage limit** (2026-11-12): a review agent cut off
   part way is resumed with a message, not started again.
 

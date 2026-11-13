@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 
 /** Also what another owner's listing answers: its existence is none of their business. */
 export function listingNotFound(): NotFoundException {
@@ -26,5 +31,15 @@ export function badUpload(code: string): BadRequestException {
     error: 'Bad Request',
     message: code,
     code,
+  });
+}
+
+/** What only a listing's primary owner may do (#55): remove owners, set shares, delete it. */
+export function primaryOnly(): ForbiddenException {
+  return new ForbiddenException({
+    statusCode: 403,
+    error: 'Forbidden',
+    message: 'PRIMARY_ONLY',
+    code: 'PRIMARY_ONLY',
   });
 }

@@ -13,7 +13,7 @@ import {
   pgTable,
   text,
   timestamp,
-  uniqueIndex,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { bookings } from './bookings.js';
@@ -114,10 +114,17 @@ export const ledgerEntries = pgTable(
     currency: char('currency', { length: 3 }).notNull(),
     /** Stripe's id for what moved (`ch_`, `re_`, `tr_`); none for the commission, which stays. */
     stripeId: text('stripe_id'),
+    /** A transfer's payee (co-ownership, #54): each owner paid has an entry of their own. */
+    ownerId: uuid('owner_id').references(() => ownerProfiles.id, { onDelete: 'restrict' }),
     createdAt: instant('created_at').defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex('ledger_entries_booking_kind_idx').on(t.bookingId, t.kind),
+    // One of each kind per booking, and one transfer per payee: writing one twice changes nothing.
+    unique('ledger_entries_booking_kind_owner_key')
+      .on(t.bookingId, t.kind, t.ownerId)
+      .nullsNotDistinct(),
+    index('ledger_entries_owner_idx').on(t.ownerId),
+    check('ledger_entries_owner_check', sql`(${t.ownerId} is not null) = (${t.kind} = 'transfer')`),
     // The daily check reads what was entered since its last run.
     index('ledger_entries_created_idx').on(t.createdAt),
     check('ledger_entries_kind_check', sql`${t.kind} in (${sqlList(LEDGER_KINDS)})`),

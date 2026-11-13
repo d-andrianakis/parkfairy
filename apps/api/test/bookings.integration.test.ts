@@ -181,6 +181,10 @@ describe('bookings', () => {
       })
       .returning({ id: schema.parkingLocations.id });
     const id = row?.id ?? '';
+    // Its owner, as the API makes a listing: the primary, with all of the owners' share (#53).
+    await db
+      .insert(schema.listingOwners)
+      .values({ locationId: id, ownerId: ownerProfileId, role: 'primary', shareBps: 10_000 });
     const spaces = await db
       .insert(schema.parkingSpaces)
       .values(
@@ -205,6 +209,17 @@ describe('bookings', () => {
       .where(like(schema.parkingLocations.slug, `${PREFIX}%`));
     const ids = ours.map((row) => row.id);
     if (ids.length === 0) return;
+    await db
+      .delete(schema.bookingPayees)
+      .where(
+        inArray(
+          schema.bookingPayees.bookingId,
+          db
+            .select({ id: schema.bookings.id })
+            .from(schema.bookings)
+            .where(inArray(schema.bookings.locationId, ids)),
+        ),
+      );
     await db.delete(schema.bookings).where(inArray(schema.bookings.locationId, ids));
     await db.delete(schema.parkingLocations).where(inArray(schema.parkingLocations.id, ids));
   }

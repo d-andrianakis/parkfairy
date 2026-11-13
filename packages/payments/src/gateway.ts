@@ -93,11 +93,13 @@ export interface PaymentsGateway {
   /** A refund as it stands now, to check one Stripe says changed. */
   refund(refundId: string): Promise<RefundState>;
   /**
-   * The owner's share to their Express account (#4, #6), tied to the charge so it waits for the
-   * money to be there. Asked again, the same transfer (idempotency key).
+   * A payee's part of the owners' share to their Express account (#4, #6, #54), tied to the
+   * charge so it waits for the money to be there. Asked again, the same transfer (idempotency key,
+   * per booking and payee).
    */
   transfer(input: {
     bookingId: string;
+    ownerId: string;
     accountId: string;
     amountMinor: number;
     currency: string;
@@ -108,7 +110,7 @@ export interface PaymentsGateway {
    * enough): its cancellation refund, its transfer, so a retry never makes a second one.
    */
   refundMadeFor(paymentIntentId: string): Promise<string | null>;
-  transferMadeFor(bookingId: string): Promise<string | null>;
+  transferMadeFor(bookingId: string, ownerId: string): Promise<string | null>;
   /**
    * A PaymentIntent nobody will pay any more (its hold lapsed): it can't be paid after this. One
    * paid or called off meanwhile is left as it is, and its state returned.
@@ -330,7 +332,7 @@ export function stripeGateway(
         return refund.id;
       }),
     refund: (refundId) => call(async () => refundStateOf(await client.refunds.retrieve(refundId))),
-    transfer: ({ bookingId, accountId, amountMinor, currency, chargeId }) =>
+    transfer: ({ bookingId, ownerId, accountId, amountMinor, currency, chargeId }) =>
       call(async () => {
         const made = await client.transfers.create(
           {
@@ -340,9 +342,9 @@ export function stripeGateway(
             // Paid out of this charge: the transfer waits for its money to be available.
             source_transaction: chargeId,
             transfer_group: `booking_${bookingId}`,
-            metadata: { bookingId },
+            metadata: { bookingId, ownerId },
           },
-          { idempotencyKey: `transfer-${bookingId}` },
+          { idempotencyKey: `transfer-${bookingId}-${ownerId}` },
         );
         return made.id;
       }),
@@ -357,13 +359,17 @@ export function stripeGateway(
         );
         return made?.id ?? null;
       }),
-    transferMadeFor: (bookingId) =>
+    transferMadeFor: (bookingId, ownerId) =>
       call(async () => {
         const transfers = await client.transfers.list({
           transfer_group: `booking_${bookingId}`,
           limit: 10,
         });
-        return transfers.data.find((made) => made.metadata.bookingId === bookingId)?.id ?? null;
+        return (
+          transfers.data.find(
+            (made) => made.metadata.bookingId === bookingId && made.metadata.ownerId === ownerId,
+          )?.id ?? null
+        );
       }),
     cancelPayment: (paymentIntentId) =>
       call(async () => {
