@@ -1,5 +1,7 @@
 import {
+  disputesToAnswer,
   lapsedPayments,
+  lostDisputesHeld,
   ledgerMismatches,
   markTransferSending,
   MONEY_PAGE_SIZE,
@@ -31,6 +33,11 @@ const DAY_MS = 24 * HOUR_MS;
 export const REFUND_GRACE_MS = 5 * MINUTE_MS;
 /** A lapsed hold's payment is called off an hour on, leaving a late payment its time (#3). */
 export const LAPSED_PAYMENT_MS = HOUR_MS;
+/**
+ * A dispute due within this many days with nothing sent to the bank is support's to answer now:
+ * past its deadline it is lost (#59: the evidence is staged, never submitted for them).
+ */
+export const DISPUTE_DUE_ALERT_DAYS = 3;
 /** A transfer waiting this long, mostly on a restricted account, is support's to look into (#52). */
 export const TRANSFER_WAIT_ALERT_DAYS = 3;
 /**
@@ -271,8 +278,9 @@ async function cancelLapsedPayments(
 
 /**
  * The day's look at the money, with Stripe or without (it only reads): the ledger adds up for
- * everything entered since the last look, no refund has been owed for a day, and no owner's
- * transfer has waited for days (#52). What it finds is support's (error logs).
+ * everything entered since the last look, no refund has been owed for a day, no owner's transfer
+ * has waited for days (#52), no dispute is about to go unanswered (#59), and no lost one still
+ * waits on support's decision (#57). What it finds is support's (error logs).
  */
 async function checkMoney({ db, logger }: ProcessorContext, now: Date) {
   // Two days back: a run late or missed still overlaps the one before.
@@ -289,7 +297,19 @@ async function checkMoney({ db, logger }: ProcessorContext, now: Date) {
   if (waiting.bookings > 0) {
     logger.error(waiting, `transfers waiting over ${TRANSFER_WAIT_ALERT_DAYS} days`);
   }
-  return { mismatched: mismatched.length, stuck, waiting: waiting.bookings };
+  const unanswered = await disputesToAnswer(
+    db,
+    new Date(now.getTime() + DISPUTE_DUE_ALERT_DAYS * DAY_MS),
+  );
+  if (unanswered > 0) {
+    logger.error(
+      { disputes: unanswered },
+      `disputes due within ${DISPUTE_DUE_ALERT_DAYS} days, nothing submitted`,
+    );
+  }
+  const lost = await lostDisputesHeld(db);
+  if (lost > 0) logger.error({ disputes: lost }, 'lost disputes waiting on support’s decision');
+  return { mismatched: mismatched.length, stuck, waiting: waiting.bookings, unanswered, lost };
 }
 
 const SWEEPS: Record<string, (payments: PaymentsGateway, ctx: ProcessorContext) => Promise<Swept>> =

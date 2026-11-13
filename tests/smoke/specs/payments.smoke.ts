@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, request as http, test, type Page } from '@playwright/test';
 import {
   activatePayouts,
+  disputeOf,
   HAS_DATABASE,
   publishListing,
   refundOf,
@@ -16,7 +17,8 @@ import { athensDay, listingWithStaff } from '../support/listings';
 // the one page whose CSP lets Stripe in; Stripe's signed webhook settles the booking. Without
 // Stripe's keys (#47) owners are told payouts can't be set up, and only a local run books, without
 // paying: what runs here until test keys exist. Round 4.2: a paid booking called off is refunded
-// at Stripe at once, by its terms, and the ledger has both the charge and the refund.
+// at Stripe at once, by its terms, and the ledger has both the charge and the refund. Round 4.3:
+// a payment the driver's bank disputes is recorded, its evidence staged for support (#59).
 
 test.use(ownVisitor);
 
@@ -143,6 +145,56 @@ test('with Stripe’s test keys: a driver pays, is booked, cancels and is refund
       driver.getByText(/^Ακυρώσατε αυτή την κράτηση\. Θα σας επιστραφεί ποσό \d+,\d{2}\s€\.$/),
     ).toBeVisible();
     await expectAccessible(driver);
+  } finally {
+    await context.close();
+    await unpublishListing(id);
+  }
+});
+
+test('with Stripe’s test keys: a disputed payment is recorded, its evidence staged (#59)', async ({
+  browser,
+  page,
+}) => {
+  test.skip(!EMAIL_OUTBOX, 'New accounts need their confirmation emails');
+  test.skip(!HAS_DATABASE, 'Putting a listing live is done by hand in the database');
+  test.setTimeout(240_000);
+  await registerAndSignIn(page, uniqueEmail('disputed-owner'), 'Owner Disputed');
+  test.skip(!(await withStripe(page)), 'Needs Stripe’s test keys (decision #47)');
+
+  const { id, slug } = await listingWithStaff(
+    page,
+    `Γκαράζ αμφισβήτησης ${randomUUID().slice(0, 6)}`,
+  );
+  await publishListing(id);
+  await activatePayouts(id);
+  const day = athensDay(17);
+  const context = await browser.newContext();
+  const driver = await context.newPage();
+  try {
+    await registerAndSignIn(driver, uniqueEmail('disputing-driver'), 'Driver Disputing');
+    await driver.goto(
+      `/en/parking/${slug}?startDate=${day}&startTime=10:00&endDate=${day}&endTime=12:00`,
+    );
+    await driver.getByRole('button', { name: 'Book this space' }).click();
+    await expect(driver).toHaveURL(/\/en\/bookings\/[0-9a-f-]{36}$/);
+    const bookingId = /bookings\/([0-9a-f-]{36})/.exec(driver.url())?.[1] ?? '';
+    await driver.getByRole('textbox', { name: 'Number plate' }).fill('IKB1234');
+    await driver.getByRole('button', { name: 'Continue to payment' }).click();
+    // Stripe's test card that is paid, then disputed by the bank.
+    const card = driver.frameLocator('iframe[title*="payment"]').first();
+    await card.getByLabel(/card number/i).fill('4000 0000 0000 0259');
+    await card.getByLabel(/expiration/i).fill('12 / 34');
+    await card.getByLabel(/security code|cvc/i).fill('123');
+    await driver.getByRole('button', { name: /^Pay / }).click();
+    await expect(driver.getByRole('heading', { level: 2, name: 'Booking confirmed' })).toBeFocused({
+      timeout: 60_000,
+    });
+    // Stripe's webhook brings the dispute: recorded, the booking's facts staged at Stripe.
+    await expect
+      .poll(() => disputeOf(bookingId), { timeout: 90_000 })
+      .toMatchObject({
+        evidenceStaged: true,
+      });
   } finally {
     await context.close();
     await unpublishListing(id);

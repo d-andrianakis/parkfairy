@@ -52,6 +52,25 @@ export type RefundStatus = (typeof REFUND_STATUSES)[number];
  * made the transfer. A `sending` one is asked again, never made twice (idempotency, then a look).
  */
 export const TRANSFER_STATUSES = ['sending', 'sent'] as const;
+
+/**
+ * A dispute's state, as Stripe has it (4.3, #57–#60). `warning_*` are inquiries before a
+ * chargeback. Settled: won, lost, `warning_closed` and `prevented`; an open or lost one holds the
+ * booking's payout (#58), a lost one for support to decide (#57).
+ */
+export const DISPUTE_STATUSES = [
+  'warning_needs_response',
+  'warning_under_review',
+  'warning_closed',
+  'needs_response',
+  'under_review',
+  'won',
+  'lost',
+  'prevented',
+] as const;
+export type DisputeStatus = (typeof DISPUTE_STATUSES)[number];
+/** A dispute that leaves the booking's money where it was: its payout may go. */
+export const DISPUTES_RELEASED = ['won', 'warning_closed', 'prevented'] as const;
 export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
 
 /** What the booking page needs to take the payment. */

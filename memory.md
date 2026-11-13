@@ -184,6 +184,17 @@ Answered by the product owner on 2026-11-13, for co-ownership:
 56. **Co-owners are added by email invite**: the person signs in or signs up, and accepts. Invites
     expire after 7 days and can be withdrawn.
 
+Answered by the product owner on 2026-11-13, for disputes (4.3):
+
+57. **A lost dispute is decided case by case**: support decides in Stripe who bears it (the
+    owners, from their payouts, or Parkfairy); the app records it and alerts support.
+58. **An open dispute holds that booking's payout**: if the owners haven't been paid yet, their
+    transfer waits until the dispute is settled; other bookings' payouts go on.
+59. **Evidence is prepared automatically**: the booking's facts go to Stripe when the dispute
+    opens; support can add more in Stripe's dashboard.
+60. **Nothing automatic happens to the driver's account**: the dispute is recorded on the booking,
+    and any action is support's.
+
 Our readings for co-ownership (2026-11-13), not asked; change any that are wrong:
 
 - **The primary owner is the listing's `owner_id`**, as before; every owner, the primary too, has a

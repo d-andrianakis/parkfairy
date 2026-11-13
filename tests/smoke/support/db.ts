@@ -18,6 +18,17 @@ async function run<Row extends object = object>(sql: string, values: unknown[]):
   }
 }
 
+/** A booking's dispute (4.3), as Stripe's webhook recorded it; none yet, null. */
+export async function disputeOf(
+  bookingId: string,
+): Promise<{ status: string; evidenceStaged: boolean } | null> {
+  const [row] = await run<{ status: string; evidence_staged_at: string | null }>(
+    `select status, evidence_staged_at from payment_disputes where booking_id = $1`,
+    [bookingId],
+  );
+  return row ? { status: row.status, evidenceStaged: row.evidence_staged_at !== null } : null;
+}
+
 /** A cancelled booking's refund at Stripe (4.2), and what its ledger has: kinds and amounts. */
 export async function refundOf(
   bookingId: string,

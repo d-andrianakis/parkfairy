@@ -3,6 +3,7 @@ import { schema, type Database } from '@parkfairy/database';
 import { eq } from 'drizzle-orm';
 import { BookingsService } from '../bookings/bookings.service.js';
 import { DB } from '../database/database.module.js';
+import { DisputesService } from './disputes.service.js';
 import { PayoutsService } from './payouts.service.js';
 import { PaymentProviderError, type PaymentsEvent } from '@parkfairy/payments';
 
@@ -21,6 +22,7 @@ export class PaymentEventsService {
     @Inject(DB) private readonly db: Database,
     private readonly bookings: BookingsService,
     private readonly payouts: PayoutsService,
+    private readonly disputes: DisputesService,
   ) {}
 
   async handle(event: PaymentsEvent): Promise<void> {
@@ -31,10 +33,11 @@ export class PaymentEventsService {
       .from(events)
       .where(eq(events.stripeEventId, event.id));
     if (seen) return;
-    if (event.kind === 'payment' || event.kind === 'refund') {
+    if (event.kind === 'payment' || event.kind === 'refund' || event.kind === 'dispute') {
       try {
         if (event.kind === 'payment') await this.bookings.settlePayment(event.paymentIntentId);
-        else await this.bookings.settleRefund(event.refundId);
+        else if (event.kind === 'refund') await this.bookings.settleRefund(event.refundId);
+        else await this.disputes.settle(event.disputeId);
       } catch (error) {
         // Stripe retries the delivery; what failed is worth a line (its type and code only).
         if (error instanceof PaymentProviderError) {

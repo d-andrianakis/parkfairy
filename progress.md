@@ -1046,7 +1046,7 @@ Built in Stripe's test mode, without keys, before #18 and #19 (memory.md #46–#
   stand-in.
 - **4.2** Refunds on cancellation by either side, transfers to owners 24 hours after the stay, the
   ledger and its daily check (done 2026-11-13).
-- **4.3** Disputes, and what #18 and #19 answer.
+- **4.3** Disputes (#57–#60), and what #18 and #19 answer.
 
 ### 4.2 Refunds, transfers, the ledger (2026-11-13)
 

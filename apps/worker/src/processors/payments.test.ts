@@ -1,5 +1,7 @@
 import {
+  disputesToAnswer,
   lapsedPayments,
+  lostDisputesHeld,
   ledgerMismatches,
   markTransferSending,
   noteMoneyRetry,
@@ -24,6 +26,7 @@ import type { Logger } from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QUEUES, type ProcessorContext } from '../queues.js';
 import {
+  DISPUTE_DUE_ALERT_DAYS,
   KEY_DAY_MS,
   LAPSED_PAYMENT_MS,
   MAX_PAGES,
@@ -36,6 +39,8 @@ import {
 // Pages of two, so a test can see the sweep go on to the next.
 vi.mock('@parkfairy/database', () => ({
   MONEY_PAGE_SIZE: 2,
+  disputesToAnswer: vi.fn(),
+  lostDisputesHeld: vi.fn(),
   lapsedPayments: vi.fn(),
   ledgerMismatches: vi.fn(),
   markTransferSending: vi.fn(),
@@ -94,6 +99,8 @@ function gateway() {
     refundPayment: vi.fn<PaymentsGateway['refundPayment']>(() => Promise.resolve()),
     refundCancelled: vi.fn<PaymentsGateway['refundCancelled']>(() => Promise.resolve('re_new')),
     refund: vi.fn(),
+    dispute: vi.fn(),
+    stageDisputeEvidence: vi.fn(),
     transfer: vi.fn<PaymentsGateway['transfer']>(() => Promise.resolve('tr_new')),
     refundMadeFor: vi.fn<PaymentsGateway['refundMadeFor']>(() => Promise.resolve(null)),
     transferMadeFor: vi.fn<PaymentsGateway['transferMadeFor']>(() => Promise.resolve(null)),
@@ -170,6 +177,8 @@ describe('payments processor', () => {
     }
     vi.mocked(markTransferSending).mockResolvedValue(true);
     vi.mocked(refundsStuck).mockResolvedValue(0);
+    vi.mocked(disputesToAnswer).mockResolvedValue(0);
+    vi.mocked(lostDisputesHeld).mockResolvedValue(0);
     vi.mocked(transfersWaiting).mockResolvedValue({ bookings: 0, owners: 0 });
   });
 
@@ -558,7 +567,17 @@ describe('payments processor', () => {
 
   describe('the day’s check', () => {
     it('looks at what was entered since the run before, and says nothing when all is well', async () => {
-      await expect(run('check-money')).resolves.toEqual({ mismatched: 0, stuck: 0, waiting: 0 });
+      await expect(run('check-money')).resolves.toEqual({
+        mismatched: 0,
+        stuck: 0,
+        waiting: 0,
+        unanswered: 0,
+        lost: 0,
+      });
+      expect(disputesToAnswer).toHaveBeenCalledWith(
+        db,
+        new Date(NOW.getTime() + DISPUTE_DUE_ALERT_DAYS * 24 * HOUR_MS),
+      );
       expect(ledgerMismatches).toHaveBeenCalledWith(db, ago(48 * HOUR_MS));
       expect(refundsStuck).toHaveBeenCalledWith(db, ago(24 * HOUR_MS));
       expect(transfersWaiting).toHaveBeenCalledWith(
@@ -572,11 +591,24 @@ describe('payments processor', () => {
       vi.mocked(ledgerMismatches).mockResolvedValueOnce(['b1']);
       vi.mocked(refundsStuck).mockResolvedValueOnce(2);
       vi.mocked(transfersWaiting).mockResolvedValueOnce({ bookings: 3, owners: 2 });
+      vi.mocked(disputesToAnswer).mockResolvedValueOnce(4);
+      vi.mocked(lostDisputesHeld).mockResolvedValueOnce(5);
       await expect(run('check-money', { payments: null })).resolves.toEqual({
         mismatched: 1,
         stuck: 2,
         waiting: 3,
+        unanswered: 4,
+        lost: 5,
       });
+      // A dispute unanswered by its deadline is lost (#59); a lost one waits on support (#57).
+      expect(log.logger.error).toHaveBeenCalledWith(
+        { disputes: 4 },
+        `disputes due within ${DISPUTE_DUE_ALERT_DAYS} days, nothing submitted`,
+      );
+      expect(log.logger.error).toHaveBeenCalledWith(
+        { disputes: 5 },
+        'lost disputes waiting on support’s decision',
+      );
       expect(log.logger.error).toHaveBeenCalledWith(
         { bookingIds: ['b1'] },
         'ledger does not add up',

@@ -4,6 +4,8 @@ import {
   PaymentProviderError,
   stripeGateway,
   type AccountStatus,
+  type DisputeEvidence,
+  type DisputeState,
   type PaymentState,
   type PaymentsGateway,
   type RefundState,
@@ -29,6 +31,9 @@ export function fakeStripe() {
     string,
     { id: string; amountMinor: number; paymentIntentId: string; status: RefundState['status'] }
   >();
+  /** Disputes, and the evidence staged on each (#59). */
+  const disputes = new Map<string, DisputeState>();
+  const evidence = new Map<string, DisputeEvidence>();
   /** The owner's transfer per booking. */
   const transfers = new Map<
     string,
@@ -183,6 +188,24 @@ export function fakeStripe() {
       intents.set(id, canceled);
       return Promise.resolve({ ...canceled });
     }),
+    dispute: vi.fn<PaymentsGateway['dispute']>((id) => {
+      const known = disputes.get(id);
+      return known
+        ? Promise.resolve({ ...known })
+        : Promise.reject(new PaymentProviderError('invalid_request_error resource_missing'));
+    }),
+    stageDisputeEvidence: vi.fn<PaymentsGateway['stageDisputeEvidence']>((id, staged) => {
+      const known = disputes.get(id);
+      if (!known) {
+        return Promise.reject(new PaymentProviderError('invalid_request_error resource_missing'));
+      }
+      // As Stripe: evidence sent to the bank can't change.
+      if (known.submissions > 0) {
+        return Promise.reject(new PaymentProviderError('invalid_request_error'));
+      }
+      evidence.set(id, staged);
+      return Promise.resolve();
+    }),
     parseEvent: (rawBody: Buffer, signature: string) => real.parseEvent(rawBody, signature),
   } satisfies PaymentsGateway;
 
@@ -193,6 +216,32 @@ export function fakeStripe() {
     refunds,
     cancellationRefunds,
     transfers,
+    disputes,
+    evidence,
+    /** A driver's bank disputing a payment (4.3): open, needing a response within a week. */
+    openDispute(paymentIntentId: string, change: Partial<DisputeState> = {}): string {
+      const intent = intents.get(paymentIntentId);
+      if (!intent) throw new Error(`No PaymentIntent ${paymentIntentId}`);
+      const id = `du_${(++next).toString().padStart(6, '0')}Fake`;
+      disputes.set(id, {
+        id,
+        status: 'needs_response',
+        reason: 'product_not_received',
+        amountMinor: intent.receivedMinor,
+        currency: intent.currency,
+        chargeId: intent.chargeId,
+        paymentIntentId,
+        dueBy: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        submissions: 0,
+        ...change,
+      });
+      return id;
+    },
+    setDispute(id: string, change: Partial<DisputeState>) {
+      const known = disputes.get(id);
+      if (!known) throw new Error(`No dispute ${id}`);
+      disputes.set(id, { ...known, ...change });
+    },
     /** A cancellation's refund Stripe took and that failed after (a closed card, say). */
     failRefund(bookingId: string) {
       const made = cancellationRefunds.get(bookingId);

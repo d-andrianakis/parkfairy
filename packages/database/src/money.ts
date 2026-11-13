@@ -296,7 +296,8 @@ export interface TransferDue {
 
 /**
  * What makes a paid stay's transfer due at `dueBefore` (its end): confirmed, or cancelled with
- * something kept once its refund is settled with Stripe (what's kept is then final), not sent.
+ * something kept once its refund is settled with Stripe (what's kept is then final), not sent,
+ * and not disputed: an open or lost dispute holds it (#58), a lost one for support to decide (#57).
  */
 const dueWhere = (dueBefore: Date) => sql`
   b.payment_status = 'succeeded'
@@ -305,6 +306,10 @@ const dueWhere = (dueBefore: Date) => sql`
   and b.ends_at <= ${dueBefore.toISOString()}::timestamptz
   and (b.refund_status is null or b.refund_status in ('sent', 'failed'))
   and (b.refund_minor is null or b.refund_minor < b.total_minor)
+  and not exists (
+    select 1 from payment_disputes d
+    where d.booking_id = b.id and d.status not in ('won', 'warning_closed', 'prevented')
+  )
 `;
 
 /** A payee still to be paid, who can be now: Stripe can pay them, or their part came to nothing. */

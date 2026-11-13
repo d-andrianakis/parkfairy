@@ -2,7 +2,12 @@
  * Payments (Phase 4): owners' payout accounts at Stripe, the platform's settings, and the Stripe
  * events already handled. A booking's own payment lives on the booking (`payment_intent_id`).
  */
-import { PAYOUT_STATUSES, type PayoutStatus } from '@parkfairy/contracts';
+import {
+  DISPUTE_STATUSES,
+  PAYOUT_STATUSES,
+  type DisputeStatus,
+  type PayoutStatus,
+} from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -130,5 +135,48 @@ export const ledgerEntries = pgTable(
     check('ledger_entries_kind_check', sql`${t.kind} in (${sqlList(LEDGER_KINDS)})`),
     check('ledger_entries_amount_check', sql`${t.amountMinor} > 0`),
     check('ledger_entries_currency_check', sql`${t.currency} ~ '^[A-Z]{3}$'`),
+  ],
+);
+
+/**
+ * A driver's bank disputing a booking's payment (4.3, #57–#60), as Stripe last told us. The
+ * booking's evidence is staged at Stripe when it opens (#59), for support to complete and submit
+ * there; an open or lost dispute holds the booking's payout (#58). A financial record: nothing
+ * cascades into it.
+ */
+export const paymentDisputes = pgTable(
+  'payment_disputes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bookingId: uuid('booking_id')
+      .notNull()
+      .references(() => bookings.id, { onDelete: 'restrict' }),
+    stripeDisputeId: text('stripe_dispute_id').notNull().unique(),
+    status: text('status').$type<DisputeStatus>().notNull(),
+    /** Stripe's category (`fraudulent`, `product_not_received`, …). */
+    reason: text('reason').notNull(),
+    amountMinor: integer('amount_minor').notNull(),
+    currency: char('currency', { length: 3 }).notNull(),
+    /** When the response is due at Stripe; past it, the dispute is lost. */
+    dueBy: instant('due_by'),
+    /** How many responses went to the bank (from Stripe): none yet, and support must act. */
+    submissions: integer('submissions').default(0).notNull(),
+    evidenceStagedAt: instant('evidence_staged_at'),
+    createdAt: instant('created_at').defaultNow().notNull(),
+    updatedAt: instant('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (t) => [
+    index('payment_disputes_booking_idx').on(t.bookingId),
+    // The day's look at disputes still to answer, by when.
+    index('payment_disputes_open_idx')
+      .on(t.dueBy)
+      .where(sql`${t.status} in ('needs_response', 'warning_needs_response')`),
+    check('payment_disputes_status_check', sql`${t.status} in (${sqlList(DISPUTE_STATUSES)})`),
+    check('payment_disputes_amount_check', sql`${t.amountMinor} > 0`),
+    check('payment_disputes_currency_check', sql`${t.currency} ~ '^[A-Z]{3}$'`),
+    check('payment_disputes_submissions_check', sql`${t.submissions} >= 0`),
   ],
 );

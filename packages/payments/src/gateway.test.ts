@@ -59,6 +59,10 @@ function fakeClient() {
       create: vi.fn(() => Promise.resolve({ id: 'tr_1' })),
       list: vi.fn(() => Promise.resolve({ data: [] as unknown[] })),
     },
+    disputes: {
+      retrieve: vi.fn(),
+      update: vi.fn(() => Promise.resolve({ id: 'du_1' })),
+    },
     webhooks: signer.webhooks,
   };
   return client;
@@ -415,6 +419,82 @@ describe('stripeGateway', () => {
     await expect(gatewayWith(client).transferMadeFor('b1', 'o1')).resolves.toBeNull();
   });
 
+  it('reads a dispute: its state, what it’s about, and when its answer is due', async () => {
+    const client = fakeClient();
+    client.disputes.retrieve.mockResolvedValueOnce({
+      id: 'du_1',
+      status: 'needs_response',
+      reason: 'product_not_received',
+      amount: 400,
+      currency: 'eur',
+      charge: 'ch_1',
+      payment_intent: { id: 'pi_1' },
+      evidence_details: { due_by: 1_800_000_000, submission_count: 0 },
+    });
+    await expect(gatewayWith(client).dispute('du_1')).resolves.toEqual({
+      id: 'du_1',
+      status: 'needs_response',
+      reason: 'product_not_received',
+      amountMinor: 400,
+      currency: 'EUR',
+      chargeId: 'ch_1',
+      paymentIntentId: 'pi_1',
+      dueBy: new Date(1_800_000_000_000),
+      submissions: 0,
+    });
+    // A state this version doesn't know is one to answer, never one let go.
+    client.disputes.retrieve.mockResolvedValueOnce({
+      id: 'du_2',
+      status: 'something_new',
+      reason: 'general',
+      amount: 1,
+      currency: 'eur',
+      charge: { id: 'ch_2' },
+      payment_intent: null,
+      evidence_details: null,
+    });
+    await expect(gatewayWith(client).dispute('du_2')).resolves.toMatchObject({
+      status: 'needs_response',
+      chargeId: 'ch_2',
+      paymentIntentId: null,
+      dueBy: null,
+      submissions: 0,
+    });
+  });
+
+  it('stages a booking’s evidence for support, never submitting it (#59)', async () => {
+    const client = fakeClient();
+    await gatewayWith(client).stageDisputeEvidence('du_1', {
+      bookingId: 'b1',
+      productDescription: 'Parking',
+      serviceDate: '2026-11-20',
+      customerName: 'Eleni',
+      customerEmail: 'eleni@example.gr',
+      cancellationPolicy: 'Free until a day before',
+      refundPolicy: 'Refunds by the policy',
+      accessActivityLog: 'Booked, paid',
+      uncategorized: 'Reference K7M4-Q2ZD',
+    });
+    expect(client.disputes.update).toHaveBeenCalledWith(
+      'du_1',
+      {
+        evidence: {
+          product_description: 'Parking',
+          service_date: '2026-11-20',
+          customer_name: 'Eleni',
+          customer_email_address: 'eleni@example.gr',
+          cancellation_policy_disclosure: 'Free until a day before',
+          refund_policy_disclosure: 'Refunds by the policy',
+          access_activity_log: 'Booked, paid',
+          uncategorized_text: 'Reference K7M4-Q2ZD',
+        },
+        submit: false,
+        metadata: { bookingId: 'b1' },
+      },
+      { idempotencyKey: 'dispute-evidence-du_1' },
+    );
+  });
+
   it('refunds all of a payment, once', async () => {
     const client = fakeClient();
     await gatewayWith(client).refundPayment('pi_1', 'not_bookable');
@@ -467,6 +547,24 @@ describe('stripeGateway', () => {
         kind: 'payment',
         paymentIntentId: 'pi_9',
       });
+    });
+
+    it('reads a dispute opened, changed or closed as the dispute to look at', () => {
+      for (const type of [
+        'charge.dispute.created',
+        'charge.dispute.updated',
+        'charge.dispute.closed',
+        'charge.dispute.funds_withdrawn',
+        'charge.dispute.funds_reinstated',
+      ]) {
+        const { body, signature } = sign(type, { id: 'du_7', object: 'dispute' });
+        expect(gatewayWith(fakeClient()).parseEvent(body, signature)).toEqual({
+          id: 'evt_1',
+          type,
+          kind: 'dispute',
+          disputeId: 'du_7',
+        });
+      }
     });
 
     it('reads a refund that changed as the refund to look at', () => {

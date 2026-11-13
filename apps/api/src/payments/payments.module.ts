@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { BookingsModule } from '../bookings/bookings.module.js';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
+import { DisputesService } from './disputes.service.js';
 import { PaymentEventsService } from './payment-events.service.js';
 import { PAYMENTS } from './payments.tokens.js';
 import { PayoutsController } from './payouts.controller.js';
@@ -26,6 +27,6 @@ export class PaymentsGatewayModule {}
 @Module({
   imports: [BookingsModule],
   controllers: [PayoutsController, StripeWebhookController],
-  providers: [PayoutsService, PaymentEventsService],
+  providers: [PayoutsService, PaymentEventsService, DisputesService],
 })
 export class PaymentsModule {}

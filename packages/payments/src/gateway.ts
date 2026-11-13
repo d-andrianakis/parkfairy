@@ -1,4 +1,9 @@
-import type { PaymentStatus, PayoutStatus } from '@parkfairy/contracts';
+import {
+  DISPUTE_STATUSES,
+  type DisputeStatus,
+  type PaymentStatus,
+  type PayoutStatus,
+} from '@parkfairy/contracts';
 import Stripe from 'stripe';
 
 /**
@@ -39,10 +44,43 @@ export interface RefundState {
   bookingId: string | null;
 }
 
+/** A dispute as Stripe has it now (4.3): what it's about, how it stands, when it's due. */
+export interface DisputeState {
+  id: string;
+  status: DisputeStatus;
+  reason: string;
+  amountMinor: number;
+  currency: string;
+  chargeId: string | null;
+  paymentIntentId: string | null;
+  /** Past it, a dispute without a response is lost. */
+  dueBy: Date | null;
+  /** Responses sent to the bank: once one is, the evidence can't change. */
+  submissions: number;
+}
+
+/**
+ * What a booking says for itself in a dispute (#59), as text Stripe passes to the bank. Staged,
+ * never submitted: support completes it in Stripe's dashboard and submits it there (once sent,
+ * nothing can be added), or accepts the dispute.
+ */
+export interface DisputeEvidence {
+  bookingId: string;
+  productDescription: string;
+  serviceDate: string;
+  customerName: string;
+  customerEmail: string;
+  cancellationPolicy: string;
+  refundPolicy: string;
+  accessActivityLog: string;
+  uncategorized: string;
+}
+
 /** A webhook event, verified, narrowed to what we act on. */
 export type PaymentsEvent =
   | { id: string; type: string; kind: 'payment'; paymentIntentId: string }
   | { id: string; type: string; kind: 'refund'; refundId: string }
+  | { id: string; type: string; kind: 'dispute'; disputeId: string }
   | {
       id: string;
       type: string;
@@ -92,6 +130,10 @@ export interface PaymentsGateway {
   ): Promise<string>;
   /** A refund as it stands now, to check one Stripe says changed. */
   refund(refundId: string): Promise<RefundState>;
+  /** A dispute as it stands now (4.3), to act on one Stripe says changed. */
+  dispute(disputeId: string): Promise<DisputeState>;
+  /** The booking's evidence, staged on the dispute for support to complete and submit (#59). */
+  stageDisputeEvidence(disputeId: string, evidence: DisputeEvidence): Promise<void>;
   /**
    * A payee's part of the owners' share to their Express account (#4, #6, #54), tied to the
    * charge so it waits for the money to be there. Asked again, the same transfer (idempotency key,
@@ -163,6 +205,15 @@ export function paymentStatusOf(status: Stripe.PaymentIntent.Status): PaymentSta
   return 'pending';
 }
 
+/** A dispute opened, changed or closed (4.3): ours to record, to stage evidence for, to hold. */
+const DISPUTE_EVENTS = new Set([
+  'charge.dispute.created',
+  'charge.dispute.updated',
+  'charge.dispute.closed',
+  'charge.dispute.funds_withdrawn',
+  'charge.dispute.funds_reinstated',
+]);
+
 /** A refund that changed: one that failed after Stripe took it is ours to hear of (4.2). */
 const REFUND_EVENTS = new Set(['refund.updated', 'refund.failed', 'charge.refund.updated']);
 
@@ -206,6 +257,27 @@ function stateOf(intent: Stripe.PaymentIntent): PaymentState {
       charge?.id ?? (typeof intent.latest_charge === 'string' ? intent.latest_charge : null),
     currency: intent.currency.toUpperCase(),
     bookingId: intent.metadata.bookingId ?? null,
+  };
+}
+
+function disputeStateOf(dispute: Stripe.Dispute): DisputeState {
+  const status = (DISPUTE_STATUSES as readonly string[]).includes(dispute.status)
+    ? (dispute.status as DisputeStatus)
+    : 'needs_response';
+  const due = dispute.evidence_details?.due_by;
+  return {
+    id: dispute.id,
+    status,
+    reason: dispute.reason,
+    amountMinor: dispute.amount,
+    currency: dispute.currency.toUpperCase(),
+    chargeId: typeof dispute.charge === 'string' ? dispute.charge : (dispute.charge?.id ?? null),
+    paymentIntentId:
+      typeof dispute.payment_intent === 'string'
+        ? dispute.payment_intent
+        : (dispute.payment_intent?.id ?? null),
+    dueBy: due ? new Date(due * 1000) : null,
+    submissions: dispute.evidence_details?.submission_count ?? 0,
   };
 }
 
@@ -332,6 +404,31 @@ export function stripeGateway(
         return refund.id;
       }),
     refund: (refundId) => call(async () => refundStateOf(await client.refunds.retrieve(refundId))),
+    dispute: (disputeId) =>
+      call(async () => disputeStateOf(await client.disputes.retrieve(disputeId))),
+    stageDisputeEvidence: (disputeId, evidence) =>
+      call(async () => {
+        await client.disputes.update(
+          disputeId,
+          {
+            evidence: {
+              product_description: evidence.productDescription,
+              service_date: evidence.serviceDate,
+              customer_name: evidence.customerName,
+              customer_email_address: evidence.customerEmail,
+              cancellation_policy_disclosure: evidence.cancellationPolicy,
+              refund_policy_disclosure: evidence.refundPolicy,
+              access_activity_log: evidence.accessActivityLog,
+              uncategorized_text: evidence.uncategorized,
+            },
+            // Staged, not sent: once submitted nothing can be added, and countering is support's
+            // call (it costs a fee; accepting may be better).
+            submit: false,
+            metadata: { bookingId: evidence.bookingId },
+          },
+          { idempotencyKey: `dispute-evidence-${disputeId}` },
+        );
+      }),
     transfer: ({ bookingId, ownerId, accountId, amountMinor, currency, chargeId }) =>
       call(async () => {
         const made = await client.transfers.create(
@@ -402,6 +499,10 @@ export function stripeGateway(
         }
       }
       if (!event) throw new InvalidSignatureError();
+      if (DISPUTE_EVENTS.has(event.type)) {
+        const dispute = event.data.object as Stripe.Dispute;
+        return { id: event.id, type: event.type, kind: 'dispute', disputeId: dispute.id };
+      }
       if (REFUND_EVENTS.has(event.type)) {
         const refund = event.data.object as Stripe.Refund;
         return { id: event.id, type: event.type, kind: 'refund', refundId: refund.id };
