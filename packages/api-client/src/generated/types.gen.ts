@@ -778,6 +778,104 @@ export type OwnerCalendar = {
     truncated: boolean;
 };
 
+export type AuditAction = 'listing.approved' | 'listing.changes_requested' | 'listing.proof_opened';
+
+export type AdminQueueQuery = {
+    status: 'in_review' | 'changes_requested' | 'published' | 'suspended';
+    after?: string;
+};
+
+export type AdminQueueItem = {
+    id: string;
+    status: ListingStatus;
+    name: string | null;
+    address: string | null;
+    contentLocale: Locale;
+    owner: string | null;
+    submittedAt: string | null;
+};
+
+export type AdminQueue = {
+    listings: Array<AdminQueueItem>;
+    next: string | null;
+};
+
+export type AdminOwner = {
+    role: ListingOwnerRole;
+    accountName: string;
+    kind: OwnerKind | null;
+    firstName: string | null;
+    lastName: string | null;
+    legalName: string | null;
+    country: string | null;
+    taxCountry: string;
+    taxIdEnding: string | null;
+    vatIdEnding: string | null;
+    registrationEnding: string | null;
+    verification: OwnerVerification;
+    sharePercent: number;
+    detailsComplete: boolean;
+};
+
+export type AdminProof = {
+    id: string;
+    kind: ProofKind;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    createdAt: string;
+};
+
+export type AdminListingReview = {
+    id: string;
+    status: ListingStatus;
+    name: string | null;
+    description: string | null;
+    address: string | null;
+    areaId: AreaId | null;
+    contentLocale: Locale;
+    landRegistrationNumber: string | null;
+    hourlyRate: Money | null;
+    spaces: Array<string>;
+    photos: number;
+    submittedAt: string | null;
+    reviewNote: string | null;
+    owners: Array<AdminOwner>;
+    proofs: Array<AdminProof>;
+    canDecide: boolean;
+    own: boolean;
+};
+
+export type AdminChangesInput = {
+    note: string;
+};
+
+export type AdminAuditQuery = {
+    action?: AuditAction;
+    after?: string;
+};
+
+export type AuditEntry = {
+    id: string;
+    at: string;
+    action: AuditAction;
+    actor: {
+        id: string;
+        name: string;
+        email: string;
+    };
+    targetType: 'listing';
+    targetId: string;
+    details: {
+        [key: string]: string | number | boolean | null;
+    };
+};
+
+export type AuditLog = {
+    entries: Array<AuditEntry>;
+    next: string | null;
+};
+
 export type PlaceSuggestion = {
     id: string;
     name: string;
@@ -1821,6 +1919,150 @@ export type AcceptListingInviteResponses = {
 };
 
 export type AcceptListingInviteResponse = AcceptListingInviteResponses[keyof AcceptListingInviteResponses];
+
+export type GetAdminQueueData = {
+    body?: never;
+    path?: never;
+    query?: {
+        after?: string;
+        status?: string;
+    };
+    url: '/v1/admin/listings';
+};
+
+export type GetAdminQueueErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+};
+
+export type GetAdminQueueError = GetAdminQueueErrors[keyof GetAdminQueueErrors];
+
+export type GetAdminQueueResponses = {
+    200: AdminQueue;
+};
+
+export type GetAdminQueueResponse = GetAdminQueueResponses[keyof GetAdminQueueResponses];
+
+export type GetAdminListingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/listings/{id}';
+};
+
+export type GetAdminListingErrors = {
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type GetAdminListingError = GetAdminListingErrors[keyof GetAdminListingErrors];
+
+export type GetAdminListingResponses = {
+    200: AdminListingReview;
+};
+
+export type GetAdminListingResponse = GetAdminListingResponses[keyof GetAdminListingResponses];
+
+export type DownloadAdminProofData = {
+    body?: never;
+    path: {
+        id: string;
+        proofId: string;
+    };
+    query?: never;
+    url: '/v1/admin/listings/{id}/proofs/{proofId}';
+};
+
+export type DownloadAdminProofErrors = {
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type DownloadAdminProofError = DownloadAdminProofErrors[keyof DownloadAdminProofErrors];
+
+export type DownloadAdminProofResponses = {
+    200: Blob | File;
+};
+
+export type DownloadAdminProofResponse = DownloadAdminProofResponses[keyof DownloadAdminProofResponses];
+
+export type ApproveAdminListingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/listings/{id}/approve';
+};
+
+export type ApproveAdminListingErrors = {
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type ApproveAdminListingError = ApproveAdminListingErrors[keyof ApproveAdminListingErrors];
+
+export type ApproveAdminListingResponses = {
+    200: AdminListingReview;
+};
+
+export type ApproveAdminListingResponse = ApproveAdminListingResponses[keyof ApproveAdminListingResponses];
+
+export type RequestAdminListingChangesData = {
+    body: AdminChangesInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/listings/{id}/request-changes';
+};
+
+export type RequestAdminListingChangesErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type RequestAdminListingChangesError = RequestAdminListingChangesErrors[keyof RequestAdminListingChangesErrors];
+
+export type RequestAdminListingChangesResponses = {
+    200: AdminListingReview;
+};
+
+export type RequestAdminListingChangesResponse = RequestAdminListingChangesResponses[keyof RequestAdminListingChangesResponses];
+
+export type GetAuditLogData = {
+    body?: never;
+    path?: never;
+    query?: {
+        after?: string;
+        action?: string;
+    };
+    url: '/v1/admin/audit';
+};
+
+export type GetAuditLogErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+};
+
+export type GetAuditLogError = GetAuditLogErrors[keyof GetAuditLogErrors];
+
+export type GetAuditLogResponses = {
+    200: AuditLog;
+};
+
+export type GetAuditLogResponse = GetAuditLogResponses[keyof GetAuditLogResponses];
 
 export type GetMyBookingsData = {
     body?: never;

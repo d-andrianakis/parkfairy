@@ -12,5 +12,6 @@ export * from './payments.js';
 export * from './bookings.js';
 export * from './earnings.js';
 export * from './owner-calendar.js';
+export * from './admin.js';
 export * from './places.js';
 export * from './listing-owners.js';

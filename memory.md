@@ -1581,3 +1581,33 @@ Our readings for managers (2026-11-15), not asked; change any that are wrong:
   manager**, by role and never by name (`booking-cancelled-by-team`, linking to the owners page,
   where the names are). The primary's own cancellation tells no one. Asked for by the product owner
   after the security review; co-owners are included since they can cancel just the same.
+
+Our readings for staff review, 5.2a (2026-11-15), not asked; change any that are wrong:
+
+- **Approving publishes the listing and verifies its accountable owners** (the primary, and everyone
+  paid a share) from `pending` to `verified`: the review was of their details and of the proof of the
+  right to rent. Sending back leaves their verification alone. A listing's owners are told by the
+  status sweep that already runs on the column (`notified_status`), as when it is changed by hand.
+- **Staff decide other people's listings only**: an admin who owns, co-owns or manages a listing gets
+  `OWN_LISTING` for it. A decision is made once (`NOT_IN_REVIEW` for the second), under the listing's
+  row lock.
+- **The review shows less than the owner's own page**: owners by name and kind, country, tax values as
+  their last three characters (#67), their verification and share; no phone, address, birth date or
+  email. Drafts are never shown to staff.
+- **What the log keeps**: who, when, what and to what, with the ids and, for sending back, the note
+  (the listing's own is cleared when the owner sends it in again). Opening a proof is a line; just
+  reading a review is not. The proof's line is written after its file was read and before it is
+  handed over, so a file that can't be read is not recorded as opened.
+- **2026-11-15 · The log can't be tidied, in tests either.** Test lines and the accounts that wrote
+  them stay for good (`audit_log` restricts its actors), so integration tests leave staff accounts
+  behind and top the log up to a fixed size rather than adding to it forever. In production the
+  database role the API uses must not own the table (an owner can drop the trigger): to be set up
+  with the deployment (Phase 6).
+- **Hardening from the 5.2a security review**: the audit triggers are `ENABLE ALWAYS` (migration
+  0037), so `session_replication_role` can't skip them; approving re-reads the accountable owners'
+  details under their profile locks (`OWNER_DETAILS_MISSING`), since owners can edit them while a
+  listing is in review; opening a proof refuses `Sec-Fetch-Site: cross-site` (a GET that writes a
+  line shouldn't run from a link on another site); notes refuse bidi and zero-width characters.
+  Not yet decided, for Phase 6 with retention (#18): the log keeps staff by account (restricted) and
+  a staff-typed note for good, so erasing a former staff member or what a note says needs a
+  decision (pseudonymous actor, a retention period, or a warning to staff).

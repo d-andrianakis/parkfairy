@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+import { AdminModule } from './admin/admin.module.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { redactUrl } from './common/log-redaction.js';
 import { NoStoreInterceptor } from './common/no-store.interceptor.js';
@@ -66,6 +67,7 @@ const REQUEST_ID_PATTERN = /^[\w-]{1,128}$/;
     StorageModule,
     ParkingModule,
     OwnerModule,
+    AdminModule,
     PaymentsGatewayModule,
     BookingsModule,
     PaymentsModule,

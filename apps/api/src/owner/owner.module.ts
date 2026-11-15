@@ -11,6 +11,8 @@ import { OwnerProfileService } from './owner-profile.service.js';
 
 @Module({
   controllers: [OwnerController, ListingOwnersController],
+  // The admin module reads tax values as their endings only (#67).
+  exports: [FIELD_CRYPTO],
   providers: [
     OwnerProfileService,
     OwnerListingsService,

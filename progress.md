@@ -1529,6 +1529,34 @@ primary owner adds and removes them by the emailed invite; an account is enough.
   accepts at once (both held by the listing lock), `claimDueEmails` under a real worker
 - [ ] **Contracts & docs**: client regenerated, memory.md updated
 
+### 5.2 Admin approvals and the audit log (2026-11-15, decisions #66–#68)
+
+Staff review what people sent in, in a separate admin app (#66) on the one API. Built in slices:
+5.2a the API and the audit log (done below), 5.2b the admin app (sign-in with a second factor, the
+queue, a review page, the log), 5.2c the rest of the Phase 5 list (moderation, users, bookings,
+payments, overstay reports, removing two-factor).
+
+- [x] **5.2a Implemented**: `GET /admin/listings` (queue by status, oldest first, never a draft),
+      `GET /admin/listings/:id` (owners with tax as their last three characters, proofs),
+      `GET /admin/listings/:id/proofs/:proofId` (a download; opening one is logged), `POST
+…/approve` and `…/request-changes` (decided once, under the listing's lock; never by an
+      owner or manager of it), `GET /admin/audit`; every route `@Roles('admin')` with a second factor
+- [x] **Audit log** (#68): `audit_log`, one line per change and per proof opened, written in the
+      change's own transaction; the database refuses an update, a delete or a truncate (trigger,
+      migration 0036), and an account that acted can't be deleted (restrict)
+- [x] **Unit and integration tests** (contracts, `admin.integration.test.ts`, 53)
+- [x] **Smoke test** `tests/smoke/specs/admin.smoke.ts` (what a visitor and an ordinary account
+      meet: 401, 403, and a write from another site refused on its origin); the staff's own paths,
+      which need a second factor, are in the integration tests, and the admin app (5.2b) adds the
+      end-to-end ones
+- [x] **Security / Performance / Test** reviews of 5.2a: done. Fixed: the log's order matches its
+      index (a mismatch sorted the whole log per page), the triggers fire always, approving re-reads
+      owners' details, no proof from a link on another site, no bidi characters in a note, and the
+      test gaps (rollback, ties, several owners, self-review, races). Open, low: the queue sorts
+      every listing of a status (an expression can't be indexed; fine to ~100k), the staff
+      account and note are kept for good (retention, Phase 6)
+- [ ] **Accessibility / i18n**: with the admin app (5.2b); the API has no copy of its own
+
 - [~] 2FA enrolment UI done (1.3); admin MFA enforced end to end once admin routes exist
   (sessions without a second factor are already ended when it is switched on)
 - [~] Owner calendar and earnings done (5.1); a bookings list across listings is not
