@@ -2,7 +2,12 @@ import { createHash, randomBytes } from 'node:crypto';
 import { LISTING_INVITE_DAYS } from '@parkfairy/contracts';
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
-import { bookingPayees, listingInvites, listingOwners } from './schema/listing-owners.js';
+import {
+  bookingPayees,
+  listingHandovers,
+  listingInvites,
+  listingOwners,
+} from './schema/listing-owners.js';
 
 /**
  * Co-ownership in SQL (#53–#56), shared by the API (bookability, the hold) and the worker (an
@@ -97,5 +102,22 @@ export async function purgeListingInvites(db: Database, before: Date): Promise<n
       and(isNull(listingInvites.expiresAt), lt(listingInvites.createdAt, before)),
     ),
   );
+  return rowCount ?? 0;
+}
+
+/**
+ * Offers of the primary role withdrawn or lapsed before `before` go. An accepted offer stays: it is
+ * the record of who handed a listing to whom, one per real change of hands. (Its two owner profiles
+ * are restricted from deletion by it: deleting an account is Phase 6's to decide.)
+ */
+export async function purgeListingHandovers(db: Database, before: Date): Promise<number> {
+  const { rowCount } = await db
+    .delete(listingHandovers)
+    .where(
+      and(
+        isNull(listingHandovers.acceptedAt),
+        or(lt(listingHandovers.withdrawnAt, before), lt(listingHandovers.expiresAt, before)),
+      ),
+    );
   return rowCount ?? 0;
 }

@@ -14,12 +14,15 @@ import {
 } from '@parkfairy/database';
 import {
   BOOKING_EMAIL_KINDS,
+  HANDOVER_EMAIL_KINDS,
   OWNER_EMAIL_KINDS,
   renderBookingEmail,
+  renderHandoverEmail,
   renderInviteEmail,
   renderOwnerEmail,
   SendStopped,
   type BookingEmailKind,
+  type HandoverEmailKind,
   type OutgoingEmail,
   type OwnerEmailKind,
   type OwnerEmailLocale,
@@ -51,11 +54,12 @@ export const SEND_RUN_MS = 25_000;
 
 const OWNER_KINDS = new Set<string>(OWNER_EMAIL_KINDS);
 const BOOKING_KINDS = new Set<string>(BOOKING_EMAIL_KINDS);
+const HANDOVER_KINDS = new Set<string>(HANDOVER_EMAIL_KINDS);
 
 /** The message for an outbox row. A kind nobody knows, or a booking email without its booking, throws. */
 function render(row: ClaimedEmail, webUrl: string): OutgoingEmail {
   const locale = row.locale as OwnerEmailLocale;
-  const { listingName, contentLocale, booking } = row.payload;
+  const { listingName, contentLocale, booking, listingId } = row.payload;
   if (OWNER_KINDS.has(row.kind)) {
     return renderOwnerEmail({
       kind: row.kind as OwnerEmailKind,
@@ -75,6 +79,16 @@ function render(row: ClaimedEmail, webUrl: string): OutgoingEmail {
       webUrl,
       listingName,
       booking,
+    });
+  }
+  if (HANDOVER_KINDS.has(row.kind)) {
+    if (!listingId) throw new Error(`Email "${row.kind}" has no listing`);
+    return renderHandoverEmail({
+      kind: row.kind as HandoverEmailKind,
+      to: row.to,
+      locale,
+      webUrl,
+      listingId,
     });
   }
   throw new Error(`Unknown email kind "${row.kind}"`);

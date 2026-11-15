@@ -516,6 +516,65 @@ describe('owner emails processor', () => {
     });
   });
 
+  describe('handing over the primary role (#61–#64)', () => {
+    const LISTING = 'l0l0l0l0-0000-4000-8000-000000000002';
+
+    it('tells the co-owner offered the role and the primary who gave it up, to the owners page', async () => {
+      vi.mocked(claimDueEmails).mockResolvedValue([
+        row({
+          id: 'email-5',
+          kind: 'listing-handover-offered',
+          locale: 'en',
+          // A name an owner typed in the payload would stay out of the email all the same.
+          payload: { listingId: LISTING, listingName: 'Ermou Garage' },
+        }),
+        row({
+          id: 'email-6',
+          kind: 'listing-handover-accepted',
+          locale: 'el',
+          payload: { listingId: LISTING },
+        }),
+      ]);
+      await expect(run('send-owner-emails')).resolves.toEqual({
+        sent: 2,
+        failed: 0,
+        handedBack: 0,
+      });
+      const [offered, accepted] = send.mock.calls.map(([email]) => email);
+      expect(offered?.subject).toBe(
+        'You’ve been offered the primary role of a listing on Parkfairy',
+      );
+      expect(offered?.text).toContain(
+        `https://parkfairy.example/en/owner/listings/${LISTING}/owners`,
+      );
+      expect(offered?.text).not.toContain('Ermou Garage');
+      expect(offered?.idempotencyKey).toBe('email-5');
+      expect(accepted?.subject).toBe('Ο χώρος σας έχει νέο κύριο ιδιοκτήτη');
+      expect(accepted?.text).toContain(
+        `https://parkfairy.example/el/owner/listings/${LISTING}/owners`,
+      );
+      // No invite to mint a link for: these are ordinary rows.
+      expect(mintInviteToken).not.toHaveBeenCalled();
+    });
+
+    it('refuses one that lost its listing, without losing the rest', async () => {
+      vi.mocked(claimDueEmails).mockResolvedValue([
+        row({ kind: 'listing-handover-offered', payload: {} }),
+        row({ id: 'email-2' }),
+      ]);
+      await expect(run('send-owner-emails')).resolves.toEqual({
+        sent: 1,
+        failed: 1,
+        handedBack: 0,
+      });
+      expect(markEmailFailed).toHaveBeenCalledWith(
+        db,
+        expect.objectContaining({ id: 'email-1' }),
+        'Email "listing-handover-offered" has no listing',
+      );
+    });
+  });
+
   it('refuses a kind it has no template for, without losing the rest', async () => {
     const unknown = row({ kind: 'nonsense' as ClaimedEmail['kind'] });
     vi.mocked(claimDueEmails).mockResolvedValue([unknown, row({ id: 'email-2' })]);

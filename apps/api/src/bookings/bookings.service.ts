@@ -46,7 +46,7 @@ import {
   type Database,
   type OutboxBooking,
 } from '@parkfairy/database';
-import { and, asc, desc, eq, gt, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { DB } from '../database/database.module.js';
@@ -501,14 +501,11 @@ export class BookingsService {
     locationId: string,
     kind: Kind,
   ): Promise<{ kind: Kind; userId: string; to: 'owner' }[]> {
-    const heard: { kind: Kind; userId: string; to: 'owner' }[] = [];
-    for (const ownerUserId of await this.ownerUsersOf(tx, locationId)) {
-      if (ownerUserId === driverId) continue;
-      if (await this.ownerStillHears(tx, driverId, ownerUserId)) {
-        heard.push({ kind, userId: ownerUserId, to: 'owner' });
-      }
-    }
-    return heard;
+    const accounts = (await this.ownerUsersOf(tx, locationId)).filter((id) => id !== driverId);
+    const events = await this.driverEmailsToOwners(tx, driverId, accounts);
+    return accounts
+      .filter((userId) => (events.get(userId) ?? 0) <= OWNER_EMAILS_PER_DRIVER_DAY)
+      .map((userId) => ({ kind, userId, to: 'owner' as const }));
   }
 
   /**
@@ -1169,15 +1166,21 @@ export class BookingsService {
   }
 
   /**
-   * Whether this driver's bookings may still email this owner today (L3): the confirmations and
-   * driver's cancellations of the last 24 hours at any of the owner's listings, the one being
-   * written included, against OWNER_EMAILS_PER_DRIVER_DAY. Read on the driver's own bookings
+   * How many emails this driver's bookings have earned each of these owners in the last day (L3):
+   * the confirmations and driver's cancellations at any of the owner's listings, the one being
+   * written included, in one statement for all of them. Read on the driver's own bookings
    * (`bookings_user_starts_idx`), which are few. Two at once may both pass: a cap, not a count.
    */
-  private async ownerStillHears(tx: Transaction, driverId: string, ownerUserId: string) {
+  private async driverEmailsToOwners(
+    tx: Transaction,
+    driverId: string,
+    ownerUserIds: string[],
+  ): Promise<Map<string, number>> {
+    if (ownerUserIds.length === 0) return new Map();
     const since = new Date(Date.now() - DAY_MS);
-    const [row] = await tx
+    const rows = await tx
       .select({
+        userId: profile.userId,
         events: sql<number>`(count(*) filter (where ${booking.confirmedAt} > ${since})
           + count(*) filter (where ${booking.cancelledBy} = 'driver' and ${booking.cancelledAt} > ${since}))::int`,
       })
@@ -1187,13 +1190,14 @@ export class BookingsService {
       .where(
         and(
           eq(booking.userId, driverId),
-          eq(profile.userId, ownerUserId),
+          inArray(profile.userId, ownerUserIds),
           // Only rows with an event in the window (a cancellation comes after its confirmation),
           // so neither a long history nor a week of holds is read under the locks.
           sql`coalesce(${booking.cancelledAt}, ${booking.confirmedAt}) > ${since}`,
         ),
-      );
-    return (row?.events ?? 0) <= OWNER_EMAILS_PER_DRIVER_DAY;
+      )
+      .groupBy(profile.userId);
+    return new Map(rows.map((row) => [row.userId, row.events]));
   }
 
   /** The accounts of every owner of the listing, the primary first. */

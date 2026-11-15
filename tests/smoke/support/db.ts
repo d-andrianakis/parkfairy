@@ -96,6 +96,24 @@ export async function activatePayouts(listingId: string): Promise<void> {
   );
 }
 
+/**
+ * The account with this address can be paid: an active Express account, as Stripe's webhook would
+ * leave it. For a co-owner, who must have one to take over a listing's primary role (#63); the
+ * account needs its owner profile (accepting an invitation makes one).
+ */
+export async function activatePayoutsOf(email: string): Promise<void> {
+  const made = await run(
+    `insert into payout_accounts (owner_id, stripe_account_id, status)
+     select p.id, 'acct_smoke' || substr(md5(random()::text), 1, 12), 'active'
+     from owner_profiles p join users u on u.id = p.user_id
+     where u.email = $1
+     on conflict (owner_id) do update set status = 'active'
+     returning owner_id`,
+    [email.toLowerCase()],
+  );
+  if (made.length !== 1) throw new Error('No owner profile for that address');
+}
+
 export async function addBookings(listingId: string, count: number): Promise<void> {
   await run(
     `insert into bookings (reference, user_id, location_id, space_id, space_label, listing_name,

@@ -5,6 +5,7 @@ import '@/lib/zod-jitless';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   acceptListingHandover,
+  getListingOwners,
   inviteListingOwner,
   leaveListing,
   offerListingHandover,
@@ -60,6 +61,9 @@ const HANDOVER_HEADING = 'listing-handover-heading';
 /** Focusable for those moves, with the ring the focus shows. */
 const FOCUS_TARGET =
   'rounded-sm outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/50';
+
+/** Answers that mean the offer on the page isn't the one in force any more. */
+const STALE_OFFER = new Set(['HANDOVER_NOT_FOUND', 'HANDOVER_EXPIRED']);
 
 type Owner = ListingOwners['owners'][number];
 const nameOf = (owner: Owner) => owner.name ?? owner.email ?? '';
@@ -413,6 +417,19 @@ function Handover({
       })
     : '';
   const time = (chunks: ReactNode) => <time dateTime={offer?.expiresAt ?? ''}>{chunks}</time>;
+  // The offer on the page is no longer in force: read how things stand now, and say so there.
+  async function stale(): Promise<boolean> {
+    const outcome = await attempt(() => getListingOwners({ path: { id: owners.listingId } }));
+    if (!outcome.ok || !outcome.data) return false;
+    const now = outcome.data;
+    // The focus goes to the card's heading only if the card is still there: for the primary, while
+    // an offer or a co-owner to offer to remains (they may have been taken over, or left, meanwhile).
+    const stays =
+      now.handover !== null ||
+      (now.role === 'primary' && now.owners.some((owner) => owner.role === 'co_owner'));
+    onChanged(now, t('handoverStale'), stays ? HANDOVER_HEADING : OWNERS_HEADING);
+    return true;
+  }
 
   return (
     <Card>
@@ -450,7 +467,17 @@ function Handover({
             onDone={(answer) => {
               if (answer) onChanged(answer, t('handoverAccepted'), OWNERS_HEADING);
             }}
+            onStale={stale}
           />
+        ) : null}
+        {offer?.canAccept ? (
+          // Taking over needs payouts set up (checked again at the press): the way there is here,
+          // not only in the refusal's text.
+          <p className="text-sm">
+            <Link href="/owner/payouts" className="underline underline-offset-4">
+              {t('handoverPayoutsLink')}
+            </Link>
+          </p>
         ) : null}
         {offer?.canWithdraw ? (
           <TwoPresses
@@ -473,6 +500,7 @@ function Handover({
                 );
               }
             }}
+            onStale={stale}
           />
         ) : null}
         {primary && !offer ? (
@@ -585,6 +613,7 @@ function TwoPresses<T>({
   keep,
   act,
   onDone,
+  onStale,
 }: {
   id: string;
   label: ReactNode;
@@ -594,6 +623,12 @@ function TwoPresses<T>({
   keep?: string;
   act: () => Promise<{ data?: T; error?: unknown; response?: Response }>;
   onDone: (answer: T | undefined) => void;
+  /**
+   * The thing asked about is gone or has changed (an offer withdrawn, lapsed or replaced meanwhile):
+   * pressing again could only say so again, so the caller re-reads the page and says it there.
+   * Answers whether it did: if not, the question stays, with the refusal's own words.
+   */
+  onStale?: () => Promise<boolean>;
 }) {
   const t = useTranslations('Owner.owners');
   const ownerError = useOwnerError();
@@ -617,6 +652,10 @@ function TwoPresses<T>({
     if (outcome.ok) {
       setAsking(false);
       onDone(outcome.data);
+    } else if (onStale && STALE_OFFER.has(outcome.failure.code ?? '')) {
+      // Not before the page is read again: until then the question keeps the focus and the alert.
+      if (await onStale()) setAsking(false);
+      else setFailure(ownerError(outcome.failure));
     } else setFailure(ownerError(outcome.failure));
   }
 

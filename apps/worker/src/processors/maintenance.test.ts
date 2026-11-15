@@ -3,6 +3,7 @@ import {
   deleteStaleHolds,
   deleteUnconfirmedAccounts,
   expireLapsedHolds,
+  purgeListingHandovers,
   purgeListingInvites,
   type Database,
 } from '@parkfairy/database';
@@ -22,6 +23,7 @@ vi.mock('@parkfairy/database', () => ({
   deleteUnconfirmedAccounts: vi.fn(),
   expireLapsedHolds: vi.fn(),
   deleteStaleHolds: vi.fn(),
+  purgeListingHandovers: vi.fn(),
   purgeListingInvites: vi.fn(),
 }));
 
@@ -162,6 +164,21 @@ describe('maintenance processor', () => {
     ).resolves.toEqual({ purged: 4 });
     expect(LISTING_INVITE_DAYS_KEPT).toBe(30);
     expect(purgeListingInvites).toHaveBeenCalledWith(db, new Date('2026-12-01T09:00:00Z'));
+    vi.useRealTimers();
+  });
+
+  it('forgets withdrawn and lapsed handover offers a month on, daily, keeping accepted ones', async () => {
+    vi.useFakeTimers({ now: new Date('2026-12-31T09:00:00Z'), toFake: ['Date'] });
+    vi.mocked(purgeListingHandovers).mockResolvedValue(2);
+    const db = {} as Database;
+    expect(maintenanceProcessor.schedules).toContainEqual({
+      id: 'purge-listing-handovers',
+      everyMs: 24 * 60 * 60 * 1000,
+    });
+    await expect(
+      maintenanceProcessor.process(jobNamed('purge-listing-handovers'), { db, logger, email }),
+    ).resolves.toEqual({ purged: 2 });
+    expect(purgeListingHandovers).toHaveBeenCalledWith(db, new Date('2026-12-01T09:00:00Z'));
     vi.useRealTimers();
   });
 

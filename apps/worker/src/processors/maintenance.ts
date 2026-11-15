@@ -3,6 +3,7 @@ import {
   deleteStaleHolds,
   deleteUnconfirmedAccounts,
   expireLapsedHolds,
+  purgeListingHandovers,
   purgeListingInvites,
   purgeStripeEvents,
 } from '@parkfairy/database';
@@ -40,6 +41,7 @@ export const maintenanceProcessor: QueueProcessor = {
     { id: 'delete-stale-holds', everyMs: DAY_MS / 24 },
     { id: 'purge-stripe-events', everyMs: DAY_MS },
     { id: 'purge-listing-invites', everyMs: DAY_MS },
+    { id: 'purge-listing-handovers', everyMs: DAY_MS },
   ],
   async process(job, { db, logger }) {
     switch (job.name) {
@@ -76,6 +78,14 @@ export const maintenanceProcessor: QueueProcessor = {
           new Date(Date.now() - STRIPE_EVENT_DAYS * DAY_MS),
         );
         if (purged > 0) logger.info({ purged }, 'old Stripe events purged');
+        return { purged };
+      }
+      case 'purge-listing-handovers': {
+        const purged = await purgeListingHandovers(
+          db,
+          new Date(Date.now() - LISTING_INVITE_DAYS_KEPT * DAY_MS),
+        );
+        if (purged > 0) logger.info({ purged }, 'old handover offers purged');
         return { purged };
       }
       case 'purge-listing-invites': {

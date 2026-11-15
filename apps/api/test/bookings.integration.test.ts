@@ -1685,6 +1685,43 @@ describe('bookings', () => {
       expect(await ownerEmails(elsewhere.id)).toBe(0);
     });
 
+    it('counts the cap for each owner of a co-owned listing on their own (L3)', async () => {
+      const user = await driver();
+      const solo = await addListing('cap-solo');
+      const shared = await addListing('cap-shared');
+      // A co-owner of the shared listing only, whom this driver has never made an email for.
+      const coOwner = await signUpUser(app);
+      users.push(coOwner);
+      const [coProfile] = await db
+        .insert(schema.ownerProfiles)
+        .values({ userId: coOwner.id })
+        .returning({ id: schema.ownerProfiles.id });
+      await db.insert(schema.listingOwners).values({
+        locationId: shared.id,
+        ownerId: coProfile?.id ?? '',
+        role: 'co_owner',
+        shareBps: 0,
+      });
+      const stay = stayOn(freshDay());
+      const heardBy = async (id: string, who: TestUser) =>
+        (await emailsAbout(id)).filter((email) => email.userId === who.id).length;
+      // The driver uses up the first owner's cap on a listing of theirs alone.
+      for (let n = 0; n < OWNER_EMAILS_PER_DRIVER_DAY; n++) {
+        const booking = await booked(user, solo, 'A1', stay);
+        await api(owner, 'post', `/owner/listings/${solo.id}/bookings/${booking.id}/cancel`)
+          .send()
+          .expect(204);
+      }
+      // On the shared one: the first owner hears nothing more, the co-owner still hears of it.
+      const onShared = await booked(user, shared, 'A1', stay);
+      expect(await heardBy(onShared.id, owner)).toBe(0);
+      expect(await heardBy(onShared.id, coOwner)).toBe(1);
+      // And the driver is told as ever.
+      expect(
+        (await emailsAbout(onShared.id)).filter((email) => email.userId === user.id),
+      ).toHaveLength(1);
+    });
+
     it('limits holds per account, from however many addresses (L2)', async () => {
       const user = await driver();
       const day = freshDay();

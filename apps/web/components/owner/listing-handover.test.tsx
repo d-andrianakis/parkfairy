@@ -1,5 +1,6 @@
 import {
   acceptListingHandover,
+  getListingOwners,
   offerListingHandover,
   withdrawListingHandover,
   type ListingOwners,
@@ -16,6 +17,7 @@ import { ListingOwnersPanel } from './listing-owners';
 vi.mock('@parkfairy/api-client', () => ({
   client: { setConfig: vi.fn() },
   acceptListingHandover: vi.fn(),
+  getListingOwners: vi.fn(),
   inviteListingOwner: vi.fn(),
   leaveListing: vi.fn(),
   offerListingHandover: vi.fn(),
@@ -153,6 +155,119 @@ describe('handing over the primary role', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Yes, take over' }));
     expect(await screen.findByText(/needs payouts set up with Stripe first/)).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Save shares' })).toBeNull();
+  });
+
+  it('links the co-owner offered the role to their payouts page', () => {
+    show(owners('co_owner', { ...OFFER, canAccept: true }));
+    expect(screen.getByRole('link', { name: 'Set up your payouts' })).toHaveAttribute(
+      'href',
+      '/en/owner/payouts',
+    );
+  });
+
+  it('has no payouts link for the primary, whose co-owner it is who must act', () => {
+    show(owners('primary', OFFER));
+    expect(screen.queryByRole('link', { name: 'Set up your payouts' })).toBeNull();
+  });
+
+  describe('an offer that is no longer in force', () => {
+    it('reads the page again instead of keeping a button that can only fail, co-owner', async () => {
+      vi.mocked(acceptListingHandover).mockResolvedValue(
+        refusal('HANDOVER_NOT_FOUND', 404) as never,
+      );
+      vi.mocked(getListingOwners).mockResolvedValue(answer(owners('co_owner')) as never);
+      show(owners('co_owner', { ...OFFER, canAccept: true }));
+      await userEvent.click(screen.getByRole('button', { name: 'Take over the primary role' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Yes, take over' }));
+      // The page is read as it stands now: the offer, and the card with it, are gone.
+      await waitFor(() =>
+        expect(getListingOwners).toHaveBeenCalledWith({ path: { id: LISTING_ID } }),
+      );
+      await waitFor(() => expect(screen.queryByText('Handing over the primary role')).toBeNull());
+      expect(screen.queryByRole('button', { name: 'Yes, take over' })).toBeNull();
+      // Said where a screen reader hears it, with the focus on a heading that stays.
+      expect(
+        await screen.findByText(/That offer is no longer open, so this page now shows/),
+      ).toBeVisible();
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { level: 2, name: 'Owners and shares' })).toHaveFocus(),
+      );
+    });
+
+    it('does the same for a lapsed offer, and the primary can offer again', async () => {
+      vi.mocked(withdrawListingHandover).mockResolvedValue(
+        refusal('HANDOVER_EXPIRED', 409) as never,
+      );
+      vi.mocked(getListingOwners).mockResolvedValue(answer(owners('primary')) as never);
+      show(owners('primary', OFFER));
+      await userEvent.click(screen.getByRole('button', { name: 'Take the offer back' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Yes, take it back' }));
+      expect(await screen.findByText(/That offer is no longer open/)).toBeVisible();
+      expect(
+        await screen.findByRole('button', { name: 'Offer the primary role to Eleni' }),
+      ).toBeVisible();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('heading', { level: 2, name: 'Handing over the primary role' }),
+        ).toHaveFocus(),
+      );
+    });
+
+    it('keeps the question, and says why, when the page can’t be read again', async () => {
+      vi.mocked(acceptListingHandover).mockResolvedValue(
+        refusal('HANDOVER_NOT_FOUND', 404) as never,
+      );
+      vi.mocked(getListingOwners).mockResolvedValue(refusal('GENERIC', 500) as never);
+      show(owners('co_owner', { ...OFFER, canAccept: true }));
+      await userEvent.click(screen.getByRole('button', { name: 'Take over the primary role' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Yes, take over' }));
+      await waitFor(() => expect(getListingOwners).toHaveBeenCalled());
+      // Nothing was learned: the question stays, and the refusal's own words say what happened.
+      expect(
+        await screen.findByText(/There’s no open offer of the primary role any more/),
+      ).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Yes, take over' })).toBeVisible();
+      expect(screen.getByText(/Take over the primary role\?/)).toBeVisible();
+    });
+
+    it('puts the focus on the owners heading when the card goes with the offer being accepted', async () => {
+      // The primary takes the offer back, but the co-owner had already accepted it: they are a
+      // co-owner now, and the card they pressed in is gone.
+      vi.mocked(withdrawListingHandover).mockResolvedValue(
+        refusal('HANDOVER_NOT_FOUND', 404) as never,
+      );
+      vi.mocked(getListingOwners).mockResolvedValue(answer(owners('co_owner')) as never);
+      show(owners('primary', OFFER));
+      await userEvent.click(screen.getByRole('button', { name: 'Take the offer back' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Yes, take it back' }));
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { level: 2, name: 'Owners and shares' })).toHaveFocus(),
+      );
+      expect(screen.queryByText('Handing over the primary role')).toBeNull();
+    });
+
+    it('does not read the page again for a refusal that is not about the offer', async () => {
+      vi.mocked(acceptListingHandover).mockResolvedValue(
+        refusal('PAYOUTS_NOT_ACTIVE', 409) as never,
+      );
+      show(owners('co_owner', { ...OFFER, canAccept: true }));
+      await userEvent.click(screen.getByRole('button', { name: 'Take over the primary role' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Yes, take over' }));
+      expect(await screen.findByText(/needs payouts set up with Stripe first/)).toBeVisible();
+      expect(getListingOwners).not.toHaveBeenCalled();
+    });
+
+    it('reads the page again when a co-owner accepts an offer that has lapsed, in Greek too', async () => {
+      vi.mocked(acceptListingHandover).mockResolvedValue(refusal('HANDOVER_EXPIRED', 409) as never);
+      vi.mocked(getListingOwners).mockResolvedValue(answer(owners('co_owner')) as never);
+      show(owners('co_owner', { ...OFFER, canAccept: true }), 'el');
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Αναλάβετε τον ρόλο του κύριου ιδιοκτήτη' }),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Ναι, αναλαμβάνω' }));
+      expect(await screen.findByText(/Η πρόταση δεν είναι πλέον ανοιχτή/)).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Ναι, αναλαμβάνω' })).toBeNull();
+    });
   });
 
   it('keeps quiet for a co-owner with nothing offered, and for a primary with no co-owner', () => {

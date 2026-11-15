@@ -1029,6 +1029,8 @@
       "handoverDeclineQuestion": "Decline the offer of the primary role? The primary owner stays as they are.",
       "handoverDeclineConfirm": "Yes, decline",
       "handoverClosed": "The offer of the primary role is closed.",
+      "handoverStale": "That offer is no longer open, so this page now shows how things stand.",
+      "handoverPayoutsLink": "Set up your payouts",
       "keepOffer": "No, leave it as it is"
     },
     "invite": {

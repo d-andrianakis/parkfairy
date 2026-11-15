@@ -16,11 +16,12 @@ import {
   enqueueOnboardingReminders,
   markEmailSent,
   mintInviteToken,
+  purgeListingHandovers,
   releaseEmails,
   schema,
   type Database,
 } from '@parkfairy/database';
-import { and, eq, inArray, like, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, like, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DB } from '../src/database/database.module.js';
@@ -738,6 +739,190 @@ describe('co-ownership of a listing (#53–#56)', () => {
       expect((await call(primary, 'delete', `/owner/listings/${id}`)).status).toBe(403);
       // Accepting again is no offer.
       await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(404);
+    });
+
+    /** The handover emails queued for an account, as the worker will find them. */
+    const queuedFor = (user: TestUser) =>
+      db
+        .select({
+          kind: schema.emailOutbox.kind,
+          payload: schema.emailOutbox.payload,
+          inviteId: schema.emailOutbox.inviteId,
+        })
+        .from(schema.emailOutbox)
+        .where(
+          and(
+            eq(schema.emailOutbox.userId, user.id),
+            inArray(schema.emailOutbox.kind, [
+              'listing-handover-offered',
+              'listing-handover-accepted',
+            ]),
+          ),
+        );
+
+    it('tells the co-owner of the offer, and the old primary of the acceptance, in nothing an owner typed', async () => {
+      const { primary, coOwner, id, second } = await ready();
+      // Named by the owner: it must stay out of the outbox, as the invite's does.
+      await db
+        .update(schema.parkingLocations)
+        .set({ name: 'Click here to verify your account' })
+        .where(eq(schema.parkingLocations.id, id));
+      expect(await queuedFor(coOwner)).toEqual([]);
+      await offer(primary, id, second?.id).expect(200);
+      expect(await queuedFor(coOwner)).toEqual([
+        { kind: 'listing-handover-offered', payload: { listingId: id }, inviteId: null },
+      ]);
+      // The one offering is not told of their own press.
+      expect(await queuedFor(primary)).toEqual([]);
+      await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(200);
+      expect(await queuedFor(primary)).toEqual([
+        { kind: 'listing-handover-accepted', payload: { listingId: id }, inviteId: null },
+      ]);
+      // The new primary has just pressed it: still just the offer.
+      expect(await queuedFor(coOwner)).toHaveLength(1);
+      // Accepting again is no offer, and queues nothing more.
+      await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(404);
+      expect(await queuedFor(primary)).toHaveLength(1);
+    });
+
+    it('sends one offer email a day for a listing, whatever the offering and taking back', async () => {
+      const { primary, id, second } = await ready();
+      const coOwnerUser = await db
+        .select({ userId: schema.ownerProfiles.userId })
+        .from(schema.ownerProfiles)
+        .where(eq(schema.ownerProfiles.id, second?.id ?? ''));
+      for (let again = 0; again < 3; again++) {
+        await offer(primary, id, second?.id).expect(200);
+        await call(primary, 'delete', `/owner/listings/${id}/handover`).expect(200);
+      }
+      const rows = await db
+        .select({ id: schema.emailOutbox.id })
+        .from(schema.emailOutbox)
+        .where(
+          and(
+            eq(schema.emailOutbox.userId, coOwnerUser[0]?.userId ?? ''),
+            eq(schema.emailOutbox.kind, 'listing-handover-offered'),
+          ),
+        );
+      expect(rows).toHaveLength(1);
+    });
+
+    it('queues nothing for an offer or an acceptance that was refused', async () => {
+      const { primary, coOwner, id, second } = await ready();
+      await payouts(coOwner, 'restricted');
+      await offer(primary, id, second?.id).expect(409);
+      expect(await queuedFor(coOwner)).toEqual([]);
+      await payouts(coOwner);
+      await offer(primary, id, second?.id).expect(200);
+      await payouts(coOwner, 'restricted');
+      await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(409);
+      expect(await queuedFor(primary)).toEqual([]);
+    });
+
+    it('forgets withdrawn and lapsed offers after a month, and keeps accepted ones and open ones', async () => {
+      const { primary, coOwner, id, second } = await ready();
+      const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+      const rows = () =>
+        db
+          .select({ id: schema.listingHandovers.id })
+          .from(schema.listingHandovers)
+          .where(eq(schema.listingHandovers.locationId, id));
+      // Withdrawn long ago, lapsed long ago, accepted long ago, open now: made one at a time,
+      // as only one is open at once.
+      await offer(primary, id, second?.id).expect(200);
+      await db
+        .update(schema.listingHandovers)
+        .set({ withdrawnAt: old })
+        .where(eq(schema.listingHandovers.locationId, id));
+      await offer(primary, id, second?.id).expect(200);
+      await db
+        .update(schema.listingHandovers)
+        .set({ expiresAt: old })
+        .where(
+          and(
+            eq(schema.listingHandovers.locationId, id),
+            isNull(schema.listingHandovers.withdrawnAt),
+          ),
+        );
+      await offer(primary, id, second?.id).expect(200);
+      await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(200);
+      await db
+        .update(schema.listingHandovers)
+        .set({ acceptedAt: old, expiresAt: old })
+        .where(isNotNull(schema.listingHandovers.acceptedAt));
+      expect(await rows()).toHaveLength(3);
+      const kept = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      expect(await purgeListingHandovers(db, kept)).toBe(2);
+      // The accepted one, a record of who handed it to whom, stays.
+      expect(await rows()).toHaveLength(1);
+    });
+
+    it('keeps offers that are recent or still open, and goes by age at the cutoff', async () => {
+      const { primary, id, second } = await ready();
+      const day = 24 * 60 * 60 * 1000;
+      const cutoff = new Date(Date.now() - 30 * day);
+      const handovers = schema.listingHandovers;
+      const offerWith = async (settle: Partial<typeof handovers.$inferInsert>) => {
+        await offer(primary, id, second?.id).expect(200);
+        // Only the open one: the offers before it keep the ages they were given.
+        await db
+          .update(handovers)
+          .set(settle)
+          .where(
+            and(
+              eq(handovers.locationId, id),
+              isNull(handovers.acceptedAt),
+              isNull(handovers.withdrawnAt),
+            ),
+          );
+      };
+      await offerWith({ withdrawnAt: new Date(Date.now() - 29 * day) }); // just inside the month
+      await offerWith({ expiresAt: new Date(Date.now() - 10 * day) }); // lapsed, but recently
+      await offerWith({ withdrawnAt: new Date(Date.now() - 31 * day) }); // just past it: goes
+      await offer(primary, id, second?.id).expect(200); // open, expiring in a week
+      const before = await db
+        .select({ id: handovers.id })
+        .from(handovers)
+        .where(eq(handovers.locationId, id));
+      expect(before).toHaveLength(4);
+      expect(await purgeListingHandovers(db, cutoff)).toBe(1);
+      expect(
+        await db.select({ id: handovers.id }).from(handovers).where(eq(handovers.locationId, id)),
+      ).toHaveLength(3);
+    });
+
+    it('sets three owners’ shares at once and refuses an owner of another listing', async () => {
+      const { primary, coOwner, id } = await coOwned();
+      const third = await person();
+      const { token } = await invite(primary, id, third.email);
+      await call(third, 'post', '/owner/invites/accept').send({ token }).expect(200);
+      await report(primary);
+      await report(coOwner);
+      await report(third);
+      const [a, b, c] = (await owners(primary, id)).owners;
+      const put = (shares: { ownerId: string | undefined; percent: number }[]) =>
+        call(primary, 'put', `/owner/listings/${id}/shares`).send({ shares });
+      const set = await put([
+        { ownerId: a?.id, percent: 50 },
+        { ownerId: b?.id, percent: 30 },
+        { ownerId: c?.id, percent: 20 },
+      ]).expect(200);
+      expect(ListingOwnersSchema.parse(set.body).owners.map((owner) => owner.sharePercent)).toEqual(
+        [50, 30, 20],
+      );
+      // The right number of shares, one of them for somebody else: nothing changes.
+      expect(
+        (
+          await put([
+            { ownerId: a?.id, percent: 10 },
+            { ownerId: b?.id, percent: 30 },
+            { ownerId: randomUUID(), percent: 60 },
+          ]).expect(409)
+        ).body,
+      ).toMatchObject({ code: 'SHARES_MISMATCH' });
+      expect((await owners(primary, id)).owners.map((owner) => owner.sharePercent)).toEqual([
+        50, 30, 20,
+      ]);
     });
 
     it('refuses a draft’s deletion by a primary demoted while it waited on the lock', async () => {

@@ -1375,9 +1375,8 @@ between 4.2 and 4.3.
 
 Left open:
 
-- [~] Handing the primary role to a co-owner (2026-11-15, decisions in memory.md): built and tested
-  through the API and the owners page; see "Handing over the primary role" below. Open: its
-  smoke test, native-speaker pass, and an email to the old and new primary
+- [x] Handing the primary role to a co-owner (2026-11-15, decisions in memory.md): built, tested and
+      smoked; see "Handing over the primary role" below. Open there: the native-speaker pass
 - [ ] Native speaker: `Owner.owners.*`, `Owner.invite.*`, `Owner.errors.TOO_MANY_INVITES`,
       `Owner.errors.OWNER_DETAILS_MISSING`, `Owner.dashboard.owners`, `Owner.proof.primaryOnly`,
       the invite email; «Κύρια ιδιοκτησία» and «Συνιδιοκτησία» as role names; whether «ο κύριος
@@ -1392,8 +1391,9 @@ Left open:
       and the primary no longer locked out on drafts. Test review: both race tests made
       deterministic, other kind of switch, every field, a share on a second listing, `saveTax`, the
       form's refusals in both languages. Sending in still checks the details, as a second line
-- [ ] Smoke: `co-ownership.smoke.ts` has no step for the refusal (a co-owner given a share on a live
-      listing empties a field and the page says why); not run in this round
+- [x] Smoke (2026-11-15): `co-ownership.smoke.ts` has the refusal: a co-owner paid a share of a
+      listing with staff empties their phone and the page says why, then replaces it and the
+      message goes
 - [x] Security residual (2026-11-15): invitations to one listing are counted per inbox, `+tag`
       stripped (`a+1@x`, `a+2@x` and `a@x` share the week's two). Still open, by design: the same
       address may be asked to another listing (a day's 20 from one owner is the bound), and dotted
@@ -1402,9 +1402,10 @@ Left open:
 - [ ] Accessibility advisories: withdrawing is one press, and with two invites a week per address
       a mistaken one can't always be redone at once; the panel's status line sits at its top,
       far from the button at 200% or 320 px, and moves what follows once it has text
-- [ ] Performance lows, left for scale: telling every owner of a booking takes a query per owner
-      under the booking's lock (one statement would do); `setShares` and `markTransferSending`
-      update row by row; `change()` reads the answer inside the listing's lock; signed in, the
+- [x] Performance lows done (2026-11-15): telling every owner of a booking is one grouped query
+      (`driverEmailsToOwners`, tested per owner on a co-owned listing); `setShares` is one statement
+      (tested with three owners and a foreign id).
+- [ ] Performance lows, left for scale: `markTransferSending` updates row by row; `change()` reads the answer inside the listing's lock; signed in, the
       invite page carries the whole owner catalogue; the owners page's metadata asks the API
       before a signed-out visitor is sent to sign in; past the key's day, `transferMadeFor` lists
       a booking's transfers once per payee; `bookableColumns.ownerUserId` is no longer read
@@ -1435,14 +1436,30 @@ listing limit, and the role's rights (removal, shares, deeds, deletion, status e
       errors read wrongly for the primary making the offer, Greek aspect, gender and date wording:
       fixed. Left: a stale-offer error keeps its confirm button until reload; the payouts error has
       no link; the lock held for the extra `read()` query (sub-millisecond)
-- [ ] Smoke test for the handover
-- [ ] Security lows: `transferMadeFor`'s `primary` is read live from the listing (only matters for a
-      legacy transfer without owner metadata retried after a handover); an offer's `TOO_MANY_LISTINGS`
-      tells a primary that their co-owner owns that many listings; settled offers are never purged;
-      the old primary can no longer open the deeds they uploaded (GDPR access is support's)
-- [ ] Emails: neither the old nor the new primary is told by email (the outbox has no kind for it)
-- [ ] Native speaker: `Owner.owners.handover*`, `keepOffer`, `Owner.errors.HANDOVER_*`,
-      `PAYOUTS_NOT_ACTIVE`
+- [x] **Smoke test** (`co-ownership.smoke.ts`, 2026-11-15): a refusal while payouts aren't set up,
+      "No" leaving things as they are, the offer, the co-owner's email from the worker, their page
+      (offer, payouts link, Greek, axe), taking over with focus, the old primary a co-owner who is
+      emailed. The handover part needs the database (a payout account is made by hand)
+- [x] **Emails** (2026-11-15, migration 0030): the co-owner is told of an offer (at most one a day per
+      listing and co-owner) and the old primary of the acceptance (`packages/email/src/handover-emails.ts`).
+      The new primary has just pressed the button, so isn't mailed. Nothing an owner typed is in
+      either: the link carries the listing's id only. Tested in the email package, the worker, and
+      the integration suite (nothing queued for a refused offer or accept)
+- [x] Handover UI (2026-11-15): an offer found stale (withdrawn, lapsed or accepted meanwhile) makes
+      the page read itself again, say so and move the focus to a heading that stays; if the re-read
+      fails the question keeps its alert. The co-owner offered the role gets a link to their payouts
+- [x] Security low: withdrawn and lapsed offers are purged after 30 days (`purge-listing-handovers`);
+      accepted ones stay as the record of who handed a listing to whom
+- [ ] Security lows left: `transferMadeFor`'s `primary` is read live from the listing (only matters
+      for a legacy transfer without owner metadata retried after a handover); an offer's
+      `TOO_MANY_LISTINGS` tells a primary that their co-owner owns that many listings; accepted
+      offers restrict deleting either profile (Phase 6's erasure work must decide); the old primary
+      can no longer open the deeds they uploaded (GDPR access is support's); a second offer to the
+      same co-owner the same UTC day is not emailed
+- [ ] Native speaker: `Owner.owners.handover*`, `handoverStale`, `handoverPayoutsLink`, `keepOffer`,
+      `Owner.errors.HANDOVER_*`, `PAYOUTS_NOT_ACTIVE`, and the `el` block of
+      `packages/email/src/handover-emails.ts` (especially «συνιδιοκτείτε», «παραδόθηκε», «μέλη»)
+- [ ] Manual NVDA and VoiceOver: the stale-offer message and focus on both sides; the payouts link
 
 ## Phase 5: Owner and admin dashboards
 

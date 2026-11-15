@@ -25,6 +25,9 @@ export const OUTBOX_EMAIL_KINDS = [
   'booking-cancelled-by-driver',
   // To someone invited to own a listing (#56), who may have no account yet.
   'listing-invite',
+  // To the co-owner offered the primary role, and to the primary who gave it up (#61–#64).
+  'listing-handover-offered',
+  'listing-handover-accepted',
 ] as const;
 export type OutboxEmailKind = (typeof OUTBOX_EMAIL_KINDS)[number];
 
@@ -60,6 +63,8 @@ export interface OutboxPayload {
   /** The language the listing is written in, for `lang` on its name (rows from 2026-11-11 on). */
   contentLocale?: string;
   booking?: OutboxBooking;
+  /** Handover emails: the page they link to; the listing's name is never in them (an owner's text). */
+  listingId?: string;
 }
 
 export const emailOutbox = pgTable(

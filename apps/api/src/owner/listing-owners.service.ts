@@ -258,12 +258,17 @@ export class ListingOwnersService {
       const paid = shares.filter((share) => share.percent > 0).map((share) => share.ownerId);
       const missing = await unreported(tx, paid);
       if (missing.length > 0) throw conflict('OWNER_DETAILS_MISSING', { owners: missing });
-      for (const share of shares) {
-        await tx
-          .update(owners)
-          .set({ shareBps: share.percent * SHARE_BPS_PER_PERCENT })
-          .where(and(eq(owners.locationId, listingId), eq(owners.ownerId, share.ownerId)));
-      }
+      // One statement for all of them (at most ten owners, each otherwise a round trip under the lock).
+      await tx.execute(sql`
+        update listing_owners as o set share_bps = v.bps
+        from (values ${sql.join(
+          shares.map(
+            (share) => sql`(${share.ownerId}::uuid, ${share.percent * SHARE_BPS_PER_PERCENT}::int)`,
+          ),
+          sql`, `,
+        )}) as v(owner_id, bps)
+        where o.location_id = ${listingId} and o.owner_id = v.owner_id
+      `);
       // Paid now, on a listing that may already be live: theirs for staff to verify, as a
       // submission makes it (in id order, as a submission takes them).
       if (paid.length > 0) {
@@ -309,7 +314,34 @@ export class ListingOwnersService {
         toOwnerId: ownerId,
         expiresAt: new Date(Date.now() + LISTING_HANDOVER_DAYS * 24 * 60 * 60 * 1000),
       });
+      // Told by email, at most once a day for one listing: offering and taking back over and over
+      // is no way to fill someone's inbox (the day's key is the one the outbox refuses twice).
+      await this.tell(tx, ownerId, 'listing-handover-offered', {
+        listingId,
+        dedupeKey: `listing-handover-offered:${listingId}:${ownerId}:${new Date().toISOString().slice(0, 10)}`,
+      });
     });
+  }
+
+  /**
+   * An email to one owner about the listing's handover, written in this transaction (so none goes
+   * for a change that rolled back). Nothing an owner typed is in it: the listing's id, for the link.
+   */
+  private async tell(
+    tx: Transaction,
+    ownerId: string,
+    kind: 'listing-handover-offered' | 'listing-handover-accepted',
+    { listingId, dedupeKey }: { listingId: string; dedupeKey: string },
+  ): Promise<void> {
+    const [to] = await tx
+      .select({ userId: profile.userId })
+      .from(profile)
+      .where(eq(profile.id, ownerId));
+    if (!to) return;
+    await tx
+      .insert(outbox)
+      .values({ kind, userId: to.userId, payload: { listingId }, dedupeKey })
+      .onConflictDoNothing({ target: outbox.dedupeKey });
   }
 
   /** Takes the offer back (the primary) or declines it (the co-owner offered the role). */
@@ -374,6 +406,11 @@ export class ListingOwnersService {
         .set({ verification: 'pending' })
         .where(and(eq(profile.id, me.ownerId), eq(profile.verification, 'unverified')));
       await tx.update(handovers).set({ acceptedAt: new Date() }).where(eq(handovers.id, offer.id));
+      // The one who gave the role up hears it was taken (the one who took it has just pressed).
+      await this.tell(tx, offer.fromOwnerId, 'listing-handover-accepted', {
+        listingId,
+        dedupeKey: `listing-handover-accepted:${offer.id}`,
+      });
       me.role = 'primary';
     });
   }

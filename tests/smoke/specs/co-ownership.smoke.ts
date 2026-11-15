@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { emailLink, waitForEmail } from '../support/email';
+import { activatePayoutsOf, HAS_DATABASE } from '../support/db';
 import { EMAIL_OUTBOX } from '../support/env';
 import {
   confirmEmail,
@@ -16,7 +17,9 @@ import { fillOwnerDetails, listingWithStaff } from '../support/listings';
 // listing's owners page; the worker sends the invitation, its link's token after `#`; the person
 // invited, signed out, signs in on the way and comes back to accept it; the primary sets the
 // shares once everyone given one has filled in their details (#22), and the page says drivers
-// wait until everyone with a share can be paid.
+// wait until everyone with a share can be paid. A co-owner paid a share can't empty their details
+// (they would go missing under live bookings), and the primary can hand the role over: offered by
+// email, accepted by the co-owner, the old primary staying as a co-owner (#61–#64).
 
 test.use(ownVisitor);
 
@@ -25,9 +28,10 @@ test('an owner invites a co-owner by email, who accepts, and the primary sets th
   page,
 }) => {
   test.skip(!EMAIL_OUTBOX, 'The invitation is read from the local email outbox');
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const name = `Κοινό γκαράζ ${Date.now().toString(36)}`;
-  await registerAndSignIn(page, uniqueEmail('primary-owner'), 'Maria Primary');
+  const primaryEmail = uniqueEmail('primary-owner');
+  await registerAndSignIn(page, primaryEmail, 'Maria Primary');
   const { id } = await listingWithStaff(page, name);
 
   // From the dashboard to the listing's owners.
@@ -107,19 +111,137 @@ test('an owner invites a co-owner by email, who accepts, and the primary sets th
     );
     await expectAccessible(page);
     await fillOwnerDetails(invited);
+
+    // Filled in: saved. They can't be paid yet, so drivers wait.
+    await page.getByRole('button', { name: 'Save shares' }).click();
+    await expect(page.getByText('Shares saved.')).toBeVisible();
+    await expect(page.getByText(/Drivers can’t book this listing until every owner/)).toBeVisible();
+    await expectAccessible(page);
+
+    // Paid a share of a listing that is with staff: their details can't be left incomplete, and
+    // the page says why beside the status, not "check your connection".
+    await invited.goto('/en/owner/profile');
+    const phone = invited.getByRole('textbox', { name: 'Phone' });
+    await expect(phone).not.toHaveValue('');
+    await phone.clear();
+    await phone.press('Tab');
+    await expect(
+      invited.getByText(/You’re paid a share of a listing that is with us or live/),
+    ).toBeVisible();
+    await expectAccessible(invited);
+    // A value can still be replaced.
+    await phone.fill('+30 210 123 4568');
+    await phone.press('Tab');
+    await expect(
+      invited.getByText(/You’re paid a share of a listing that is with us or live/),
+    ).toHaveCount(0);
+
+    // And in Greek.
+    await page.goto(`/el/owner/listings/${id}/owners`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Ιδιοκτήτες' })).toBeVisible();
+    await expect(page.getByText('Συνιδιοκτησία', { exact: true })).toBeVisible();
+    await expectAccessible(page);
+
+    // A payout account is made by hand in the database (Stripe isn't in this run).
+    if (HAS_DATABASE) await handOver({ page, invited, id, primaryEmail, coOwnerEmail });
   } finally {
     await context.close();
   }
-
-  // Filled in: saved. They can't be paid yet, so drivers wait.
-  await page.getByRole('button', { name: 'Save shares' }).click();
-  await expect(page.getByText('Shares saved.')).toBeVisible();
-  await expect(page.getByText(/Drivers can’t book this listing until every owner/)).toBeVisible();
-  await expectAccessible(page);
-
-  // And in Greek.
-  await page.goto(`/el/owner/listings/${id}/owners`);
-  await expect(page.getByRole('heading', { level: 1, name: 'Ιδιοκτήτες' })).toBeVisible();
-  await expect(page.getByText('Συνιδιοκτησία', { exact: true })).toBeVisible();
-  await expectAccessible(page);
 });
+
+/**
+ * The primary offers the role (asked twice), the co-owner is emailed, takes it over (asked twice)
+ * once their payouts are set up, and the old primary is told by email and stays as a co-owner.
+ */
+async function handOver({
+  page,
+  invited,
+  id,
+  primaryEmail,
+  coOwnerEmail,
+}: {
+  page: Page;
+  invited: Page;
+  id: string;
+  primaryEmail: string;
+  coOwnerEmail: string;
+}) {
+  const ownersPath = `/en/owner/listings/${id}/owners`;
+  await page.goto(ownersPath);
+  await expect(
+    page.getByRole('heading', { level: 2, name: 'Handing over the primary role' }),
+  ).toBeVisible();
+  await expectAccessible(page);
+
+  // Asked twice: the first press changes nothing, and "No" leaves things as they are.
+  await page.getByRole('button', { name: 'Offer the primary role to Eleni Co' }).click();
+  await expect(page.getByText(/Nothing changes until they accept/)).toBeFocused();
+  await page.getByRole('button', { name: 'No, leave it as it is' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Offer the primary role to Eleni Co' }),
+  ).toBeFocused();
+
+  // Not ready to lead: payouts. The refusal names what's missing, and nothing was offered.
+  await page.getByRole('button', { name: 'Offer the primary role to Eleni Co' }).click();
+  await page.getByRole('button', { name: 'Yes, offer it' }).click();
+  await expect(page.getByText(/needs payouts set up with Stripe first/)).toBeVisible();
+  await expectAccessible(page);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Take the offer back' })).toHaveCount(0);
+
+  await activatePayoutsOf(coOwnerEmail);
+  await page.getByRole('button', { name: 'Offer the primary role to Eleni Co' }).click();
+  await page.getByRole('button', { name: 'Yes, offer it' }).click();
+  await expect(page.getByText('Offered the primary role to Eleni Co.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Take the offer back' })).toBeFocused();
+  await expect(page.getByText(/has been offered the primary role/)).toBeVisible();
+  await expectAccessible(page);
+
+  // The co-owner is emailed by the worker, with nothing an owner typed in it.
+  const offered = await waitForEmail(
+    coOwnerEmail,
+    'You’ve been offered the primary role of a listing on Parkfairy',
+    { timeout: 90_000 },
+  );
+  expect(emailLink(offered)).toContain(`/en/owner/listings/${id}/owners`);
+
+  // Their page: the offer, the way to payouts, and Greek.
+  await invited.goto(ownersPath);
+  await expect(invited.getByText(/You’ve been offered the primary role/)).toBeVisible();
+  await expect(invited.getByRole('link', { name: 'Set up your payouts' })).toHaveAttribute(
+    'href',
+    '/en/owner/payouts',
+  );
+  await expectAccessible(invited);
+  await invited.goto(`/el/owner/listings/${id}/owners`);
+  await expect(
+    invited.getByRole('heading', { level: 2, name: 'Παράδοση του ρόλου του κύριου ιδιοκτήτη' }),
+  ).toBeVisible();
+  await expectAccessible(invited);
+
+  // Taking over: asked twice, the focus lands on the page's owners heading, and the rights moved.
+  await invited.goto(ownersPath);
+  await invited.getByRole('button', { name: 'Take over the primary role' }).click();
+  await invited.getByRole('button', { name: 'Yes, take over' }).click();
+  await expect(invited.getByText('You’re now the primary owner.')).toBeVisible();
+  await expect(invited.getByRole('heading', { level: 2, name: 'Owners and shares' })).toBeFocused();
+  await expect(invited.getByRole('button', { name: 'Save shares' })).toBeVisible();
+  await expect(invited.getByRole('button', { name: 'Leave this listing' })).toHaveCount(0);
+  await expectAccessible(invited);
+
+  // The old primary stays, as a co-owner: no shares to set, nobody to remove, but a way out.
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Leave this listing' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save shares' })).toHaveCount(0);
+  await expect(page.getByText('Maria Primary (you)')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { level: 2, name: 'Handing over the primary role' }),
+  ).toHaveCount(0);
+  await expectAccessible(page);
+
+  // And is told, by the worker.
+  const accepted = await waitForEmail(primaryEmail, 'Your listing has a new primary owner', {
+    timeout: 90_000,
+  });
+  expect(emailLink(accepted)).toContain(`/en/owner/listings/${id}/owners`);
+}

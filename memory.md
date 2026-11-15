@@ -262,6 +262,16 @@ Our readings for co-ownership (2026-11-13), not asked; change any that are wrong
     side's lock in a second transaction to prove each waits for the other. A direct database edit
     can still empty the details; sending in checks them again.
 
+Our readings for the handover (2026-11-15), not asked; change any that are wrong:
+
+- **Two emails, no third.** The co-owner is mailed when offered the role and the old primary when
+  it is accepted; the one who accepts has just pressed the button. Neither carries a name (nobody's,
+  nor the listing's): the link opens the owners page, which names them once signed in. The offer
+  email goes at most once a day per listing and co-owner (a dedupe key with the UTC date), so
+  offering and taking back is no way to fill an inbox; the page always shows the offer.
+- **Offers that came to nothing are purged after 30 days, accepted ones are kept** (the record of
+  who handed a listing over; `listing_handovers` restricts deleting either profile, for Phase 6).
+
 Our readings (2026-11-08), not asked; change any that are wrong:
 
 - **One hold per driver.** A new hold lets the driver's earlier ones go, so one account can't sit
@@ -1487,3 +1497,6 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
 - **2026-11-08 · A stay is «στάθμευση» in Greek, not «παραμονή»** (which reads as a hotel stay), as
   the catalogue already had it (`Listing.yourStay`, `spaceTotal`). The booking copy follows; a native
   speaker may still prefer otherwise (progress.md).
+- **2026-11-15 · Two Playwright runs at once fail each other.** Both write `tests/smoke/test-results`,
+  and the loser's trace files vanish mid-run (`ENOENT … .playwright-artifacts`) as the context
+  closes, which looks like a failure of the test. Run the suite once at a time, from the repo root.
