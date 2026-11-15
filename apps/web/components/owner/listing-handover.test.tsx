@@ -120,12 +120,15 @@ describe('handing over the primary role', () => {
     vi.mocked(acceptListingHandover).mockResolvedValue(answer(owners('primary')) as never);
     show(owners('co_owner', { ...OFFER, canAccept: true }));
     expect(screen.getByText(/You’ve been offered the primary role/)).toBeVisible();
-    await userEvent.click(screen.getByRole('button', { name: 'Take over as primary owner' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Take over the primary role' }));
     expect(acceptListingHandover).not.toHaveBeenCalled();
     expect(screen.getByText(/stays on as a co-owner with their share/)).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Yes, take over' }));
     expect(await screen.findByText('You’re now the primary owner.')).toBeInTheDocument();
     expect(acceptListingHandover).toHaveBeenCalledWith({ path: { id: LISTING_ID } });
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 2, name: 'Owners and shares' })).toHaveFocus(),
+    );
     // Now the primary's panel: the shares can be saved.
     expect(screen.getByRole('button', { name: 'Save shares' })).toBeVisible();
   });
@@ -136,15 +139,19 @@ describe('handing over the primary role', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Decline the offer' }));
     await userEvent.click(screen.getByRole('button', { name: 'Yes, decline' }));
     expect(await screen.findByText('The offer of the primary role is closed.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Take over as primary owner' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Take over the primary role' })).toBeNull();
+    // The card is gone with the offer: the focus goes to a heading that stays, not to the page top.
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 2, name: 'Owners and shares' })).toHaveFocus(),
+    );
   });
 
   it('says why when the co-owner can’t take over yet, and changes nothing', async () => {
     vi.mocked(acceptListingHandover).mockResolvedValue(refusal('PAYOUTS_NOT_ACTIVE', 409) as never);
     show(owners('co_owner', { ...OFFER, canAccept: true }));
-    await userEvent.click(screen.getByRole('button', { name: 'Take over as primary owner' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Take over the primary role' }));
     await userEvent.click(screen.getByRole('button', { name: 'Yes, take over' }));
-    expect(await screen.findByText(/payouts must be set up with Stripe first/)).toBeVisible();
+    expect(await screen.findByText(/needs payouts set up with Stripe first/)).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Save shares' })).toBeNull();
   });
 
@@ -160,7 +167,9 @@ describe('handing over the primary role', () => {
   it('speaks Greek and passes axe, with the offer shown and the question asked', async () => {
     const { container } = show(owners('co_owner', { ...OFFER, canAccept: true }), 'el');
     expect(screen.getByRole('heading', { level: 2, name: /Παράδοση του ρόλου/ })).toBeVisible();
-    await userEvent.click(screen.getByRole('button', { name: 'Αναλάβετε ως κύριος ιδιοκτήτης' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Αναλάβετε τον ρόλο του κύριου ιδιοκτήτη' }),
+    );
     expect(screen.getByRole('button', { name: 'Ναι, αναλαμβάνω' })).toBeVisible();
     await expectNoAxeViolations(container);
   });

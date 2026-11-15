@@ -204,6 +204,13 @@
       "when": 1794734637905,
       "tag": "0028_striped_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794737599554,
+      "tag": "0029_windy_metal_master",
+      "breakpoints": true
     }
   ]
 }

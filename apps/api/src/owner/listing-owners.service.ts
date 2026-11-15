@@ -190,7 +190,8 @@ export class ListingOwnersService {
           and ${invites.createdAt} > now() - interval '1 day')::int`,
       })
       .from(invites)
-      // Each side bounded by its window too, so each index reads only that window's rows.
+      // Each side bounded by its window too: the listing's invites by their week (a listing has at
+      // most ten owners and invites, so the inbox expression filters few rows), the inviter's by their day.
       .where(
         or(
           and(

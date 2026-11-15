@@ -142,6 +142,9 @@ export const listingHandovers = pgTable(
     uniqueIndex('listing_handovers_open_idx')
       .on(t.locationId)
       .where(sql`${t.acceptedAt} is null and ${t.withdrawnAt} is null`),
+    // The listing's offers, settled ones too: its deletion cascades here (the partial index above
+    // can't serve a delete that must find them all).
+    index('listing_handovers_location_idx').on(t.locationId, t.createdAt),
     // The owners a profile's removal or leaving must close offers of, and the RESTRICT checks.
     index('listing_handovers_to_idx').on(t.toOwnerId),
     index('listing_handovers_from_idx').on(t.fromOwnerId),

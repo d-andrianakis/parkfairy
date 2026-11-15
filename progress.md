@@ -1429,7 +1429,13 @@ listing limit, and the role's rights (removal, shares, deeds, deletion, status e
 - [x] **Security** review: no bypass. Fixed: a demoted primary's deletion of a draft or a deed
       racing the accept (the role is now read under the lock); the new primary set to pending for
       staff's verification
-- [ ] Smoke test for the handover; performance, accessibility and i18n review agents not run yet
+- [x] Performance review: nothing above low; fixed the cascade's missing index (migration 0029) and
+      the stale comment on the inbox cap. Accessibility review: focus lost when a co-owner declines
+      (now the owners heading; focus asserted in tests). i18n review: the payouts and listing-limit
+      errors read wrongly for the primary making the offer, Greek aspect, gender and date wording:
+      fixed. Left: a stale-offer error keeps its confirm button until reload; the payouts error has
+      no link; the lock held for the extra `read()` query (sub-millisecond)
+- [ ] Smoke test for the handover
 - [ ] Security lows: `transferMadeFor`'s `primary` is read live from the listing (only matters for a
       legacy transfer without owner metadata retried after a handover); an offer's `TOO_MANY_LISTINGS`
       tells a primary that their co-owner owns that many listings; settled offers are never purged;

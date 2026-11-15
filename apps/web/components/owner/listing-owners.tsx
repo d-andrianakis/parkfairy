@@ -463,7 +463,15 @@ function Handover({
             keep={t('keepOffer')}
             act={() => withdrawListingHandover({ path: { id: owners.listingId } })}
             onDone={(answer) => {
-              if (answer) onChanged(answer, t('handoverClosed'), HANDOVER_HEADING);
+              // A co-owner who declines has no card left (nothing is offered, and it isn't theirs to
+              // make): the focus goes to the page's first heading, which stays.
+              if (answer) {
+                onChanged(
+                  answer,
+                  t('handoverClosed'),
+                  offer.canAccept ? OWNERS_HEADING : HANDOVER_HEADING,
+                );
+              }
             }}
           />
         ) : null}

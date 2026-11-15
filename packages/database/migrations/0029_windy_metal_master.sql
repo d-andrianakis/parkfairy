@@ -1,0 +1,1 @@
+CREATE INDEX "listing_handovers_location_idx" ON "listing_handovers" USING btree ("location_id","created_at");
