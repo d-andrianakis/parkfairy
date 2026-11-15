@@ -57,6 +57,24 @@ describe('useOwnerError', () => {
     );
   });
 
+  it('knows every refusal of co-ownership (#53–#56), in words of ours', async () => {
+    const { LISTING_OWNER_ERROR_CODES } = await import('@parkfairy/contracts');
+    const generic = catalogs.el.Owner.errors.generic;
+    for (const code of LISTING_OWNER_ERROR_CODES) {
+      expect(catalogs.en.Owner.errors, code).toHaveProperty(code);
+      expect(catalogs.el.Owner.errors, code).toHaveProperty(code);
+      // Known to the owner area: not the generic text a code it never heard of gets.
+      expect(translate()({ code }), code).not.toBe(generic);
+    }
+  });
+
+  it('says which invitation cap was met, in Greek too', () => {
+    expect(translate()({ code: 'TOO_MANY_INVITES', limit: 'day' })).toMatch(/^Στείλατε/);
+    expect(translate()({ code: 'TOO_MANY_INVITES', limit: 'address' })).toMatch(
+      /^Αυτή η διεύθυνση/,
+    );
+  });
+
   it('never shows text from the server', () => {
     const generic = catalogs.el.Owner.errors.generic;
     expect(translate()({ code: 'SOMETHING_NEW', message: 'English from a server' })).toBe(generic);

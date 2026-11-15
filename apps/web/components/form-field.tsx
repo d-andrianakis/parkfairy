@@ -5,10 +5,11 @@ import { PlainField, PlainFieldError } from './plain-field';
 
 interface FormFieldProps extends ComponentProps<typeof Input> {
   id: string;
-  label: string;
+  /** Rich where it names someone (their name isolated, in its language). */
+  label: ReactNode;
   /** Persistent guidance shown under the field (e.g. password rules). */
   hint?: string;
-  error?: string;
+  error?: ReactNode;
   /**
    * A control sitting inside the input, at its end; the input must leave room for it. Pass null
    * while it can't render yet: leaving it out changes the tree around the input, and React would

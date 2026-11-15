@@ -178,6 +178,89 @@ export type ParkingListingDetail = {
     bookingOpen: boolean;
 };
 
+export type CheckoutKind = 'payment' | 'confirm';
+
+export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'refunding' | 'refunded' | 'canceled';
+
+export type BookingPayment = {
+    clientSecret: string;
+    status: PaymentStatus;
+};
+
+export type PayoutStatus = 'none' | 'pending' | 'restricted' | 'active';
+
+export type OwnerPayouts = {
+    available: boolean;
+    status: PayoutStatus;
+};
+
+export type PayoutLinkInput = {
+    locale: Locale;
+};
+
+export type PayoutLink = {
+    url: string;
+};
+
+export type ListingOwnerRole = 'primary' | 'co_owner';
+
+export type ListingOwner = {
+    id: string;
+    name: string | null;
+    email: string | null;
+    role: ListingOwnerRole;
+    sharePercent: number;
+    payouts: PayoutStatus | null;
+    you: boolean;
+};
+
+export type ListingInvite = {
+    id: string;
+    email: string | null;
+    invitedBy: string | null;
+    expiresAt: string | null;
+    canWithdraw: boolean;
+};
+
+export type ListingOwners = {
+    listingId: string;
+    name: string | null;
+    contentLocale: Locale;
+    role: ListingOwnerRole;
+    owners: Array<ListingOwner>;
+    invites: Array<ListingInvite>;
+    payable: boolean;
+    room: number;
+};
+
+export type ListingInviteInput = {
+    email: string;
+    locale: Locale;
+};
+
+export type ListingSharesInput = {
+    shares: Array<{
+        ownerId: string;
+        percent: number;
+    }>;
+};
+
+export type InviteTokenInput = {
+    token: string;
+};
+
+export type InvitePreview = {
+    state: 'open' | 'expired' | 'used';
+    listingName: string | null;
+    contentLocale: Locale;
+    invitedBy: string | null;
+    forYou: boolean;
+};
+
+export type InviteAccepted = {
+    listingId: string;
+};
+
 export type OwnerKind = 'individual' | 'business';
 
 export type OwnerVerification = 'unverified' | 'pending' | 'verified' | 'rejected';
@@ -389,7 +472,7 @@ export type ProofKind = 'titleDeed' | 'lease' | 'operatingLicence' | 'other';
 export type OwnerProof = {
     id: string;
     kind: ProofKind;
-    fileName: string;
+    fileName: string | null;
     contentType: 'application/pdf' | 'image/jpeg' | 'image/png';
     sizeBytes: number;
     createdAt: string;
@@ -460,6 +543,7 @@ export type OwnerPrices = {
 export type OwnerListing = {
     id: string;
     status: ListingStatus;
+    role: ListingOwnerRole;
     locked: boolean;
     progress: OwnerListingProgress;
     doneAccountSteps: Array<AccountStep>;
@@ -483,30 +567,6 @@ export type OwnerListing = {
 
 export type OwnerListingCreated = {
     id: string;
-};
-
-export type CheckoutKind = 'payment' | 'confirm';
-
-export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'refunding' | 'refunded' | 'canceled';
-
-export type BookingPayment = {
-    clientSecret: string;
-    status: PaymentStatus;
-};
-
-export type PayoutStatus = 'none' | 'pending' | 'restricted' | 'active';
-
-export type OwnerPayouts = {
-    available: boolean;
-    status: PayoutStatus;
-};
-
-export type PayoutLinkInput = {
-    locale: Locale;
-};
-
-export type PayoutLink = {
-    url: string;
 };
 
 export type BookingStatus = 'held' | 'confirmed' | 'cancelled' | 'expired' | 'released';
@@ -613,65 +673,6 @@ export type Place = {
 
 export type PlaceList = {
     places: Array<Place>;
-};
-
-export type ListingOwnerRole = 'primary' | 'co_owner';
-
-export type ListingOwner = {
-    id: string;
-    name: string | null;
-    email: string;
-    role: ListingOwnerRole;
-    sharePercent: number;
-    payouts: PayoutStatus;
-    you: boolean;
-};
-
-export type ListingInvite = {
-    id: string;
-    email: string;
-    invitedBy: string | null;
-    expiresAt: string | null;
-    canWithdraw: boolean;
-};
-
-export type ListingOwners = {
-    listingId: string;
-    name: string | null;
-    contentLocale: Locale;
-    role: ListingOwnerRole;
-    owners: Array<ListingOwner>;
-    invites: Array<ListingInvite>;
-    payable: boolean;
-    room: number;
-};
-
-export type ListingInviteInput = {
-    email: string;
-    locale: Locale;
-};
-
-export type ListingSharesInput = {
-    shares: Array<{
-        ownerId: string;
-        percent: number;
-    }>;
-};
-
-export type InviteTokenInput = {
-    token: string;
-};
-
-export type InvitePreview = {
-    state: 'open' | 'expired' | 'used';
-    listingName: string | null;
-    contentLocale: Locale;
-    invitedBy: string | null;
-    forYou: boolean;
-};
-
-export type InviteAccepted = {
-    listingId: string;
 };
 
 export type GetLivenessData = {

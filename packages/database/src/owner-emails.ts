@@ -74,6 +74,10 @@ export async function enqueueOnboardingReminders(db: Database, before: Date): Pr
           select 1 from parking_locations l
           where l.owner_id = p.id and (l.updated_at >= ${cutoff} or l.status <> 'draft')
         )
+        -- A co-owner has a listing they run with others: nothing of their own to finish (#53).
+        and not exists (
+          select 1 from listing_owners lo where lo.owner_id = p.id and lo.role = 'co_owner'
+        )
       order by p.updated_at
       limit ${SWEEP_LIMIT}
       for update of p skip locked
@@ -127,9 +131,15 @@ export async function claimDueEmails(db: Database, limit: number): Promise<Claim
       kind: emailOutbox.kind,
       attempts: emailOutbox.attempts,
       payload: emailOutbox.payload,
-      // An account's address and language, or an invite's (who may have no account yet).
+      // An account's address and language, or an invite's (who may have no account yet): in
+      // the language of the account it was sent to, confirmed, else the inviter's.
       to: sql<string>`coalesce(${users.email}, ${listingInvites.email})`,
-      locale: sql<string>`coalesce(${users.locale}, ${listingInvites.locale})`,
+      // Both addresses are lowercase (Better Auth stores them so; invites' CHECK), so the unique
+      // index finds it: \`lower(email)\` would read every account for each invite.
+      locale: sql<string>`coalesce(${users.locale}, (
+        select invitee.locale from ${users} invitee
+        where invitee.email = ${listingInvites.email} and invitee.email_verified
+      ), ${listingInvites.locale})`,
       inviteId: emailOutbox.inviteId,
     })
     .from(emailOutbox)

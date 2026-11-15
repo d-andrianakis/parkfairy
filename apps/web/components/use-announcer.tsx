@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 /**
  * A polite live region that speaks every time, including when the same text comes twice: it is
@@ -9,9 +9,10 @@ import { useState } from 'react';
  * that aren't only for screen readers.
  */
 export function useAnnouncer(className = 'sr-only') {
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<ReactNode>('');
 
-  function announce(text: string) {
+  /** Rich where it names someone: their name isolated, in its language. */
+  function announce(text: ReactNode) {
     setMessage('');
     requestAnimationFrame(() => setMessage(text));
   }

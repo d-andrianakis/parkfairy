@@ -1,7 +1,7 @@
 /**
  * Co-ownership (#53–#56): a listing's owners, the primary (the listing's `owner_id`) and
  * co-owners, each with a share of the owners' payouts; invites to join; and each booking's payees,
- * copied from the owners at the hold, as its commission is (#15).
+ * copied from the owners when it is confirmed.
  */
 import {
   LISTING_OWNER_ROLES,
@@ -96,6 +96,10 @@ export const listingInvites = pgTable(
       .where(sql`${t.acceptedAt} is null and ${t.withdrawnAt} is null`),
     // The purge of old ones.
     index('listing_invites_created_idx').on(t.createdAt),
+    // The limits: invites to one address from a listing in a week, by one inviter in a day. They
+    // serve the cascade from the listing and the SET NULL from the profile too.
+    index('listing_invites_listing_email_idx').on(t.locationId, t.email, t.createdAt),
+    index('listing_invites_inviter_idx').on(t.invitedBy, t.createdAt),
     check('listing_invites_email_check', sql`${t.email} = lower(${t.email})`),
     check('listing_invites_locale_check', sql`${t.locale} in (${sqlList(SUPPORTED_LOCALES)})`),
     check(
@@ -110,8 +114,9 @@ export const listingInvites = pgTable(
 );
 
 /**
- * Who a booking's owners' share goes to, copied from the listing's owners with a share at the hold
- * (#54): a share changed, or an owner joining or leaving later, changes only bookings made after.
+ * Who a booking's owners' share goes to, copied from the listing's owners with a share when the
+ * booking is confirmed (#54): a share changed, or an owner joining or leaving later, changes only
+ * bookings made after, and a hold that never books has none.
  * Each payee is paid on their own, 24 hours after the stay (#4); one whose account Stripe has
  * restricted waits alone (#52). A financial record: nothing cascades into it.
  */

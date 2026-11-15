@@ -1,3 +1,4 @@
+import { DISPUTES_RELEASED } from '@parkfairy/contracts';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import { bookings } from './schema/bookings.js';
@@ -294,6 +295,26 @@ export interface TransferDue {
   cursor: MoneyCursor;
 }
 
+/** A dispute of booking `b` that holds its payout (#58): any not settled for the owners. */
+const heldByDispute = sql`
+  select 1 from payment_disputes d
+  where d.booking_id = b.id and d.status not in (${sql.join(
+    DISPUTES_RELEASED.map((status) => sql`${status}`),
+    sql`, `,
+  )})
+`;
+
+/**
+ * Whether a dispute holds this booking's payout now (#58): asked again right before each payee's
+ * transfer, as one recorded since the page was read must stop the rest.
+ */
+export async function transferHeld(db: Database, bookingId: string): Promise<boolean> {
+  const rows = await db.execute<{ held: boolean }>(sql`
+    select exists (${heldByDispute}) as held from ${bookings} b where b.id = ${bookingId}
+  `);
+  return rows.rows[0]?.held === true;
+}
+
 /**
  * What makes a paid stay's transfer due at `dueBefore` (its end): confirmed, or cancelled with
  * something kept once its refund is settled with Stripe (what's kept is then final), not sent,
@@ -306,10 +327,7 @@ const dueWhere = (dueBefore: Date) => sql`
   and b.ends_at <= ${dueBefore.toISOString()}::timestamptz
   and (b.refund_status is null or b.refund_status in ('sent', 'failed'))
   and (b.refund_minor is null or b.refund_minor < b.total_minor)
-  and not exists (
-    select 1 from payment_disputes d
-    where d.booking_id = b.id and d.status not in ('won', 'warning_closed', 'prevented')
-  )
+  and not exists (${heldByDispute})
 `;
 
 /** A payee still to be paid, who can be now: Stripe can pay them, or their part came to nothing. */

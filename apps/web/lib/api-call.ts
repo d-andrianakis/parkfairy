@@ -13,6 +13,10 @@ export interface ApiFailure {
   bookings?: number;
   /** `REFUND_CHANGED`: what cancelling gives back now. */
   refund?: { amountMinor: number; currency: string };
+  /** `OWNER_DETAILS_MISSING`: the owners whose share waits on their details. */
+  owners?: string[];
+  /** `TOO_MANY_INVITES`: which cap was met. */
+  limit?: 'day' | 'address';
 }
 
 export type Outcome<T> = { ok: true; data: T } | { ok: false; failure: ApiFailure };

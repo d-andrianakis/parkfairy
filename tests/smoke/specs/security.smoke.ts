@@ -145,6 +145,28 @@ test.describe('signed in', () => {
     expect(await hoursCopied.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
   });
 
+  test('a listing’s owners cannot be changed from another site', async ({ page }) => {
+    await page.goto('/en');
+    const headers = { origin: 'https://evil.example' };
+    const id = '11111111-1111-4111-8111-111111111111';
+    const token = 'A'.repeat(43);
+    // Inviting, accepting, shares and leaving (#53–#56): each is a write, wherever it comes from.
+    const writes: [method: 'post' | 'put' | 'delete', path: string, data: unknown][] = [
+      ['post', `/api/v1/owner/listings/${id}/invites`, { email: 'x@example.com', locale: 'en' }],
+      ['delete', `/api/v1/owner/listings/${id}/invites/${id}`, undefined],
+      ['put', `/api/v1/owner/listings/${id}/shares`, { shares: [{ ownerId: id, percent: 100 }] }],
+      ['delete', `/api/v1/owner/listings/${id}/owners/${id}`, undefined],
+      ['post', `/api/v1/owner/listings/${id}/leave`, {}],
+      ['post', '/api/v1/owner/invites/preview', { token }],
+      ['post', '/api/v1/owner/invites/accept', { token }],
+    ];
+    for (const [method, path, data] of writes) {
+      const response = await page.request[method](path, { headers, data });
+      expect(response.status(), `${method} ${path}`).toBe(403);
+      expect(await response.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
+    }
+  });
+
   test('bookings cannot be made or changed from another site', async ({ page }) => {
     await page.goto('/en');
     const headers = { origin: 'https://evil.example' };

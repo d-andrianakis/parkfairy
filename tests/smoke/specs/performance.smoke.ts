@@ -101,7 +101,10 @@ const ACCOUNT_PAGES = [
   '/en/two-factor',
 ];
 
-for (const path of ['/en', ...ACCOUNT_PAGES, ...CATALOGUE]) {
+// The invite page, signed out: where an invitation's link lands someone with no account yet.
+const INVITE_PAGE = `/en/owner/invite#${'A'.repeat(43)}`;
+
+for (const path of ['/en', ...ACCOUNT_PAGES, INVITE_PAGE, ...CATALOGUE]) {
   test(`${path} stays within the first-visit budget`, async ({ page }) => {
     await expectWithinBudget(page, path);
   });
@@ -228,6 +231,22 @@ test.describe('signed in', () => {
     } finally {
       await page.request.delete(`/api/v1/owner/listings/${id}`, { headers });
     }
+  });
+
+  test('a listing’s owners stay within the first-visit budget', async ({ page }) => {
+    const headers = { origin: WEB_URL };
+    const created = await page.request.post('/api/v1/owner/listings', { headers });
+    expect(created.status()).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    try {
+      await expectWithinBudget(page, `/en/owner/listings/${id}/owners`);
+    } finally {
+      await page.request.delete(`/api/v1/owner/listings/${id}`, { headers });
+    }
+  });
+
+  test('the invite page, signed in, stays within the first-visit budget', async ({ page }) => {
+    await expectWithinBudget(page, INVITE_PAGE);
   });
 
   test('closures and special hours stay within the first-visit budget', async ({ page }) => {

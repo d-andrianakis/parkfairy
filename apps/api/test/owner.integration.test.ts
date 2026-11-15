@@ -32,6 +32,7 @@ import {
   markEmailFailed,
   markEmailSent,
   MAX_EMAIL_ATTEMPTS,
+  mintInviteToken,
   purgeSentEmails,
   releaseEmails,
   schema,
@@ -1065,6 +1066,97 @@ describe('owner onboarding', () => {
         (await api(submitter, 'get', '/profile').expect(200)).body,
       );
       expect(profileNow.verification).toBe('pending');
+    });
+
+    /** `user` becomes a co-owner of `id`, invited by `primary`, as the invite page has it. */
+    async function coOwn(primary: TestUser, id: string, user: TestUser) {
+      const sent = await api(primary, 'post', `/listings/${id}/invites`)
+        .send({ email: user.email, locale: 'el' })
+        .expect(200);
+      const made = (sent.body as { invites: { id: string; email: string | null }[] }).invites.find(
+        (open) => open.email === user.email,
+      );
+      const minted = await mintInviteToken(db, made?.id ?? '');
+      await api(user, 'post', '/invites/accept').send({ token: minted?.token }).expect(200);
+    }
+
+    async function reported(user: TestUser) {
+      await api(user, 'patch', '/profile').send(profile).expect(200);
+      await api(user, 'put', '/profile/tax').send(tax).expect(200);
+    }
+
+    it('needs the primary’s details and tax, and each paid owner’s, whoever sends it (#22, #55)', async () => {
+      const primary = await signUpUser(app);
+      const coOwner = await signUpUser(app);
+      const id = await readyListing(primary);
+      await coOwn(primary, id, coOwner);
+      await reported(coOwner);
+      // The co-owner's own steps are done; the primary's, whom staff verify for it, aren't.
+      expect(
+        (await api(coOwner, 'post', `/listings/${id}/submit`).send({ confirmed: true }).expect(409))
+          .body,
+      ).toMatchObject({ code: 'OWNER_DETAILS_MISSING' });
+
+      await reported(primary);
+      const listed = await api(primary, 'get', `/listings/${id}/owners`).expect(200);
+      const [first, second] = (listed.body as { owners: { id: string }[] }).owners;
+      await api(primary, 'put', `/listings/${id}/shares`)
+        .send({
+          shares: [
+            { ownerId: first?.id, percent: 50 },
+            { ownerId: second?.id, percent: 50 },
+          ],
+        })
+        .expect(200);
+      // A paid co-owner who took their details back out holds it up, even sent by the primary.
+      await api(coOwner, 'patch', '/profile').send({ phone: '' }).expect(200);
+      expect(
+        (await api(primary, 'post', `/listings/${id}/submit`).send({ confirmed: true }).expect(409))
+          .body,
+      ).toMatchObject({ code: 'OWNER_DETAILS_MISSING' });
+      await api(coOwner, 'patch', '/profile').send({ phone: profile.phone }).expect(200);
+      await api(primary, 'post', `/listings/${id}/submit`).send({ confirmed: true }).expect(200);
+      // Each of them staff's to verify now.
+      for (const user of [primary, coOwner]) {
+        const now = OwnerProfileSchema.parse((await api(user, 'get', '/profile').expect(200)).body);
+        expect(now.verification).toBe('pending');
+      }
+    });
+
+    it('lets a co-owner with no share and no details leave the sending in alone', async () => {
+      const id = await readyListing(submitter);
+      // Never paid, so not theirs to report: they help run the listing.
+      await coOwn(submitter, id, await signUpUser(app));
+      await api(submitter, 'post', `/listings/${id}/submit`).send({ confirmed: true }).expect(200);
+    });
+
+    it('keeps a listing’s deeds the primary’s to open and remove, not a co-owner’s', async () => {
+      const primary = await signUpUser(app);
+      const coOwner = await signUpUser(app);
+      const id = await newListing(primary);
+      await coOwn(primary, id, coOwner);
+      const proof = OwnerProofSchema.parse((await uploadProof(primary, id, PDF).expect(201)).body);
+      // Nor its file's name, which can carry the names and tax numbers in it.
+      const seen = async (user: TestUser) =>
+        OwnerListingSchema.parse((await api(user, 'get', `/listings/${id}`).expect(200)).body);
+      expect((await seen(coOwner)).proofs).toEqual([
+        expect.objectContaining({ id: proof.id, kind: 'lease', fileName: null }),
+      ]);
+      expect(await seen(coOwner)).toMatchObject({ role: 'co_owner' });
+      expect((await seen(primary)).proofs[0]?.fileName).toBe('μισθωτήριο.pdf');
+      // One the co-owner adds: theirs to add, its name the primary's to see.
+      const added = OwnerProofSchema.parse((await uploadProof(coOwner, id, PDF).expect(201)).body);
+      expect(added.fileName).toBeNull();
+      // A deed or a lease names people and their tax numbers.
+      const refusals = [
+        () => api(coOwner, 'get', `/listings/${id}/proofs/${proof.id}`),
+        () => api(coOwner, 'delete', `/listings/${id}/proofs/${proof.id}`),
+      ];
+      for (const refused of refusals) {
+        expect((await refused().expect(403)).body).toMatchObject({ code: 'PRIMARY_ONLY' });
+      }
+      await api(primary, 'get', `/listings/${id}/proofs/${proof.id}`).parse(bytes).expect(200);
+      await api(primary, 'delete', `/listings/${id}/proofs/${proof.id}`).expect(204);
     });
 
     it('takes one of two submissions at once, without an error for the other’s data', async () => {

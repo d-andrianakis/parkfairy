@@ -1,5 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  INVITES_PER_ADDRESS_WEEK,
+  INVITES_PER_DAY,
   InviteAcceptedSchema,
   InvitePreviewSchema,
   LISTING_OWNERS_MAX,
@@ -13,12 +15,13 @@ import {
   type ListingSharesInput,
 } from '@parkfairy/contracts';
 import { hashInviteToken, schema, type Database } from '@parkfairy/database';
-import { and, asc, eq, gt, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { DB } from '../database/database.module.js';
 import type { Reader } from '../parking/listing-data.js';
+import { doneAccountSteps } from './onboarding-progress.js';
 import { conflict, listingNotFound, primaryOnly } from './owner.errors.js';
-import { OwnerProfileService } from './owner-profile.service.js';
+import { OwnerProfileService, profileFacts } from './owner-profile.service.js';
 
 const listing = schema.parkingLocations;
 const owners = schema.listingOwners;
@@ -90,14 +93,24 @@ export class ListingOwnersService {
     { email, locale }: ListingInviteInput,
   ): Promise<ListingOwners> {
     const address = email.trim().toLowerCase();
-    return this.change(userId, listingId, async (tx, me, row) => {
+    const refusal: { code: 'ALREADY_OWNER' | 'ALREADY_INVITED' | null } = { code: null };
+    const answer = await this.change(userId, listingId, async (tx, me) => {
+      // The inviter's row: their day's count spans their listings, each under its own lock.
+      await tx
+        .select({ id: profile.id })
+        .from(profile)
+        .where(eq(profile.id, me.ownerId))
+        .for('update');
+      const primary = me.role === 'primary';
+      // A co-owner sees the others' names, not their addresses: each of their tries counts, so
+      // asking whether an address is an owner's costs what an invite does.
+      if (!primary) await this.withinCaps(tx, listingId, me.ownerId, address);
       const [owner] = await tx
         .select({ id: owners.id })
         .from(owners)
         .innerJoin(profile, eq(profile.id, owners.ownerId))
         .innerJoin(users, eq(users.id, profile.userId))
         .where(and(eq(owners.locationId, listingId), sql`lower(${users.email}) = ${address}`));
-      if (owner) throw conflict('ALREADY_OWNER');
       const [earlier] = await tx
         .select({ id: invites.id, expiresAt: invites.expiresAt })
         .from(invites)
@@ -109,33 +122,84 @@ export class ListingOwnersService {
             isNull(invites.withdrawnAt),
           ),
         );
+      const open = earlier && (!earlier.expiresAt || earlier.expiresAt > new Date());
+      if (owner || open) {
+        refusal.code = owner ? 'ALREADY_OWNER' : 'ALREADY_INVITED';
+        if (primary) return;
+        // Kept, withdrawn and sending nothing, so the try counts against the caps.
+        await tx.insert(invites).values({
+          locationId: listingId,
+          invitedBy: me.ownerId,
+          email: address,
+          locale,
+          withdrawnAt: new Date(),
+        });
+        return;
+      }
       if (earlier) {
-        if (!earlier.expiresAt || earlier.expiresAt > new Date()) throw conflict('ALREADY_INVITED');
         await tx.update(invites).set({ withdrawnAt: new Date() }).where(eq(invites.id, earlier.id));
       }
       if ((await this.taken(tx, listingId)) >= LISTING_OWNERS_MAX) {
         throw conflict('TOO_MANY_OWNERS');
       }
+      if (primary) await this.withinCaps(tx, listingId, me.ownerId, address);
       const [made] = await tx
         .insert(invites)
         .values({ locationId: listingId, invitedBy: me.ownerId, email: address, locale })
         .returning({ id: invites.id });
       if (!made) throw new Error('Invite not inserted');
-      const [inviter] = await tx
-        .select({ name: users.name })
-        .from(users)
-        .where(eq(users.id, userId));
+      // Nothing typed by an owner in it, not even the listing's name: a draft's name is anyone's
+      // free text, which would go out from our address to someone who never asked (#56).
       await tx.insert(outbox).values({
         kind: 'listing-invite',
         inviteId: made.id,
-        payload: {
-          listingName: row.name ?? undefined,
-          contentLocale: row.contentLocale,
-          inviterName: inviter?.name,
-        },
+        payload: {},
         dedupeKey: `listing-invite:${made.id}`,
       });
     });
+    if (refusal.code) throw conflict(refusal.code);
+    return answer;
+  }
+
+  /**
+   * Invites send emails to addresses that may be no one's: a person's few, never a loop of invite
+   * and withdraw at one address, nor a list. Says which cap was met.
+   */
+  private async withinCaps(
+    tx: Transaction,
+    listingId: string,
+    inviterId: string,
+    address: string,
+  ): Promise<void> {
+    const [recent] = await tx
+      .select({
+        toAddress: sql<number>`count(*) filter (where ${invites.locationId} = ${listingId}
+          and ${invites.email} = ${address}
+          and ${invites.createdAt} > now() - interval '7 days')::int`,
+        byInviter: sql<number>`count(*) filter (where ${invites.invitedBy} = ${inviterId}
+          and ${invites.createdAt} > now() - interval '1 day')::int`,
+      })
+      .from(invites)
+      // Each side bounded by its window too, so each index reads only that window's rows.
+      .where(
+        or(
+          and(
+            eq(invites.locationId, listingId),
+            eq(invites.email, address),
+            sql`${invites.createdAt} > now() - interval '7 days'`,
+          ),
+          and(
+            eq(invites.invitedBy, inviterId),
+            sql`${invites.createdAt} > now() - interval '1 day'`,
+          ),
+        ),
+      );
+    if ((recent?.byInviter ?? 0) >= INVITES_PER_DAY) {
+      throw conflict('TOO_MANY_INVITES', { limit: 'day' });
+    }
+    if ((recent?.toAddress ?? 0) >= INVITES_PER_ADDRESS_WEEK) {
+      throw conflict('TOO_MANY_INVITES', { limit: 'address' });
+    }
   }
 
   /** Withdraws an open invite: the inviter's own, or any if the primary asks. */
@@ -178,11 +242,24 @@ export class ListingOwnersService {
       if (current.length !== shares.length || current.some((owner) => !named.has(owner.ownerId))) {
         throw conflict('SHARES_MISMATCH');
       }
+      // Paid means reported (#22): a share only for an owner whose details and tax are in. The
+      // answer names them, so the form can say whose share waits.
+      const paid = shares.filter((share) => share.percent > 0).map((share) => share.ownerId);
+      const missing = await unreported(tx, paid);
+      if (missing.length > 0) throw conflict('OWNER_DETAILS_MISSING', { owners: missing });
       for (const share of shares) {
         await tx
           .update(owners)
           .set({ shareBps: share.percent * SHARE_BPS_PER_PERCENT })
           .where(and(eq(owners.locationId, listingId), eq(owners.ownerId, share.ownerId)));
+      }
+      // Paid now, on a listing that may already be live: theirs for staff to verify, as a
+      // submission makes it (in id order, as a submission takes them).
+      if (paid.length > 0) {
+        await tx
+          .update(profile)
+          .set({ verification: 'pending' })
+          .where(and(inArray(profile.id, paid), eq(profile.verification, 'unverified')));
       }
     });
   }
@@ -252,7 +329,6 @@ export class ListingOwnersService {
       .from(invites)
       .where(eq(invites.tokenHash, hash));
     if (!found) throw notFound('INVITE_NOT_FOUND');
-    const owner = await this.profiles.ensure(reader.id);
     return this.db.transaction(async (tx) => {
       // The listing's lock first, as every change to its owners takes it; then the invite.
       await tx
@@ -267,6 +343,16 @@ export class ListingOwnersService {
         .for('update');
       if (!invite || invite.withdrawnAt) throw notFound('INVITE_NOT_FOUND');
       if (!invitedIs(reader, invite.email)) throw conflict('INVITE_FOR_ANOTHER_ACCOUNT');
+      if (!invite.acceptedAt && invite.expiresAt && invite.expiresAt <= new Date()) {
+        throw conflict('INVITE_EXPIRED');
+      }
+      // This account's to accept: only now an owner profile, if it has none.
+      await tx.insert(profile).values({ userId: reader.id }).onConflictDoNothing();
+      const [owner] = await tx
+        .select({ id: profile.id })
+        .from(profile)
+        .where(eq(profile.userId, reader.id));
+      if (!owner) throw new Error('Owner profile missing right after insert');
       const [already] = await tx
         .select({ id: owners.id })
         .from(owners)
@@ -276,7 +362,6 @@ export class ListingOwnersService {
         if (!already) throw notFound('INVITE_NOT_FOUND');
         return InviteAcceptedSchema.parse({ listingId: invite.locationId });
       }
-      if (invite.expiresAt && invite.expiresAt <= new Date()) throw conflict('INVITE_EXPIRED');
       const [{ count } = { count: 0 }] = await tx
         .select({ count: sql<number>`count(*)::int` })
         .from(owners)
@@ -358,6 +443,18 @@ export class ListingOwnersService {
       )
       .returning({ shareBps: owners.shareBps });
     if (!gone) throw notFound('OWNER_NOT_FOUND');
+    // Their open invites go with them: a removed owner can't come back through one.
+    await tx
+      .update(invites)
+      .set({ withdrawnAt: new Date() })
+      .where(
+        and(
+          eq(invites.locationId, listingId),
+          eq(invites.invitedBy, ownerId),
+          isNull(invites.acceptedAt),
+          isNull(invites.withdrawnAt),
+        ),
+      );
     if (gone.shareBps > 0) {
       await tx
         .update(owners)
@@ -418,27 +515,36 @@ export class ListingOwnersService {
     ]);
     const [row] = info;
     if (!row) throw listingNotFound();
+    const primary = me.role === 'primary';
     return ListingOwnersSchema.parse({
       listingId: me.listingId,
       name: row.name,
       contentLocale: row.contentLocale,
       role: me.role,
-      owners: rows.map((owner) => ({
-        id: owner.id,
-        name: owner.name,
-        email: owner.email,
-        role: owner.role,
-        sharePercent: owner.shareBps / SHARE_BPS_PER_PERCENT,
-        payouts: owner.payouts ?? 'none',
-        you: owner.userId === userId,
-      })),
-      invites: open.map((invite) => ({
-        id: invite.id,
-        email: invite.email,
-        invitedBy: invite.invitedBy,
-        expiresAt: invite.expiresAt?.toISOString() ?? null,
-        canWithdraw: me.role === 'primary' || invite.invitedById === me.ownerId,
-      })),
+      owners: rows.map((owner) => {
+        const you = owner.userId === userId;
+        // Each co-owner sees the others' names: addresses and Stripe's state are the primary's.
+        const shown = primary || you;
+        return {
+          id: owner.id,
+          name: owner.name,
+          email: shown ? owner.email : null,
+          role: owner.role,
+          sharePercent: owner.shareBps / SHARE_BPS_PER_PERCENT,
+          payouts: shown ? (owner.payouts ?? 'none') : null,
+          you,
+        };
+      }),
+      invites: open.map((invite) => {
+        const theirs = primary || invite.invitedById === me.ownerId;
+        return {
+          id: invite.id,
+          email: theirs ? invite.email : null,
+          invitedBy: invite.invitedBy,
+          expiresAt: invite.expiresAt?.toISOString() ?? null,
+          canWithdraw: theirs,
+        };
+      }),
       payable: rows.every((owner) => owner.shareBps === 0 || owner.payouts === 'active'),
       room: Math.max(0, LISTING_OWNERS_MAX - rows.length - open.length),
     });
@@ -448,4 +554,23 @@ export class ListingOwnersService {
 /** The account invited: its address, confirmed. */
 function invitedIs(reader: InviteReader, email: string): boolean {
   return reader.emailVerified && reader.email.trim().toLowerCase() === email;
+}
+
+/**
+ * Whether every one of these owners has filled in their details and tax (#22): what a payee, or
+ * an owner of a listing sent in, must have.
+ */
+export async function everyoneReported(db: Reader, ownerIds: readonly string[]): Promise<boolean> {
+  return (await unreported(db, ownerIds)).length === 0;
+}
+
+/** Those of these owners who haven't (each once, as asked). */
+export async function unreported(db: Reader, ownerIds: readonly string[]): Promise<string[]> {
+  const asked = [...new Set(ownerIds)];
+  if (asked.length === 0) return [];
+  const rows = await db.select().from(profile).where(inArray(profile.id, asked));
+  const done = new Set(
+    rows.filter((row) => doneAccountSteps(profileFacts(row)).length === 2).map((row) => row.id),
+  );
+  return asked.filter((id) => !done.has(id));
 }

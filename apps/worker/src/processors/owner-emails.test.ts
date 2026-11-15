@@ -468,7 +468,8 @@ describe('owner emails processor', () => {
         inviteId: 'invite-1',
         to: 'eleni@example.gr',
         locale: 'en',
-        payload: { listingName: 'Ermou Garage', contentLocale: 'en', inviterName: 'Maria' },
+        // A row queued before the name was left out still carries it: it stays out anyway.
+        payload: { listingName: 'Ermou Garage', contentLocale: 'en' },
         ...overrides,
       });
 
@@ -485,7 +486,10 @@ describe('owner emails processor', () => {
       const email = send.mock.calls[0]?.[0];
       expect(email?.to).toBe('eleni@example.gr');
       expect(email?.text).toContain(`https://parkfairy.example/en/owner/invite#${token}`);
-      expect(email?.text).toContain('Maria invites you to own “Ermou Garage”');
+      expect(email?.text).toContain('You’re invited to co-own a parking listing on Parkfairy.');
+      // Nothing an owner typed goes out from our address (#56): not even the listing's name.
+      expect(email?.text).not.toContain('Ermou Garage');
+      expect(email?.html).not.toContain('Ermou Garage');
       // A new link is a new email to Resend: never refused for a changed body under one key.
       expect(email?.idempotencyKey).toBe(`email-9:hash-of-${'T'.repeat(8)}`);
       expect(markEmailSent).toHaveBeenCalledWith(db, 'email-9');

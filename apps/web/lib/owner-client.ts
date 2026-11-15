@@ -20,6 +20,7 @@ const KNOWN_CODES = [
   'LISTING_LOCKED',
   'LISTING_NOT_FOUND',
   'NOTHING_TO_COPY',
+  'OWNER_DETAILS_MISSING',
   'OWNER_NOT_FOUND',
   'PAYMENTS_UNAVAILABLE',
   'PAYMENT_PROVIDER_ERROR',
@@ -33,6 +34,7 @@ const KNOWN_CODES = [
   'PROFILE_INCOMPLETE',
   'PROFILE_REQUIRED',
   'SHARES_MISMATCH',
+  'TOO_MANY_INVITES',
   'TOO_MANY_LISTINGS',
   'TOO_MANY_OWNERS',
   'TOO_MANY_PHOTOS',
@@ -55,6 +57,9 @@ export function useOwnerError() {
     }
     if (failure.code === 'LISTING_BOOKED' || failure.code === 'SPACES_BOOKED') {
       return t(failure.code, { count: failure.bookings ?? 1 });
+    }
+    if (failure.code === 'TOO_MANY_INVITES') {
+      return t(failure.code, { limit: failure.limit === 'day' ? 'day' : 'address' });
     }
     return isKnownCode(failure.code) ? t(failure.code) : t('generic');
   };

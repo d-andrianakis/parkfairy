@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AREA_IDS, AreaIdSchema } from './areas.js';
 import { DEFAULT_TIME_ZONE, LocaleSchema } from './i18n.js';
+import { ListingOwnerRoleSchema } from './listing-owners.js';
 import {
   BOOKING_STEP_MINUTES,
   CANCELLATION_POLICIES,
@@ -691,7 +692,11 @@ export const OwnerProofSchema = z
   .object({
     id: z.uuid(),
     kind: ProofKindSchema,
-    fileName: z.string(),
+    /**
+     * As uploaded; null to a co-owner: a deed's or a lease's file name can carry the names and tax
+     * numbers in it, and only the primary may open one.
+     */
+    fileName: z.string().nullable(),
     contentType: z.enum(PROOF_CONTENT_TYPES),
     sizeBytes: z.int().positive(),
     createdAt: z.iso.datetime(),
@@ -814,6 +819,8 @@ export const OwnerListingSchema = z
   .object({
     id: z.uuid(),
     status: ListingStatusSchema,
+    /** The asker's place among its owners (#55): what the steps offer them. */
+    role: ListingOwnerRoleSchema,
     /** Staff are looking at it, or it is live: the steps are read-only. */
     locked: z.boolean(),
     progress: OwnerListingProgressSchema,

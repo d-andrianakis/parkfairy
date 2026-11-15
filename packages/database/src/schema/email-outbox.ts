@@ -60,8 +60,6 @@ export interface OutboxPayload {
   /** The language the listing is written in, for `lang` on its name (rows from 2026-11-11 on). */
   contentLocale?: string;
   booking?: OutboxBooking;
-  /** An invite's (#56): who sent it, by their account's name, shown to the person invited. */
-  inviterName?: string;
 }
 
 export const emailOutbox = pgTable(

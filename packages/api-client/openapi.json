@@ -4707,6 +4707,346 @@
         ],
         "additionalProperties": false
       },
+      "CheckoutKind": {
+        "type": "string",
+        "enum": [
+          "payment",
+          "confirm"
+        ]
+      },
+      "PaymentStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "processing",
+          "succeeded",
+          "refunding",
+          "refunded",
+          "canceled"
+        ]
+      },
+      "BookingPayment": {
+        "type": "object",
+        "properties": {
+          "clientSecret": {
+            "type": "string",
+            "pattern": "^pi_[A-Za-z0-9]+_secret_[A-Za-z0-9]+$"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          }
+        },
+        "required": [
+          "clientSecret",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "PayoutStatus": {
+        "type": "string",
+        "enum": [
+          "none",
+          "pending",
+          "restricted",
+          "active"
+        ]
+      },
+      "OwnerPayouts": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PayoutStatus"
+          }
+        },
+        "required": [
+          "available",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "PayoutLinkInput": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "$ref": "#/components/schemas/Locale"
+          }
+        },
+        "required": [
+          "locale"
+        ],
+        "additionalProperties": false
+      },
+      "PayoutLink": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "ListingOwnerRole": {
+        "type": "string",
+        "enum": [
+          "primary",
+          "co_owner"
+        ]
+      },
+      "ListingOwner": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "nullable": true,
+            "type": "string"
+          },
+          "email": {
+            "nullable": true,
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ListingOwnerRole"
+          },
+          "sharePercent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "payouts": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayoutStatus"
+              }
+            ]
+          },
+          "you": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role",
+          "sharePercent",
+          "payouts",
+          "you"
+        ],
+        "additionalProperties": false
+      },
+      "ListingInvite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "email": {
+            "nullable": true,
+            "type": "string"
+          },
+          "invitedBy": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "canWithdraw": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "invitedBy",
+          "expiresAt",
+          "canWithdraw"
+        ],
+        "additionalProperties": false
+      },
+      "ListingOwners": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "nullable": true,
+            "type": "string"
+          },
+          "contentLocale": {
+            "$ref": "#/components/schemas/Locale"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ListingOwnerRole"
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingOwner"
+            }
+          },
+          "invites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingInvite"
+            }
+          },
+          "payable": {
+            "type": "boolean"
+          },
+          "room": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "listingId",
+          "name",
+          "contentLocale",
+          "role",
+          "owners",
+          "invites",
+          "payable",
+          "room"
+        ],
+        "additionalProperties": false
+      },
+      "ListingInviteInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "locale": {
+            "$ref": "#/components/schemas/Locale"
+          }
+        },
+        "required": [
+          "email",
+          "locale"
+        ],
+        "additionalProperties": false
+      },
+      "ListingSharesInput": {
+        "type": "object",
+        "properties": {
+          "shares": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ownerId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "percent": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              },
+              "required": [
+                "ownerId",
+                "percent"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "shares"
+        ],
+        "additionalProperties": false
+      },
+      "InviteTokenInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "InvitePreview": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "expired",
+              "used"
+            ]
+          },
+          "listingName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "contentLocale": {
+            "$ref": "#/components/schemas/Locale"
+          },
+          "invitedBy": {
+            "nullable": true,
+            "type": "string"
+          },
+          "forYou": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "state",
+          "listingName",
+          "contentLocale",
+          "invitedBy",
+          "forYou"
+        ],
+        "additionalProperties": false
+      },
+      "InviteAccepted": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "listingId"
+        ],
+        "additionalProperties": false
+      },
       "OwnerKind": {
         "type": "string",
         "enum": [
@@ -5907,6 +6247,7 @@
             "$ref": "#/components/schemas/ProofKind"
           },
           "fileName": {
+            "nullable": true,
             "type": "string"
           },
           "contentType": {
@@ -6268,6 +6609,9 @@
           "status": {
             "$ref": "#/components/schemas/ListingStatus"
           },
+          "role": {
+            "$ref": "#/components/schemas/ListingOwnerRole"
+          },
           "locked": {
             "type": "boolean"
           },
@@ -6367,6 +6711,7 @@
         "required": [
           "id",
           "status",
+          "role",
           "locked",
           "progress",
           "doneAccountSteps",
@@ -6392,91 +6737,6 @@
         },
         "required": [
           "id"
-        ],
-        "additionalProperties": false
-      },
-      "CheckoutKind": {
-        "type": "string",
-        "enum": [
-          "payment",
-          "confirm"
-        ]
-      },
-      "PaymentStatus": {
-        "type": "string",
-        "enum": [
-          "pending",
-          "processing",
-          "succeeded",
-          "refunding",
-          "refunded",
-          "canceled"
-        ]
-      },
-      "BookingPayment": {
-        "type": "object",
-        "properties": {
-          "clientSecret": {
-            "type": "string",
-            "pattern": "^pi_[A-Za-z0-9]+_secret_[A-Za-z0-9]+$"
-          },
-          "status": {
-            "$ref": "#/components/schemas/PaymentStatus"
-          }
-        },
-        "required": [
-          "clientSecret",
-          "status"
-        ],
-        "additionalProperties": false
-      },
-      "PayoutStatus": {
-        "type": "string",
-        "enum": [
-          "none",
-          "pending",
-          "restricted",
-          "active"
-        ]
-      },
-      "OwnerPayouts": {
-        "type": "object",
-        "properties": {
-          "available": {
-            "type": "boolean"
-          },
-          "status": {
-            "$ref": "#/components/schemas/PayoutStatus"
-          }
-        },
-        "required": [
-          "available",
-          "status"
-        ],
-        "additionalProperties": false
-      },
-      "PayoutLinkInput": {
-        "type": "object",
-        "properties": {
-          "locale": {
-            "$ref": "#/components/schemas/Locale"
-          }
-        },
-        "required": [
-          "locale"
-        ],
-        "additionalProperties": false
-      },
-      "PayoutLink": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string",
-            "format": "uri"
-          }
-        },
-        "required": [
-          "url"
         ],
         "additionalProperties": false
       },
@@ -6935,254 +7195,6 @@
         },
         "required": [
           "places"
-        ],
-        "additionalProperties": false
-      },
-      "ListingOwnerRole": {
-        "type": "string",
-        "enum": [
-          "primary",
-          "co_owner"
-        ]
-      },
-      "ListingOwner": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "name": {
-            "nullable": true,
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "role": {
-            "$ref": "#/components/schemas/ListingOwnerRole"
-          },
-          "sharePercent": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 100
-          },
-          "payouts": {
-            "$ref": "#/components/schemas/PayoutStatus"
-          },
-          "you": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "email",
-          "role",
-          "sharePercent",
-          "payouts",
-          "you"
-        ],
-        "additionalProperties": false
-      },
-      "ListingInvite": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "email": {
-            "type": "string"
-          },
-          "invitedBy": {
-            "nullable": true,
-            "type": "string"
-          },
-          "expiresAt": {
-            "nullable": true,
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-          },
-          "canWithdraw": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "email",
-          "invitedBy",
-          "expiresAt",
-          "canWithdraw"
-        ],
-        "additionalProperties": false
-      },
-      "ListingOwners": {
-        "type": "object",
-        "properties": {
-          "listingId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "name": {
-            "nullable": true,
-            "type": "string"
-          },
-          "contentLocale": {
-            "$ref": "#/components/schemas/Locale"
-          },
-          "role": {
-            "$ref": "#/components/schemas/ListingOwnerRole"
-          },
-          "owners": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ListingOwner"
-            }
-          },
-          "invites": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ListingInvite"
-            }
-          },
-          "payable": {
-            "type": "boolean"
-          },
-          "room": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          }
-        },
-        "required": [
-          "listingId",
-          "name",
-          "contentLocale",
-          "role",
-          "owners",
-          "invites",
-          "payable",
-          "room"
-        ],
-        "additionalProperties": false
-      },
-      "ListingInviteInput": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "maxLength": 254,
-            "format": "email",
-            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-          },
-          "locale": {
-            "$ref": "#/components/schemas/Locale"
-          }
-        },
-        "required": [
-          "email",
-          "locale"
-        ],
-        "additionalProperties": false
-      },
-      "ListingSharesInput": {
-        "type": "object",
-        "properties": {
-          "shares": {
-            "minItems": 1,
-            "maxItems": 10,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "ownerId": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "percent": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 100
-                }
-              },
-              "required": [
-                "ownerId",
-                "percent"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "shares"
-        ],
-        "additionalProperties": false
-      },
-      "InviteTokenInput": {
-        "type": "object",
-        "properties": {
-          "token": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$"
-          }
-        },
-        "required": [
-          "token"
-        ],
-        "additionalProperties": false
-      },
-      "InvitePreview": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "type": "string",
-            "enum": [
-              "open",
-              "expired",
-              "used"
-            ]
-          },
-          "listingName": {
-            "nullable": true,
-            "type": "string"
-          },
-          "contentLocale": {
-            "$ref": "#/components/schemas/Locale"
-          },
-          "invitedBy": {
-            "nullable": true,
-            "type": "string"
-          },
-          "forYou": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "state",
-          "listingName",
-          "contentLocale",
-          "invitedBy",
-          "forYou"
-        ],
-        "additionalProperties": false
-      },
-      "InviteAccepted": {
-        "type": "object",
-        "properties": {
-          "listingId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          }
-        },
-        "required": [
-          "listingId"
         ],
         "additionalProperties": false
       }

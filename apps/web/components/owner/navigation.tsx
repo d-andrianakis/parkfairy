@@ -41,14 +41,18 @@ export function StepLink({
 
 /**
  * Moves the focus once React has finished: the control that had it may be going, and the one
- * taking over may only just exist, or only just stop being disabled.
+ * taking over may only just exist, or only just stop being disabled. `onlyIfLost`: only if the
+ * focus was let go (on the page, or its main), after an answer that took a while: someone who has
+ * moved on meanwhile isn't pulled back.
  */
-export function useFocusAfterRender() {
+export function useFocusAfterRender({ onlyIfLost = false }: { onlyIfLost?: boolean } = {}) {
   const target = useRef<string | null>(null);
   const [, render] = useState(0);
   useEffect(() => {
     if (target.current === null) return;
-    document.getElementById(target.current)?.focus();
+    const active = document.activeElement;
+    const lost = !active || active === document.body || active.id === 'main-content';
+    if (!onlyIfLost || lost) document.getElementById(target.current)?.focus();
     target.current = null;
   });
   return (id: string) => {

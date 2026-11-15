@@ -57,6 +57,8 @@ export interface DisputeState {
   dueBy: Date | null;
   /** Responses sent to the bank: once one is, the evidence can't change. */
   submissions: number;
+  /** Stripe holds evidence for it already (ours staged before, or support's in the dashboard). */
+  evidenceGiven: boolean;
 }
 
 /**
@@ -152,7 +154,12 @@ export interface PaymentsGateway {
    * enough): its cancellation refund, its transfer, so a retry never makes a second one.
    */
   refundMadeFor(paymentIntentId: string): Promise<string | null>;
-  transferMadeFor(bookingId: string, ownerId: string): Promise<string | null>;
+  /** `primary`: a transfer made before co-ownership, with no payee named, is theirs. */
+  transferMadeFor(
+    bookingId: string,
+    ownerId: string,
+    options?: { primary?: boolean },
+  ): Promise<string | null>;
   /**
    * A PaymentIntent nobody will pay any more (its hold lapsed): it can't be paid after this. One
    * paid or called off meanwhile is left as it is, and its state returned.
@@ -224,6 +231,17 @@ const PAYMENT_EVENTS = new Set([
   'payment_intent.canceled',
 ]);
 
+/**
+ * Every event the webhook reads: the endpoint (or `stripe listen`) must send each. One left out
+ * fails quietly: without the dispute events, no payout is ever held (#58).
+ */
+export const WEBHOOK_EVENTS = [
+  'account.updated',
+  ...PAYMENT_EVENTS,
+  ...REFUND_EVENTS,
+  ...DISPUTE_EVENTS,
+] as const;
+
 /** Only what a failure may say in our logs. */
 function providerError(error: unknown): PaymentProviderError {
   if (error instanceof Stripe.errors.StripeError) {
@@ -278,6 +296,9 @@ function disputeStateOf(dispute: Stripe.Dispute): DisputeState {
         : (dispute.payment_intent?.id ?? null),
     dueBy: due ? new Date(due * 1000) : null,
     submissions: dispute.evidence_details?.submission_count ?? 0,
+    evidenceGiven: Object.values(dispute.evidence ?? {}).some(
+      (value) => value !== null && value !== '',
+    ),
   };
 }
 
@@ -456,17 +477,17 @@ export function stripeGateway(
         );
         return made?.id ?? null;
       }),
-    transferMadeFor: (bookingId, ownerId) =>
+    transferMadeFor: (bookingId, ownerId, options) =>
       call(async () => {
         const transfers = await client.transfers.list({
           transfer_group: `booking_${bookingId}`,
-          limit: 10,
+          limit: 100,
         });
-        return (
-          transfers.data.find(
-            (made) => made.metadata.bookingId === bookingId && made.metadata.ownerId === ownerId,
-          )?.id ?? null
-        );
+        const theirs = (made: Stripe.Transfer) =>
+          made.metadata.bookingId === bookingId &&
+          (made.metadata.ownerId === ownerId ||
+            (options?.primary === true && !made.metadata.ownerId));
+        return transfers.data.find(theirs)?.id ?? null;
       }),
     cancelPayment: (paymentIntentId) =>
       call(async () => {

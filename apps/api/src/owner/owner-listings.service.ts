@@ -25,6 +25,7 @@ import {
   type ListingPricesInput,
   type ListingProofPatch,
   type ListingSpacesInput,
+  type ListingStatus,
   type OwnerHoursCopy,
   type OwnerListingClosures,
   type OwnerOtherListings,
@@ -62,6 +63,7 @@ import {
   nextListingStep,
 } from './onboarding-progress.js';
 import { badUpload, conflict, listingNotFound, primaryOnly } from './owner.errors.js';
+import { everyoneReported } from './listing-owners.service.js';
 import { OwnerProfileService, profileFacts } from './owner-profile.service.js';
 import { slugFromName } from './slug.js';
 
@@ -163,6 +165,34 @@ const isUniqueViolation = (error: unknown, constraint: string) => {
   return code === '23505' && name === constraint;
 };
 
+/**
+ * Locks the listings copied to, in id order, then checks each is still the user's. Two statements:
+ * one would join the owners as they were before it waited for a lock, so an owner removed
+ * meanwhile would still write. A listing that isn't theirs refuses the lot, with the same 404 as
+ * one that doesn't exist.
+ */
+async function lockOwnedTargets(
+  tx: Transaction,
+  targets: string[],
+  userId: string,
+): Promise<{ id: string; status: ListingStatus }[]> {
+  const locked = await tx
+    .select({ id: listing.id, status: listing.status })
+    .from(listing)
+    .where(inArray(listing.id, targets))
+    .orderBy(asc(listing.id))
+    .for('no key update');
+  const theirs = await tx
+    .select({ id: owners.locationId })
+    .from(owners)
+    .innerJoin(profile, eq(profile.id, owners.ownerId))
+    .where(and(inArray(owners.locationId, targets), eq(profile.userId, userId)));
+  if (locked.length !== targets.length || theirs.length !== targets.length) {
+    throw listingNotFound();
+  }
+  return locked;
+}
+
 @Injectable()
 export class OwnerListingsService {
   private readonly logger = new Logger(OwnerListingsService.name);
@@ -220,6 +250,7 @@ export class OwnerListingsService {
 
   async get(userId: string, id: string): Promise<OwnerListing> {
     const row = await this.owned(userId, id);
+    const role = await this.roleOf(userId, id);
     const [spaces, periods, exceptions, prices, photos, proofs, owner] = await Promise.all([
       this.db
         .select()
@@ -234,12 +265,13 @@ export class OwnerListingsService {
       this.hoursExceptions(this.db, row),
       this.prices(row),
       this.photos(this.db, row.id),
-      this.proofs(row.id),
+      this.proofs(row.id, role === 'primary'),
       this.profiles.find(userId),
     ]);
     return OwnerListingSchema.parse({
       id: row.id,
       status: row.status,
+      role,
       locked: !isEditable(row.status),
       // From the rows just read: counting the same tables again would double the queries.
       progress: this.progressFrom(
@@ -519,16 +551,7 @@ export class OwnerListingsService {
     const today = zonedParts(new Date(), source.timeZone).date;
 
     const outcomes = await this.db.transaction(async (tx) => {
-      const locked = await tx
-        .select({ id: listing.id, status: listing.status })
-        .from(listing)
-        .innerJoin(owners, eq(owners.locationId, listing.id))
-        .innerJoin(profile, eq(profile.id, owners.ownerId))
-        .where(and(inArray(listing.id, targets), eq(profile.userId, userId)))
-        .orderBy(asc(listing.id))
-        .for('no key update', { of: listing });
-      // A listing that isn't theirs refuses the lot, with the same 404 as one that doesn't exist.
-      if (locked.length !== targets.length) throw listingNotFound();
+      const locked = await lockOwnedTargets(tx, targets, userId);
 
       // Ended entries are never shown again, but the overlap constraint still sees them.
       await tx
@@ -627,16 +650,7 @@ export class OwnerListingsService {
     if (week.length === 0) throw conflict('NOTHING_TO_COPY');
 
     const outcomes = await this.db.transaction(async (tx) => {
-      const locked = await tx
-        .select({ id: listing.id, status: listing.status })
-        .from(listing)
-        .innerJoin(owners, eq(owners.locationId, listing.id))
-        .innerJoin(profile, eq(profile.id, owners.ownerId))
-        .where(and(inArray(listing.id, targets), eq(profile.userId, userId)))
-        .orderBy(asc(listing.id))
-        .for('no key update', { of: listing });
-      // A listing that isn't theirs refuses the lot, with the same 404 as one that doesn't exist.
-      if (locked.length !== targets.length) throw listingNotFound();
+      const locked = await lockOwnedTargets(tx, targets, userId);
 
       const editable = locked.filter((row) => isEditable(row.status)).map((row) => row.id);
       // A listing sent back after it was live may have bookings the new week must keep open.
@@ -851,7 +865,10 @@ export class OwnerListingsService {
       await this.deleteFiles([storageKey]);
       throw error;
     }
-    const saved = (await this.proofs(locationId)).find((document) => document.id === documentId);
+    const primary = (await this.roleOf(userId, id)) === 'primary';
+    const saved = (await this.proofs(locationId, primary)).find(
+      (document) => document.id === documentId,
+    );
     if (!saved) throw new Error('Proof vanished right after insert');
     return saved;
   }
@@ -862,6 +879,9 @@ export class OwnerListingsService {
     proofId: string,
   ): Promise<{ file: Buffer; fileName: string; contentType: string }> {
     const { id: locationId } = await this.owned(userId, id);
+    // A deed or a lease names people and their tax numbers: the primary's to open, not every
+    // co-owner's (or everyone they invite).
+    if ((await this.roleOf(userId, id)) !== 'primary') throw primaryOnly();
     if (!UUID.test(proofId)) throw listingNotFound();
     const [row] = await this.db
       .select()
@@ -875,6 +895,7 @@ export class OwnerListingsService {
 
   async removeProof(userId: string, id: string, proofId: string): Promise<void> {
     if (!UUID.test(proofId)) throw listingNotFound();
+    if ((await this.roleOf(userId, id)) !== 'primary') throw primaryOnly();
     const storageKey = await this.edit(userId, id, async (tx, row) => {
       const [removed] = await tx
         .delete(proof)
@@ -919,6 +940,18 @@ export class OwnerListingsService {
       const progress = await this.progressOne(row, tx);
       const missing = missingForSubmit(progress.doneSteps, doneAccountSteps(profileFacts(owner)));
       if (missing.length > 0) throw conflict('LISTING_INCOMPLETE', { missing });
+      // The primary, and everyone paid for it, must have their details and tax in too (#22).
+      const accountable = await tx
+        .select({ id: owners.ownerId })
+        .from(owners)
+        .where(
+          and(
+            eq(owners.locationId, row.id),
+            sql`(${owners.role} = 'primary' or ${owners.shareBps} > 0)`,
+          ),
+        );
+      const ids = [...new Set([owner.id, ...accountable.map((one) => one.id)])];
+      if (!(await everyoneReported(tx, ids))) throw conflict('OWNER_DETAILS_MISSING');
 
       await tx
         .update(listing)
@@ -929,10 +962,11 @@ export class OwnerListingsService {
           reviewNote: null,
         })
         .where(eq(listing.id, row.id));
+      // Theirs to verify too, the submitter's and every accountable owner's.
       await tx
         .update(profile)
         .set({ verification: 'pending' })
-        .where(and(eq(profile.id, owner.id), eq(profile.verification, 'unverified')));
+        .where(and(inArray(profile.id, ids), eq(profile.verification, 'unverified')));
     });
   }
 
@@ -1154,7 +1188,8 @@ export class OwnerListingsService {
       .orderBy(asc(photo.position), asc(photo.createdAt));
   }
 
-  private async proofs(id: string): Promise<OwnerProof[]> {
+  /** `primary`: the file names too, which are the primary's to see as the files are. */
+  private async proofs(id: string, primary: boolean): Promise<OwnerProof[]> {
     const rows = await this.db
       .select()
       .from(proof)
@@ -1163,7 +1198,7 @@ export class OwnerListingsService {
     return rows.map(({ id: documentId, kind, fileName, contentType, sizeBytes, createdAt }) => ({
       id: documentId,
       kind,
-      fileName,
+      fileName: primary ? fileName : null,
       // The column's CHECK holds it to this list.
       contentType: contentType as OwnerProof['contentType'],
       sizeBytes,
@@ -1251,6 +1286,13 @@ export class OwnerListingsService {
     const owned = await this.owned(userId, id);
     return this.db.transaction(async (tx) => {
       const [row] = await tx.select().from(listing).where(eq(listing.id, owned.id)).for('update');
+      // Still one of its owners now the row is locked: one removed meanwhile changes nothing.
+      const [still] = await tx
+        .select({ id: owners.id })
+        .from(owners)
+        .innerJoin(profile, eq(profile.id, owners.ownerId))
+        .where(and(eq(owners.locationId, owned.id), eq(profile.userId, userId)));
+      if (!still) throw listingNotFound();
       if (!row || (!anyStatus && !isEditable(row.status))) throw conflict('LISTING_LOCKED');
       const result = await work(tx, row);
       if (isEditable(row.status)) {

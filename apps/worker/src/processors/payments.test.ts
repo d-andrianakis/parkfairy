@@ -12,6 +12,7 @@ import {
   recordUnbookedRefund,
   refundsOwed,
   refundsStuck,
+  transferHeld,
   transfersDue,
   transfersWaiting,
   type Database,
@@ -52,6 +53,7 @@ vi.mock('@parkfairy/database', () => ({
   recordUnbookedRefund: vi.fn(),
   refundsOwed: vi.fn(),
   refundsStuck: vi.fn(),
+  transferHeld: vi.fn(),
   transfersDue: vi.fn(),
   transfersWaiting: vi.fn(),
 }));
@@ -176,6 +178,7 @@ describe('payments processor', () => {
       vi.mocked(fn).mockResolvedValue([] as never);
     }
     vi.mocked(markTransferSending).mockResolvedValue(true);
+    vi.mocked(transferHeld).mockResolvedValue(false);
     vi.mocked(refundsStuck).mockResolvedValue(0);
     vi.mocked(disputesToAnswer).mockResolvedValue(0);
     vi.mocked(lostDisputesHeld).mockResolvedValue(0);
@@ -455,9 +458,37 @@ describe('payments processor', () => {
       vi.mocked(transfersDue).mockResolvedValueOnce([dueTransfer({ sending: old, payees })]);
       stripe.transferMadeFor.mockResolvedValueOnce('tr_old');
       await run('send-transfers');
-      expect(stripe.transferMadeFor).toHaveBeenCalledWith('b1', 'o1');
+      // The primary's may be one made before co-ownership, with no owner named on it.
+      expect(stripe.transferMadeFor).toHaveBeenCalledWith('b1', 'o1', { primary: true });
       expect(stripe.transfer).toHaveBeenCalledOnce();
       expect(recordPayeeTransfer).toHaveBeenLastCalledWith(db, 'b1', 'o1', 'tr_old');
+    });
+
+    it('asks Stripe for a co-owner’s earlier transfer by their own id only, past the key’s day', async () => {
+      const old = { transferMinor: 1800, commissionMinor: 200, since: ago(KEY_DAY_MS + MINUTE_MS) };
+      const payees = [
+        payee({ transferMinor: 1200, sent: true }),
+        payee({ ownerId: 'o2', primary: false, accountId: 'acct_2', transferMinor: 600 }),
+      ];
+      vi.mocked(transfersDue).mockResolvedValueOnce([dueTransfer({ sending: old, payees })]);
+      await run('send-transfers');
+      // Never the primary's old transfer (no owner named on it) taken for the co-owner's.
+      expect(stripe.transferMadeFor).toHaveBeenCalledWith('b1', 'o2', { primary: false });
+      expect(stripe.transfer).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerId: 'o2', amountMinor: 600 }),
+      );
+    });
+
+    it('stops paying a booking a dispute was recorded for since the page was read (#58)', async () => {
+      const payees = [payee({ shareBps: 5000 }), payee({ ownerId: 'o2', shareBps: 5000 })];
+      vi.mocked(transfersDue).mockResolvedValueOnce([dueTransfer({ payees })]);
+      // The first payee's transfer goes; the dispute lands before the second's.
+      vi.mocked(transferHeld).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+      await run('send-transfers');
+      expect(stripe.transfer).toHaveBeenCalledOnce();
+      expect(stripe.transfer).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 'o1' }));
+      expect(recordPayeeTransfer).toHaveBeenCalledOnce();
+      expect(transferHeld).toHaveBeenCalledWith(db, 'b1');
     });
 
     it('asks Stripe for a charge it didn’t have when the payment settled', async () => {

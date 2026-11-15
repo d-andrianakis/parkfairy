@@ -36,6 +36,33 @@ export function athensInstant(day: string, time: string): string {
 }
 
 /**
+ * The owner details and tax of the account signed in on `page`, through the API: what an owner
+ * sent in, or paid (#22), must have.
+ */
+export async function fillOwnerDetails(page: Page): Promise<void> {
+  const headers = { origin: WEB_URL };
+  const profile = await page.request.patch('/api/v1/owner/profile', {
+    headers,
+    data: {
+      kind: 'individual',
+      firstName: 'Ελένη',
+      lastName: 'Κλειδαριά',
+      phone: '+30 210 123 4567',
+      addressLine: 'Ερμού 1',
+      city: 'Αθήνα',
+      postalCode: '105 63',
+      country: 'GR',
+    },
+  });
+  expect(profile.ok(), 'patch /profile').toBe(true);
+  const tax = await page.request.put('/api/v1/owner/profile/tax', {
+    headers,
+    data: { taxCountry: 'GR', taxId: '094259216', birthDate: '1980-02-03' },
+  });
+  expect(tax.ok(), 'put /profile/tax').toBe(true);
+}
+
+/**
  * Everything up to staff, through the API, for the owner signed in on `page`: the steps have
  * their own smoke test. Open all week at €2.00 an hour, with the spaces named, written in Greek
  * unless `contentLocale` says otherwise. Far from the demo areas, so no other test's search meets
@@ -55,21 +82,7 @@ export async function listingWithStaff(
     expect(response.ok(), `${method} ${path}`).toBe(true);
     return response;
   };
-  await call('patch', '/profile', {
-    kind: 'individual',
-    firstName: 'Ελένη',
-    lastName: 'Κλειδαριά',
-    phone: '+30 210 123 4567',
-    addressLine: 'Ερμού 1',
-    city: 'Αθήνα',
-    postalCode: '105 63',
-    country: 'GR',
-  });
-  await call('put', '/profile/tax', {
-    taxCountry: 'GR',
-    taxId: '094259216',
-    birthDate: '1980-02-03',
-  });
+  await fillOwnerDetails(page);
   const { id } = (await (await call('post', '/listings', undefined)).json()) as { id: string };
   await call('patch', `/listings/${id}/location`, {
     name,

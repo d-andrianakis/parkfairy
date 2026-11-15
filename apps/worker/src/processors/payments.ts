@@ -13,6 +13,7 @@ import {
   recordUnbookedRefund,
   refundsOwed,
   refundsStuck,
+  transferHeld,
   transfersDue,
   transfersWaiting,
   type MoneyCursor,
@@ -217,7 +218,12 @@ async function sendTransfers(payments: PaymentsGateway, ctx: ProcessorContext): 
           continue;
         }
         const made =
-          part > 0 && keyForgotten ? await payments.transferMadeFor(due.id, payee.ownerId) : null;
+          part > 0 && keyForgotten
+            ? await payments.transferMadeFor(due.id, payee.ownerId, { primary: payee.primary })
+            : null;
+        // A dispute recorded since the page was read holds the rest (#58): asked before each
+        // transfer, as recording one takes the booking's lock and this page may be minutes old.
+        if (part > 0 && !made && (await transferHeld(db, due.id))) break;
         const transferId =
           part === 0
             ? null

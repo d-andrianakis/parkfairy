@@ -193,6 +193,8 @@ test('with Stripe’s test keys: a disputed payment is recorded, its evidence st
     await expect
       .poll(() => disputeOf(bookingId), { timeout: 90_000 })
       .toMatchObject({
+        // Open, for support to answer in Stripe (#59): staged, never submitted for them.
+        status: 'needs_response',
         evidenceStaged: true,
       });
   } finally {

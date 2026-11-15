@@ -43,6 +43,7 @@ export const progressFixture = (
 export const listingFixture = (overrides: Partial<OwnerListing> = {}): OwnerListing => ({
   id: LISTING_ID,
   status: 'draft',
+  role: 'primary',
   locked: false,
   progress: progressFixture(),
   doneAccountSteps: [],

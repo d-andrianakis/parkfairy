@@ -162,6 +162,10 @@ export function ProofStep({ listing }: { listing: OwnerListing }) {
           <h2 id="proofs-heading" className="font-medium">
             {t('listHeading')}
           </h2>
+          {/* The API refuses a co-owner these files (#55): said, not only left out. */}
+          {listing.role === 'primary' ? null : (
+            <p className="text-sm text-muted-foreground">{t('primaryOnly')}</p>
+          )}
           <ul className="grid gap-2">
             {proofs.map((proof) => (
               <li
@@ -171,33 +175,35 @@ export function ProofStep({ listing }: { listing: OwnerListing }) {
                 <span className="flex min-w-0 items-center gap-2">
                   <FileText aria-hidden className="size-4 shrink-0" />
                   <span className="min-w-0 wrap-anywhere">
-                    {proof.fileName}
+                    {proof.fileName ?? t(`kinds.${proof.kind}`)}
                     <span className="block text-sm text-muted-foreground">
                       {t(`kinds.${proof.kind}`)} · {fileSize(proof.sizeBytes)}
                     </span>
                   </span>
                 </span>
-                <span className="flex flex-wrap gap-2">
-                  <Button asChild variant="outline" size="sm" className={WRAPPING_BUTTON}>
-                    <a
-                      href={`/api/v1/owner/listings/${listing.id}/proofs/${proof.id}`}
-                      className="wrap-anywhere"
+                {proof.fileName === null ? null : (
+                  <span className="flex flex-wrap gap-2">
+                    <Button asChild variant="outline" size="sm" className={WRAPPING_BUTTON}>
+                      <a
+                        href={`/api/v1/owner/listings/${listing.id}/proofs/${proof.id}`}
+                        className="wrap-anywhere"
+                      >
+                        <Download aria-hidden />
+                        {t('download', { name: proof.fileName })}
+                      </a>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className={`${WRAPPING_BUTTON} wrap-anywhere`}
+                      onClick={() => void remove(proof)}
                     >
-                      <Download aria-hidden />
-                      {t('download', { name: proof.fileName })}
-                    </a>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className={`${WRAPPING_BUTTON} wrap-anywhere`}
-                    onClick={() => void remove(proof)}
-                  >
-                    <Trash2 aria-hidden />
-                    {t('remove', { name: proof.fileName })}
-                  </Button>
-                </span>
+                      <Trash2 aria-hidden />
+                      {t('remove', { name: proof.fileName })}
+                    </Button>
+                  </span>
+                )}
               </li>
             ))}
           </ul>

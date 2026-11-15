@@ -16,6 +16,10 @@ export type ListingOwnerRole = z.infer<typeof ListingOwnerRoleSchema>;
 
 /** Owners and pending invites together, per listing. */
 export const LISTING_OWNERS_MAX = 10;
+/** Invites one account may send in a day, over all its listings: a person's need, not a list's. */
+export const INVITES_PER_DAY = 20;
+/** Invites to one address from one listing in a week, withdrawn ones too: no invite-withdraw loop. */
+export const INVITES_PER_ADDRESS_WEEK = 2;
 /** How long an invite's link works, from when it was sent (#56). */
 export const LISTING_INVITE_DAYS = 7;
 /** Shares are whole percentages; stored as basis points (100 = 1%). */
@@ -29,12 +33,16 @@ export const ListingOwnerSchema = z
     /** The owner's profile id: what shares and removal refer to. */
     id: z.uuid(),
     name: z.string().nullable(),
-    email: z.string(),
+    /** Seen by the primary, and by each owner of their own: co-owners see each other's names. */
+    email: z.string().nullable(),
     role: ListingOwnerRoleSchema,
     /** Their share of the owners' payouts, in whole percent. */
     sharePercent: z.number().int().min(0).max(100),
-    /** Whether Stripe can pay them: one with a share and no active account keeps bookings shut. */
-    payouts: PayoutStatusSchema,
+    /**
+     * Whether Stripe can pay them: one with a share and no active account keeps bookings shut.
+     * Seen by the primary, and by each owner of their own.
+     */
+    payouts: PayoutStatusSchema.nullable(),
     /** The account asking. */
     you: z.boolean(),
   })
@@ -44,7 +52,8 @@ export type ListingOwner = z.infer<typeof ListingOwnerSchema>;
 export const ListingInviteSchema = z
   .object({
     id: z.uuid(),
-    email: z.string(),
+    /** Seen by the primary and by whoever sent it. */
+    email: z.string().nullable(),
     /** Who sent it, by name; null if they have since left. */
     invitedBy: z.string().nullable(),
     /** Until when its link works; null while the email is still on its way. */
@@ -150,5 +159,9 @@ export const LISTING_OWNER_ERROR_CODES = [
   'INVITE_FOR_ANOTHER_ACCOUNT',
   /** The shares named aren't the listing's owners, each once. */
   'SHARES_MISMATCH',
+  /** More invites than a day (or a week, to one address) allows. */
+  'TOO_MANY_INVITES',
+  /** An owner given a share, or one of a listing sent in, hasn't filled in their details and tax. */
+  'OWNER_DETAILS_MISSING',
 ] as const;
 export type ListingOwnerErrorCode = (typeof LISTING_OWNER_ERROR_CODES)[number];

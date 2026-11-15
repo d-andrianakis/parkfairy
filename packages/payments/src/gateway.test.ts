@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import Stripe from 'stripe';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -6,7 +7,15 @@ import {
   PaymentProviderError,
   paymentStatusOf,
   stripeGateway,
+  WEBHOOK_EVENTS,
 } from './gateway.js';
+
+describe('the webhook’s events', () => {
+  it('are each written down where the endpoint is set up, so none is left out', () => {
+    const example = readFileSync(new URL('../../../.env.example', import.meta.url), 'utf8');
+    for (const event of WEBHOOK_EVENTS) expect(example, event).toContain(event);
+  });
+});
 
 const SECRET = 'whsec_unitTestSecret';
 const signer = new Stripe('sk_test_unit');
@@ -341,7 +350,22 @@ describe('stripeGateway', () => {
     await expect(gatewayWith(client).refundMadeFor('pi_1')).resolves.toBe('re_2');
     await expect(gatewayWith(client).transferMadeFor('b1', 'o1')).resolves.toBe('tr_2');
     expect(client.refunds.list).toHaveBeenCalledWith({ payment_intent: 'pi_1', limit: 10 });
-    expect(client.transfers.list).toHaveBeenCalledWith({ transfer_group: 'booking_b1', limit: 10 });
+    // A booking's group holds a transfer per owner: up to ten owners, and room to spare.
+    expect(client.transfers.list).toHaveBeenCalledWith({
+      transfer_group: 'booking_b1',
+      limit: 100,
+    });
+  });
+
+  it('counts a transfer from before co-ownership, with no owner named, as the primary’s only', async () => {
+    const client = fakeClient();
+    const before = { data: [{ id: 'tr_before', metadata: { bookingId: 'b1' } }] };
+    client.transfers.list.mockResolvedValueOnce(before).mockResolvedValueOnce(before);
+    await expect(gatewayWith(client).transferMadeFor('b1', 'o1', { primary: true })).resolves.toBe(
+      'tr_before',
+    );
+    // A co-owner's is never the one made before they were one.
+    await expect(gatewayWith(client).transferMadeFor('b1', 'o2')).resolves.toBeNull();
   });
 
   it('cancels a PaymentIntent nobody will pay, and reads the charge either way Stripe gives it', async () => {
@@ -441,6 +465,22 @@ describe('stripeGateway', () => {
       paymentIntentId: 'pi_1',
       dueBy: new Date(1_800_000_000_000),
       submissions: 0,
+      evidenceGiven: false,
+    });
+    // Evidence Stripe holds already (support's, from the dashboard): said, so none goes over it.
+    client.disputes.retrieve.mockResolvedValueOnce({
+      id: 'du_3',
+      status: 'needs_response',
+      reason: 'fraudulent',
+      amount: 400,
+      currency: 'eur',
+      charge: 'ch_3',
+      payment_intent: 'pi_3',
+      evidence: { product_description: null, uncategorized_text: 'From support.' },
+      evidence_details: { due_by: 1_800_000_000, submission_count: 0 },
+    });
+    await expect(gatewayWith(client).dispute('du_3')).resolves.toMatchObject({
+      evidenceGiven: true,
     });
     // A state this version doesn't know is one to answer, never one let go.
     client.disputes.retrieve.mockResolvedValueOnce({

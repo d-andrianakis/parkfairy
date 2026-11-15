@@ -13,10 +13,11 @@ import { useEffect, useState } from 'react';
 import { FocusHeading } from '@/components/focus-heading';
 import { FormError } from '@/components/form-error';
 import { PersonName, placeTag } from '@/components/parking/place-words';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { forgetInviteToken, takeInviteToken } from '@/lib/invite-token';
 import { attempt, useOwnerError } from '@/lib/owner-client';
-import { ownersHref } from '@/lib/owner-href';
+import { INVITE_PATH, ownersHref } from '@/lib/owner-href';
+import { forgetEverySentTo } from '@/lib/remembered-email';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 
 type View =
@@ -33,6 +34,53 @@ export function KeepInviteToken() {
     takeInviteToken();
   }, []);
   return null;
+}
+
+/**
+ * Signed in with another address than the one invited: out, and to signing in with it, back here
+ * after. The invite's token stays in the tab; nothing else of this account does.
+ */
+function SwitchAccount() {
+  const t = useTranslations('Owner.invite');
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function switchAccount() {
+    if (pending) return;
+    setPending(true);
+    setFailed(false);
+    // Better Auth's client only for this rare press, not in every first visit to the page.
+    const outcome = await import('@/lib/auth-client')
+      .then(({ authClient }) => authClient.signOut())
+      .catch(() => ({ error: true }));
+    if (outcome.error) {
+      // Still signed in: going to sign in would only come back here.
+      setPending(false);
+      setFailed(true);
+      return;
+    }
+    forgetEverySentTo();
+    router.replace({ pathname: '/sign-in', query: { next: INVITE_PATH } });
+    router.refresh();
+  }
+
+  return (
+    <div className="grid gap-2">
+      <FormError message={failed ? t('signOutFailed') : null} />
+      <div>
+        <Button
+          type="button"
+          variant="outline"
+          className={WRAPPING_BUTTON}
+          aria-disabled={pending || undefined}
+          onClick={() => void switchAccount()}
+        >
+          {pending ? t('signingOut') : t('switchAccount')}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -53,10 +101,16 @@ export function InviteAcceptance() {
     const read = async (): Promise<View> => {
       if (!token) return { kind: 'missing' };
       const outcome = await attempt(() => previewListingInvite({ body: { token } }));
-      if (outcome.ok && outcome.data) return { kind: 'open', preview: outcome.data, token };
-      return !outcome.ok && outcome.failure.code === 'INVITE_NOT_FOUND'
-        ? { kind: 'not-found' }
-        : { kind: 'unavailable' };
+      if (outcome.ok && outcome.data) {
+        // Used or lapsed: nothing to keep in the tab (a shared computer keeps nothing).
+        if (outcome.data.state !== 'open') forgetInviteToken();
+        return { kind: 'open', preview: outcome.data, token };
+      }
+      if (!outcome.ok && outcome.failure.code === 'INVITE_NOT_FOUND') {
+        forgetInviteToken();
+        return { kind: 'not-found' };
+      }
+      return { kind: 'unavailable' };
     };
     void read().then((next) => {
       if (live) setView(next);
@@ -85,49 +139,54 @@ export function InviteAcceptance() {
     </Alert>
   );
 
-  switch (view.kind) {
-    case 'reading':
-      return (
-        <p role="status" className="text-muted-foreground">
-          {t('reading')}
-        </p>
-      );
-    case 'missing':
-      return said(t('missing'));
-    case 'not-found':
-      return said(t('notFound'));
-    case 'unavailable':
-      return said(ownerError({}));
-    case 'accepted':
-      return (
-        <div className="grid gap-3">
-          <FocusHeading>{t('accepted')}</FocusHeading>
-          <div>
-            <Button asChild className={WRAPPING_BUTTON}>
-              <Link href={ownersHref(view.listingId)}>{t('toOwners')}</Link>
-            </Button>
-          </div>
+  if (view.kind === 'accepted') {
+    return (
+      <div className="grid gap-3">
+        <FocusHeading>{t('accepted')}</FocusHeading>
+        <div>
+          <Button asChild className={WRAPPING_BUTTON}>
+            <Link href={ownersHref(view.listingId)}>{t('toOwners')}</Link>
+          </Button>
         </div>
-      );
-    case 'open': {
-      const { preview, token } = view;
-      if (preview.state !== 'open') return said(t(preview.state));
-      const name = preview.listingName ?? '';
-      const listing = placeTag(name, preview.contentLocale);
-      return (
-        <div className="grid gap-4">
-          <p role="status">
-            {preview.invitedBy
-              ? t.rich('lead', {
-                  inviter: preview.invitedBy,
-                  name,
-                  who: () => <PersonName name={preview.invitedBy ?? ''} lang={locale} />,
-                  listing,
-                })
-              : t.rich('leadNoInviter', { name, listing })}
-          </p>
+      </div>
+    );
+  }
+
+  const open = view.kind === 'open' && view.preview.state === 'open' ? view : null;
+  /** What the invitation is: said in the status line that was "Reading…", the same element. */
+  const lead = (() => {
+    if (!open) return view.kind === 'reading' ? t('reading') : '';
+    const { preview } = open;
+    const inviter = preview.invitedBy;
+    const person = () => <PersonName name={inviter ?? ''} lang={locale} />;
+    if (!preview.listingName) {
+      return inviter ? t.rich('leadUnnamed', { inviter, person }) : t('leadNoInviterUnnamed');
+    }
+    const name = preview.listingName;
+    const listing = placeTag(name, preview.contentLocale);
+    return inviter
+      ? t.rich('lead', { inviter, name, person, listing })
+      : t.rich('leadNoInviter', { name, listing });
+  })();
+
+  return (
+    <div className="grid gap-4">
+      {/* Read whole as it changes: its text becomes several nodes (a name, a listing's). */}
+      <p
+        role="status"
+        aria-atomic="true"
+        className={open ? undefined : 'text-muted-foreground empty:sr-only'}
+      >
+        {lead}
+      </p>
+      {view.kind === 'missing' ? said(t('missing')) : null}
+      {view.kind === 'not-found' ? said(t('notFound')) : null}
+      {view.kind === 'unavailable' ? said(ownerError({})) : null}
+      {view.kind === 'open' && view.preview.state !== 'open' ? said(t(view.preview.state)) : null}
+      {open ? (
+        <>
           <p className="text-muted-foreground">{t('meaning')}</p>
-          {preview.forYou ? (
+          {open.preview.forYou ? (
             <div className="grid gap-2">
               <FormError message={failure} />
               <div>
@@ -135,17 +194,20 @@ export function InviteAcceptance() {
                   type="button"
                   className={WRAPPING_BUTTON}
                   aria-disabled={saving || undefined}
-                  onClick={() => void accept(token)}
+                  onClick={() => void accept(open.token)}
                 >
                   {saving ? t('accepting') : t('accept')}
                 </Button>
               </div>
             </div>
           ) : (
-            said(t('notForYou'))
+            <div className="grid gap-3">
+              {said(t('notForYou'))}
+              <SwitchAccount />
+            </div>
           )}
-        </div>
-      );
-    }
-  }
+        </>
+      ) : null}
+    </div>
+  );
 }

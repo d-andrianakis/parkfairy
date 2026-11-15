@@ -102,9 +102,6 @@ async function message(
       locale: row.locale as OwnerEmailLocale,
       webUrl,
       token: minted.token,
-      listingName: row.payload.listingName,
-      contentLocale: row.payload.contentLocale,
-      inviterName: row.payload.inviterName,
     }),
     key: `${row.id}:${hashInviteToken(minted.token).slice(0, 16)}`,
   };

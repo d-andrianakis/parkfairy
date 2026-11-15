@@ -204,6 +204,8 @@ export function fakeStripe() {
         return Promise.reject(new PaymentProviderError('invalid_request_error'));
       }
       evidence.set(id, staged);
+      // Stripe holds it now: read again, the dispute says so.
+      disputes.set(id, { ...known, evidenceGiven: true });
       return Promise.resolve();
     }),
     parseEvent: (rawBody: Buffer, signature: string) => real.parseEvent(rawBody, signature),
@@ -233,6 +235,7 @@ export function fakeStripe() {
         paymentIntentId,
         dueBy: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         submissions: 0,
+        evidenceGiven: false,
         ...change,
       });
       return id;

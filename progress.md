@@ -1048,6 +1048,63 @@ Built in Stripe's test mode, without keys, before #18 and #19 (memory.md #46–#
   ledger and its daily check (done 2026-11-13).
 - **4.3** Disputes (#57–#60), and what #18 and #19 answer.
 
+### 4.3 Disputes (2026-11-13)
+
+Decisions #57–#60 (memory.md). Support answers disputes in Stripe's dashboard; the app records
+them, prepares the evidence, holds the payout and tells support.
+
+- [x] **Implemented**: `payment_disputes` (migration 0026), filled from `charge.dispute.*` webhooks
+      after reading the dispute from Stripe, matched to a booking by its PaymentIntent only (a
+      dispute without one is another app's). The booking's facts staged as evidence once, never
+      submitted, and never over evidence Stripe holds already (#59); an open or lost dispute
+      holds that booking's payout (#58), recorded under the booking's lock and asked again
+      before each payee's transfer; a settled dispute never reopened by an older reading;
+      support alerted when one opens, is lost (#57), is due within three days with nothing
+      submitted, or is lost and still held (`check-money`). Nothing happens to the driver's
+      account (#60). The webhook's events listed in `.env.example`, held to the code by a test.
+- [x] **Unit tests**: the gateway's dispute read (and evidence already given), evidence staging,
+      the events and their list; the worker's `check-money` alerts, a co-owner's transfer looked
+      up by their own id, and a dispute recorded mid-page stopping the rest
+- [x] **Integration tests** (`payments.integration.test.ts`, "disputes (4.3: #57–#60)", 15):
+      recorded, staged once, without the plate; support told once when opened and when lost,
+      with ids only; the day's list exactly the disputes due soon with nothing sent; a lost
+      dispute already paid not counted as held; a cancelled booking's refund and the stay in
+      Athens time; a warning staged; none without a PaymentIntent; nothing over evidence given;
+      two deliveries at once as one; a settled dispute kept against an older reading; the payout
+      held while open or lost, let go once won, warning_closed or prevented; another app's left
+      alone; Stripe refusing the evidence answered 500 and staged when told again
+- [~] **Smoke test** (`payments.smoke.ts`): a disputed payment (Stripe's test card for disputes)
+  recorded against its booking, open, its evidence staged. Runs only with Stripe test keys, so
+  not run locally yet
+- [x] **Security** review (2026-11-15): safe in test mode; evidence staged late could overwrite
+      support's (now never over evidence given), the hold and the transfer sweep could cross
+      (now locked and asked again), an older reading could reopen a settled dispute (now kept):
+      fixed
+- [x] **Performance** review (2026-11-15): matching by charge read the whole bookings table (now
+      the PaymentIntent's unique index): fixed; the lows below
+- [x] **Accessibility**: no UI in this round (support works in Stripe)
+- [x] **i18n** review (2026-11-15): nothing reaches users (the evidence is in English, for the
+      bank; alerts are logs)
+- [x] **Test** review (2026-11-15): the alerts, the plate check that couldn't fail, the day's list,
+      the held count, the evidence's texts and times, the branches, deliveries at once and out of
+      order, the released statuses: all added above
+- [x] **Contracts & docs**: migration 0026 reviewed, memory.md, the webhook's events
+
+Left open:
+
+- [ ] Reconciliation against Stripe's balance transactions, disputes and Dashboard refunds
+- [ ] What #18 and #19 answer (the accountant, the lawyer, Stripe's eligibility)
+- [ ] Before live: check that Stripe's Smart Disputes (or any setting of the account) never
+      submits staged evidence by itself; a line on dispute evidence (the driver's name and email,
+      the listing's address, to Stripe and the bank) in the privacy notice and the record of
+      processing
+- [ ] Support's way to decide a lost dispute and let its payout go (Phase 5); meanwhile each
+      sweep passes held bookings again (a few ms at scale)
+- [ ] A refund owed on a disputed charge is refused by Stripe and retried as "owed for over a
+      day": its own alert would say why
+- [ ] Staging evidence in a worker job rather than in the webhook's request (two Stripe calls in a
+      row there; both safe to repeat)
+
 ### 4.2 Refunds, transfers, the ledger (2026-11-13)
 
 Decisions #50–#52. The money moves the worker makes, so the Stripe gateway moved into a package
@@ -1257,29 +1314,86 @@ between 4.2 and 4.3.
   - Web: the listing's owners page (shares, invite, invitations, remove, leave), the invite page
     (signed out it keeps the token for the tab and asks to sign in), the dashboard's way there.
 - [x] **Unit tests**: contracts, `splitShares`, the gateway's per-payee transfer, the invite
-      email, the worker (invite email minted per send, nothing for a closed invite, per-payee
-      transfers with a restricted co-owner and a part of 0, the purge), the owners panel, the
-      invite page and its token, both pages
-- [x] **Integration tests** (`listing-owners.integration.test.ts`, 16; `payments` co-owned): the
-      primary at 100%, invite → minted → preview → accepted by the right account only, rights of
-      each role, shares, leave and remove, the limits and a lapsed invite, strangers, the
-      dashboard, bookings telling every owner with payees copied by share; with Stripe, bookable
-      only when every owner with a share can be paid, and each paid their part
+      email (nothing an owner typed in it; its days the invite's), the worker (invite email
+      minted per send, nothing for a closed invite, per-payee transfers with a restricted
+      co-owner and a part of 0, the purge), the owners panel (per-field refusals, the focus kept
+      where someone moved, the next invitation's button, two presses each), the invite page and
+      its token (a failed sign-out said), the proof step as a co-owner, every refusal translated,
+      both pages
+- [x] **Integration tests** (`listing-owners.integration.test.ts`, 25; `owner` and `payments`
+      co-owned): the primary at 100%, invite → minted → preview → accepted by the right account
+      only (a refused one makes no profile), rights of each role, shares (refused naming whose
+      details aren't in; a share sends its owner to staff), leave and remove (their invites
+      withdrawn), the limits, the invite caps (which one, per listing) and a lapsed invite, a
+      co-owner's try at an address already here counted, what a co-owner sees, the invite's
+      language and its outbox row empty of anything typed, no reminder for a co-owner, a
+      co-owner removed while their cancel or edit waits on the lock doing neither, strangers,
+      the dashboard, bookings telling every owner with payees copied by share; sending in needs
+      the primary's and every paid owner's details, not an unpaid co-owner's; proofs and their
+      names the primary's; with Stripe, bookable only when every owner with a share can be
+      paid, and each paid their part
 - [x] **Smoke test** (`co-ownership.smoke.ts`): invite by email through the worker, the link
-      opened signed out, sign in, accept, shares, Greek, axe; `/owner/invite` in the a11y list
-- [ ] **Security** review (stopped by the usage limit: to run again)
-- [ ] **Performance** review (stopped by the usage limit: to run again)
-- [ ] **Accessibility** review (stopped by the usage limit: to run again)
-- [ ] **i18n** review (stopped by the usage limit: to run again)
-- [ ] **Test** review (stopped by the usage limit: to run again)
+      opened signed out, sign in, the invite page in both languages, accept, what a co-owner
+      sees, shares refused at the co-owner's field until their details are in, then saved,
+      Greek, axe; `/owner/invite` in the a11y list; the
+      new routes' origin checks (`security.smoke.ts`); the owners page and the invite page,
+      signed in and out, under the first-visit budget (`performance.smoke.ts`)
+- [x] **Security** review (2026-11-13): a removed owner back in through their own invite (their
+      invites now go with them), invite spam (caps), payees without their details and tax for
+      DAC7 (a share needs them; so does sending in, for every paid owner), proofs open to every
+      co-owner (now the primary's), co-owners seeing each other's addresses and Stripe state
+      (names only), a refused accept leaving a profile, membership rechecked under the locks in
+      edit and owner cancel: all fixed. Second round (2026-11-15): the listing's name (an
+      owner's free text) out of the invite email; the day's cap counted under the inviter's
+      lock; a co-owner's try at an address already here counted, so it tells nothing for free;
+      owner cancel and copies read membership after the lock, not before; a share sends its
+      owner to staff to verify; proof file names the primary's: all fixed
+- [x] **Performance** review (2026-11-13): the two pages missing from the budget (added); 0025's
+      lock pattern, harmless before launch (the post-launch pattern in memory.md); the lows below.
+      Second round (2026-11-15): the invite's language looked up by `lower(email)` (every account
+      read per invite), the caps' counts unbounded by their windows, the auth client in the
+      invite page's first load: fixed
+- [x] **Accessibility** review (2026-11-13): the owners panel's announcements, focus after remove,
+      withdraw, leave and a full listing, the shares' hint, unit and total error, the two-press
+      confirm's description, one stable status line on the invite page, and a way to sign out
+      when the invite is another address's: all fixed. Second round (2026-11-15): which owner's
+      details hold a share back, said at their field (the primary's own with links to the
+      steps); the total's error described, not an alert; the focus left where someone moved
+      meanwhile; withdraw's focus to the next invitation; a failed sign-out said; names in labels
+      and announcements isolated; the status read whole; the tab retitled after leaving: fixed
+- [x] **i18n** review (2026-11-13): names isolated with `<bdi>` in rich text, dates in `<time>`,
+      plurals for days and room, no gendered words for the person invited, the invite's email
+      in the invitee's language, Greek titles and labels: all fixed. Second round (2026-11-15):
+      the details refusal names the steps and whose share; which invitation cap was met; the
+      email's days tied to the invite's; names in labels and announcements; wording: fixed
+- [x] **Test** review (2026-11-13, again 2026-11-15): a refused accept making a profile and a
+      co-owner reminded to onboard were bugs (fixed, with tests); the co-owner's transfer lookup,
+      the two presses, the lock rechecks (checked to fail without the fix), the email's days,
+      the leave focus, a sign-out failure, a token kept on a failure of ours: added
 - [x] **Contracts & docs**: migration 0025 reviewed (backfills: every listing's owner its primary,
       every confirmed booking's payee), OpenAPI and client regenerated, memory.md
 
 Left open:
 
 - [ ] Handing the primary role to a co-owner; listing status emails go to the primary alone
-- [ ] Native speaker: Owner.owners._, Owner.invite._, the invite email, «Κύρια ιδιοκτησία» and
-      «Συνιδιοκτησία» as role names
+- [ ] Native speaker: `Owner.owners.*`, `Owner.invite.*`, `Owner.errors.TOO_MANY_INVITES`,
+      `Owner.errors.OWNER_DETAILS_MISSING`, `Owner.dashboard.owners`, `Owner.proof.primaryOnly`,
+      the invite email; «Κύρια ιδιοκτησία» and «Συνιδιοκτησία» as role names; whether «ο κύριος
+      ιδιοκτήτης» and «# ιδιοκτήτη» should become «μέλος» wording; «ισχύει έως» or «έως τις»;
+      «να αθροίζουν 100%» here and in `Validation.sharesTotal`, both or neither
+- [ ] Security residuals: one inbox can still get a day's 20 invites through `+tag` or dotted
+      variants of its address (the per-address cap is per exact address); a paid owner can make
+      their details incomplete later (switching to a business clears the birth date): refuse
+      that while they have a share, or count it in what makes a listing bookable
+- [ ] Accessibility advisories: withdrawing is one press, and with two invites a week per address
+      a mistaken one can't always be redone at once; the panel's status line sits at its top,
+      far from the button at 200% or 320 px, and moves what follows once it has text
+- [ ] Performance lows, left for scale: telling every owner of a booking takes a query per owner
+      under the booking's lock (one statement would do); `setShares` and `markTransferSending`
+      update row by row; `change()` reads the answer inside the listing's lock; signed in, the
+      invite page carries the whole owner catalogue; the owners page's metadata asks the API
+      before a signed-out visitor is sent to sign in; past the key's day, `transferMadeFor` lists
+      a booking's transfers once per payee; `bookableColumns.ownerUserId` is no longer read
 
 ## Phase 5: Owner and admin dashboards
 

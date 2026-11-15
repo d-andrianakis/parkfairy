@@ -1,4 +1,4 @@
-import type { DisputeStatus } from '@parkfairy/contracts';
+import { DISPUTES_SETTLED, type DisputeStatus } from '@parkfairy/contracts';
 import { eq, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import { paymentDisputes } from './schema/payments.js';
@@ -20,26 +20,40 @@ export interface DisputeRecord {
 
 /**
  * A dispute as Stripe has it now, recorded against its booking: new, or brought up to date. Says
- * whether it is new, and whether its evidence was staged already (#59).
+ * whether it is new, and whether its evidence was staged already (#59); null when this reading is
+ * older than the one recorded (a settled dispute read as open, by a delivery that crossed a later
+ * one): it changes nothing.
+ *
+ * The booking's row is locked first, as the transfer sweep's update takes it: a dispute recorded
+ * here and a transfer marked as sending there happen one after the other, never both unseen.
  */
 export async function recordDispute(
   db: Database,
   bookingId: string,
   dispute: DisputeRecord,
-): Promise<{ opened: boolean; evidenceStaged: boolean }> {
-  const rows = await db.execute<{ opened: boolean; evidence_staged_at: string | null }>(sql`
-    insert into ${paymentDisputes}
-      (booking_id, stripe_dispute_id, status, reason, amount_minor, currency, due_by, submissions)
-    values (${bookingId}, ${dispute.stripeDisputeId}, ${dispute.status}, ${dispute.reason},
-      ${dispute.amountMinor}, ${dispute.currency},
-      ${dispute.dueBy ? dispute.dueBy.toISOString() : null}::timestamptz, ${dispute.submissions})
-    on conflict (stripe_dispute_id) do update set
-      status = excluded.status, reason = excluded.reason, amount_minor = excluded.amount_minor,
-      due_by = excluded.due_by, submissions = excluded.submissions, updated_at = now()
-    returning (xmax = 0) as opened, evidence_staged_at
-  `);
-  const [row] = rows.rows;
-  return { opened: row?.opened === true, evidenceStaged: Boolean(row?.evidence_staged_at) };
+): Promise<{ opened: boolean; evidenceStaged: boolean } | null> {
+  const settled = sql.join(
+    DISPUTES_SETTLED.map((status) => sql`${status}`),
+    sql`, `,
+  );
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select 1 from bookings where id = ${bookingId} for update`);
+    const rows = await tx.execute<{ opened: boolean; evidence_staged_at: string | null }>(sql`
+      insert into ${paymentDisputes}
+        (booking_id, stripe_dispute_id, status, reason, amount_minor, currency, due_by, submissions)
+      values (${bookingId}, ${dispute.stripeDisputeId}, ${dispute.status}, ${dispute.reason},
+        ${dispute.amountMinor}, ${dispute.currency},
+        ${dispute.dueBy ? dispute.dueBy.toISOString() : null}::timestamptz, ${dispute.submissions})
+      on conflict (stripe_dispute_id) do update set
+        status = excluded.status, reason = excluded.reason, amount_minor = excluded.amount_minor,
+        due_by = excluded.due_by, submissions = excluded.submissions, updated_at = now()
+      where ${paymentDisputes.status} not in (${settled}) or excluded.status in (${settled})
+      returning (xmax = 0) as opened, evidence_staged_at
+    `);
+    const [row] = rows.rows;
+    if (!row) return null;
+    return { opened: row.opened === true, evidenceStaged: Boolean(row.evidence_staged_at) };
+  });
 }
 
 /** The booking's evidence is staged at Stripe: not again. */

@@ -15,12 +15,16 @@ export function useInvalidSubmitStatus() {
   const t = useTranslations('Forms');
   const [message, setMessage] = useState('');
 
-  /** For forms that keep their own errors. */
-  function report(count: number) {
-    const text = t('invalidSummary', { count });
+  /** What's wrong, in so many words, where no field is (a form's own check, a total). */
+  function say(text: string) {
     // Clear first, so the same message is announced again on the next failed attempt.
     setMessage('');
     requestAnimationFrame(() => setMessage(text));
+  }
+
+  /** For forms that keep their own errors. */
+  function report(count: number) {
+    say(t('invalidSummary', { count }));
   }
 
   function onInvalid<T extends FieldValues>(errors: FieldErrors<T>) {
@@ -34,5 +38,5 @@ export function useInvalidSubmitStatus() {
       {message}
     </p>
   );
-  return { onInvalid, report, clear, region };
+  return { onInvalid, report, say, clear, region };
 }

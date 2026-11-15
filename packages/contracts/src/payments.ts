@@ -71,6 +71,8 @@ export const DISPUTE_STATUSES = [
 export type DisputeStatus = (typeof DISPUTE_STATUSES)[number];
 /** A dispute that leaves the booking's money where it was: its payout may go. */
 export const DISPUTES_RELEASED = ['won', 'warning_closed', 'prevented'] as const;
+/** Decided for good: an open status read after one of these is an older reading. */
+export const DISPUTES_SETTLED = [...DISPUTES_RELEASED, 'lost'] as const;
 export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
 
 /** What the booking page needs to take the payment. */

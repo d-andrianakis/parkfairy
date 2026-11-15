@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import {
   addDays,
   DEFAULT_TIME_ZONE,
+  INVITES_PER_ADDRESS_WEEK,
+  INVITES_PER_DAY,
   InvitePreviewSchema,
   ListingOwnersSchema,
   OwnerOnboardingSchema,
@@ -9,7 +11,15 @@ import {
   zonedTimeToUtc,
   type ListingOwners,
 } from '@parkfairy/contracts';
-import { mintInviteToken, schema, type Database } from '@parkfairy/database';
+import {
+  claimDueEmails,
+  enqueueOnboardingReminders,
+  markEmailSent,
+  mintInviteToken,
+  releaseEmails,
+  schema,
+  type Database,
+} from '@parkfairy/database';
 import { and, eq, inArray, like, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -25,6 +35,19 @@ const zone = DEFAULT_TIME_ZONE;
 const today = zonedParts(new Date(), zone).date;
 let nextOffset = 6;
 const at = (day: string, time: string) => zonedTimeToUtc(day, time, zone)?.toISOString() ?? '';
+// What a paid owner must have filled in (#22): their details, and their tax.
+const DETAILS = {
+  kind: 'individual',
+  firstName: 'Ελένη',
+  lastName: 'Δοκιμή',
+  phone: '+30 2721 000 000',
+  addressLine: 'Αριστομένους 1',
+  city: 'Καλαμάτα',
+  postalCode: '241 00',
+  country: 'GR',
+};
+const TAX = { taxCountry: 'GR', taxId: '094259216', birthDate: '1980-02-03' };
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe('co-ownership of a listing (#53–#56)', () => {
   let app: TestApp;
@@ -85,6 +108,20 @@ describe('co-ownership of a listing (#53–#56)', () => {
     return { id: made.id, token: minted.token, answer };
   }
 
+  /** Fills in an owner's details and tax, as they would in their own account. */
+  async function report(user: TestUser) {
+    await call(user, 'patch', '/owner/profile').send(DETAILS).expect(200);
+    await call(user, 'put', '/owner/profile/tax').send(TAX).expect(200);
+  }
+
+  const profileOf = async (user: TestUser) =>
+    (
+      await db
+        .select({ id: schema.ownerProfiles.id })
+        .from(schema.ownerProfiles)
+        .where(eq(schema.ownerProfiles.userId, user.id))
+    )[0];
+
   /** A listing with a co-owner who accepted: the primary, the co-owner, the listing. */
   async function coOwned() {
     const primary = await person();
@@ -135,6 +172,8 @@ describe('co-ownership of a listing (#53–#56)', () => {
     ['post', `/owner/listings/${randomUUID()}/invites`],
     ['put', `/owner/listings/${randomUUID()}/shares`],
     ['post', `/owner/listings/${randomUUID()}/leave`],
+    ['delete', `/owner/listings/${randomUUID()}/invites/${randomUUID()}`],
+    ['delete', `/owner/listings/${randomUUID()}/owners/${randomUUID()}`],
     ['post', '/owner/invites/preview'],
     ['post', '/owner/invites/accept'],
   ] as const)('needs an account for %s %s', async (method, path) => {
@@ -172,8 +211,9 @@ describe('co-ownership of a listing (#53–#56)', () => {
       .select()
       .from(schema.emailOutbox)
       .where(eq(schema.emailOutbox.inviteId, inviteId));
-    // No address and no link in the outbox: the worker reads both when it sends.
-    expect(queued).toMatchObject({ kind: 'listing-invite', userId: null });
+    // No address and no link in the outbox: the worker reads both when it sends. Nor the
+    // listing's name: nothing an owner typed goes out to someone who never asked.
+    expect(queued).toMatchObject({ kind: 'listing-invite', userId: null, payload: {} });
     expect(JSON.stringify(queued?.payload)).not.toContain(token);
     expect(JSON.stringify(queued?.payload)).not.toContain(invited.email);
     // Only the token's hash is kept.
@@ -198,6 +238,8 @@ describe('co-ownership of a listing (#53–#56)', () => {
     expect(
       (await call(stranger, 'post', '/owner/invites/accept').send({ token }).expect(409)).body,
     ).toMatchObject({ code: 'INVITE_FOR_ANOTHER_ACCOUNT' });
+    // Refused, it leaves nothing behind: no owner profile for the account that tried.
+    expect(await profileOf(stranger)).toBeUndefined();
 
     const accepted = await call(invited, 'post', '/owner/invites/accept')
       .send({ token })
@@ -217,11 +259,7 @@ describe('co-ownership of a listing (#53–#56)', () => {
       ],
     );
     // An owner profile was made for the account.
-    const [profile] = await db
-      .select({ id: schema.ownerProfiles.id })
-      .from(schema.ownerProfiles)
-      .where(eq(schema.ownerProfiles.userId, invited.id));
-    expect(profile).toBeDefined();
+    expect(await profileOf(invited)).toBeDefined();
   });
 
   it('accepts only for a confirmed address', async () => {
@@ -293,11 +331,31 @@ describe('co-ownership of a listing (#53–#56)', () => {
         { ownerId: second?.id, percent: b },
       ],
     });
+    // Paid means reported (#22): no share for an owner whose details and tax aren't in, and
+    // the answer says whose.
+    expect(
+      (await call(primary, 'put', `/owner/listings/${id}/shares`).send(shares(100, 0)).expect(409))
+        .body,
+    ).toMatchObject({ code: 'OWNER_DETAILS_MISSING', owners: [first?.id] });
+    await report(primary);
+    await call(primary, 'put', `/owner/listings/${id}/shares`).send(shares(100, 0)).expect(200);
+    expect(
+      (await call(primary, 'put', `/owner/listings/${id}/shares`).send(shares(70, 30)).expect(409))
+        .body,
+    ).toMatchObject({ code: 'OWNER_DETAILS_MISSING', owners: [second?.id] });
+    expect((await owners(primary, id)).owners.map((owner) => owner.sharePercent)).toEqual([100, 0]);
+    await report(coOwner);
     const set = ListingOwnersSchema.parse(
       (await call(primary, 'put', `/owner/listings/${id}/shares`).send(shares(70, 30)).expect(200))
         .body,
     );
     expect(set.owners.map((owner) => owner.sharePercent)).toEqual([70, 30]);
+    // Paid now, on a listing that may be live already: theirs for staff to verify.
+    const [verified] = await db
+      .select({ verification: schema.ownerProfiles.verification })
+      .from(schema.ownerProfiles)
+      .where(eq(schema.ownerProfiles.userId, coOwner.id));
+    expect(verified?.verification).toBe('pending');
     // The co-owner has a share now and can't be paid: drivers can't book it until they can.
     expect(set.payable).toBe(false);
     expect(
@@ -316,6 +374,8 @@ describe('co-ownership of a listing (#53–#56)', () => {
 
   it('gives a leaving or removed co-owner’s share back to the primary', async () => {
     const { primary, coOwner, id } = await coOwned();
+    await report(primary);
+    await report(coOwner);
     const [first, second] = (await owners(primary, id)).owners;
     await call(primary, 'put', `/owner/listings/${id}/shares`)
       .send({
@@ -372,6 +432,7 @@ describe('co-ownership of a listing (#53–#56)', () => {
       (await call(late, 'post', '/owner/invites/accept').send({ token: first.token }).expect(409))
         .body,
     ).toMatchObject({ code: 'INVITE_EXPIRED' });
+    expect(await profileOf(late)).toBeUndefined();
     expect(
       (await call(late, 'post', '/owner/invites/preview').send({ token: first.token }).expect(200))
         .body,
@@ -407,6 +468,200 @@ describe('co-ownership of a listing (#53–#56)', () => {
         .body,
     ).toMatchObject({ code: 'INVITE_NOT_FOUND' });
     await call(stranger, 'post', '/owner/invites/preview').send({ token: 'short' }).expect(400);
+  });
+
+  it('shows a co-owner the others’ names only, and the addresses of the invitations they sent', async () => {
+    const { primary, coOwner, id } = await coOwned();
+    const fromPrimary = await invite(primary, id, `p-${randomUUID()}@example.com`);
+    const fromCo = await invite(coOwner, id, `c-${randomUUID()}@example.com`);
+
+    const theirs = await owners(coOwner, id);
+    expect(theirs.owners).toEqual([
+      expect.objectContaining({ role: 'primary', name: 'Test Driver', email: null, payouts: null }),
+      expect.objectContaining({
+        role: 'co_owner',
+        email: coOwner.email,
+        payouts: 'none',
+        you: true,
+      }),
+    ]);
+    expect(theirs.invites).toEqual([
+      expect.objectContaining({ id: fromPrimary.id, email: null, canWithdraw: false }),
+      expect.objectContaining({ id: fromCo.id, canWithdraw: true }),
+    ]);
+    expect(theirs.invites[1]?.email).toMatch(/^c-/);
+    // The primary's view: everyone's address and Stripe's state, and every invitation.
+    const primarys = await owners(primary, id);
+    expect(primarys.owners.map((owner) => [owner.email, owner.payouts])).toEqual([
+      [primary.email, 'none'],
+      [coOwner.email, 'none'],
+    ]);
+    expect(primarys.invites.map((open) => [open.email !== null, open.canWithdraw])).toEqual([
+      [true, true],
+      [true, true],
+    ]);
+  });
+
+  it('counts a co-owner’s try at an address already here, so asking costs what inviting does', async () => {
+    const { primary, coOwner, id } = await coOwned();
+    const invited = await invite(primary, id, `p-${randomUUID()}@example.com`);
+    const coOwnerId = (await owners(primary, id)).owners[1]?.id ?? '';
+    const tries = async () =>
+      (
+        await db
+          .select({ id: schema.listingInvites.id })
+          .from(schema.listingInvites)
+          .where(eq(schema.listingInvites.invitedBy, coOwnerId))
+      ).length;
+    const send = (email: string) =>
+      call(coOwner, 'post', `/owner/listings/${id}/invites`).send({ email, locale: 'en' });
+    expect(await tries()).toBe(0);
+    // The primary's address, and one the primary invited, which the co-owner can't see.
+    expect((await send(primary.email).expect(409)).body).toMatchObject({ code: 'ALREADY_OWNER' });
+    const [made] = await db
+      .select({ email: schema.listingInvites.email })
+      .from(schema.listingInvites)
+      .where(eq(schema.listingInvites.id, invited.id));
+    expect((await send(made?.email ?? '').expect(409)).body).toMatchObject({
+      code: 'ALREADY_INVITED',
+    });
+    // Each kept, withdrawn, sending nothing: counted against their caps, invisible in the list.
+    expect(await tries()).toBe(2);
+    expect((await owners(coOwner, id)).invites.map((open) => open.id)).toEqual([invited.id]);
+  });
+
+  it('withdraws a removed owner’s invitations with them, and nobody else’s', async () => {
+    const { primary, coOwner, id } = await coOwned();
+    const friend = await person();
+    const theirs = await invite(coOwner, id, friend.email);
+    const kept = await invite(primary, id, `kept-${randomUUID()}@example.com`);
+    const coOwnerId = (await owners(primary, id)).owners[1]?.id ?? '';
+    await call(primary, 'delete', `/owner/listings/${id}/owners/${coOwnerId}`).expect(200);
+
+    expect((await owners(primary, id)).invites.map((open) => open.id)).toEqual([kept.id]);
+    // Their link opens nothing now: no way back in through one, theirs or a friend's.
+    expect(
+      (
+        await call(friend, 'post', '/owner/invites/preview')
+          .send({ token: theirs.token })
+          .expect(200)
+      ).body,
+    ).toMatchObject({ state: 'used' });
+    await call(friend, 'post', '/owner/invites/accept').send({ token: theirs.token }).expect(404);
+    expect(await profileOf(friend)).toBeUndefined();
+  });
+
+  it('caps invitations: a few a week to one address, and a day’s worth from one owner', async () => {
+    const primary = await person();
+    const id = await newListing(primary);
+    const send = (email: string) =>
+      call(primary, 'post', `/owner/listings/${id}/invites`).send({ email, locale: 'en' });
+    // Invite and withdraw, again and again: an inbox no one asked to fill.
+    const again = `again-${randomUUID()}@example.com`;
+    for (let round = 0; round < INVITES_PER_ADDRESS_WEEK; round++) {
+      const sent = await invite(primary, id, again);
+      await call(primary, 'delete', `/owner/listings/${id}/invites/${sent.id}`).expect(200);
+    }
+    expect((await send(again).expect(409)).body).toMatchObject({
+      code: 'TOO_MANY_INVITES',
+      limit: 'address',
+    });
+    // The cap is per listing: the same address may be asked to another.
+    const elsewhere = await newListing(primary);
+    await call(primary, 'post', `/owner/listings/${elsewhere}/invites`)
+      .send({ email: again, locale: 'en' })
+      .expect(200);
+
+    // Across their listings, in a day: the rest filled in the database, withdrawn so they take
+    // no room.
+    const me = (await owners(primary, id)).owners[0]?.id ?? '';
+    const other = await newListing(primary);
+    await db.insert(schema.listingInvites).values(
+      Array.from({ length: INVITES_PER_DAY - INVITES_PER_ADDRESS_WEEK - 1 }, (_, n) => ({
+        locationId: other,
+        invitedBy: me,
+        email: `day-${n}-${randomUUID()}@example.com`,
+        locale: 'en' as const,
+        withdrawnAt: new Date(),
+      })),
+    );
+    expect((await send(`fresh-${randomUUID()}@example.com`).expect(409)).body).toMatchObject({
+      code: 'TOO_MANY_INVITES',
+      limit: 'day',
+    });
+    // A day later, the owner may invite again.
+    await db
+      .update(schema.listingInvites)
+      .set({ createdAt: new Date(Date.now() - 2 * DAY_MS) })
+      .where(eq(schema.listingInvites.invitedBy, me));
+    await send(`fresh-${randomUUID()}@example.com`).expect(200);
+  });
+
+  it('writes the invitation in the language of the account it goes to, once confirmed', async () => {
+    const primary = await person();
+    const invitee = await person();
+    const id = await newListing(primary);
+    await updateUser(app, invitee.id, { locale: 'el' });
+    const confirmed = await invite(primary, id, invitee.email); // asked for in English
+    const unknown = await invite(primary, id, `nobody-${randomUUID()}@example.com`);
+    const mine = new Set([confirmed.id, unknown.id]);
+
+    const due = await claimDueEmails(db, 500);
+    const ours = (inviteId: string) => due.find((email) => email.inviteId === inviteId);
+    try {
+      expect(ours(confirmed.id)).toMatchObject({ to: invitee.email, locale: 'el' });
+      expect(ours(unknown.id)).toMatchObject({ locale: 'en' });
+    } finally {
+      // This suite's are done with; anyone else's go back to the queue as they were.
+      await Promise.all(
+        due
+          .filter((email) => email.inviteId !== null && mine.has(email.inviteId))
+          .map((email) => markEmailSent(db, email.id)),
+      );
+      await releaseEmails(
+        db,
+        due.filter((email) => email.inviteId === null || !mine.has(email.inviteId)),
+      );
+    }
+
+    // An unconfirmed account's language is no one's word: the inviter's choice stands.
+    await updateUser(app, invitee.id, { emailVerified: false });
+    const third = await invite(primary, await newListing(primary), invitee.email);
+    const later = await claimDueEmails(db, 500);
+    try {
+      expect(later.find((email) => email.inviteId === third.id)).toMatchObject({ locale: 'en' });
+    } finally {
+      await updateUser(app, invitee.id, { emailVerified: true });
+      await Promise.all(
+        later
+          .filter((email) => email.inviteId === third.id)
+          .map((email) => markEmailSent(db, email.id)),
+      );
+      await releaseEmails(
+        db,
+        later.filter((email) => email.inviteId !== third.id),
+      );
+    }
+  });
+
+  it('never reminds a co-owner to finish a listing of their own they never started', async () => {
+    const { coOwner } = await coOwned();
+    await db
+      .update(schema.ownerProfiles)
+      // First in the sweep's order, so a cap on how many it takes can't hide them.
+      .set({ updatedAt: new Date('2000-01-01T00:00:00Z') })
+      .where(eq(schema.ownerProfiles.userId, coOwner.id));
+    await enqueueOnboardingReminders(db, new Date(Date.now() - 3 * DAY_MS));
+    const reminded = await db
+      .select({ id: schema.emailOutbox.id })
+      .from(schema.emailOutbox)
+      .where(
+        and(
+          eq(schema.emailOutbox.userId, coOwner.id),
+          eq(schema.emailOutbox.kind, 'onboarding-reminder'),
+        ),
+      );
+    expect(reminded).toEqual([]);
   });
 
   it('shows a co-owned listing on the co-owner’s dashboard, and among theirs to copy to', async () => {
@@ -474,8 +729,82 @@ describe('co-ownership of a listing (#53–#56)', () => {
       return bookingId;
     }
 
+    /**
+     * Runs `request` while the listing's lock is held as a change to its owners holds it, and
+     * removes the co-owner before letting go: what was asked must see they're gone.
+     */
+    async function removedWhileWaiting(
+      id: string,
+      coOwnerId: string,
+      request: () => Promise<{ status: number }>,
+    ) {
+      let answer: Promise<{ status: number }> | undefined;
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`select 1 from parking_locations where id = ${id} for update`);
+        answer = request();
+        // Waiting on the lock, as seen by Postgres: no sleeping and hoping.
+        await expect
+          .poll(
+            async () =>
+              (
+                await db.execute<{ waiting: number }>(sql`
+                  select count(*)::int as waiting from pg_stat_activity
+                  where datname = current_database() and wait_event_type = 'Lock'`)
+              ).rows[0]?.waiting ?? 0,
+            { timeout: 10_000, interval: 50 },
+          )
+          .toBeGreaterThan(0);
+        await tx
+          .delete(schema.listingOwners)
+          .where(
+            and(
+              eq(schema.listingOwners.locationId, id),
+              eq(schema.listingOwners.ownerId, coOwnerId),
+            ),
+          );
+      });
+      if (!answer) throw new Error('No request');
+      return answer;
+    }
+
+    it('lets a co-owner removed while their cancel or edit waits on the lock do neither', async () => {
+      const { primary, coOwner, id } = await coOwned();
+      const listing = await live(id);
+      const bookingId = await book(await person(), listing);
+      const coOwnerId = (await owners(primary, id)).owners[1]?.id ?? '';
+      const cancelled = await removedWhileWaiting(id, coOwnerId, () =>
+        call(coOwner, 'post', `/owner/listings/${id}/bookings/${bookingId}/cancel`)
+          .send({})
+          .then((response) => response),
+      );
+      expect(cancelled.status).toBe(404);
+      const [still] = await db
+        .select({ status: schema.bookings.status })
+        .from(schema.bookings)
+        .where(eq(schema.bookings.id, bookingId));
+      expect(still?.status).toBe('confirmed');
+
+      // The same for an edit: back in as a co-owner, then removed while it waits.
+      const { token } = await invite(primary, id, coOwner.email);
+      await call(coOwner, 'post', '/owner/invites/accept').send({ token }).expect(200);
+      const again = (await owners(primary, id)).owners[1]?.id ?? '';
+      const edited = await removedWhileWaiting(id, again, () =>
+        call(coOwner, 'patch', `/owner/listings/${id}/location`)
+          .send({ description: 'Changed by someone no longer here.' })
+          .then((response) => response),
+      );
+      expect(edited.status).toBe(404);
+      const [unchanged] = await db
+        .select({ description: schema.parkingLocations.description })
+        .from(schema.parkingLocations)
+        .where(eq(schema.parkingLocations.id, id));
+      expect(unchanged?.description).not.toBe('Changed by someone no longer here.');
+    });
+
     it('lets no owner book their own, tells every owner, and pays each by share', async () => {
       const { primary, coOwner, id } = await coOwned();
+      await report(primary);
+      await report(coOwner);
       const listing = await live(id);
       const [first, second] = (await owners(primary, id)).owners;
       await call(primary, 'put', `/owner/listings/${id}/shares`)

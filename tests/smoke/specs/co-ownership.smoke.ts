@@ -10,12 +10,13 @@ import {
   signUp,
   uniqueEmail,
 } from '../support/fixtures';
-import { listingWithStaff } from '../support/listings';
+import { fillOwnerDetails, listingWithStaff } from '../support/listings';
 
 // Feature: co-ownership of a listing (#53–#56). The primary owner invites by email from the
 // listing's owners page; the worker sends the invitation, its link's token after `#`; the person
 // invited, signed out, signs in on the way and comes back to accept it; the primary sets the
-// shares, and the page says drivers wait until everyone with a share can be paid.
+// shares once everyone given one has filled in their details (#22), and the page says drivers
+// wait until everyone with a share can be paid.
 
 test.use(ownVisitor);
 
@@ -67,27 +68,50 @@ test('an owner invites a co-owner by email, who accepts, and the primary sets th
     await signIn(invited, coOwnerEmail);
     await expect(invited).toHaveURL('/en/owner/invite');
     await expect(invited.getByRole('status')).toContainText(
-      `Maria Primary invites you to own “${name}” with its owners.`,
+      `Maria Primary invites you to co-own “${name}”.`,
     );
     await expectAccessible(invited);
+    // And in Greek: the token kept for the tab while the invitation is open.
+    await invited.goto('/el/owner/invite');
+    await expect(invited.getByRole('status')).toContainText(
+      `Maria Primary σας προσκαλεί να συμμετέχετε στην ιδιοκτησία του χώρου «${name}».`,
+    );
+    await expectAccessible(invited);
+    await invited.goto('/en/owner/invite');
     await invited.getByRole('button', { name: 'Accept invitation' }).click();
     await expect(
       invited.getByRole('heading', { name: 'You’re now one of this listing’s owners.' }),
     ).toBeFocused();
     await invited.getByRole('link', { name: 'See the listing’s owners' }).click();
     await expect(invited.getByText('Eleni Co (you)')).toBeVisible();
-    // A co-owner sees the shares, and may leave, but not set them.
+    // A co-owner sees the shares, and may leave, but not set them, nor anyone's address.
     await expect(invited.getByRole('spinbutton')).toHaveCount(0);
     await expect(invited.getByRole('button', { name: 'Leave this listing' })).toBeVisible();
+    await expect(invited.getByText(coOwnerEmail, { exact: true })).toBeVisible();
+    await expect(invited.getByText(/^primary-owner/)).toHaveCount(0);
+
+    // The primary gives the co-owner a share: refused while their details and tax aren't in.
+    await page.reload();
+    await page.getByRole('spinbutton', { name: 'Share for Maria Primary' }).fill('70');
+    await page.getByRole('spinbutton', { name: 'Share for Eleni Co' }).fill('30');
+    await expect(page.getByText('Total: 100%')).toBeVisible();
+    await page.getByRole('button', { name: 'Save shares' }).click();
+    await expect(
+      page.getByText(/^An owner with a share, or the primary owner, hasn’t/),
+    ).toBeVisible();
+    // Said at the share that waits, naming whose it is.
+    await expect(
+      page.getByRole('spinbutton', { name: 'Share for Eleni Co' }),
+    ).toHaveAccessibleDescription(
+      /Eleni Co can have a share once they’ve filled in “About you” and “Tax details”/,
+    );
+    await expectAccessible(page);
+    await fillOwnerDetails(invited);
   } finally {
     await context.close();
   }
 
-  // The primary gives the co-owner a share; they can't be paid yet, so drivers wait.
-  await page.reload();
-  await page.getByRole('spinbutton', { name: 'Share for Maria Primary' }).fill('70');
-  await page.getByRole('spinbutton', { name: 'Share for Eleni Co' }).fill('30');
-  await expect(page.getByText('Total: 100%')).toBeVisible();
+  // Filled in: saved. They can't be paid yet, so drivers wait.
   await page.getByRole('button', { name: 'Save shares' }).click();
   await expect(page.getByText('Shares saved.')).toBeVisible();
   await expect(page.getByText(/Drivers can’t book this listing until every owner/)).toBeVisible();

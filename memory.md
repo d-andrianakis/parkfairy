@@ -201,8 +201,8 @@ Our readings for co-ownership (2026-11-13), not asked; change any that are wrong
   row in `listing_owners` with a share. The primary starts at 100%.
 - **Shares are whole percentages adding up to 100**, set by the primary for everyone at once. A new
   co-owner joins at 0%: they help run the listing, and are paid once the primary gives them a share.
-- **A booking's payees are copied at the hold**, as its commission is (#15): a share changed, an
-  owner joining or leaving, changes only bookings made after.
+- **A booking's payees are copied when it is confirmed** (not at the hold, which may never book):
+  a share changed, an owner joining or leaving, changes only bookings confirmed after.
 - **Each payee is paid on their own**, 24 hours after the stay: one whose account is restricted
   waits alone (#52). The owners' 90% is split by largest remainder, the primary first on a tie.
 - **A listing is bookable while every owner with a share can be paid**; an owner at 0% needs no
@@ -213,6 +213,31 @@ Our readings for co-ownership (2026-11-13), not asked; change any that are wrong
   owners and pending invites together per listing; one live invite per address per listing.
 - **Co-owners can leave**; the primary can't (they would delete the listing, or hand it over
   later). Any owner may withdraw an invite they sent; the primary, any invite.
+- From the reviews (2026-11-13):
+  - **Paid means reported (#22)**: a share above 0 only for an owner whose details and tax are in
+    (409 `OWNER_DETAILS_MISSING`); sending a listing in needs the primary's and every paid owner's
+    too, whoever sends it, and puts each of them to staff to verify.
+  - **A listing's proofs are the primary's**: a deed or a lease names people and their tax
+    numbers. Co-owners may add one, but not open or remove one (403 `PRIMARY_ONLY`), and see
+    each by its kind: its file name is null to them (2026-11-15).
+  - **Co-owners see each other's names only**: addresses and Stripe's state are the primary's to
+    see (and each owner's own). An invitation's address is shown to the primary and to whoever
+    sent it.
+  - **Invites are capped**: two a week to one address on one listing (invite, withdraw, invite is
+    an inbox no one asked to fill), twenty a day from one owner across their listings, counted
+    under the inviter's profile lock (409 `TOO_MANY_INVITES`, with `limit: 'day' | 'address'`).
+    A removed or leaving owner's open invites are withdrawn with them, so nobody comes back in
+    through one. A co-owner's try at an address that is an owner's or already invited is kept as
+    a withdrawn invite and counts: else asking would tell them whose address it is, for free.
+  - **The invite email carries nothing an owner typed** (2026-11-15): not the inviter's name, nor
+    the listing's (a draft's name is free text nobody reviews, sent from our address to someone
+    who never asked). The invite page names the listing once its reader has signed in. It is
+    written in the language of the account at that address if it is confirmed, else in the
+    inviter's choice.
+  - **A share sends its owner to staff**: given a share, an unverified owner becomes pending, as
+    a submission makes them (the listing may be live already). The refusal names whose details
+    are missing (`owners` in the 409), so the form says it at their field.
+  - **Co-owners get no onboarding reminder**: they have nothing of their own to finish.
 - **A co-owner sees the listing's bookings and its drivers' names and plates**, as the primary does.
 
 Our readings (2026-11-08), not asked; change any that are wrong:
@@ -971,6 +996,33 @@ locked`) in one statement. The two sets are kept apart (`user_id <> $user`) beca
     against balance transactions.
   - **Alerts are error logs** with fixed messages ("refund owed for over a day", "ledger does not
     add up", "transfers waiting over 3 days", "refund failed at Stripe") until monitoring exists.
+- **Disputes (Phase 4.3, 2026-11-13, #57–#60).** `payment_disputes` keeps one row per Stripe
+  dispute against its booking, upserted from `charge.dispute.*` webhooks after reading the dispute
+  from Stripe (the event's body is never trusted). Another app's dispute on the same Stripe account
+  matches no booking and is left alone.
+  - **Evidence is staged, never submitted** (#59): Stripe treats submitted evidence as final, and no
+    answer by the due date loses the dispute. So the API stages the booking's facts once
+    (`submit: false`, key `dispute-evidence-<id>`, only while it needs a response with nothing
+    submitted), and support completes and submits it in Stripe. Staged evidence doesn't submit
+    itself, so `check-money` warns of a dispute due within three days with nothing submitted.
+  - **The evidence is in English, for the bank**, and leaves out the plate: support adds it if it
+    helps. Logs carry ids, the reason and dates only, as a dispute's own text can carry the
+    driver's details.
+  - **An open or lost dispute holds that booking's payout** (#58): the transfer sweep skips a
+    booking with a dispute whose status isn't `won`, `warning_closed` or `prevented`
+    (`DISPUTES_RELEASED`). A lost one stays held until support decides who bears it (#57), and
+    `check-money` lists those still held. Recording a dispute locks its booking, and the worker
+    asks `transferHeld` again before each payee's transfer: a page read minutes before must not
+    pay the rest.
+  - (After the reviews, 2026-11-15) **Matched by PaymentIntent only**: every charge of ours comes
+    from one, and `stripe_charge_id` has no index (an OR with it read the whole table).
+    **Never staged over evidence Stripe holds** (`evidenceGiven`): Stripe keeps an answered
+    error under the idempotency key for a day, so a staging that failed is retried a day later,
+    by when support may have written it in the dashboard. **A settled dispute stays settled**:
+    `recordDispute` returns null for an open status read after `won`, `lost`, `warning_closed`
+    or `prevented` (two deliveries crossing), and nothing else happens.
+  - The webhook's events are listed in `.env.example` and held to the code (`WEBHOOK_EVENTS`):
+    an endpoint without the dispute events would never hold a payout, silently.
 - **Co-ownership (2026-11-13, #53–#56).** `listing_owners` holds every owner of a listing, the
   primary too, with a share in basis points; the listing's `owner_id` stays the primary, so what
   needs "the" owner (status emails, the listing cap) is unchanged.
@@ -1298,6 +1350,24 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   first, and the stale-hold sweep skips any booking with one (one would fail the whole batch).
 - **Drizzle's `$onUpdate` sets `updated_at` on every `.update()`**: a write that mustn't move it
   (the money backoff) goes through `db.execute` instead.
+- **Migrations once there is real data** (2026-11-13, the co-ownership performance review):
+  Drizzle runs every pending migration in one transaction, so a lock taken early is held until the
+  end. 0025 takes ACCESS EXCLUSIVE on `bookings`, then backfills, builds indexes and validates
+  CHECKs under it: nothing today (no staging or production yet), 30–90 s of no bookings at a
+  million rows. After launch: add CHECKs and FKs `NOT VALID` and `VALIDATE CONSTRAINT` in a later
+  migration; bulk-insert before building indexes and FKs; run large backfills as batched jobs
+  outside the migration; set `lock_timeout`.
+- **A locking read doesn't see what changed in the tables it joins** (2026-11-15, the second
+  security review): under READ COMMITTED, `select … join listing_owners … for share of listing`
+  takes its snapshot before it waits for the lock, and after the wait rechecks only the locked
+  rows. An owner removed by the transaction it waited for still joins, so their cancel went
+  through (the test proves it: 204 with the old query). Lock first, then read what depends on it
+  in a second statement (`cancelForOwner`, `lockOwnedTargets`, `edit()` already did). The test
+  holds the lock, waits for the request in `pg_stat_activity` (`wait_event_type = 'Lock'`), then
+  changes the row and commits: no sleeps.
+- **`useFocusAfterRender({ onlyIfLost: true })`** moves the focus only if it was let go (on
+  `body` or `#main-content`), for answers that can take a while: someone who tabbed on meanwhile
+  stays put. The default still moves it, as the owner steps need (their button stays focused).
 - **Supertest can't hold several requests built before any is sent** (2026-11-13): "Cannot read
   properties of null (reading 'address')". Build each where it is awaited.
 - **Agent reviews can stop on the account's usage limit** (2026-11-12): a review agent cut off
@@ -1359,6 +1429,9 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
   KiB at first, signed in with the picker or not, because the server page imported it; 169 KiB once
   it loaded through `BookSpacePicker`, 185 KiB where it shows. A booking's page 210 KiB with zod for
   the plate, 176 KiB with `contracts/plates`. `/en/bookings` 167 KiB, `/en/search` 172 KiB.
+- 2026-11-15 (co-ownership, `performance.smoke.ts` on production builds): a listing's owners page
+  225 KiB (zod, React Hook Form and its resolver for the shares and the invite: the closest of the
+  owner pages to the 250 KiB budget), the invite page 188 KiB signed in or out, 16–17 requests.
 - **Smoke tests that hold sign up a driver of their own** (`ownDriver`), never the shared account:
   one hold per driver, and the suite runs in parallel. Inside `test.use({ storageState })`, a context
   from `browser.newContext()` starts signed in too, so `ownDriver` passes an empty `storageState`;

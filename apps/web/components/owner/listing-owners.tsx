@@ -12,8 +12,8 @@ import {
   type ListingOwners,
 } from '@parkfairy/api-client';
 import {
-  DEFAULT_TIME_ZONE,
   LISTING_INVITE_DAYS,
+  LISTING_OWNERS_MAX,
   ListingInviteInputSchema,
   ListingSharesInputSchema,
   type ListingSharesInput,
@@ -24,52 +24,71 @@ import { Button } from '@parkfairy/ui/components/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@parkfairy/ui/components/card';
 import { FieldGroup } from '@parkfairy/ui/components/field';
 import { CircleAlert } from 'lucide-react';
-import { useFormatter, useLocale, useTranslations } from 'next-intl';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { hasLocale, useFormatter, useLocale, useTranslations } from 'next-intl';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
+import { FocusHeading } from '@/components/focus-heading';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
+import { PersonName } from '@/components/parking/place-words';
+import { useAnnouncer } from '@/components/use-announcer';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
-import { useRouter } from '@/i18n/navigation';
+import { timeOptions } from '@/i18n/formats';
+import { Link } from '@/i18n/navigation';
+import { routing } from '@/i18n/routing';
 import { attempt, useOwnerError } from '@/lib/owner-client';
 import { useValidationMessage } from '@/lib/use-validation-message';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 import { useFocusAfterRender } from './navigation';
 
-/** Shares as people read them: whole percents, in the page's language ("70%", "70 %"). */
+/** Shares as people read them: whole percents, in the page's language ("70%"). */
 const PERCENT = { style: 'percent', maximumFractionDigits: 0 } as const;
 
 /** What the invite form asks for; the language the email is written in is the page's. */
 const InviteFormSchema = ListingInviteInputSchema.pick({ email: true });
 type InviteForm = z.infer<typeof InviteFormSchema>;
 
-/** A polite region saying what was just done, cleared first so the same words are said again. */
-function useDone() {
-  const [said, setSaid] = useState('');
-  return {
-    say(text: string) {
-      setSaid('');
-      requestAnimationFrame(() => setSaid(text));
-    },
-    region: (
-      <p role="status" className="text-sm text-muted-foreground empty:hidden">
-        {said}
-      </p>
-    ),
-  };
-}
+/** Where the focus goes when what had it is gone (an owner removed, an invite withdrawn). */
+const OWNERS_HEADING = 'listing-owners-heading';
+const INVITE_HEADING = 'listing-invite-heading';
+const INVITES_HEADING = 'listing-invites-heading';
+/** Focusable for those moves, with the ring the focus shows. */
+const FOCUS_TARGET =
+  'rounded-sm outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/50';
+
+type Owner = ListingOwners['owners'][number];
+const nameOf = (owner: Owner) => owner.name ?? owner.email ?? '';
 
 /**
  * A listing's owners (#53–#56): who they are, their shares and whether Stripe can pay them;
  * invites to join, and those still waiting. Every owner may invite; the primary sets the shares and
- * removes co-owners; a co-owner may leave. Each change answers with the owners as they now are.
+ * removes co-owners; a co-owner may leave. Each change answers with the owners as they now are,
+ * and says so in a region that is always there; the focus goes somewhere that stays.
  */
 export function ListingOwnersPanel({ initial }: { initial: ListingOwners }) {
   const [owners, setOwners] = useState(initial);
+  const [left, setLeft] = useState(false);
   const t = useTranslations('Owner.owners');
-  const done = useDone();
+  const locale = useLocale();
+  const done = useAnnouncer('text-sm wrap-anywhere text-muted-foreground empty:sr-only');
+  // Answers can take a while: whoever has moved on meanwhile keeps their place.
+  const focus = useFocusAfterRender({ onlyIfLost: true });
   const primary = owners.role === 'primary';
+
+  if (left) {
+    return (
+      <div className="grid gap-3">
+        {/* The tab says it too: the page it named is no longer theirs. */}
+        <FocusHeading retitle>{t('left')}</FocusHeading>
+        <div>
+          <Button asChild variant="outline" className={WRAPPING_BUTTON}>
+            <Link href="/owner">{t('backToListings')}</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6">
@@ -77,7 +96,9 @@ export function ListingOwnersPanel({ initial }: { initial: ListingOwners }) {
       <Card>
         <CardHeader>
           <CardTitle>
-            <h2>{t('sharesTitle')}</h2>
+            <h2 id={OWNERS_HEADING} tabIndex={-1} className={FOCUS_TARGET}>
+              {t('sharesTitle')}
+            </h2>
           </CardTitle>
           <p className="text-sm text-muted-foreground">{t('sharesLead')}</p>
         </CardHeader>
@@ -89,38 +110,72 @@ export function ListingOwnersPanel({ initial }: { initial: ListingOwners }) {
             </Alert>
           )}
           {primary ? (
-            <SharesForm owners={owners} onSaved={setOwners} said={done.say} />
+            <SharesForm owners={owners} onSaved={setOwners} said={done.announce} />
           ) : (
             <OwnerList owners={owners} />
           )}
           {primary ? (
-            <RemoveOwners owners={owners} onChanged={setOwners} said={done.say} />
+            <RemoveOwners
+              owners={owners}
+              onRemoved={(answer, name) => {
+                setOwners(answer);
+                done.announce(
+                  t.rich('removed', {
+                    name,
+                    person: () => <PersonName name={name} lang={locale} />,
+                  }),
+                );
+                focus(OWNERS_HEADING);
+              }}
+            />
           ) : (
-            <LeaveListing listingId={owners.listingId} />
+            <LeaveListing listingId={owners.listingId} onLeft={() => setLeft(true)} />
           )}
         </CardContent>
       </Card>
-      <InviteOwner owners={owners} onInvited={setOwners} said={done.say} />
+      <InviteOwner
+        owners={owners}
+        onInvited={(answer, email) => {
+          setOwners(answer);
+          done.announce(t('invited', { email }));
+          // The form went with the last place: the focus to the section's heading.
+          if (answer.room === 0) focus(INVITE_HEADING);
+        }}
+      />
       {owners.invites.length > 0 ? (
-        <OpenInvites owners={owners} onChanged={setOwners} said={done.say} />
+        <OpenInvites
+          owners={owners}
+          onWithdrawn={(answer, email, next) => {
+            setOwners(answer);
+            done.announce(t('withdrawn', { email }));
+            focus(next);
+          }}
+        />
       ) : null}
     </div>
   );
 }
 
-/** Each owner, as one line of facts: name, role, share, payouts. */
-function OwnerFacts({ owner }: { owner: ListingOwners['owners'][number] }) {
+/** Each owner, as a few facts: name, role, share, and payouts where the asker may see them. */
+function OwnerFacts({ owner }: { owner: Owner }) {
   const t = useTranslations('Owner.owners');
   const format = useFormatter();
-  const name = owner.name ?? owner.email;
+  const locale = useLocale();
+  const person = () => <PersonName name={nameOf(owner)} lang={locale} />;
   return (
     <div className="grid gap-1">
-      <p className="font-medium wrap-anywhere">{owner.you ? t('you', { name }) : name}</p>
-      <p className="text-sm wrap-anywhere text-muted-foreground">{owner.email}</p>
+      <p className="font-medium wrap-anywhere">
+        {owner.you ? t.rich('you', { name: nameOf(owner), person }) : person()}
+      </p>
+      {owner.email ? (
+        <p className="text-sm wrap-anywhere text-muted-foreground">{owner.email}</p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Badge variant="outline">{t(`role.${owner.role}`)}</Badge>
         <span>{t('share', { percent: format.number(owner.sharePercent / 100, PERCENT) })}</span>
-        <span className="text-muted-foreground">{t(`payouts.${owner.payouts}`)}</span>
+        {owner.payouts ? (
+          <span className="text-muted-foreground">{t(`payouts.${owner.payouts}`)}</span>
+        ) : null}
       </div>
     </div>
   );
@@ -146,81 +201,161 @@ function SharesForm({
 }: {
   owners: ListingOwners;
   onSaved: (owners: ListingOwners) => void;
-  said: (text: string) => void;
+  said: (text: ReactNode) => void;
 }) {
   const t = useTranslations('Owner.owners');
   const format = useFormatter();
+  const locale = useLocale();
   const validation = useValidationMessage();
   const ownerError = useOwnerError();
   const status = useInvalidSubmitStatus();
   const [failure, setFailure] = useState<string | null>(null);
-  const shares = () =>
-    owners.owners.map((owner) => ({ ownerId: owner.id, percent: owner.sharePercent }));
+  /** Owners whose share the API refused until their details are in: said at their field. */
+  const [unreported, setUnreported] = useState<ReadonlySet<string>>(() => new Set());
   const {
     register,
     handleSubmit,
     reset,
     control,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<ListingSharesInput>({
     resolver: zodResolver(ListingSharesInputSchema),
-    defaultValues: { shares: shares() },
+    defaultValues: {
+      shares: owners.owners.map((o) => ({ ownerId: o.id, percent: o.sharePercent })),
+    },
   });
-  // The owners changed (one removed, or left): the form follows them.
+  // The owners changed (one removed, or joined): the form follows them, keeping what was typed
+  // for those still here. Any other answer (an invite sent) leaves the fields alone.
+  const ids = owners.owners.map((owner) => owner.id).join(',');
+  const saved = useMemo(
+    () => new Map(owners.owners.map((owner) => [owner.id, owner.sharePercent])),
+    [owners.owners],
+  );
+  const shown = useRef(ids);
   useEffect(() => {
-    reset({ shares: owners.owners.map((o) => ({ ownerId: o.id, percent: o.sharePercent })) });
-  }, [owners.owners, reset]);
+    if (shown.current === ids) return;
+    shown.current = ids;
+    const typed = new Map(getValues('shares').map((share) => [share.ownerId, share.percent]));
+    reset({
+      shares: ids
+        .split(',')
+        .map((id) => ({ ownerId: id, percent: typed.get(id) ?? saved.get(id) ?? 0 })),
+    });
+  }, [ids, saved, getValues, reset]);
   const watched = useWatch({ control, name: 'shares' });
   const total = (watched ?? []).reduce(
     (sum, share) => sum + (Number.isFinite(share.percent) ? share.percent : 0),
     0,
   );
 
-  const onSubmit = handleSubmit(async (input) => {
-    status.clear();
-    setFailure(null);
-    const outcome = await attempt(() =>
-      setListingShares({ path: { id: owners.listingId }, body: input }),
-    );
-    if (outcome.ok && outcome.data) {
-      onSaved(outcome.data);
-      said(t('sharesSaved'));
-    } else setFailure(ownerError(outcome.ok ? {} : outcome.failure));
-  }, status.onInvalid);
+  const onSubmit = handleSubmit(
+    async (input) => {
+      status.clear();
+      setFailure(null);
+      setUnreported(new Set());
+      const outcome = await attempt(() =>
+        setListingShares({ path: { id: owners.listingId }, body: input }),
+      );
+      if (outcome.ok && outcome.data) {
+        onSaved(outcome.data);
+        said(t('sharesSaved'));
+        return;
+      }
+      const refused = outcome.ok ? {} : outcome.failure;
+      setFailure(ownerError(refused));
+      if (refused.code === 'OWNER_DETAILS_MISSING') setUnreported(new Set(refused.owners ?? []));
+    },
+    (found) => {
+      const fields = Array.isArray(found.shares)
+        ? found.shares.filter((share) => share !== undefined).length
+        : 0;
+      // The list's own check (the total) names no field: what's wrong is said as it is.
+      if (fields > 0) status.report(fields);
+      else
+        status.say(
+          validation(found.shares?.root?.message ?? found.shares?.message) ?? t('sharesHint'),
+        );
+    },
+  );
   const submit = (event: FormEvent<HTMLFormElement>) => {
     if (isSubmitting) event.preventDefault();
     else void onSubmit(event);
   };
   // The total's own message, from the list's check (`sharesTotal`).
-  const listError = errors.shares?.root?.message ?? errors.shares?.message;
+  const totalError = validation(errors.shares?.root?.message ?? errors.shares?.message);
 
   return (
     <form onSubmit={submit} noValidate>
       <FieldGroup>
-        <FormError message={failure ?? validation(listError) ?? null} />
-        <ul className="grid gap-6">
-          {owners.owners.map((owner, index) => (
-            <li key={owner.id} className="grid gap-3">
-              <OwnerFacts owner={owner} />
-              <input type="hidden" {...register(`shares.${index}.ownerId`)} />
-              <FormField
-                id={`share-${owner.id}`}
-                label={t('shareLabel', { name: owner.name ?? owner.email })}
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={100}
-                step={1}
-                className="w-28"
-                error={validation(errors.shares?.[index]?.percent?.message)}
-                {...register(`shares.${index}.percent`, { valueAsNumber: true })}
-              />
-            </li>
-          ))}
-        </ul>
-        <p className="text-sm" aria-live="polite">
-          {t('total', { total: format.number(total / 100, PERCENT) })}
+        <FormError message={failure} />
+        <p id="shares-hint" className="text-sm text-muted-foreground">
+          {t('sharesHint')}
         </p>
+        <ul className="grid gap-6">
+          {owners.owners.map((owner, index) => {
+            const name = nameOf(owner);
+            const person = () => <PersonName name={name} lang={locale} />;
+            const waits = unreported.has(owner.id)
+              ? owner.you
+                ? t.rich('shareNeedsYourDetails', {
+                    profile: (chunks) => (
+                      <Link href="/owner/profile" className="underline underline-offset-4">
+                        {chunks}
+                      </Link>
+                    ),
+                    tax: (chunks) => (
+                      <Link href="/owner/tax" className="underline underline-offset-4">
+                        {chunks}
+                      </Link>
+                    ),
+                  })
+                : t.rich('shareNeedsDetails', { name, person })
+              : null;
+            const own = validation(errors.shares?.[index]?.percent?.message) ?? waits;
+            return (
+              <li key={owner.id} className="grid gap-3">
+                <OwnerFacts owner={owner} />
+                <input type="hidden" {...register(`shares.${index}.ownerId`)} />
+                <FormField
+                  id={`share-${owner.id}`}
+                  label={t.rich('shareLabel', { name, person })}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="w-28"
+                  hint={t('percentUnit')}
+                  error={own ?? undefined}
+                  // The total's error is each field's too: any of them may be what's wrong.
+                  aria-invalid={own || totalError ? true : undefined}
+                  aria-describedby={[
+                    'shares-hint',
+                    `share-${owner.id}-hint`,
+                    own ? `share-${owner.id}-error` : null,
+                    'shares-total',
+                    totalError ? 'shares-total-error' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  {...register(`shares.${index}.percent`, { valueAsNumber: true })}
+                />
+              </li>
+            );
+          })}
+        </ul>
+        <div className="grid gap-1">
+          <p id="shares-total" className="text-sm">
+            {t('total', { total: format.number(total / 100, PERCENT) })}
+          </p>
+          {/* Read with each field it is about, not as an alert over them; the summary says it. */}
+          {totalError ? (
+            <p id="shares-total-error" className="text-sm text-destructive">
+              {totalError}
+            </p>
+          ) : null}
+        </div>
         <div>
           <Button
             type="submit"
@@ -239,62 +374,41 @@ function SharesForm({
 /** Two presses for each, in place: removing an owner can't be undone. */
 function RemoveOwners({
   owners,
-  onChanged,
-  said,
+  onRemoved,
 }: {
   owners: ListingOwners;
-  onChanged: (owners: ListingOwners) => void;
-  said: (text: string) => void;
+  onRemoved: (owners: ListingOwners, name: string) => void;
 }) {
+  const t = useTranslations('Owner.owners');
+  const locale = useLocale();
   const coOwners = owners.owners.filter((owner) => owner.role === 'co_owner');
   if (coOwners.length === 0) return null;
   return (
     <ul className="grid gap-2">
-      {coOwners.map((owner) => (
-        <li key={owner.id}>
-          <RemoveOwner
-            listingId={owners.listingId}
-            owner={owner}
-            onChanged={onChanged}
-            said={said}
-          />
-        </li>
-      ))}
+      {coOwners.map((owner) => {
+        const name = nameOf(owner);
+        const person = () => <PersonName name={name} lang={locale} />;
+        return (
+          <li key={owner.id}>
+            <TwoPresses
+              id={`remove-${owner.id}`}
+              label={t.rich('remove', { name, person })}
+              question={t.rich('removeQuestion', { name, person })}
+              confirm={t('removeConfirm')}
+              act={() => removeListingOwner({ path: { id: owners.listingId, ownerId: owner.id } })}
+              onDone={(answer) => {
+                if (answer) onRemoved(answer, name);
+              }}
+            />
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-function RemoveOwner({
-  listingId,
-  owner,
-  onChanged,
-  said,
-}: {
-  listingId: string;
-  owner: ListingOwners['owners'][number];
-  onChanged: (owners: ListingOwners) => void;
-  said: (text: string) => void;
-}) {
+function LeaveListing({ listingId, onLeft }: { listingId: string; onLeft: () => void }) {
   const t = useTranslations('Owner.owners');
-  const name = owner.name ?? owner.email;
-  return (
-    <TwoPresses
-      id={`remove-${owner.id}`}
-      label={t('remove', { name })}
-      question={t('removeQuestion', { name })}
-      confirm={t('removeConfirm')}
-      act={() => removeListingOwner({ path: { id: listingId, ownerId: owner.id } })}
-      onDone={(answer) => {
-        if (answer) onChanged(answer);
-        said(t('removed', { name }));
-      }}
-    />
-  );
-}
-
-function LeaveListing({ listingId }: { listingId: string }) {
-  const t = useTranslations('Owner.owners');
-  const router = useRouter();
   return (
     <TwoPresses
       id="leave-listing"
@@ -302,15 +416,15 @@ function LeaveListing({ listingId }: { listingId: string }) {
       question={t('leaveQuestion')}
       confirm={t('leaveConfirm')}
       act={() => leaveListing({ path: { id: listingId } })}
-      // Theirs no more: back to their own listings.
-      onDone={() => router.replace('/owner')}
+      onDone={onLeft}
     />
   );
 }
 
 /**
  * A destructive press asked twice, as deleting a draft is: the question takes the focus, which is
- * what makes it read out; keeping puts the focus back on the button.
+ * what makes it read out, and describes the confirming button; keeping puts the focus back on the
+ * first button. Done, the caller says where the focus goes.
  */
 function TwoPresses<T>({
   id,
@@ -321,8 +435,8 @@ function TwoPresses<T>({
   onDone,
 }: {
   id: string;
-  label: string;
-  question: string;
+  label: ReactNode;
+  question: ReactNode;
   confirm: string;
   act: () => Promise<{ data?: T; error?: unknown; response?: Response }>;
   onDone: (answer: T | undefined) => void;
@@ -334,6 +448,7 @@ function TwoPresses<T>({
   const [asking, setAsking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const questionId = `${id}-question`;
 
   useEffect(() => {
     if (asking) asked.current?.focus();
@@ -358,10 +473,10 @@ function TwoPresses<T>({
         type="button"
         variant="outline"
         size="sm"
-        className={WRAPPING_BUTTON}
+        className={`${WRAPPING_BUTTON} wrap-anywhere`}
         onClick={() => setAsking(true)}
       >
-        {label}
+        <span>{label}</span>
       </Button>
     );
   }
@@ -370,8 +485,9 @@ function TwoPresses<T>({
       <FormError message={failure} />
       <p
         ref={asked}
+        id={questionId}
         tabIndex={-1}
-        className="rounded-sm text-sm outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className={`text-sm wrap-anywhere ${FOCUS_TARGET}`}
       >
         {question}
       </p>
@@ -381,6 +497,7 @@ function TwoPresses<T>({
           variant="destructive"
           size="sm"
           className={WRAPPING_BUTTON}
+          aria-describedby={questionId}
           aria-disabled={saving || undefined}
           onClick={() => void go()}
         >
@@ -390,6 +507,7 @@ function TwoPresses<T>({
           type="button"
           variant="outline"
           size="sm"
+          className={WRAPPING_BUTTON}
           onClick={() => {
             setAsking(false);
             setFailure(null);
@@ -407,11 +525,9 @@ function TwoPresses<T>({
 function InviteOwner({
   owners,
   onInvited,
-  said,
 }: {
   owners: ListingOwners;
-  onInvited: (owners: ListingOwners) => void;
-  said: (text: string) => void;
+  onInvited: (owners: ListingOwners, email: string) => void;
 }) {
   const t = useTranslations('Owner.owners');
   const locale = useLocale();
@@ -432,13 +548,15 @@ function InviteOwner({
     const outcome = await attempt(() =>
       inviteListingOwner({
         path: { id: owners.listingId },
-        body: { email, locale: locale === 'el' ? 'el' : 'en' },
+        body: {
+          email,
+          locale: hasLocale(routing.locales, locale) ? locale : routing.defaultLocale,
+        },
       }),
     );
     if (outcome.ok && outcome.data) {
-      onInvited(outcome.data);
       reset({ email: '' });
-      said(t('invited', { email }));
+      onInvited(outcome.data, email);
     } else setFailure(ownerError(outcome.ok ? {} : outcome.failure));
   }, status.onInvalid);
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -450,14 +568,16 @@ function InviteOwner({
     <Card>
       <CardHeader>
         <CardTitle>
-          <h2>{t('inviteTitle')}</h2>
+          <h2 id={INVITE_HEADING} tabIndex={-1} className={FOCUS_TARGET}>
+            {t('inviteTitle')}
+          </h2>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
           {t('inviteLead', { days: LISTING_INVITE_DAYS })}
         </p>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <p className="text-sm">{t('room', { count: owners.room })}</p>
+        <p className="text-sm">{t('room', { count: owners.room, max: LISTING_OWNERS_MAX })}</p>
         {owners.room > 0 ? (
           <form onSubmit={submit} noValidate>
             <FieldGroup>
@@ -490,15 +610,18 @@ function InviteOwner({
 
 function OpenInvites({
   owners,
-  onChanged,
-  said,
+  onWithdrawn,
 }: {
   owners: ListingOwners;
-  onChanged: (owners: ListingOwners) => void;
-  said: (text: string) => void;
+  /**
+   * `next`: where the focus goes: the following invitation's button (the one before, if it was
+   * the last), else the invitations' heading, else the invite form's, once none are left.
+   */
+  onWithdrawn: (owners: ListingOwners, email: string, next: string) => void;
 }) {
   const t = useTranslations('Owner.owners');
   const format = useFormatter();
+  const locale = useLocale();
   const ownerError = useOwnerError();
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -512,8 +635,23 @@ function OpenInvites({
     );
     setBusy(null);
     if (outcome.ok && outcome.data) {
-      onChanged(outcome.data);
-      said(t('withdrawn', { email }));
+      const answer = outcome.data;
+      const mine = (list: ListingOwners['invites']) =>
+        list.filter((invite) => invite.canWithdraw && invite.email).map((invite) => invite.id);
+      const before = mine(owners.invites);
+      const after = new Set(mine(answer.invites));
+      const at = before.indexOf(inviteId);
+      const next =
+        before.slice(at + 1).find((id) => after.has(id)) ??
+        before
+          .slice(0, Math.max(at, 0))
+          .reverse()
+          .find((id) => after.has(id));
+      onWithdrawn(
+        answer,
+        email,
+        next ? `withdraw-${next}` : answer.invites.length > 0 ? INVITES_HEADING : INVITE_HEADING,
+      );
     } else setFailure(ownerError(outcome.ok ? {} : outcome.failure));
   }
 
@@ -521,7 +659,9 @@ function OpenInvites({
     <Card>
       <CardHeader>
         <CardTitle>
-          <h2>{t('invitesTitle')}</h2>
+          <h2 id={INVITES_HEADING} tabIndex={-1} className={FOCUS_TARGET}>
+            {t('invitesTitle')}
+          </h2>
         </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -529,30 +669,37 @@ function OpenInvites({
         <ul className="grid gap-4">
           {owners.invites.map((invite) => (
             <li key={invite.id} className="grid gap-1">
-              <p className="font-medium wrap-anywhere">{invite.email}</p>
+              <p className="font-medium wrap-anywhere">{invite.email ?? t('inviteHidden')}</p>
               <p className="text-sm text-muted-foreground">
                 {invite.expiresAt
-                  ? t('inviteUntil', {
+                  ? t.rich('inviteUntil', {
                       date: format.dateTime(new Date(invite.expiresAt), {
                         day: 'numeric',
                         month: 'long',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZone: DEFAULT_TIME_ZONE,
+                        ...timeOptions(locale),
                       }),
+                      time: (chunks) => <time dateTime={invite.expiresAt ?? ''}>{chunks}</time>,
                     })
                   : t('inviteSending')}
-                {invite.invitedBy ? ` · ${t('invitedBy', { name: invite.invitedBy })}` : null}
               </p>
-              {invite.canWithdraw ? (
+              {invite.invitedBy ? (
+                <p className="text-sm wrap-anywhere text-muted-foreground">
+                  {t.rich('invitedBy', {
+                    name: invite.invitedBy,
+                    person: () => <PersonName name={invite.invitedBy ?? ''} lang={locale} />,
+                  })}
+                </p>
+              ) : null}
+              {invite.canWithdraw && invite.email ? (
                 <div>
                   <Button
+                    id={`withdraw-${invite.id}`}
                     type="button"
                     variant="outline"
                     size="sm"
-                    className={WRAPPING_BUTTON}
+                    className={`${WRAPPING_BUTTON} wrap-anywhere`}
                     aria-disabled={busy === invite.id || undefined}
-                    onClick={() => void withdraw(invite.id, invite.email)}
+                    onClick={() => void withdraw(invite.id, invite.email ?? '')}
                   >
                     {t('withdraw', { email: invite.email })}
                   </Button>

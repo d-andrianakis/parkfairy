@@ -223,6 +223,22 @@ describe('ProofStep', () => {
     expect(screen.getByText(/2 kB|2 KB/)).toBeInTheDocument();
   });
 
+  it('shows a co-owner each document by its kind, with nothing to open or remove (#55)', async () => {
+    const { container } = renderInSubtree(
+      <ProofStep
+        listing={listingFixture({ role: 'co_owner', proofs: [proof({ fileName: null })] })}
+      />,
+    );
+    // The file's name can carry names and tax numbers: the API sends it to the primary only.
+    expect(screen.getAllByText(/^Lease allowing you to sublet/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: /Download/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Remove/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/^Only the primary owner can open or remove these files/),
+    ).toBeVisible();
+    await expectNoAxeViolations(container);
+  });
+
   it('removes a document and keeps the focus on the page', async () => {
     renderInSubtree(<ProofStep listing={listingFixture({ proofs: [proof()] })} />);
     await userEvent.click(screen.getByRole('button', { name: 'Remove μισθωτήριο.pdf' }));

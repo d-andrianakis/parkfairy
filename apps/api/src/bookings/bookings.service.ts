@@ -1105,6 +1105,20 @@ export class BookingsService {
     const owned = await this.ownedListing(userId, listingId);
     if (!UUID.test(bookingId)) throw notFound('BOOKING_NOT_FOUND');
     const owed = await this.db.transaction(async (tx) => {
+      // The listing's lock first (before the booking's, as every path takes them), then whether
+      // this is still one of its owners, read after it: one statement would join the owners as
+      // they were before the wait, and an owner removed meanwhile would still cancel.
+      await tx
+        .select({ id: listing.id })
+        .from(listing)
+        .where(eq(listing.id, owned.id))
+        .for('share');
+      const [still] = await tx
+        .select({ id: owners.id })
+        .from(owners)
+        .innerJoin(profile, eq(profile.id, owners.ownerId))
+        .where(and(eq(owners.locationId, owned.id), eq(profile.userId, userId)));
+      if (!still) throw listingNotFound();
       const [current] = await tx
         .select()
         .from(booking)

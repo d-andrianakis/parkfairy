@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { DEFAULT_TIME_ZONE, type CancellationPolicy } from '@parkfairy/contracts';
 import { markEvidenceStaged, recordDispute, schema, type Database } from '@parkfairy/database';
 import type { DisputeEvidence, DisputeState, PaymentsGateway } from '@parkfairy/payments';
-import { eq, or } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { DB } from '../database/database.module.js';
 import { PAYMENTS } from './payments.tokens.js';
 
@@ -52,7 +52,7 @@ export class DisputesService {
     const dispute = await gateway.dispute(disputeId);
     const found = await this.bookingOf(dispute);
     if (!found) return;
-    const { opened, evidenceStaged } = await recordDispute(this.db, found.id, {
+    const recorded = await recordDispute(this.db, found.id, {
       stripeDisputeId: dispute.id,
       status: dispute.status,
       reason: dispute.reason,
@@ -61,6 +61,9 @@ export class DisputesService {
       dueBy: dispute.dueBy,
       submissions: dispute.submissions,
     });
+    // An older reading than the one recorded (a delivery crossed by a later one): nothing to do.
+    if (!recorded) return;
+    const { opened, evidenceStaged } = recorded;
     // Ids, the reason and dates only: the dispute's own text can carry the driver's details.
     const facts = {
       bookingId: found.id,
@@ -72,8 +75,14 @@ export class DisputesService {
     };
     if (opened) this.logger.error(facts, 'payment disputed: support to answer before it is due');
     if (toAnswer(dispute.status) && dispute.submissions === 0 && !evidenceStaged) {
-      // Recorded first: a failure here is retried with Stripe's next delivery of the event.
-      await gateway.stageDisputeEvidence(dispute.id, this.evidence(found));
+      // Never over what Stripe holds: support may have written it in the dashboard by now, or
+      // our staging went through and only its record here didn't.
+      if (!dispute.evidenceGiven) {
+        // Recorded first: a lost connection is retried with Stripe's next delivery. An error
+        // Stripe answered is kept under the key for a day, so retries fail alike until then;
+        // the daily look tells support of a dispute due soon either way.
+        await gateway.stageDisputeEvidence(dispute.id, this.evidence(found));
+      }
       await markEvidenceStaged(this.db, dispute.id);
     }
     if (dispute.status === 'lost') {
@@ -81,13 +90,13 @@ export class DisputesService {
     }
   }
 
-  /** Ours, by its PaymentIntent or its charge; none for another app's. */
+  /**
+   * Ours, by its PaymentIntent (its unique index); none for another app's. Every charge of ours
+   * comes from a PaymentIntent, so a dispute without one is someone else's: matching the charge
+   * too would read the whole table, as `stripe_charge_id` has no index.
+   */
   private async bookingOf(dispute: DisputeState) {
-    const which = [
-      ...(dispute.paymentIntentId ? [eq(booking.paymentIntentId, dispute.paymentIntentId)] : []),
-      ...(dispute.chargeId ? [eq(booking.stripeChargeId, dispute.chargeId)] : []),
-    ];
-    if (which.length === 0) return null;
+    if (!dispute.paymentIntentId) return null;
     const [row] = await this.db
       .select({
         id: booking.id,
@@ -112,7 +121,7 @@ export class DisputesService {
       })
       .from(booking)
       .innerJoin(users, eq(users.id, booking.userId))
-      .where(or(...which));
+      .where(eq(booking.paymentIntentId, dispute.paymentIntentId));
     return row ?? null;
   }
 

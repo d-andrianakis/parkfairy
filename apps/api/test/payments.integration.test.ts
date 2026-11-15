@@ -15,6 +15,7 @@ import {
   deleteStaleHolds,
   disputesToAnswer,
   lostDisputesHeld,
+  recordDispute,
   expireLapsedHolds,
   lapsedPayments,
   ledgerMismatches,
@@ -1754,18 +1755,17 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
         expect(staged?.cancellationPolicy).toContain('24 hours before the start');
         expect(staged?.uncategorized).toContain(held.reference);
         expect(staged?.refundPolicy).toContain('was not cancelled');
-        // Not the plate: support adds it if it helps.
-        expect(JSON.stringify(staged)).not.toContain('ΙΚΒ');
+        // Not the plate (kept as Latin letters): support adds it if it helps.
+        const plate = (await row(held.id)).vehiclePlate;
+        expect(plate).toBe('IKB1234');
+        expect(JSON.stringify(staged)).not.toContain(plate);
 
         // Told again: brought up to date, nothing staged twice.
         await tell('charge.dispute.updated', disputeId).expect(200);
         expect(stripe.gateway.stageDisputeEvidence).toHaveBeenCalledOnce();
 
-        // Held while open (#58), and on the day's list of disputes to answer before they're due.
+        // Held while open (#58).
         expect(await dueIds()).not.toContain(held.id);
-        expect(
-          await disputesToAnswer(db, new Date(Date.now() + 8 * DAY_MS)),
-        ).toBeGreaterThanOrEqual(1);
         expect(
           await markTransferSending(
             db,
@@ -1826,6 +1826,190 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
         expect((await disputeOf(disputeId))?.evidenceStagedAt).toBeInstanceOf(Date);
         expect(stripe.evidence.has(disputeId)).toBe(true);
       });
+
+      const payeesOf = async (bookingId: string) =>
+        (
+          await db
+            .select({ ownerId: schema.bookingPayees.ownerId })
+            .from(schema.bookingPayees)
+            .where(eq(schema.bookingPayees.bookingId, bookingId))
+        ).map((payee) => payee.ownerId);
+      /** What a spied logger was told about this dispute, in so many words. */
+      const opened = (told: { mock: { calls: unknown[][] } }, disputeId: string, message: string) =>
+        told.mock.calls.filter(
+          ([facts, text]) =>
+            text === message && (facts as { disputeId?: string }).disputeId === disputeId,
+        );
+
+      it('tells support once when a dispute opens and again when it is lost, with ids only (#57)', async () => {
+        const { driver, held, intent } = await paidBooking();
+        const told = vi.spyOn(Logger.prototype, 'error');
+        try {
+          const disputeId = stripe.openDispute(intent);
+          await tell('charge.dispute.created', disputeId).expect(200);
+          await tell('charge.dispute.updated', disputeId).expect(200);
+          const open = 'payment disputed: support to answer before it is due';
+          expect(opened(told, disputeId, open)).toEqual([
+            [expect.objectContaining({ bookingId: held.id, disputeId, ownersPaid: false }), open],
+          ]);
+          stripe.setDispute(disputeId, { status: 'lost' });
+          await tell('charge.dispute.closed', disputeId).expect(200);
+          const lost = 'dispute lost: support decides who bears it';
+          expect(opened(told, disputeId, lost)).toHaveLength(1);
+          // Ids, the reason and dates: nothing of the driver's.
+          const logged = JSON.stringify(told.mock.calls);
+          expect(logged).not.toContain(driver.email);
+          expect(logged).not.toContain('Test Driver');
+        } finally {
+          told.mockRestore();
+        }
+      });
+
+      it('lists for the day’s look only disputes due soon with nothing sent to the bank', async () => {
+        const soon = new Date(Date.now() + 2 * DAY_MS);
+        const at = new Date(Date.now() + 3 * DAY_MS);
+        const before = await disputesToAnswer(db, at);
+        const dispute = async (change: Parameters<typeof stripe.openDispute>[1]) => {
+          const { intent } = await paidBooking();
+          await tell('charge.dispute.created', stripe.openDispute(intent, change)).expect(200);
+        };
+        await dispute({ dueBy: soon }); // counted
+        await dispute({ dueBy: soon, status: 'warning_needs_response' }); // counted
+        await dispute({ dueBy: new Date(Date.now() + 7 * DAY_MS) }); // due later
+        await dispute({ dueBy: soon, submissions: 1 }); // answered
+        await dispute({ dueBy: soon, status: 'under_review' }); // with the bank
+        expect(await disputesToAnswer(db, at)).toBe(before + 2);
+      });
+
+      it('doesn’t count a lost dispute whose owners were paid already, and says they were', async () => {
+        const { held, intent, total } = await paidBooking();
+        await endedDaysAgo(held.id);
+        const [ownerId = ''] = await payeesOf(held.id);
+        const shares = sharesOf({ totalMinor: total, refundMinor: 0, commissionBps: 1000 });
+        expect(
+          await markTransferSending(
+            db,
+            held.id,
+            { transferMinor: shares.ownerMinor, commissionMinor: shares.commissionMinor },
+            new Map([[ownerId, shares.ownerMinor]]),
+          ),
+        ).toBe(true);
+        await recordPayeeTransfer(db, held.id, ownerId, `tr_${randomUUID().slice(0, 8)}`);
+        expect((await row(held.id)).transferStatus).toBe('sent');
+
+        const told = vi.spyOn(Logger.prototype, 'error');
+        try {
+          const before = await lostDisputesHeld(db);
+          const disputeId = stripe.openDispute(intent, { status: 'lost' });
+          await tell('charge.dispute.created', disputeId).expect(200);
+          expect(await lostDisputesHeld(db)).toBe(before);
+          expect(
+            opened(told, disputeId, 'payment disputed: support to answer before it is due')[0]?.[0],
+          ).toMatchObject({ ownersPaid: true });
+        } finally {
+          told.mockRestore();
+        }
+      });
+
+      it('stages a cancelled booking’s refund, and the stay in Athens time', async () => {
+        const { driver, held, intent, total } = await paidBooking();
+        await cancel(driver, held.id).expect(200);
+        // 00:30 in Athens on the day the clocks go back: the day of the stay is Athens's.
+        await db
+          .update(schema.bookings)
+          .set({
+            startsAt: new Date('2026-10-24T21:30:00Z'),
+            endsAt: new Date('2026-10-24T23:30:00Z'),
+            blockedUntil: new Date('2026-10-24T23:30:00Z'),
+          })
+          .where(eq(schema.bookings.id, held.id));
+        const disputeId = stripe.openDispute(intent);
+        await tell('charge.dispute.created', disputeId).expect(200);
+        const staged = stripe.evidence.get(disputeId);
+        expect(staged?.refundPolicy).toContain('cancelled by the driver');
+        expect(staged?.refundPolicy).toContain(`${(total / 100).toFixed(2)} EUR was refunded`);
+        expect(staged?.serviceDate).toBe('2026-10-25');
+        expect(staged?.productDescription).toContain('00:30');
+        expect(staged?.productDescription).toContain('(Athens time)');
+      });
+
+      it('stages the evidence of a warning to answer too, and none without a PaymentIntent', async () => {
+        const warned = await paidBooking();
+        const warningId = stripe.openDispute(warned.intent, { status: 'warning_needs_response' });
+        await tell('charge.dispute.created', warningId).expect(200);
+        expect(stripe.evidence.has(warningId)).toBe(true);
+        // Every charge of ours comes from a PaymentIntent: one without is another app's.
+        const bare = await paidBooking();
+        const bareId = stripe.openDispute(bare.intent, { paymentIntentId: null });
+        await tell('charge.dispute.created', bareId).expect(200);
+        expect(await disputeOf(bareId)).toBeUndefined();
+        expect(stripe.evidence.has(bareId)).toBe(false);
+      });
+
+      it('never stages over evidence Stripe holds already (support’s, from the dashboard)', async () => {
+        const { intent } = await paidBooking();
+        const disputeId = stripe.openDispute(intent, { evidenceGiven: true });
+        await tell('charge.dispute.created', disputeId).expect(200);
+        expect(stripe.gateway.stageDisputeEvidence).not.toHaveBeenCalled();
+        // Done with: a later delivery doesn't try again.
+        expect((await disputeOf(disputeId))?.evidenceStagedAt).toBeInstanceOf(Date);
+      });
+
+      it('takes two deliveries of one dispute at once as one, staged once', async () => {
+        const { intent } = await paidBooking();
+        const disputeId = stripe.openDispute(intent);
+        const answers = await Promise.all([
+          tell('charge.dispute.created', disputeId),
+          tell('charge.dispute.funds_withdrawn', disputeId),
+        ]);
+        // Either both took it, or one asks Stripe to try again, which then finds it done.
+        for (const answer of answers) expect([200, 500]).toContain(answer.status);
+        if (answers.some((answer) => answer.status === 500)) {
+          await tell('charge.dispute.updated', disputeId).expect(200);
+        }
+        const rows = await db
+          .select({ id: schema.paymentDisputes.id })
+          .from(schema.paymentDisputes)
+          .where(eq(schema.paymentDisputes.stripeDisputeId, disputeId));
+        expect(rows).toHaveLength(1);
+        expect(stripe.evidence.has(disputeId)).toBe(true);
+      });
+
+      it('keeps a settled dispute settled when an older reading arrives after it', async () => {
+        const won = await paidBooking();
+        await endedDaysAgo(won.held.id);
+        const disputeId = stripe.openDispute(won.intent, { status: 'won' });
+        await tell('charge.dispute.closed', disputeId).expect(200);
+        // A delivery that read Stripe before the dispute was won, recorded after it.
+        expect(
+          await recordDispute(db, won.held.id, {
+            stripeDisputeId: disputeId,
+            status: 'needs_response',
+            reason: 'fraudulent',
+            amountMinor: won.total,
+            currency: 'EUR',
+            dueBy: new Date(Date.now() + 7 * DAY_MS),
+            submissions: 0,
+          }),
+        ).toBeNull();
+        expect((await disputeOf(disputeId))?.status).toBe('won');
+        expect(await dueIds()).toContain(won.held.id);
+        expect(stripe.gateway.stageDisputeEvidence).not.toHaveBeenCalled();
+      });
+
+      it.each(['warning_closed', 'prevented'] as const)(
+        'lets the payout go once a dispute is %s',
+        async (status) => {
+          const { held, intent } = await paidBooking();
+          await endedDaysAgo(held.id);
+          const disputeId = stripe.openDispute(intent);
+          await tell('charge.dispute.created', disputeId).expect(200);
+          expect(await dueIds()).not.toContain(held.id);
+          stripe.setDispute(disputeId, { status });
+          await tell('charge.dispute.closed', disputeId).expect(200);
+          expect(await dueIds()).toContain(held.id);
+        },
+      );
 
       it('stages nothing once the bank has a response, or for one already settled', async () => {
         const answered = await paidBooking();
