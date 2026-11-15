@@ -4,12 +4,15 @@ import {
   INVITES_PER_DAY,
   InviteAcceptedSchema,
   InvitePreviewSchema,
+  LISTING_MANAGERS_MAX,
   LISTING_OWNERS_MAX,
+  ManagedListingsSchema,
   ListingOwnersSchema,
   SHARE_BPS_PER_PERCENT,
   type InviteAccepted,
   type InvitePreview,
   type ListingInviteInput,
+  type ManagedListings,
   type ListingOwnerRole,
   type ListingOwners,
   type ListingHandoverInput,
@@ -28,6 +31,7 @@ import { OwnerProfileService, profileFacts } from './owner-profile.service.js';
 
 const listing = schema.parkingLocations;
 const owners = schema.listingOwners;
+const managers = schema.listingManagers;
 const invites = schema.listingInvites;
 const profile = schema.ownerProfiles;
 const users = schema.users;
@@ -56,7 +60,9 @@ interface Membership {
   role: ListingOwnerRole;
 }
 
-function notFound(code: 'OWNER_NOT_FOUND' | 'INVITE_NOT_FOUND' | 'HANDOVER_NOT_FOUND') {
+function notFound(
+  code: 'OWNER_NOT_FOUND' | 'MANAGER_NOT_FOUND' | 'INVITE_NOT_FOUND' | 'HANDOVER_NOT_FOUND',
+) {
   return new NotFoundException({ statusCode: 404, error: 'Not Found', message: code, code });
 }
 
@@ -98,11 +104,16 @@ export class ListingOwnersService {
   async invite(
     userId: string,
     listingId: string,
-    { email, locale }: ListingInviteInput,
+    { email, locale, role }: ListingInviteInput,
   ): Promise<ListingOwners> {
     const address = email.trim().toLowerCase();
-    const refusal: { code: 'ALREADY_OWNER' | 'ALREADY_INVITED' | null } = { code: null };
+    const manager = role === 'manager';
+    const refusal: { code: 'ALREADY_OWNER' | 'ALREADY_MANAGER' | 'ALREADY_INVITED' | null } = {
+      code: null,
+    };
     const answer = await this.change(userId, listingId, async (tx, me) => {
+      // Only the primary owner adds a manager (#70).
+      if (manager && me.role !== 'primary') throw primaryOnly();
       // The inviter's row: their day's count spans their listings, each under its own lock.
       await tx
         .select({ id: profile.id })
@@ -119,6 +130,11 @@ export class ListingOwnersService {
         .innerJoin(profile, eq(profile.id, owners.ownerId))
         .innerJoin(users, eq(users.id, profile.userId))
         .where(and(eq(owners.locationId, listingId), sql`lower(${users.email}) = ${address}`));
+      const [alreadyManager] = await tx
+        .select({ id: managers.id })
+        .from(managers)
+        .innerJoin(users, eq(users.id, managers.userId))
+        .where(and(eq(managers.locationId, listingId), sql`lower(${users.email}) = ${address}`));
       const [earlier] = await tx
         .select({ id: invites.id, expiresAt: invites.expiresAt })
         .from(invites)
@@ -131,8 +147,14 @@ export class ListingOwnersService {
           ),
         );
       const open = earlier && (!earlier.expiresAt || earlier.expiresAt > new Date());
-      if (owner || open) {
-        refusal.code = owner ? 'ALREADY_OWNER' : 'ALREADY_INVITED';
+      // A manager may be invited to co-own (it promotes them); to manage again, no.
+      const already = owner
+        ? 'ALREADY_OWNER'
+        : manager && alreadyManager
+          ? 'ALREADY_MANAGER'
+          : null;
+      if (already || open) {
+        refusal.code = already ?? 'ALREADY_INVITED';
         if (primary) return;
         // Kept, withdrawn and sending nothing, so the try counts against the caps.
         await tx.insert(invites).values({
@@ -140,6 +162,7 @@ export class ListingOwnersService {
           invitedBy: me.ownerId,
           email: address,
           locale,
+          role,
           withdrawnAt: new Date(),
         });
         return;
@@ -147,13 +170,17 @@ export class ListingOwnersService {
       if (earlier) {
         await tx.update(invites).set({ withdrawnAt: new Date() }).where(eq(invites.id, earlier.id));
       }
-      if ((await this.taken(tx, listingId)) >= LISTING_OWNERS_MAX) {
+      if (manager) {
+        if ((await this.managersTaken(tx, listingId)) >= LISTING_MANAGERS_MAX) {
+          throw conflict('TOO_MANY_MANAGERS');
+        }
+      } else if ((await this.taken(tx, listingId)) >= LISTING_OWNERS_MAX) {
         throw conflict('TOO_MANY_OWNERS');
       }
       if (primary) await this.withinCaps(tx, listingId, me.ownerId, address);
       const [made] = await tx
         .insert(invites)
-        .values({ locationId: listingId, invitedBy: me.ownerId, email: address, locale })
+        .values({ locationId: listingId, invitedBy: me.ownerId, email: address, locale, role })
         .returning({ id: invites.id });
       if (!made) throw new Error('Invite not inserted');
       // Nothing typed by an owner in it, not even the listing's name: a draft's name is anyone's
@@ -406,6 +433,19 @@ export class ListingOwnersService {
         .set({ verification: 'pending' })
         .where(and(eq(profile.id, me.ownerId), eq(profile.verification, 'unverified')));
       await tx.update(handovers).set({ acceptedAt: new Date() }).where(eq(handovers.id, offer.id));
+      // Managers the old primary asked to come are theirs no more: the new primary chooses (#70).
+      await tx
+        .update(invites)
+        .set({ withdrawnAt: new Date() })
+        .where(
+          and(
+            eq(invites.locationId, listingId),
+            eq(invites.role, 'manager'),
+            eq(invites.invitedBy, offer.fromOwnerId),
+            isNull(invites.acceptedAt),
+            isNull(invites.withdrawnAt),
+          ),
+        );
       // The one who gave the role up hears it was taken (the one who took it has just pressed).
       await this.tell(tx, offer.fromOwnerId, 'listing-handover-accepted', {
         listingId,
@@ -450,8 +490,45 @@ export class ListingOwnersService {
     });
   }
 
+  /** The primary takes a manager off the listing (#70). */
+  async removeManager(
+    userId: string,
+    listingId: string,
+    managerId: string,
+  ): Promise<ListingOwners> {
+    if (!UUID.test(managerId)) throw notFound('MANAGER_NOT_FOUND');
+    return this.change(userId, listingId, async (tx, me) => {
+      if (me.role !== 'primary') throw primaryOnly();
+      const gone = await tx
+        .delete(managers)
+        .where(and(eq(managers.id, managerId), eq(managers.locationId, listingId)))
+        .returning({ id: managers.id });
+      if (gone.length === 0) throw notFound('MANAGER_NOT_FOUND');
+    });
+  }
+
+  /** The listings the account manages (#69): what its dashboard links to. */
+  async managed(userId: string): Promise<ManagedListings> {
+    const rows = await this.db
+      .select({ id: listing.id, name: listing.name, contentLocale: listing.contentLocale })
+      .from(managers)
+      .innerJoin(listing, eq(listing.id, managers.locationId))
+      .where(eq(managers.userId, userId))
+      .orderBy(asc(listing.name), asc(listing.id))
+      .limit(100);
+    return ManagedListingsSchema.parse({ listings: rows });
+  }
+
   /** A co-owner leaves; their share goes back to the primary, who can't leave their own listing. */
   async leave(userId: string, listingId: string): Promise<void> {
+    // A manager (#70): their own row, nothing else of the listing's changes.
+    if (UUID.test(listingId)) {
+      const gone = await this.db
+        .delete(managers)
+        .where(and(eq(managers.locationId, listingId), eq(managers.userId, userId)))
+        .returning({ id: managers.id });
+      if (gone.length > 0) return;
+    }
     await this.change(userId, listingId, async (tx, me) => {
       if (me.role === 'primary') throw conflict('PRIMARY_CANNOT_LEAVE');
       await this.drop(tx, listingId, me.ownerId);
@@ -472,6 +549,7 @@ export class ListingOwnersService {
         listingName: listing.name,
         contentLocale: listing.contentLocale,
         invitedBy: inviterUser.name,
+        role: invites.role,
       })
       .from(invites)
       .innerJoin(listing, eq(listing.id, invites.locationId))
@@ -490,6 +568,7 @@ export class ListingOwnersService {
       contentLocale: found.contentLocale,
       invitedBy: found.invitedBy,
       forYou: invitedIs(reader, found.email),
+      role: found.role,
     });
   }
 
@@ -522,6 +601,7 @@ export class ListingOwnersService {
       if (!invite.acceptedAt && invite.expiresAt && invite.expiresAt <= new Date()) {
         throw conflict('INVITE_EXPIRED');
       }
+      if (invite.role === 'manager') return this.acceptAsManager(tx, invite, reader);
       // This account's to accept: only now an owner profile, if it has none.
       await tx.insert(profile).values({ userId: reader.id }).onConflictDoNothing();
       const [owner] = await tx
@@ -549,9 +629,44 @@ export class ListingOwnersService {
         role: 'co_owner',
         shareBps: 0,
       });
+      // Co-owning replaces managing: one place on the listing.
+      await tx
+        .delete(managers)
+        .where(and(eq(managers.locationId, invite.locationId), eq(managers.userId, reader.id)));
       await tx.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, invite.id));
       return InviteAcceptedSchema.parse({ listingId: invite.locationId });
     });
+  }
+
+  /**
+   * Accepting an invite to manage (#69): no owner profile, only the account. Asked again, the same
+   * answer. An owner of the listing can't also manage it.
+   */
+  private async acceptAsManager(
+    tx: Transaction,
+    invite: typeof invites.$inferSelect,
+    reader: InviteReader,
+  ): Promise<InviteAccepted> {
+    const [already] = await tx
+      .select({ id: managers.id })
+      .from(managers)
+      .where(and(eq(managers.locationId, invite.locationId), eq(managers.userId, reader.id)));
+    if (invite.acceptedAt || already) {
+      if (!already) throw notFound('INVITE_NOT_FOUND');
+      return InviteAcceptedSchema.parse({ listingId: invite.locationId });
+    }
+    const [owner] = await tx
+      .select({ id: owners.id })
+      .from(owners)
+      .innerJoin(profile, eq(profile.id, owners.ownerId))
+      .where(and(eq(owners.locationId, invite.locationId), eq(profile.userId, reader.id)));
+    if (owner) throw conflict('ALREADY_OWNER');
+    if ((await this.managersTaken(tx, invite.locationId, invite.id)) >= LISTING_MANAGERS_MAX) {
+      throw conflict('TOO_MANY_MANAGERS');
+    }
+    await tx.insert(managers).values({ locationId: invite.locationId, userId: reader.id });
+    await tx.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, invite.id));
+    return InviteAcceptedSchema.parse({ listingId: invite.locationId });
   }
 
   /** The asker's place among the listing's owners; anything else is the same 404 (#55). */
@@ -599,10 +714,12 @@ export class ListingOwnersService {
             contentLocale: row.contentLocale,
             role: me.role,
             owners: [],
+            managers: [],
             invites: [],
             handover: null,
             payable: false,
             room: 0,
+            managersRoom: 0,
           });
     });
   }
@@ -658,6 +775,27 @@ export class ListingOwnersService {
       .select({
         count: sql<number>`(select count(*) from ${owners} where ${owners.locationId} = ${listingId})
           + (select count(*) from ${invites} where ${invites.locationId} = ${listingId}
+            and ${invites.role} = 'co_owner'
+            and ${invites.acceptedAt} is null and ${invites.withdrawnAt} is null
+            and (${invites.expiresAt} is null or ${invites.expiresAt} > now()))`,
+      })
+      .from(listing)
+      .where(eq(listing.id, listingId));
+    return Number(row?.count ?? 0);
+  }
+
+  /** Managers and open manager invites: what counts against LISTING_MANAGERS_MAX. */
+  private async managersTaken(
+    db: Reader,
+    listingId: string,
+    exceptInvite?: string,
+  ): Promise<number> {
+    const [row] = await db
+      .select({
+        count: sql<number>`(select count(*) from ${managers} where ${managers.locationId} = ${listingId})
+          + (select count(*) from ${invites} where ${invites.locationId} = ${listingId}
+            and ${invites.role} = 'manager'
+            and ${exceptInvite ? sql`${invites.id} <> ${exceptInvite}` : sql`true`}
             and ${invites.acceptedAt} is null and ${invites.withdrawnAt} is null
             and (${invites.expiresAt} is null or ${invites.expiresAt} > now()))`,
       })
@@ -667,7 +805,7 @@ export class ListingOwnersService {
   }
 
   private async read(db: Reader, me: Membership, userId: string): Promise<ListingOwners> {
-    const [info, rows, open, offers] = await Promise.all([
+    const [info, rows, open, offers, managing] = await Promise.all([
       db
         .select({ name: listing.name, contentLocale: listing.contentLocale })
         .from(listing)
@@ -695,6 +833,7 @@ export class ListingOwnersService {
           invitedById: invites.invitedBy,
           invitedBy: inviterUser.name,
           expiresAt: invites.expiresAt,
+          role: invites.role,
         })
         .from(invites)
         .leftJoin(inviterProfile, eq(inviterProfile.id, invites.invitedBy))
@@ -705,6 +844,12 @@ export class ListingOwnersService {
         .select({ toOwnerId: handovers.toOwnerId, expiresAt: handovers.expiresAt })
         .from(handovers)
         .where(and(eq(handovers.locationId, me.listingId), openHandover)),
+      db
+        .select({ id: managers.id, name: users.name, email: users.email })
+        .from(managers)
+        .innerJoin(users, eq(users.id, managers.userId))
+        .where(eq(managers.locationId, me.listingId))
+        .orderBy(asc(managers.createdAt)),
     ]);
     const [offer] = offers;
     const [row] = info;
@@ -729,6 +874,12 @@ export class ListingOwnersService {
           you,
         };
       }),
+      managers: managing.map((manager) => ({
+        id: manager.id,
+        name: manager.name,
+        // The primary's, as the owners' addresses are.
+        email: primary ? manager.email : null,
+      })),
       invites: open.map((invite) => {
         const theirs = primary || invite.invitedById === me.ownerId;
         return {
@@ -737,6 +888,7 @@ export class ListingOwnersService {
           invitedBy: invite.invitedBy,
           expiresAt: invite.expiresAt?.toISOString() ?? null,
           canWithdraw: theirs,
+          role: invite.role,
         };
       }),
       handover: offer
@@ -748,7 +900,18 @@ export class ListingOwnersService {
           }
         : null,
       payable: rows.every((owner) => owner.shareBps === 0 || owner.payouts === 'active'),
-      room: Math.max(0, LISTING_OWNERS_MAX - rows.length - open.length),
+      room: Math.max(
+        0,
+        LISTING_OWNERS_MAX -
+          rows.length -
+          open.filter((invite) => invite.role === 'co_owner').length,
+      ),
+      managersRoom: Math.max(
+        0,
+        LISTING_MANAGERS_MAX -
+          managing.length -
+          open.filter((invite) => invite.role === 'manager').length,
+      ),
     });
   }
 }

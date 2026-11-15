@@ -1542,3 +1542,42 @@ Our readings for 5.1, the owner's calendar and earnings (2026-11-15), not asked;
 - **2026-11-15 · One earnings request holds a few of the API's ten pool connections**, so
   `ownerEarnings` runs its queries two at a time and skips the month and per-listing sums (and the
   waiting list) on every page after the first. A later page costs a keyset read.
+
+Answered by the product owner on 2026-11-15, for a manager role (alongside owner and co-owner):
+
+69. **A manager runs a listing day to day**: sees the calendar and the bookings (driver names and
+    plates, as owners do, #35), cancels bookings and sets closures and special hours. Cannot edit
+    the listing's details, prices, photos or spaces, invite anyone, see earnings or payouts, or open
+    proofs.
+70. **Only the primary owner adds or removes managers**, by the same emailed invite as co-owners; a
+    manager can leave on their own.
+71. **A manager needs only an account**: no owner profile, tax details, share or payouts.
+
+Our readings for managers (2026-11-15), not asked; change any that are wrong:
+
+- **A manager is an account, not an owner**: `listing_managers (location_id, user_id)`, no owner
+  profile, never a payee. Access to a listing is `runsListing(userId)` (an owner or a manager) in
+  the places a manager may go: the listing's bookings and cancelling one, the calendar, the
+  closures (read and save). Everything else still asks for an owner, so a manager gets the same 404
+  as a stranger: the listing, its owners page, proofs, shares, invites, handover, earnings.
+- **Invites carry a role** (`listing_invites.role`, `co_owner` or `manager`), one open invite per
+  address and listing whichever it is, and the same email kind with its own words. Managers have
+  their own limit (5, with their open invites); owners' places count co-owner invites only.
+- **Accepting is by role**: a manager invite makes only a manager row (no profile) and is refused to
+  someone who already owns the listing (`ALREADY_OWNER`); a co-owner invite to a manager replaces
+  the manager row, one place on a listing. A manager sees no stay that ended before they were
+  added, as a new co-owner doesn't (5.1).
+- **The dashboard**: someone with no listing of their own sees the listings they manage above the
+  owner landing; an owner sees them under their own.
+- **2026-11-15 · Access checks over a person's listings read `id in (… union all …)`, never two
+  `exists` joined by `or`, and never a lateral per row.** The `or` of two `exists` can't become a
+  join and a lateral over `listing_owners`/`listing_managers` made the calendar read every booking of
+  the platform (300 ms at 1M bookings; fixed to under 1 ms). `runsListing(userId)` is the shape to
+  reuse.
+- **2026-11-15 · Managers see each booking's total** (the price the driver paid, as owners do), not
+  earnings; owners' cancellations, a manager's included, are throttled per account (60 a minute).
+- **2026-11-15 · An owner-side cancellation records who made it** (`bookings.cancelled_by_user_id`;
+  null for a driver's, and for those before this) **and the primary hears of one by a co-owner or a
+  manager**, by role and never by name (`booking-cancelled-by-team`, linking to the owners page,
+  where the names are). The primary's own cancellation tells no one. Asked for by the product owner
+  after the security review; co-owners are included since they can cancel just the same.

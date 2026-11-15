@@ -57,10 +57,20 @@ describe('ListingSharesInputSchema', () => {
 
 describe('invites', () => {
   it('asks for an address and the language the email is written in', () => {
+    // Co-owning, unless it says it is to manage (#69).
     expect(ListingInviteInputSchema.parse({ email: 'eleni@example.gr', locale: 'el' })).toEqual({
       email: 'eleni@example.gr',
       locale: 'el',
+      role: 'co_owner',
     });
+    expect(
+      ListingInviteInputSchema.parse({ email: 'a@b.gr', locale: 'en', role: 'manager' }).role,
+    ).toBe('manager');
+    for (const role of ['primary', 'owner', '']) {
+      expect(
+        ListingInviteInputSchema.safeParse({ email: 'a@b.gr', locale: 'en', role }).success,
+      ).toBe(false);
+    }
     expect(
       ListingInviteInputSchema.safeParse({ email: 'not an address', locale: 'el' }).error?.issues[0]
         ?.message,
@@ -86,8 +96,11 @@ describe('invites', () => {
       contentLocale: 'el',
       invitedBy: 'Maria',
       forYou: true,
+      role: 'manager',
       address: 'Ερμού 1',
     });
+    expect(preview.role).toBe('manager');
+    expect(InvitePreviewSchema.safeParse({ ...preview, role: 'owner' }).success).toBe(false);
     expect(preview).not.toHaveProperty('address');
     expect(InvitePreviewSchema.safeParse({ ...preview, state: 'pending' }).success).toBe(false);
   });
@@ -120,18 +133,25 @@ describe('ListingOwnersSchema', () => {
           you: true,
         },
       ],
+      managers: [{ id: A, name: 'Nikos', email: null }],
       invites: [],
       handover: null,
       payable: true,
       room: 8,
+      managersRoom: 4,
     });
+    expect(owners.managers).toEqual([{ id: A, name: 'Nikos', email: null }]);
     expect(owners.owners.map((owner) => owner.role)).toEqual(['primary', 'co_owner']);
+    // A manager is not an owner's role: they never reach the owners' page.
     expect(ListingOwnersSchema.safeParse({ ...owners, role: 'manager' }).success).toBe(false);
   });
 
   it('names every code a co-ownership route answers with', () => {
     expect(LISTING_OWNER_ERROR_CODES).toContain('PRIMARY_ONLY');
     expect(LISTING_OWNER_ERROR_CODES).toContain('INVITE_FOR_ANOTHER_ACCOUNT');
+    for (const code of ['ALREADY_MANAGER', 'TOO_MANY_MANAGERS', 'MANAGER_NOT_FOUND']) {
+      expect(LISTING_OWNER_ERROR_CODES).toContain(code);
+    }
     expect(new Set(LISTING_OWNER_ERROR_CODES).size).toBe(LISTING_OWNER_ERROR_CODES.length);
   });
 });

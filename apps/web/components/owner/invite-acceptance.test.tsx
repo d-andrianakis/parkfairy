@@ -29,6 +29,7 @@ const open = {
   contentLocale: 'el' as const,
   invitedBy: 'Maria',
   forYou: true,
+  role: 'co_owner' as const,
 };
 
 const at = (hash: string) => window.history.replaceState(null, '', `/en/owner/invite${hash}`);
@@ -209,6 +210,50 @@ describe('InviteAcceptance', () => {
     show('el');
     await userEvent.click(await screen.findByRole('button', { name: 'Αποδοχή πρόσκλησης' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Η πρόσκληση έληξε. Ζητήστε νέα.');
+  });
+});
+
+describe('InviteAcceptance, to manage (#69)', () => {
+  const manage = { ...open, role: 'manager' as const };
+
+  it('says it is to manage, and what that is and is not', async () => {
+    preview.mockResolvedValue(answer(manage) as never);
+    const { container } = show();
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Maria invites you to manage “Γκαράζ Ερμού”.',
+      ),
+    );
+    expect(screen.getByText(/You’ll see the listing’s calendar and bookings/)).toBeVisible();
+    expect(screen.getByText(/You won’t have a share or see earnings/)).toBeVisible();
+    expect(screen.queryByText(/co-own/)).toBeNull();
+    await expectNoAxeViolations(container);
+  });
+
+  it('accepts, and leads to the listing’s calendar, not the owners’ page', async () => {
+    preview.mockResolvedValue(answer(manage) as never);
+    accept.mockResolvedValue(answer({ listingId: LISTING_ID }) as never);
+    show();
+    await userEvent.click(await screen.findByRole('button', { name: 'Accept invitation' }));
+    expect(
+      await screen.findByRole('heading', { name: 'You now manage this listing.' }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'See the listing’s calendar' })).toHaveAttribute(
+      'href',
+      `/en/owner/calendar?listing=${LISTING_ID}`,
+    );
+    expect(screen.queryByRole('link', { name: 'See the listing’s owners' })).toBeNull();
+  });
+
+  it('says it in Greek, with no word of ownership', async () => {
+    preview.mockResolvedValue(answer({ ...manage, listingName: null }) as never);
+    show('el');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Maria σας προσκαλεί να διαχειρίζεστε έναν χώρο στάθμευσης.',
+      ),
+    );
+    expect(screen.queryByText(/ιδιοκτησ/)).toBeNull();
   });
 });
 

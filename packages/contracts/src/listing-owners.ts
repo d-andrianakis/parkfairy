@@ -14,6 +14,19 @@ export const ListingOwnerRoleSchema = z.enum(LISTING_OWNER_ROLES).register(contr
 });
 export type ListingOwnerRole = z.infer<typeof ListingOwnerRoleSchema>;
 
+/**
+ * A manager runs a listing day to day (#69–#71): the calendar and bookings (and cancelling them),
+ * closures and special hours. No share, no payouts, no earnings, no edits to the listing, no
+ * invites, no proofs. Added and removed by the primary owner, by the same emailed invite.
+ */
+export const LISTING_INVITE_ROLES = ['co_owner', 'manager'] as const;
+export const ListingInviteRoleSchema = z.enum(LISTING_INVITE_ROLES).register(contractsRegistry, {
+  id: 'ListingInviteRole',
+});
+export type ListingInviteRole = z.infer<typeof ListingInviteRoleSchema>;
+/** Managers and their pending invites together, per listing. */
+export const LISTING_MANAGERS_MAX = 5;
+
 /** Owners and pending invites together, per listing. */
 export const LISTING_OWNERS_MAX = 10;
 /** Invites one account may send in a day, over all its listings: a person's need, not a list's. */
@@ -62,9 +75,23 @@ export const ListingInviteSchema = z
     expiresAt: z.iso.datetime({ offset: true }).nullable(),
     /** The asking owner may withdraw it: theirs, or any if they're the primary. */
     canWithdraw: z.boolean(),
+    /** To own the listing with its owners, or to manage it. */
+    role: ListingInviteRoleSchema,
   })
   .register(contractsRegistry, { id: 'ListingInvite' });
 export type ListingInvite = z.infer<typeof ListingInviteSchema>;
+
+/** Someone who manages the listing (#69): seen by every owner by name, by the primary with the address. */
+export const ListingManagerSchema = z
+  .object({
+    /** The manager row's id: what removal refers to. */
+    id: z.uuid(),
+    name: z.string().nullable(),
+    /** Seen by the primary. */
+    email: z.string().nullable(),
+  })
+  .register(contractsRegistry, { id: 'ListingManager' });
+export type ListingManager = z.infer<typeof ListingManagerSchema>;
 
 /** An open offer of the primary role to a co-owner: seen by every owner, by name only. */
 export const ListingHandoverSchema = z
@@ -88,6 +115,7 @@ export const ListingOwnersSchema = z
     /** The asking owner's role: only the primary removes owners and sets shares (#55). */
     role: ListingOwnerRoleSchema,
     owners: z.array(ListingOwnerSchema),
+    managers: z.array(ListingManagerSchema),
     invites: z.array(ListingInviteSchema),
     /** The open offer of the primary role, if any. */
     handover: ListingHandoverSchema.nullable(),
@@ -95,6 +123,8 @@ export const ListingOwnersSchema = z
     payable: z.boolean(),
     /** Owners and pending invites left before the limit. */
     room: z.number().int().min(0),
+    /** Managers and pending invites to manage left before their limit. */
+    managersRoom: z.number().int().min(0),
   })
   .register(contractsRegistry, { id: 'ListingOwners' });
 export type ListingOwners = z.infer<typeof ListingOwnersSchema>;
@@ -104,6 +134,8 @@ export const ListingInviteInputSchema = z
     email: z.email(message('emailInvalid')).max(254, message('emailInvalid')),
     /** The language the invite email is written in: the inviter's, as they write it. */
     locale: LocaleSchema,
+    /** To co-own it, or to manage it (the primary only). Co-owning when left out. */
+    role: ListingInviteRoleSchema.default('co_owner'),
   })
   .register(contractsRegistry, { id: 'ListingInviteInput' });
 export type ListingInviteInput = z.infer<typeof ListingInviteInputSchema>;
@@ -155,6 +187,8 @@ export const InvitePreviewSchema = z
     invitedBy: z.string().nullable(),
     /** Whether the signed-in account is the one invited (its verified address). */
     forYou: z.boolean(),
+    /** What it invites them to be. */
+    role: ListingInviteRoleSchema,
   })
   .register(contractsRegistry, { id: 'InvitePreview' });
 export type InvitePreview = z.infer<typeof InvitePreviewSchema>;
@@ -163,6 +197,21 @@ export const InviteAcceptedSchema = z
   .object({ listingId: z.uuid() })
   .register(contractsRegistry, { id: 'InviteAccepted' });
 export type InviteAccepted = z.infer<typeof InviteAcceptedSchema>;
+
+/** A listing the signed-in account manages (#69): what the dashboard links to. */
+export const ManagedListingSchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string().nullable(),
+    contentLocale: LocaleSchema,
+  })
+  .register(contractsRegistry, { id: 'ManagedListing' });
+export type ManagedListing = z.infer<typeof ManagedListingSchema>;
+
+export const ManagedListingsSchema = z
+  .object({ listings: z.array(ManagedListingSchema).max(100) })
+  .register(contractsRegistry, { id: 'ManagedListings' });
+export type ManagedListings = z.infer<typeof ManagedListingsSchema>;
 
 /** Every `code` a co-ownership route answers with, for clients to translate. */
 export const LISTING_OWNER_ERROR_CODES = [
@@ -175,6 +224,11 @@ export const LISTING_OWNER_ERROR_CODES = [
   /** Already an owner, or already invited and the invite still open. */
   'ALREADY_OWNER',
   'ALREADY_INVITED',
+  /** Already manages the listing. */
+  'ALREADY_MANAGER',
+  /** Managers and open manager invites are at their limit. */
+  'TOO_MANY_MANAGERS',
+  'MANAGER_NOT_FOUND',
   'OWNER_NOT_FOUND',
   'INVITE_NOT_FOUND',
   'INVITE_EXPIRED',

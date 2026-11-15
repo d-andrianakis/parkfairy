@@ -1,3 +1,4 @@
+import type { ListingInviteRole } from '@parkfairy/contracts';
 import { and, asc, eq, lte, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import { users } from './schema/auth.js';
@@ -104,6 +105,8 @@ export interface ClaimedEmail {
   locale: string;
   /** An invite's email (#56): its link is made as it is sent. */
   inviteId: string | null;
+  /** What that invite is to: co-owning, or managing (#69). */
+  inviteRole: ListingInviteRole | null;
 }
 
 /**
@@ -141,6 +144,7 @@ export async function claimDueEmails(db: Database, limit: number): Promise<Claim
         where invitee.email = ${listingInvites.email} and invitee.email_verified
       ), ${listingInvites.locale})`,
       inviteId: emailOutbox.inviteId,
+      inviteRole: listingInvites.role,
     })
     .from(emailOutbox)
     .leftJoin(users, eq(users.id, emailOutbox.userId))

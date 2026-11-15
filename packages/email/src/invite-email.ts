@@ -1,4 +1,4 @@
-import { LISTING_INVITE_DAYS } from '@parkfairy/contracts';
+import { LISTING_INVITE_DAYS, type ListingInviteRole } from '@parkfairy/contracts';
 import { renderEmail } from './layout.js';
 import type { OwnerEmailLocale } from './owner-emails.js';
 import type { OutgoingEmail } from './transport.js';
@@ -50,6 +50,33 @@ export const INVITE_EMAIL_COPY: Record<OwnerEmailLocale, InviteCopy> = {
   },
 };
 
+/**
+ * The invite to manage a listing (#69): the same words in the same register, for the one role
+ * that has no share and sees no money. Nothing an owner typed is in it either.
+ */
+export const MANAGER_INVITE_EMAIL_COPY: Record<OwnerEmailLocale, InviteCopy> = {
+  el: {
+    subject: 'Πρόσκληση διαχείρισης χώρου στάθμευσης στο Parkfairy',
+    heading: 'Πρόσκληση διαχείρισης',
+    body: 'Σας προσκαλούν να διαχειρίζεστε έναν χώρο στάθμευσης στο Parkfairy.',
+    action: 'Δείτε την πρόσκληση',
+    note: `Ο σύνδεσμος ισχύει για ${INVITE_EMAIL_DAYS} ημέρες. Για να αποδεχτείτε, συνδεθείτε ή δημιουργήστε λογαριασμό με αυτή τη διεύθυνση email. Αν δεν περιμένατε αυτή την πρόσκληση, μπορείτε να την αγνοήσετε.`,
+    linkFallback: 'Αν το κουμπί δεν λειτουργεί, αντιγράψτε αυτόν τον σύνδεσμο στον περιηγητή σας:',
+    footer:
+      'Parkfairy. Λαμβάνετε αυτό το μήνυμα επειδή αυτή η διεύθυνση προσκλήθηκε να διαχειρίζεται έναν χώρο στάθμευσης στο Parkfairy.',
+  },
+  en: {
+    subject: 'An invitation to manage a parking listing on Parkfairy',
+    heading: 'You’re invited to manage a listing',
+    body: 'You’re invited to manage a parking listing on Parkfairy.',
+    action: 'See the invitation',
+    note: `The link works for ${INVITE_EMAIL_DAYS} days. To accept, sign in, or create an account, with this email address. If you weren’t expecting this invitation, you can ignore it.`,
+    linkFallback: 'If the button doesn’t work, copy this link into your browser:',
+    footer:
+      'Parkfairy. You’re receiving this because this address was invited to manage a parking listing on Parkfairy.',
+  },
+};
+
 export interface InviteEmail {
   to: string;
   locale: OwnerEmailLocale;
@@ -57,10 +84,18 @@ export interface InviteEmail {
   webUrl: string;
   /** The link's token, minted as the email is sent; it goes after `#`, so no server logs it. */
   token: string;
+  /** What the invitation is to; co-owning when left out. */
+  role?: ListingInviteRole;
 }
 
-export function renderInviteEmail({ to, locale, webUrl, token }: InviteEmail): OutgoingEmail {
-  const copy = INVITE_EMAIL_COPY[locale];
+export function renderInviteEmail({
+  to,
+  locale,
+  webUrl,
+  token,
+  role = 'co_owner',
+}: InviteEmail): OutgoingEmail {
+  const copy = (role === 'manager' ? MANAGER_INVITE_EMAIL_COPY : INVITE_EMAIL_COPY)[locale];
   const url = new URL(`/${locale}/owner/invite`, webUrl);
   url.hash = token;
   return renderEmail({

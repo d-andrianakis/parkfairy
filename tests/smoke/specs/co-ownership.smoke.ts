@@ -65,7 +65,7 @@ test('an owner invites a co-owner by email, who accepts, and the primary sets th
     // Signed out: asked to sign in with the address invited; the link's token kept for the tab.
     await invited.goto(link);
     await expect(
-      invited.getByRole('heading', { level: 1, name: 'Invitation to co-own a listing' }),
+      invited.getByRole('heading', { level: 1, name: 'Invitation to a listing' }),
     ).toBeVisible();
     await expectAccessible(invited);
     await invited.getByRole('main').getByRole('link', { name: 'Sign in' }).click();
@@ -139,7 +139,9 @@ test('an owner invites a co-owner by email, who accepts, and the primary sets th
     // And in Greek.
     await page.goto(`/el/owner/listings/${id}/owners`);
     await expect(page.getByRole('heading', { level: 1, name: 'Ιδιοκτήτες' })).toBeVisible();
-    await expect(page.getByText('Συνιδιοκτησία', { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('main').locator('[data-slot="badge"]', { hasText: 'Συνιδιοκτησία' }),
+    ).toBeVisible();
     await expectAccessible(page);
 
     // A payout account is made by hand in the database (Stripe isn't in this run).

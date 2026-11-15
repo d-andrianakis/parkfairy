@@ -116,6 +116,7 @@ async function message(
       locale: row.locale as OwnerEmailLocale,
       webUrl,
       token: minted.token,
+      role: row.inviteRole ?? 'co_owner',
     }),
     key: `${row.id}:${hashInviteToken(minted.token).slice(0, 16)}`,
   };

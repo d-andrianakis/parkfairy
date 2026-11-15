@@ -16,7 +16,7 @@ import { PersonName, placeTag } from '@/components/parking/place-words';
 import { Link, useRouter } from '@/i18n/navigation';
 import { forgetInviteToken, takeInviteToken } from '@/lib/invite-token';
 import { attempt, useOwnerError } from '@/lib/owner-client';
-import { INVITE_PATH, ownersHref } from '@/lib/owner-href';
+import { CALENDAR_HREF, INVITE_PATH, ownersHref } from '@/lib/owner-href';
 import { forgetEverySentTo } from '@/lib/remembered-email';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 
@@ -26,7 +26,7 @@ type View =
   | { kind: 'not-found' }
   | { kind: 'unavailable' }
   | { kind: 'open'; preview: InvitePreview; token: string }
-  | { kind: 'accepted'; listingId: string };
+  | { kind: 'accepted'; listingId: string; role: 'co_owner' | 'manager' };
 
 /** Kept for the tab before signing in: signed out, the page has nothing else to do with it. */
 export function KeepInviteToken() {
@@ -120,7 +120,7 @@ export function InviteAcceptance() {
     };
   }, []);
 
-  async function accept(token: string) {
+  async function accept(token: string, role: 'co_owner' | 'manager') {
     if (saving) return;
     setSaving(true);
     setFailure(null);
@@ -128,7 +128,7 @@ export function InviteAcceptance() {
     setSaving(false);
     if (outcome.ok && outcome.data) {
       forgetInviteToken();
-      setView({ kind: 'accepted', listingId: outcome.data.listingId });
+      setView({ kind: 'accepted', listingId: outcome.data.listingId, role });
     } else setFailure(ownerError(outcome.ok ? {} : outcome.failure));
   }
 
@@ -142,10 +142,18 @@ export function InviteAcceptance() {
   if (view.kind === 'accepted') {
     return (
       <div className="grid gap-3">
-        <FocusHeading>{t('accepted')}</FocusHeading>
+        <FocusHeading>
+          {view.role === 'manager' ? t('manager.accepted') : t('accepted')}
+        </FocusHeading>
         <div>
           <Button asChild className={WRAPPING_BUTTON}>
-            <Link href={ownersHref(view.listingId)}>{t('toOwners')}</Link>
+            {view.role === 'manager' ? (
+              <Link href={{ pathname: CALENDAR_HREF, query: { listing: view.listingId } }}>
+                {t('manager.toListing')}
+              </Link>
+            ) : (
+              <Link href={ownersHref(view.listingId)}>{t('toOwners')}</Link>
+            )}
           </Button>
         </div>
       </div>
@@ -157,16 +165,21 @@ export function InviteAcceptance() {
   const lead = (() => {
     if (!open) return view.kind === 'reading' ? t('reading') : '';
     const { preview } = open;
+    // What it invites them to be: the same sentences, in the manager's words.
+    const key = (name: 'lead' | 'leadNoInviter' | 'leadUnnamed' | 'leadNoInviterUnnamed') =>
+      (preview.role === 'manager' ? `manager.${name}` : name) as typeof name;
     const inviter = preview.invitedBy;
     const person = () => <PersonName name={inviter ?? ''} lang={locale} />;
     if (!preview.listingName) {
-      return inviter ? t.rich('leadUnnamed', { inviter, person }) : t('leadNoInviterUnnamed');
+      return inviter
+        ? t.rich(key('leadUnnamed'), { inviter, person })
+        : t(key('leadNoInviterUnnamed'));
     }
     const name = preview.listingName;
     const listing = placeTag(name, preview.contentLocale);
     return inviter
-      ? t.rich('lead', { inviter, name, person, listing })
-      : t.rich('leadNoInviter', { name, listing });
+      ? t.rich(key('lead'), { inviter, name, person, listing })
+      : t.rich(key('leadNoInviter'), { name, listing });
   })();
 
   return (
@@ -185,7 +198,9 @@ export function InviteAcceptance() {
       {view.kind === 'open' && view.preview.state !== 'open' ? said(t(view.preview.state)) : null}
       {open ? (
         <>
-          <p className="text-muted-foreground">{t('meaning')}</p>
+          <p className="text-muted-foreground">
+            {open.preview.role === 'manager' ? t('manager.meaning') : t('meaning')}
+          </p>
           {open.preview.forYou ? (
             <div className="grid gap-2">
               <FormError message={failure} />
@@ -194,7 +209,7 @@ export function InviteAcceptance() {
                   type="button"
                   className={WRAPPING_BUTTON}
                   aria-disabled={saving || undefined}
-                  onClick={() => void accept(open.token)}
+                  onClick={() => void accept(open.token, open.preview.role)}
                 >
                   {saving ? t('accepting') : t('accept')}
                 </Button>

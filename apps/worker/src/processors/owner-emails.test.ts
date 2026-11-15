@@ -57,6 +57,7 @@ const row = (overrides: Partial<ClaimedEmail> = {}): ClaimedEmail => ({
   to: 'owner@example.gr',
   locale: 'el',
   inviteId: null,
+  inviteRole: null,
   ...overrides,
 });
 
@@ -447,6 +448,37 @@ describe('owner emails processor', () => {
     expect(owner?.idempotencyKey).toBe('email-2');
   });
 
+  it('tells the primary a manager called a booking off, by role, and links to the owners page (#69)', async () => {
+    const booking = {
+      id: 'b0b0b0b0-0000-4000-8000-000000000001',
+      listingId: 'l0l0l0l0-0000-4000-8000-000000000001',
+      reference: 'K7M4-Q2ZD',
+      address: 'Ερμού 1',
+      contentLocale: 'el',
+      spaceLabel: 'A1',
+      start: '2026-12-10T08:00:00.000Z',
+      end: '2026-12-10T10:00:00.000Z',
+      timeZone: 'Europe/Athens',
+      totalMinor: 400,
+      currency: 'EUR',
+      cancelledBy: 'owner' as const,
+      cancelledByRole: 'manager' as const,
+    };
+    vi.mocked(claimDueEmails).mockResolvedValue([
+      row({
+        kind: 'booking-cancelled-by-team',
+        locale: 'en',
+        payload: { listingName: 'Γκαράζ', booking },
+      }),
+    ]);
+    await run('send-owner-emails');
+    const email = send.mock.calls[0]?.[0];
+    expect(email?.subject).toBe('A manager cancelled a booking for “Γκαράζ”');
+    expect(email?.text).toContain(
+      `https://parkfairy.example/en/owner/listings/${booking.listingId}/owners`,
+    );
+  });
+
   it('refuses a booking email that lost its booking, without losing the rest', async () => {
     vi.mocked(claimDueEmails).mockResolvedValue([
       row({ kind: 'booking-confirmed', payload: {} }),
@@ -493,6 +525,17 @@ describe('owner emails processor', () => {
       // A new link is a new email to Resend: never refused for a changed body under one key.
       expect(email?.idempotencyKey).toBe(`email-9:hash-of-${'T'.repeat(8)}`);
       expect(markEmailSent).toHaveBeenCalledWith(db, 'email-9');
+    });
+
+    it('invites to manage when the invite is to manage (#69), with the same link', async () => {
+      const token = 'M'.repeat(43);
+      vi.mocked(mintInviteToken).mockResolvedValue({ token, expiresAt: new Date() });
+      vi.mocked(claimDueEmails).mockResolvedValue([invite({ inviteRole: 'manager' })]);
+      await run('send-owner-emails');
+      const email = send.mock.calls[0]?.[0];
+      expect(email?.text).toContain('You’re invited to manage a parking listing on Parkfairy.');
+      expect(email?.text).not.toContain('co-own');
+      expect(email?.text).toContain(`https://parkfairy.example/en/owner/invite#${token}`);
     });
 
     it('sends nothing for an invite accepted or withdrawn since, and is done with it', async () => {

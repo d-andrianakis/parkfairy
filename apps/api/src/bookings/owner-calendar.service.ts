@@ -12,13 +12,11 @@ import {
   type OwnerCalendar,
   type OwnerCalendarQuery,
 } from '@parkfairy/contracts';
-import { schema, type Database } from '@parkfairy/database';
+import { runsListing, schema, type Database } from '@parkfairy/database';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { DB } from '../database/database.module.js';
 
 const listing = schema.parkingLocations;
-const owners = schema.listingOwners;
-const profile = schema.ownerProfiles;
 
 /**
  * The owner's calendar (5.1): confirmed bookings of the listings the signed-in user owns, as a
@@ -41,9 +39,7 @@ export class OwnerCalendarService {
       this.db
         .select({ id: listing.id, name: listing.name, contentLocale: listing.contentLocale })
         .from(listing)
-        .innerJoin(owners, eq(owners.locationId, listing.id))
-        .innerJoin(profile, eq(profile.id, owners.ownerId))
-        .where(eq(profile.userId, userId))
+        .where(runsListing(userId))
         .orderBy(asc(listing.name), asc(listing.id))
         .limit(100),
       this.db.execute<{
@@ -66,13 +62,20 @@ export class OwnerCalendarService {
           to_char(b.starts_at at time zone l.time_zone, 'YYYY-MM-DD') as day
         from bookings b
         join parking_locations l on l.id = b.location_id
-        join listing_owners lo on lo.location_id = l.id
-        join owner_profiles p on p.id = lo.owner_id and p.user_id = ${userId}
+        join (
+          -- The user's own listings, with the day they joined each: an owner's, or a manager's (#69).
+          -- A plain join, so the planner starts from these and the bookings' index, not the other
+          -- way round (a lateral here read every booking of the platform).
+          select lo.location_id, lo.created_at from listing_owners lo
+            join owner_profiles p on p.id = lo.owner_id and p.user_id = ${userId}
+          union all
+          select lm.location_id, lm.created_at from listing_managers lm where lm.user_id = ${userId}
+        ) joined on joined.location_id = l.id
         join users u on u.id = b.user_id
         where b.status = 'confirmed'
           -- Drivers of stays that ended before this owner joined the listing stay unseen by them
           -- (data minimisation: a new co-owner reads no history).
-          and b.ends_at > lo.created_at
+          and b.ends_at > joined.created_at
           and b.starts_at >= ${from.toISOString()}::timestamptz
           and b.starts_at < ${to.toISOString()}::timestamptz
           and to_char(b.starts_at at time zone l.time_zone, 'YYYY-MM') = ${month}
@@ -83,10 +86,9 @@ export class OwnerCalendarService {
       // Whether the listing asked for is the user's, however many listings they have.
       query.listing
         ? this.db
-            .select({ id: owners.locationId })
-            .from(owners)
-            .innerJoin(profile, eq(profile.id, owners.ownerId))
-            .where(and(eq(owners.locationId, query.listing), eq(profile.userId, userId)))
+            .select({ id: listing.id })
+            .from(listing)
+            .where(and(eq(listing.id, query.listing), runsListing(userId)))
         : Promise.resolve([]),
     ]);
 

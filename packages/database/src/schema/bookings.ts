@@ -94,6 +94,13 @@ export const bookings = pgTable(
     confirmedAt: instant('confirmed_at'),
     cancelledAt: instant('cancelled_at'),
     cancelledBy: text('cancelled_by').$type<BookingCanceller>(),
+    /**
+     * The account that called it off from the owners' side: the primary owner, a co-owner or a
+     * manager (#69). Null for a driver's cancellation, and for bookings called off before this.
+     */
+    cancelledByUserId: uuid('cancelled_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
     /** Owed to the driver after a cancellation; paid out from Phase 4. */
     refundMinor: integer('refund_minor'),
     /**
@@ -141,6 +148,10 @@ export const bookings = pgTable(
     index('bookings_location_starts_id_idx').on(t.locationId, t.startsAt, t.id),
     // Removing a space sets its bookings' space to null; without it, a scan per space.
     index('bookings_space_idx').on(t.spaceId),
+    // Deleting an account that called bookings off sets this null: without it, a scan per account.
+    index('bookings_cancelled_by_user_idx')
+      .on(t.cancelledByUserId)
+      .where(sql`${t.cancelledByUserId} is not null`),
     // One hold per driver at a time: a second press at once can't see the first's row, so this is
     // what refuses it (the service then lets the first go and holds again).
     uniqueIndex('bookings_one_hold_per_user_idx')

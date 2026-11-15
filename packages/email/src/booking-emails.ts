@@ -10,6 +10,8 @@ export const BOOKING_EMAIL_KINDS = [
   'booking-payment-refunded',
   'booking-received',
   'booking-cancelled-by-driver',
+  // To the primary owner, when a co-owner or a manager called a booking off (#69).
+  'booking-cancelled-by-team',
 ] as const;
 export type BookingEmailKind = (typeof BOOKING_EMAIL_KINDS)[number];
 
@@ -30,6 +32,8 @@ export interface BookingEmailFacts {
   currency: string;
   refundMinor?: number | undefined;
   cancelledBy?: 'driver' | 'owner' | undefined;
+  /** For the primary's email about a cancellation by their team: the role, never a name. */
+  cancelledByRole?: 'co_owner' | 'manager' | undefined;
 }
 
 interface BookingEmailCopy {
@@ -40,7 +44,11 @@ interface BookingEmailCopy {
   note: string;
 }
 
-type Variant = BookingEmailKind | 'booking-cancelled-by-owner';
+type Variant =
+  | Exclude<BookingEmailKind, 'booking-cancelled-by-team'>
+  | 'booking-cancelled-by-owner'
+  | 'booking-cancelled-by-manager'
+  | 'booking-cancelled-by-co-owner';
 
 interface BookingEmailCatalog {
   labels: {
@@ -125,6 +133,22 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         action: 'Δείτε τις κρατήσεις',
         note: 'Δεν χρειάζεται να κάνετε κάτι.',
       },
+      'booking-cancelled-by-manager': {
+        subject: (_reference, listing) => `Διαχειριστής ακύρωσε κράτηση για τον χώρο «${listing}»`,
+        heading: 'Ένας διαχειριστής ακύρωσε μια κράτηση',
+        body: (listing) =>
+          `Ένας διαχειριστής του χώρου «${listing}» ακύρωσε μια κράτηση. Ο οδηγός ενημερώθηκε και του επιστρέφεται ολόκληρο το ποσό.`,
+        action: 'Δείτε τους διαχειριστές',
+        note: 'Στη σελίδα των ιδιοκτητών βλέπετε ποιοι διαχειρίζονται τον χώρο. Αν δεν το περιμένατε, μπορείτε να αφαιρέσετε τον διαχειριστή από εκεί.',
+      },
+      'booking-cancelled-by-co-owner': {
+        subject: (_reference, listing) => `Συνιδιοκτήτης ακύρωσε κράτηση για τον χώρο «${listing}»`,
+        heading: 'Ένας συνιδιοκτήτης ακύρωσε μια κράτηση',
+        body: (listing) =>
+          `Ένας συνιδιοκτήτης του χώρου «${listing}» ακύρωσε μια κράτηση. Ο οδηγός ενημερώθηκε και του επιστρέφεται ολόκληρο το ποσό.`,
+        action: 'Δείτε τους ιδιοκτήτες',
+        note: 'Στη σελίδα των ιδιοκτητών βλέπετε ποιοι έχουν πρόσβαση στον χώρο.',
+      },
     },
   },
   en: {
@@ -186,6 +210,22 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         action: 'See the bookings',
         note: 'You don’t need to do anything.',
       },
+      'booking-cancelled-by-manager': {
+        subject: (_reference, listing) => `A manager cancelled a booking for “${listing}”`,
+        heading: 'A manager cancelled a booking',
+        body: (listing) =>
+          `A manager of “${listing}” cancelled a booking. The driver has been told and is being refunded in full.`,
+        action: 'See the managers',
+        note: 'The owners’ page shows who manages the listing. If you weren’t expecting this, you can remove the manager from there.',
+      },
+      'booking-cancelled-by-co-owner': {
+        subject: (_reference, listing) => `A co-owner cancelled a booking for “${listing}”`,
+        heading: 'A co-owner cancelled a booking',
+        body: (listing) =>
+          `A co-owner of “${listing}” cancelled a booking. The driver has been told and is being refunded in full.`,
+        action: 'See the owners',
+        note: 'The owners’ page shows who has access to the listing.',
+      },
     },
   },
 };
@@ -233,9 +273,13 @@ export function renderBookingEmail({
 }: BookingEmail): OutgoingEmail {
   const catalog = BOOKING_EMAIL_COPY[locale];
   const variant: Variant =
-    kind === 'booking-cancelled' && booking.cancelledBy === 'owner'
-      ? 'booking-cancelled-by-owner'
-      : kind;
+    kind === 'booking-cancelled-by-team'
+      ? booking.cancelledByRole === 'manager'
+        ? 'booking-cancelled-by-manager'
+        : 'booking-cancelled-by-co-owner'
+      : kind === 'booking-cancelled' && booking.cancelledBy === 'owner'
+        ? 'booking-cancelled-by-owner'
+        : kind;
   const copy = catalog.kinds[variant];
   const listing = listingName || catalog.unnamed;
   const forDriver = DRIVER_KINDS.has(kind);
@@ -258,9 +302,12 @@ export function renderBookingEmail({
       ? [{ label: labels.refund, value: moneyIn(locale, booking.refundMinor, booking.currency) }]
       : []),
   ];
+  // About the team, not the booking: to where the team is listed (the primary's own page).
   const path = forDriver
     ? `/${locale}/bookings/${booking.id}`
-    : `/${locale}/owner/listings/${booking.listingId}/bookings`;
+    : kind === 'booking-cancelled-by-team'
+      ? `/${locale}/owner/listings/${booking.listingId}/owners`
+      : `/${locale}/owner/listings/${booking.listingId}/bookings`;
   return renderEmail({
     to,
     locale,

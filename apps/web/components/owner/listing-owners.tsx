@@ -9,6 +9,7 @@ import {
   inviteListingOwner,
   leaveListing,
   offerListingHandover,
+  removeListingManager,
   removeListingOwner,
   setListingShares,
   withdrawListingHandover,
@@ -17,6 +18,7 @@ import {
 } from '@parkfairy/api-client';
 import {
   LISTING_INVITE_DAYS,
+  LISTING_MANAGERS_MAX,
   LISTING_OWNERS_MAX,
   ListingInviteInputSchema,
   ListingSharesInputSchema,
@@ -44,6 +46,7 @@ import { routing } from '@/i18n/routing';
 import { attempt, useOwnerError } from '@/lib/owner-client';
 import { useValidationMessage } from '@/lib/use-validation-message';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
+import { ChoiceField } from './fields';
 import { useFocusAfterRender } from './navigation';
 
 /** Shares as people read them: whole percents, in the page's language ("70%"). */
@@ -58,6 +61,7 @@ const OWNERS_HEADING = 'listing-owners-heading';
 const INVITE_HEADING = 'listing-invite-heading';
 const INVITES_HEADING = 'listing-invites-heading';
 const HANDOVER_HEADING = 'listing-handover-heading';
+const MANAGERS_HEADING = 'listing-managers-heading';
 /** Focusable for those moves, with the ring the focus shows. */
 const FOCUS_TARGET =
   'rounded-sm outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/50';
@@ -66,6 +70,8 @@ const FOCUS_TARGET =
 const STALE_OFFER = new Set(['HANDOVER_NOT_FOUND', 'HANDOVER_EXPIRED']);
 
 type Owner = ListingOwners['owners'][number];
+type Manager = ListingOwners['managers'][number];
+type InviteRole = 'co_owner' | 'manager';
 const nameOf = (owner: Owner) => owner.name ?? owner.email ?? '';
 
 /**
@@ -149,13 +155,26 @@ export function ListingOwnersPanel({ initial }: { initial: ListingOwners }) {
           focus(next);
         }}
       />
+      <Managers
+        owners={owners}
+        onRemoved={(answer, name) => {
+          setOwners(answer);
+          done.announce(
+            t.rich('managerRemoved', {
+              name,
+              person: () => <PersonName name={name} lang={locale} />,
+            }),
+          );
+          focus(MANAGERS_HEADING);
+        }}
+      />
       <InviteOwner
         owners={owners}
-        onInvited={(answer, email) => {
+        onInvited={(answer, email, role) => {
           setOwners(answer);
-          done.announce(t('invited', { email }));
+          done.announce(t(role === 'manager' ? 'invitedManager' : 'invited', { email }));
           // The form went with the last place: the focus to the section's heading.
-          if (answer.room === 0) focus(INVITE_HEADING);
+          if (answer.room === 0 && (!primary || answer.managersRoom === 0)) focus(INVITE_HEADING);
         }}
       />
       {owners.invites.length > 0 ? (
@@ -550,6 +569,73 @@ function Handover({
   );
 }
 
+/**
+ * The listing's managers (#69): named for every owner, the address for the primary, who alone
+ * removes one (two presses, as owners). Always on the page, so the heading is a place to land.
+ */
+function Managers({
+  owners,
+  onRemoved,
+}: {
+  owners: ListingOwners;
+  onRemoved: (owners: ListingOwners, name: string) => void;
+}) {
+  const t = useTranslations('Owner.owners');
+  const locale = useLocale();
+  const primary = owners.role === 'primary';
+  const nameOfManager = (manager: Manager) => manager.name ?? manager.email ?? '';
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h2 id={MANAGERS_HEADING} tabIndex={-1} className={FOCUS_TARGET}>
+            {t('managersTitle')}
+          </h2>
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">{t('managersLead')}</p>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {owners.managers.length === 0 ? (
+          <p className="text-sm">{t('managersEmpty')}</p>
+        ) : (
+          <ul className="grid gap-4">
+            {owners.managers.map((manager) => {
+              const name = nameOfManager(manager);
+              const person = () => <PersonName name={name} lang={locale} />;
+              return (
+                <li key={manager.id} className="grid gap-2">
+                  <div className="grid gap-1">
+                    <p className="font-medium wrap-anywhere">{person()}</p>
+                    {manager.email ? (
+                      <p className="text-sm wrap-anywhere text-muted-foreground">{manager.email}</p>
+                    ) : null}
+                  </div>
+                  {primary ? (
+                    <TwoPresses
+                      id={`remove-manager-${manager.id}`}
+                      label={t.rich('removeManager', { name, person })}
+                      question={t.rich('removeManagerQuestion', { name, person })}
+                      confirm={t('removeConfirm')}
+                      act={() =>
+                        removeListingManager({
+                          path: { id: owners.listingId, managerId: manager.id },
+                        })
+                      }
+                      onDone={(answer) => {
+                        if (answer) onRemoved(answer, name);
+                      }}
+                    />
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 /** Two presses for each, in place: removing an owner can't be undone. */
 function RemoveOwners({
   owners,
@@ -720,7 +806,7 @@ function InviteOwner({
   onInvited,
 }: {
   owners: ListingOwners;
-  onInvited: (owners: ListingOwners, email: string) => void;
+  onInvited: (owners: ListingOwners, email: string, role: InviteRole) => void;
 }) {
   const t = useTranslations('Owner.owners');
   const locale = useLocale();
@@ -728,6 +814,12 @@ function InviteOwner({
   const ownerError = useOwnerError();
   const status = useInvalidSubmitStatus();
   const [failure, setFailure] = useState<string | null>(null);
+  // Only the primary owner adds managers (#70); anyone else invites a co-owner.
+  const primary = owners.role === 'primary';
+  const [chosen, setChosen] = useState<InviteRole>(owners.room > 0 ? 'co_owner' : 'manager');
+  const role: InviteRole = primary ? chosen : 'co_owner';
+  const room = role === 'manager' ? owners.managersRoom : owners.room;
+  const anyRoom = owners.room > 0 || (primary && owners.managersRoom > 0);
   const {
     register,
     handleSubmit,
@@ -744,16 +836,17 @@ function InviteOwner({
         body: {
           email,
           locale: hasLocale(routing.locales, locale) ? locale : routing.defaultLocale,
+          role,
         },
       }),
     );
     if (outcome.ok && outcome.data) {
       reset({ email: '' });
-      onInvited(outcome.data, email);
+      onInvited(outcome.data, email, role);
     } else setFailure(ownerError(outcome.ok ? {} : outcome.failure));
   }, status.onInvalid);
   const submit = (event: FormEvent<HTMLFormElement>) => {
-    if (isSubmitting) event.preventDefault();
+    if (isSubmitting || room === 0) event.preventDefault();
     else void onSubmit(event);
   };
 
@@ -762,19 +855,46 @@ function InviteOwner({
       <CardHeader>
         <CardTitle>
           <h2 id={INVITE_HEADING} tabIndex={-1} className={FOCUS_TARGET}>
-            {t('inviteTitle')}
+            {t(primary ? 'inviteTitlePrimary' : 'inviteTitle')}
           </h2>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          {t('inviteLead', { days: LISTING_INVITE_DAYS })}
+          {t(primary ? 'inviteLead' : 'inviteLeadOwner', { days: LISTING_INVITE_DAYS })}
         </p>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <p className="text-sm">{t('room', { count: owners.room, max: LISTING_OWNERS_MAX })}</p>
-        {owners.room > 0 ? (
+        <p id="invite-room-co_owner" className="text-sm">
+          {t('room', { count: owners.room, max: LISTING_OWNERS_MAX })}
+        </p>
+        {primary ? (
+          <p id="invite-room-manager" className="text-sm">
+            {t('roomManagers', { count: owners.managersRoom, max: LISTING_MANAGERS_MAX })}
+          </p>
+        ) : null}
+        {anyRoom ? (
           <form onSubmit={submit} noValidate>
             <FieldGroup>
               <FormError message={failure} />
+              {primary ? (
+                <ChoiceField<InviteRole>
+                  id="invite-role"
+                  legend={t('inviteRoleLegend')}
+                  choices={[
+                    {
+                      value: 'co_owner',
+                      label: t('inviteRoleCoOwner'),
+                      description: t('inviteRoleCoOwnerText'),
+                    },
+                    {
+                      value: 'manager',
+                      label: t('inviteRoleManager'),
+                      description: t('inviteRoleManagerText'),
+                    },
+                  ]}
+                  value={chosen}
+                  onChange={setChosen}
+                />
+              ) : null}
               <FormField
                 id="invite-email"
                 label={t('email')}
@@ -787,7 +907,8 @@ function InviteOwner({
                 <Button
                   type="submit"
                   className={WRAPPING_BUTTON}
-                  aria-disabled={isSubmitting || undefined}
+                  aria-disabled={isSubmitting || room === 0 || undefined}
+                  aria-describedby={`invite-room-${role}`}
                 >
                   {isSubmitting ? t('sending') : t('sendInvite')}
                 </Button>
@@ -863,6 +984,9 @@ function OpenInvites({
           {owners.invites.map((invite) => (
             <li key={invite.id} className="grid gap-1">
               <p className="font-medium wrap-anywhere">{invite.email ?? t('inviteHidden')}</p>
+              <div>
+                <Badge variant="outline">{t(`inviteRole.${invite.role}`)}</Badge>
+              </div>
               <p className="text-sm text-muted-foreground">
                 {invite.expiresAt
                   ? t.rich('inviteUntil', {

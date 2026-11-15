@@ -4,6 +4,7 @@ import {
   createConfig,
   getListingHoursExceptions,
   getListingOwners,
+  getManagedListings,
   getOtherOwnerListings,
   getOwnerListing,
   getOwnerOnboarding,
@@ -11,6 +12,7 @@ import {
   getOwnerProfile,
   type OwnerListing,
   type ListingOwners,
+  type ManagedListings,
   type OwnerListingClosures,
   type OwnerOnboarding,
   type OwnerOtherListings,
@@ -64,6 +66,16 @@ export const loadOwnerPayouts = cache(async (): Promise<OwnerPayouts | null> => 
     return data ?? null;
   } catch {
     return null;
+  }
+});
+
+/** The listings the signed-in account manages (#69), or none when the API could not answer. */
+export const loadManagedListings = cache(async (): Promise<ManagedListings['listings']> => {
+  try {
+    const { data } = await getManagedListings(await request());
+    return data?.listings ?? [];
+  } catch {
+    return [];
   }
 });
 

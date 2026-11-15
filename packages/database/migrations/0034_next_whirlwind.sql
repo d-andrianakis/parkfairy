@@ -1,0 +1,5 @@
+ALTER TABLE "email_outbox" DROP CONSTRAINT "email_outbox_kind_check";--> statement-breakpoint
+ALTER TABLE "bookings" ADD COLUMN "cancelled_by_user_id" uuid;--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_cancelled_by_user_id_users_id_fk" FOREIGN KEY ("cancelled_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "bookings_cancelled_by_user_idx" ON "bookings" USING btree ("cancelled_by_user_id") WHERE "bookings"."cancelled_by_user_id" is not null;--> statement-breakpoint
+ALTER TABLE "email_outbox" ADD CONSTRAINT "email_outbox_kind_check" CHECK ("email_outbox"."kind" in ('listing-submitted', 'listing-approved', 'listing-changes-requested', 'onboarding-reminder', 'booking-confirmed', 'booking-cancelled', 'booking-payment-refunded', 'booking-received', 'booking-cancelled-by-driver', 'booking-cancelled-by-team', 'listing-invite', 'listing-handover-offered', 'listing-handover-accepted'));

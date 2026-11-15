@@ -38,6 +38,7 @@ import {
   copyPayees,
   enterCharge,
   ownedByUser,
+  runsListing,
   payableListing,
   recordCancelRefund,
   recordRefundFailed,
@@ -66,6 +67,7 @@ const profile = schema.ownerProfiles;
 const users = schema.users;
 const outbox = schema.emailOutbox;
 const owners = schema.listingOwners;
+const managers = schema.listingManagers;
 const settings = schema.platformSettings;
 
 type BookingRow = typeof booking.$inferSelect;
@@ -1111,11 +1113,18 @@ export class BookingsService {
         .where(eq(listing.id, owned.id))
         .for('share');
       const [still] = await tx
-        .select({ id: owners.id })
+        .select({ id: owners.id, role: owners.role })
         .from(owners)
         .innerJoin(profile, eq(profile.id, owners.ownerId))
         .where(and(eq(owners.locationId, owned.id), eq(profile.userId, userId)));
-      if (!still) throw listingNotFound();
+      // A manager too (#69), the same way: read after the lock.
+      const [managing] = still
+        ? [true]
+        : await tx
+            .select({ id: managers.id })
+            .from(managers)
+            .where(and(eq(managers.locationId, owned.id), eq(managers.userId, userId)));
+      if (!still && !managing) throw listingNotFound();
       const [current] = await tx
         .select()
         .from(booking)
@@ -1132,29 +1141,59 @@ export class BookingsService {
           status: 'cancelled',
           cancelledAt: now,
           cancelledBy: 'owner',
+          // Who, so the record answers it (#69): the primary, a co-owner or a manager.
+          cancelledByUserId: userId,
           refundMinor: current.totalMinor,
           refundStatus: owesRefund(current, current.totalMinor),
         })
         .where(eq(booking.id, bookingId))
         .returning();
       if (!cancelled) throw notFound('BOOKING_NOT_FOUND');
-      await this.queueEmails(tx, cancelled, await this.listingOf(tx, owned.id), [
+      const info = await this.listingOf(tx, owned.id);
+      await this.queueEmails(tx, cancelled, info, [
         { kind: 'booking-cancelled', userId: current.userId, to: 'driver' },
       ]);
+      // The primary hears of a cancellation by anyone else on the listing (#69): a co-owner or a
+      // manager, by role and never by name; who it was is on the booking (`cancelled_by_user_id`).
+      if (still?.role !== 'primary') {
+        const [lead] = await tx
+          .select({ userId: profile.userId })
+          .from(listing)
+          .innerJoin(profile, eq(profile.id, listing.ownerId))
+          .where(eq(listing.id, owned.id));
+        if (lead && lead.userId !== userId) {
+          await tx
+            .insert(outbox)
+            .values({
+              kind: 'booking-cancelled-by-team',
+              userId: lead.userId,
+              payload: {
+                listingName: cancelled.listingName ?? undefined,
+                booking: {
+                  ...outboxBooking(cancelled, info),
+                  cancelledByRole: still ? 'co_owner' : 'manager',
+                },
+              },
+              dedupeKey: `booking:${cancelled.id}:cancelled-by-team:${lead.userId}`,
+            })
+            .onConflictDoNothing({ target: outbox.dedupeKey });
+        }
+      }
       return cancelled;
     });
     await this.sendCancelRefund(owed);
   }
 
-  /** The listing, if this user is one of its owners (#53); anything else is the same 404. */
+  /**
+   * The listing, if this user is one of its owners (#53) or manages it (#69); anything else is the
+   * same 404.
+   */
   private async ownedListing(userId: string, listingId: string) {
     if (!UUID.test(listingId)) throw listingNotFound();
     const [owned] = await this.db
       .select({ id: listing.id, name: listing.name, contentLocale: listing.contentLocale })
       .from(listing)
-      .innerJoin(owners, eq(owners.locationId, listing.id))
-      .innerJoin(profile, eq(profile.id, owners.ownerId))
-      .where(and(eq(listing.id, listingId), eq(profile.userId, userId)));
+      .where(and(eq(listing.id, listingId), runsListing(userId)));
     if (!owned) throw listingNotFound();
     return owned;
   }

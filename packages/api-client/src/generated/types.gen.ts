@@ -204,6 +204,8 @@ export type PayoutLink = {
 
 export type ListingOwnerRole = 'primary' | 'co_owner';
 
+export type ListingInviteRole = 'co_owner' | 'manager';
+
 export type ListingOwner = {
     id: string;
     name: string | null;
@@ -220,6 +222,13 @@ export type ListingInvite = {
     invitedBy: string | null;
     expiresAt: string | null;
     canWithdraw: boolean;
+    role: ListingInviteRole;
+};
+
+export type ListingManager = {
+    id: string;
+    name: string | null;
+    email: string | null;
 };
 
 export type ListingHandover = {
@@ -235,15 +244,18 @@ export type ListingOwners = {
     contentLocale: Locale;
     role: ListingOwnerRole;
     owners: Array<ListingOwner>;
+    managers: Array<ListingManager>;
     invites: Array<ListingInvite>;
     handover: ListingHandover | null;
     payable: boolean;
     room: number;
+    managersRoom: number;
 };
 
 export type ListingInviteInput = {
     email: string;
     locale: Locale;
+    role: ListingInviteRole;
 };
 
 export type ListingHandoverInput = {
@@ -267,10 +279,21 @@ export type InvitePreview = {
     contentLocale: Locale;
     invitedBy: string | null;
     forYou: boolean;
+    role: ListingInviteRole;
 };
 
 export type InviteAccepted = {
     listingId: string;
+};
+
+export type ManagedListing = {
+    id: string;
+    name: string | null;
+    contentLocale: Locale;
+};
+
+export type ManagedListings = {
+    listings: Array<ManagedListing>;
 };
 
 export type OwnerKind = 'individual' | 'business';
@@ -1618,6 +1641,49 @@ export type RemoveListingOwnerResponses = {
 };
 
 export type RemoveListingOwnerResponse = RemoveListingOwnerResponses[keyof RemoveListingOwnerResponses];
+
+export type RemoveListingManagerData = {
+    body?: never;
+    path: {
+        id: string;
+        managerId: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/managers/{managerId}';
+};
+
+export type RemoveListingManagerErrors = {
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type RemoveListingManagerError = RemoveListingManagerErrors[keyof RemoveListingManagerErrors];
+
+export type RemoveListingManagerResponses = {
+    200: ListingOwners;
+};
+
+export type RemoveListingManagerResponse = RemoveListingManagerResponses[keyof RemoveListingManagerResponses];
+
+export type GetManagedListingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/owner/managed';
+};
+
+export type GetManagedListingsErrors = {
+    401: ErrorResponse;
+};
+
+export type GetManagedListingsError = GetManagedListingsErrors[keyof GetManagedListingsErrors];
+
+export type GetManagedListingsResponses = {
+    200: ManagedListings;
+};
+
+export type GetManagedListingsResponse = GetManagedListingsResponses[keyof GetManagedListingsResponses];
 
 export type WithdrawListingHandoverData = {
     body?: never;

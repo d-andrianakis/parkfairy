@@ -38,9 +38,11 @@ describe('renderBookingEmail', () => {
       expect(email.html).toContain(fact);
     }
     const path =
-      kind.startsWith('booking-cancelled-by') || kind === 'booking-received'
-        ? `/${locale}/owner/listings/${booking.listingId}/bookings`
-        : `/${locale}/bookings/${booking.id}`;
+      kind === 'booking-cancelled-by-team'
+        ? `/${locale}/owner/listings/${booking.listingId}/owners`
+        : kind.startsWith('booking-cancelled-by') || kind === 'booking-received'
+          ? `/${locale}/owner/listings/${booking.listingId}/bookings`
+          : `/${locale}/bookings/${booking.id}`;
     expect(email.text).toContain(`https://parkfairy.example${path}`);
     expect(email.html).toContain(`href="https://parkfairy.example${path}"`);
   });
@@ -255,6 +257,50 @@ describe('copy', () => {
       expect(
         copy.subject('K7M4-Q2ZD', 'x') + copy.heading + copy.body('x') + copy.note,
       ).not.toMatch(greek);
+    }
+  });
+});
+
+describe('the primary owner’s email about a cancellation by their team (#69)', () => {
+  const team = (
+    role: 'manager' | 'co_owner',
+    locale: 'en' | 'el',
+    extra: Partial<BookingEmailFacts> = {},
+  ) =>
+    renderBookingEmail({
+      ...base,
+      booking: { ...booking, cancelledBy: 'owner', cancelledByRole: role, ...extra },
+      locale,
+      kind: 'booking-cancelled-by-team',
+      listingName: 'Γκαράζ Ερμού',
+    });
+
+  it('says by role who it was, and that the driver was told and refunded', () => {
+    expect(team('manager', 'en').subject).toBe('A manager cancelled a booking for “Γκαράζ Ερμού”');
+    expect(team('manager', 'en').text).toContain('A manager of “Γκαράζ Ερμού” cancelled a booking');
+    expect(team('manager', 'en').text).toContain('refunded in full');
+    expect(team('co_owner', 'en').subject).toBe(
+      'A co-owner cancelled a booking for “Γκαράζ Ερμού”',
+    );
+    expect(team('manager', 'el').text).toContain('Ένας διαχειριστής του χώρου «Γκαράζ Ερμού»');
+    expect(team('co_owner', 'el').text).toContain('Ένας συνιδιοκτήτης του χώρου «Γκαράζ Ερμού»');
+  });
+
+  it('is the co-owner’s wording when no role is given, and leads to where the team is listed', () => {
+    const plain = renderBookingEmail({
+      ...base,
+      locale: 'en',
+      kind: 'booking-cancelled-by-team',
+    });
+    expect(plain.text).toContain('A co-owner of');
+    expect(plain.text).toContain(`/en/owner/listings/${booking.listingId}/owners`);
+    expect(team('manager', 'en').text).toContain('remove the manager from there');
+  });
+
+  it('names no one: not the manager, not the driver, not their plate', () => {
+    for (const locale of ['en', 'el'] as const) {
+      const sent = team('manager', locale);
+      expect(sent.text).not.toMatch(/IKB|Test Driver|@/);
     }
   });
 });

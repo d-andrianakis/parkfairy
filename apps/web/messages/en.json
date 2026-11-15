@@ -913,7 +913,10 @@
       "INVITE_FOR_ANOTHER_ACCOUNT": "This invitation was sent to another email address. Sign in with that address to accept it.",
       "SHARES_MISMATCH": "The owners changed meanwhile. Reload the page and try again.",
       "TOO_MANY_INVITES": "{limit, select, day {You’ve sent as many invitations as one account can in a day. Try again tomorrow.} other {This address has had as many invitations to this listing as it can this week. Try again in a few days.}}",
-      "OWNER_DETAILS_MISSING": "An owner with a share, or the primary owner, hasn’t filled in “About you” and “Tax details” yet. Each owner fills these in from their own account."
+      "OWNER_DETAILS_MISSING": "An owner with a share, or the primary owner, hasn’t filled in “About you” and “Tax details” yet. Each owner fills these in from their own account.",
+      "TOO_MANY_MANAGERS": "This listing already has the most managers and invitations to manage allowed.",
+      "ALREADY_MANAGER": "That address is already one of this listing’s managers.",
+      "MANAGER_NOT_FOUND": "That person isn’t one of this listing’s managers any more."
     },
     "bookings": {
       "metaTitle": "Bookings for “{name}”",
@@ -1022,7 +1025,7 @@
     "owners": {
       "metaTitle": "Owners of “{name}”",
       "title": "Owners",
-      "lead": "Everyone listed here can run this listing: edit it, set its hours and prices, see and cancel its bookings, and invite others. Only the primary owner can remove owners, set the shares or delete the listing.",
+      "lead": "Everyone listed here has full control of this listing: edit it, set its hours and prices, see and cancel its bookings, and invite others. Only the primary owner can remove owners, set the shares or delete the listing.",
       "sharesTitle": "Owners and shares",
       "sharesLead": "Each stay’s payout is split by these shares. Drivers can book only while every owner with a share has set up payouts with Stripe.",
       "notPayable": "Drivers can’t book this listing until every owner with a share has set up payouts.",
@@ -1049,10 +1052,10 @@
       "keep": "No, keep",
       "removed": "Removed <person>{name}</person>.",
       "leave": "Leave this listing",
-      "leaveQuestion": "Leave this listing? You won’t be able to run it any more, and your share goes back to the primary owner.",
+      "leaveQuestion": "Leave this listing? You won’t have access to it any more, and your share goes back to the primary owner.",
       "leaveConfirm": "Yes, leave",
       "inviteTitle": "Invite an owner",
-      "inviteLead": "We’ll email a link that works for {days, plural, one {# day} other {# days}}. It is accepted by signing in, or creating an account, with that address, and the new owner starts at 0% until the primary owner gives them a share.",
+      "inviteLead": "We’ll email a link that works for {days, plural, one {# day} other {# days}}. It is accepted by signing in, or creating an account, with that address.",
       "email": "Email address",
       "sendInvite": "Send invitation",
       "sending": "Sending…",
@@ -1092,10 +1095,29 @@
       "handoverClosed": "The offer of the primary role is closed.",
       "handoverStale": "That offer is no longer open, so this page now shows how things stand.",
       "handoverPayoutsLink": "Set up your payouts",
-      "keepOffer": "No, leave it as it is"
+      "keepOffer": "No, leave it as it is",
+      "managersTitle": "Managers",
+      "managersLead": "Managers look after the listing day to day: they see the calendar and the bookings, cancel bookings, and set closures and special hours. They have no share, see no earnings, and can’t edit the listing or invite anyone. Only the primary owner adds or removes them.",
+      "managersEmpty": "No managers yet.",
+      "removeManager": "Remove manager <person>{name}</person>",
+      "removeManagerQuestion": "Remove <person>{name}</person> as a manager? They won’t see this listing’s calendar or bookings any more.",
+      "managerRemoved": "Removed manager <person>{name}</person>.",
+      "inviteTitlePrimary": "Invite an owner or a manager",
+      "inviteRoleLegend": "Role on this listing",
+      "inviteRoleCoOwner": "Co-owner",
+      "inviteRoleCoOwnerText": "Has full control of the listing and is paid a share once you set one. Starts at 0%.",
+      "inviteRoleManager": "Manager",
+      "inviteRoleManagerText": "Looks after the listing day to day. No share, no earnings, and can’t edit the listing.",
+      "inviteRole": {
+        "co_owner": "Co-owner",
+        "manager": "Manager"
+      },
+      "roomManagers": "{count, plural, =0 {This listing already has the most managers and invitations to manage allowed ({max}).} one {You can add # more manager or invitation to manage.} other {You can add # more managers or invitations to manage.}}",
+      "invitedManager": "Invitation to manage sent to {email}.",
+      "inviteLeadOwner": "We’ll email a link that works for {days, plural, one {# day} other {# days}}. It is accepted by signing in, or creating an account, with that address, and the new owner starts at 0% until the primary owner gives them a share."
     },
     "invite": {
-      "title": "Invitation to co-own a listing",
+      "title": "Invitation to a listing",
       "reading": "Reading the invitation…",
       "missing": "This page needs the link from the invitation email. Open it from the email again.",
       "notFound": "This invitation link doesn’t work. Ask whoever invited you for a new one.",
@@ -1103,7 +1125,7 @@
       "used": "This invitation has already been accepted or withdrawn.",
       "lead": "<person>{inviter}</person> invites you to co-own “<listing>{name}</listing>”.",
       "leadNoInviter": "You’re invited to co-own “<listing>{name}</listing>”.",
-      "meaning": "You’ll be able to run the listing with its other owners. The primary owner decides each owner’s share of the payouts.",
+      "meaning": "You’ll have full control of the listing together with its other owners. The primary owner decides each owner’s share of the payouts.",
       "notForYou": "This invitation was sent to another email address. Sign in with that address to accept it.",
       "accept": "Accept invitation",
       "accepting": "Accepting…",
@@ -1116,7 +1138,24 @@
       "leadNoInviterUnnamed": "You’re invited to co-own a parking listing.",
       "switchAccount": "Sign out, then sign in with the invited address",
       "signingOut": "Signing out…",
-      "signOutFailed": "We couldn’t sign you out. Try again."
+      "signOutFailed": "We couldn’t sign you out. Try again.",
+      "manager": {
+        "lead": "<person>{inviter}</person> invites you to manage “<listing>{name}</listing>”.",
+        "leadNoInviter": "You’re invited to manage “<listing>{name}</listing>”.",
+        "leadUnnamed": "<person>{inviter}</person> invites you to manage a parking listing.",
+        "leadNoInviterUnnamed": "You’re invited to manage a parking listing.",
+        "meaning": "You’ll see the listing’s calendar and bookings, be able to cancel bookings, and set closures and special hours. You won’t have a share or see earnings, and you can’t edit the listing.",
+        "accepted": "You now manage this listing.",
+        "toListing": "See the listing’s calendar"
+      }
+    },
+    "managed": {
+      "title": "Listings you manage",
+      "lead": "You look after these day to day. The primary owner adds and removes managers; you can’t edit a listing or see its earnings.",
+      "calendar": "Calendar",
+      "bookings": "Bookings",
+      "closures": "Closures and special hours",
+      "untitled": "Unnamed listing"
     }
   },
   "BookSpace": {

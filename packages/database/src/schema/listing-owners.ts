@@ -4,9 +4,11 @@
  * copied from the owners when it is confirmed.
  */
 import {
+  LISTING_INVITE_ROLES,
   LISTING_OWNER_ROLES,
   SUPPORTED_LOCALES,
   TRANSFER_STATUSES,
+  type ListingInviteRole,
   type ListingOwnerRole,
   type Locale,
   type TransferStatus,
@@ -23,6 +25,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { bookings } from './bookings.js';
+import { users } from './auth.js';
 import { ownerProfiles } from './owners.js';
 import { parkingLocations } from './parking.js';
 
@@ -65,7 +68,31 @@ export const listingOwners = pgTable(
 );
 
 /**
- * An invite to own a listing with its owners (#56), by email. The link's token is made by the
+ * Who manages a listing (#69–#71): an account, no owner profile, share or payouts. Runs the
+ * listing day to day; added by an invite from the primary owner. Removed with the listing, and
+ * with the account.
+ */
+export const listingManagers = pgTable(
+  'listing_managers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    locationId: uuid('location_id')
+      .notNull()
+      .references(() => parkingLocations.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: instant('created_at').defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('listing_managers_listing_user_idx').on(t.locationId, t.userId),
+    // A manager's listings: the dashboard, and every access check. Also the cascade from the account.
+    index('listing_managers_user_idx').on(t.userId),
+  ],
+);
+
+/**
+ * An invite to own a listing with its owners (#56), or to manage it (#69), by email. The link's token is made by the
  * worker as it sends the email and only its hash kept here, with when it stops working, so no live
  * link waits anywhere. Accepted or withdrawn, an invite is a record for a while, then purged (it
  * holds an address that may be no account's).
@@ -83,6 +110,8 @@ export const listingInvites = pgTable(
     email: text('email').notNull(),
     /** The language its email is written in: the inviter's. */
     locale: text('locale').$type<Locale>().notNull(),
+    /** What it invites them to be: a co-owner, or a manager. */
+    role: text('role').$type<ListingInviteRole>().notNull().default('co_owner'),
     tokenHash: text('token_hash').unique(),
     expiresAt: instant('expires_at'),
     acceptedAt: instant('accepted_at'),
@@ -102,6 +131,7 @@ export const listingInvites = pgTable(
     index('listing_invites_inviter_idx').on(t.invitedBy, t.createdAt),
     check('listing_invites_email_check', sql`${t.email} = lower(${t.email})`),
     check('listing_invites_locale_check', sql`${t.locale} in (${sqlList(SUPPORTED_LOCALES)})`),
+    check('listing_invites_role_check', sql`${t.role} in (${sqlList(LISTING_INVITE_ROLES)})`),
     check(
       'listing_invites_token_check',
       sql`(${t.tokenHash} is null) = (${t.expiresAt} is null) and (${t.tokenHash} is null or ${t.tokenHash} ~ '^[0-9a-f]{64}$')`,

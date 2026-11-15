@@ -2488,6 +2488,115 @@
         ]
       }
     },
+    "/v1/owner/listings/{id}/managers/{managerId}": {
+      "delete": {
+        "operationId": "removeListingManager",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "managerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingOwners"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
+    "/v1/owner/managed": {
+      "get": {
+        "operationId": "getManagedListings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedListings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "owner"
+        ]
+      }
+    },
     "/v1/owner/listings/{id}/handover": {
       "post": {
         "operationId": "offerListingHandover",
@@ -5141,6 +5250,13 @@
           "co_owner"
         ]
       },
+      "ListingInviteRole": {
+        "type": "string",
+        "enum": [
+          "co_owner",
+          "manager"
+        ]
+      },
       "ListingOwner": {
         "type": "object",
         "properties": {
@@ -5212,6 +5328,9 @@
           },
           "canWithdraw": {
             "type": "boolean"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ListingInviteRole"
           }
         },
         "required": [
@@ -5219,7 +5338,32 @@
           "email",
           "invitedBy",
           "expiresAt",
-          "canWithdraw"
+          "canWithdraw",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "ListingManager": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "nullable": true,
+            "type": "string"
+          },
+          "email": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
         ],
         "additionalProperties": false
       },
@@ -5275,6 +5419,12 @@
               "$ref": "#/components/schemas/ListingOwner"
             }
           },
+          "managers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingManager"
+            }
+          },
           "invites": {
             "type": "array",
             "items": {
@@ -5296,6 +5446,11 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "managersRoom": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -5304,10 +5459,12 @@
           "contentLocale",
           "role",
           "owners",
+          "managers",
           "invites",
           "handover",
           "payable",
-          "room"
+          "room",
+          "managersRoom"
         ],
         "additionalProperties": false
       },
@@ -5322,11 +5479,20 @@
           },
           "locale": {
             "$ref": "#/components/schemas/Locale"
+          },
+          "role": {
+            "default": "co_owner",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ListingInviteRole"
+              }
+            ]
           }
         },
         "required": [
           "email",
-          "locale"
+          "locale",
+          "role"
         ],
         "additionalProperties": false
       },
@@ -5415,6 +5581,9 @@
           },
           "forYou": {
             "type": "boolean"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ListingInviteRole"
           }
         },
         "required": [
@@ -5422,7 +5591,8 @@
           "listingName",
           "contentLocale",
           "invitedBy",
-          "forYou"
+          "forYou",
+          "role"
         ],
         "additionalProperties": false
       },
@@ -5437,6 +5607,45 @@
         },
         "required": [
           "listingId"
+        ],
+        "additionalProperties": false
+      },
+      "ManagedListing": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "nullable": true,
+            "type": "string"
+          },
+          "contentLocale": {
+            "$ref": "#/components/schemas/Locale"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "contentLocale"
+        ],
+        "additionalProperties": false
+      },
+      "ManagedListings": {
+        "type": "object",
+        "properties": {
+          "listings": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedListing"
+            }
+          }
+        },
+        "required": [
+          "listings"
         ],
         "additionalProperties": false
       },

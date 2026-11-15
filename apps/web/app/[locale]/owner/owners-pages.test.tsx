@@ -58,10 +58,12 @@ const owners = (): ListingOwners => ({
       you: true,
     },
   ],
+  managers: [],
   invites: [],
   handover: null,
   payable: false,
   room: 9,
+  managersRoom: 5,
 });
 
 beforeEach(() => {
@@ -103,11 +105,11 @@ describe('the invite page', () => {
   it('asks someone signed out to sign in or sign up, and comes back here after', async () => {
     vi.mocked(getLayoutSession).mockResolvedValue(null);
     await expect(inviteMetadata({ params })).resolves.toEqual({
-      title: 'Invitation to co-own a listing',
+      title: 'Invitation to a listing',
     });
     const { container } = await renderInOwnerArea(await InvitePage({ params }));
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Invitation to co-own a listing' }),
+      screen.getByRole('heading', { level: 1, name: 'Invitation to a listing' }),
     ).toBeVisible();
     expect(screen.getByText(/Sign in, or create an account, with the email address/)).toBeVisible();
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(

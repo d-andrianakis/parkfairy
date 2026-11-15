@@ -1497,6 +1497,38 @@ commission and VAT (#18).
   Greek (`Owner.earnings`, `Owner.calendar`)
 - [x] **Contracts & docs**: OpenAPI/client regenerated, memory.md updated
 
+### 5.3 Managers (2026-11-15, decisions #69–#71)
+
+A third role on a listing besides owner and co-owner: runs it day to day (calendar, bookings and
+cancelling, closures and special hours), no share, no earnings, no edits, no invites, no proofs. The
+primary owner adds and removes them by the emailed invite; an account is enough.
+
+- [x] **Implemented** behind the API's authorization rules: `listing_managers`, role on invites,
+      `runsListing` for exactly the manager's routes; owners' page (managers card, role choice),
+      invite page, dashboard card
+- [x] **Unit tests** (contracts, email, worker, web) and **API integration tests**
+      (`listing-managers.integration.test.ts`)
+- [x] **Smoke test** `tests/smoke/specs/listing-managers.smoke.ts`
+- [x] **Security** review: no way found for a manager to reach an owner-only route or become an
+      owner; fixed: cancelling is throttled per account, a handover withdraws the old primary's
+      open manager invites, and an owner-side cancellation now records the account
+      (`bookings.cancelled_by_user_id`) and emails the primary when it was a co-owner or a manager
+      (by role, never by name). Open, low: a manager sees each booking's total (kept: the price a
+      driver paid, not earnings), a co-owner can learn that an address has an open manager invite
+      (as with co-owner invites today)
+- [x] **Performance** review: the calendar's first join was a regression (a lateral read every
+      booking of the platform); now a plain join and `id in (…)`, measured by the reviewer at
+      0.4 ms for a typical owner and 33 ms for 150 listings
+- [~] **Accessibility** review: heading order fixed on the landing, the invite form picks a role with
+  room and blocks a full one, managed listing names are headings. Open: a manual NVDA and
+  VoiceOver pass (the radio group's legend and descriptions, the removal announcement)
+- [~] **i18n** review: «διαχείριση» now only for managers and owners "have full control"; the
+  chooser is gender-neutral. Open: a native speaker on the new Greek
+- [~] **Test** review: authorization, replay, cross-listing, closures, visibility, calendar scope,
+  the queue's role and the handover case are covered. Open: a cancel racing a removal and two
+  accepts at once (both held by the listing lock), `claimDueEmails` under a real worker
+- [ ] **Contracts & docs**: client regenerated, memory.md updated
+
 - [~] 2FA enrolment UI done (1.3); admin MFA enforced end to end once admin routes exist
   (sessions without a second factor are already ended when it is switched on)
 - [~] Owner calendar and earnings done (5.1); a bookings list across listings is not

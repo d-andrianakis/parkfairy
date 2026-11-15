@@ -232,6 +232,20 @@
       "when": 1794751811792,
       "tag": "0032_organic_dark_phoenix",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794752939766,
+      "tag": "0033_black_serpent_society",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794758242605,
+      "tag": "0034_next_whirlwind",
+      "breakpoints": true
     }
   ]
 }

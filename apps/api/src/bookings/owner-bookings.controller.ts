@@ -1,4 +1,5 @@
-import { Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -21,7 +22,11 @@ import { CurrentUser } from '../auth/auth.decorators.js';
 import { parseOrThrow } from '../common/validation.js';
 import { SESSION_COOKIE_SECURITY } from '../openapi/document.js';
 import { schemaRef } from '../openapi/zod-openapi.js';
+import { AccountThrottlerGuard } from '../rate-limit/account-throttler.guard.js';
 import { BookingsService } from './bookings.service.js';
+
+/** Calling bookings off, per account: closing a busy day takes many, a script's loop takes more. */
+const CANCEL_LIMIT = { default: { limit: 60, ttl: 60_000 } };
 
 /**
  * The bookings of an owner's listing (decision #34). As in the rest of `/owner`, another owner's
@@ -54,6 +59,9 @@ export class OwnerBookingsController {
 
   /** Calls the booking off, the driver refunded in full; `BOOKING_STARTED` once it has begun. */
   @Post(':id/bookings/:bookingId/cancel')
+  // Each is a refund and the owners' shares gone: a person's pace, per account (managers act too).
+  @Throttle(CANCEL_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
   @HttpCode(204)
   @ApiNoContentResponse()
   @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })

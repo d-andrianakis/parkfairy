@@ -246,6 +246,7 @@ describe('co-ownership of a listing (#53–#56)', () => {
       contentLocale: 'el',
       invitedBy: 'Test Driver',
       forYou: true,
+      role: 'co_owner',
     });
     expect((await preview(stranger).expect(200)).body).toMatchObject({ forYou: false });
     // A forwarded link is no use to anyone else.
@@ -678,6 +679,25 @@ describe('co-ownership of a listing (#53–#56)', () => {
       const [first, second] = (await owners(primary, id)).owners;
       return { primary, coOwner, id, first, second };
     }
+
+    it('takes the old primary’s open invitations to manage with them: the new primary chooses (#70)', async () => {
+      const { primary, coOwner, id, second } = await ready();
+      const answer = ListingOwnersSchema.parse(
+        (
+          await call(primary, 'post', `/owner/listings/${id}/invites`)
+            .send({ email: `to-manage-${tag}@example.com`, locale: 'en', role: 'manager' })
+            .expect(200)
+        ).body,
+      );
+      expect(answer.invites).toEqual([expect.objectContaining({ role: 'manager' })]);
+      await offer(primary, id, second?.id).expect(200);
+      const now = ListingOwnersSchema.parse(
+        (await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(200)).body,
+      );
+      expect(now.role).toBe('primary');
+      expect(now.invites).toEqual([]);
+      expect(now.managersRoom).toBe(5);
+    });
 
     it('moves the role only when the co-owner accepts, the old primary staying as a co-owner', async () => {
       const { primary, coOwner, id, second } = await ready();

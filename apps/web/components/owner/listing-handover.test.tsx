@@ -66,10 +66,12 @@ const owners = (
       you: as === 'co_owner',
     },
   ],
+  managers: [],
   invites: [],
   handover,
   payable: true,
   room: 8,
+  managersRoom: 5,
 });
 
 const show = (initial: ListingOwners, locale: 'en' | 'el' = 'en') =>

@@ -4,6 +4,7 @@ import { CircleAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { AccountChecklist } from '@/components/owner/account-checklist';
+import { ManagedListings } from '@/components/owner/managed-listings';
 import { ContinueCard } from '@/components/owner/continue-card';
 import { NewListingButton } from '@/components/owner/listing-actions';
 import { ListingMilestones } from '@/components/owner/listing-milestones';
@@ -12,7 +13,7 @@ import { PayoutsCard } from '@/components/owner/payouts-card';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { nextOwnerAction, setupProgress } from '@/lib/owner';
-import { loadOwnerOnboarding, loadOwnerPayouts } from '@/lib/owner.server';
+import { loadManagedListings, loadOwnerOnboarding, loadOwnerPayouts } from '@/lib/owner.server';
 import { getSession } from '@/lib/session';
 
 export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
@@ -32,7 +33,11 @@ export default async function OwnerPage({ params }: LocaleParams) {
   if (!session) return <OwnerLanding action={<SignedOutActions />} />;
 
   // Together: the payouts card is no second wait.
-  const [onboarding, payouts] = await Promise.all([loadOwnerOnboarding(), loadOwnerPayouts()]);
+  const [onboarding, payouts, managed] = await Promise.all([
+    loadOwnerOnboarding(),
+    loadOwnerPayouts(),
+    loadManagedListings(),
+  ]);
   const payoutStatus = payouts?.available ? payouts.status : null;
   if (!onboarding) {
     return (
@@ -47,8 +52,10 @@ export default async function OwnerPage({ params }: LocaleParams) {
   }
 
   if (!onboarding.started) {
+    // A manager has no listing of their own: what they run comes first, then the way to list one.
     return (
       <OwnerLanding
+        before={managed.length > 0 ? <ManagedListings listings={managed} /> : null}
         action={
           <div>
             <Button asChild>
@@ -92,6 +99,7 @@ export default async function OwnerPage({ params }: LocaleParams) {
       </div>
       <ContinueCard action={action} progress={setupProgress(onboarding.doneAccountSteps, focus)} />
       <AccountChecklist done={onboarding.doneAccountSteps} />
+      <ManagedListings listings={managed} />
       <PayoutsCard locale={locale} payouts={payouts} />
       {onboarding.listings.map((listing) => (
         <ListingMilestones key={listing.id} listing={listing} payouts={payoutStatus} />

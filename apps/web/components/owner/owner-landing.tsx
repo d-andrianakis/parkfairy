@@ -9,7 +9,7 @@ const NEEDED = ['details', 'tax', 'proof', 'photos'] as const;
 const JOURNEY = ['about', 'place', 'prices', 'review'] as const;
 
 /** For anyone who hasn't started: what it takes, before they commit to anything. */
-export function OwnerLanding({ action }: { action: ReactNode }) {
+export function OwnerLanding({ action, before }: { action: ReactNode; before?: ReactNode }) {
   const t = useTranslations('Owner.landing');
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-8 px-4 py-12">
@@ -17,6 +17,8 @@ export function OwnerLanding({ action }: { action: ReactNode }) {
         <h1 className="text-4xl font-semibold tracking-tight text-balance">{t('title')}</h1>
         <p className="text-lg text-muted-foreground">{t('lead')}</p>
       </div>
+      {/* What someone already runs, under the page's one h1 and before the way to list their own. */}
+      {before}
       {action}
       <div className="grid gap-6 sm:grid-cols-2">
         <Card>

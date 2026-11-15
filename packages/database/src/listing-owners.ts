@@ -39,6 +39,25 @@ export const ownedByUser = (userId: string) => sql`exists (
   where lo.location_id = parking_locations.id and lop.user_id = ${userId}
 )`;
 
+/** The account manages the listing (#69): added by its primary owner, with no owner profile. */
+export const managedByUser = (userId: string) => sql`exists (
+  select 1 from listing_managers lm
+  where lm.location_id = parking_locations.id and lm.user_id = ${userId}
+)`;
+
+/**
+ * The account may run the listing day to day: one of its owners, or a manager (#69). One `in` over
+ * the account's own listings, not two `exists` joined by `or`: the planner can't turn that `or`
+ * into a join, and read every listing of the platform for a calendar (measured, performance review).
+ */
+export const runsListing = (userId: string) => sql`parking_locations.id in (
+  select lo.location_id from listing_owners lo
+  join owner_profiles lop on lop.id = lo.owner_id
+  where lop.user_id = ${userId}
+  union all
+  select lm.location_id from listing_managers lm where lm.user_id = ${userId}
+)`;
+
 /**
  * A booking's payees, as the listing's owners with a share are now (#54): copied in the
  * transaction that confirms it, so later changes to the shares only reach bookings made after,

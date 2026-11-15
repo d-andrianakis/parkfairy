@@ -32,9 +32,11 @@ import {
   ListingInviteInputSchema,
   ListingOwnersSchema,
   ListingSharesInputSchema,
+  ManagedListingsSchema,
   type InviteAccepted,
   type InvitePreview,
   type ListingOwners,
+  type ManagedListings,
 } from '@parkfairy/contracts';
 import { CurrentUser } from '../auth/auth.decorators.js';
 import { parseOrThrow } from '../common/validation.js';
@@ -140,6 +142,28 @@ export class ListingOwnersController {
     @Param('ownerId') ownerId: string,
   ): Promise<ListingOwners> {
     return this.owners.removeOwner(user.id, id, ownerId);
+  }
+
+  /** The primary takes a manager off the listing (#70). */
+  @Delete('listings/:id/managers/:managerId')
+  @Throttle(CHANGE_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiOkResponse({ schema: schemaRef(ListingOwnersSchema) })
+  @ApiForbiddenResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  removeListingManager(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('managerId') managerId: string,
+  ): Promise<ListingOwners> {
+    return this.owners.removeManager(user.id, id, managerId);
+  }
+
+  /** The listings the signed-in account manages (#69). */
+  @Get('managed')
+  @ApiOkResponse({ schema: schemaRef(ManagedListingsSchema) })
+  getManagedListings(@CurrentUser() user: AuthUser): Promise<ManagedListings> {
+    return this.owners.managed(user.id);
   }
 
   @Post('listings/:id/handover')

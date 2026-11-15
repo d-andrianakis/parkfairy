@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { LISTING_INVITE_DAYS } from '@parkfairy/contracts';
-import { INVITE_EMAIL_COPY, INVITE_EMAIL_DAYS, renderInviteEmail } from './invite-email.js';
+import {
+  INVITE_EMAIL_COPY,
+  INVITE_EMAIL_DAYS,
+  MANAGER_INVITE_EMAIL_COPY,
+  renderInviteEmail,
+} from './invite-email.js';
 
 const TOKEN = 'Abc_def-0123456789abcdefghijklmnopqrstuvwxyz'.slice(0, 43);
 const email = (locale: 'el' | 'en') =>
@@ -63,6 +68,59 @@ describe('the invite email', () => {
           ours.some((text) => line.includes(text)),
           line,
         ).toBe(true);
+    }
+  });
+});
+
+describe('the invite to manage a listing (#69)', () => {
+  const manager = (locale: 'el' | 'en') =>
+    renderInviteEmail({
+      to: 'eleni@example.gr',
+      locale,
+      webUrl: 'https://parkfairy.gr',
+      token: TOKEN,
+      role: 'manager',
+    });
+
+  it('invites to manage, not to co-own, to the same page and with the same link', () => {
+    const sent = manager('en');
+    expect(sent.subject).toBe(MANAGER_INVITE_EMAIL_COPY.en.subject);
+    expect(sent.text).toContain('You’re invited to manage a parking listing on Parkfairy.');
+    expect(sent.text).not.toContain('co-own');
+    expect(sent.text).toContain(`https://parkfairy.gr/en/owner/invite#${TOKEN}`);
+    expect(manager('el').text).toContain('να διαχειρίζεστε έναν χώρο στάθμευσης');
+    expect(manager('el').text).not.toContain('συνιδιοκτησ');
+  });
+
+  it('is the co-owner’s invitation when no role is given', () => {
+    expect(email('en').text).toContain('co-own');
+    expect(email('en').subject).not.toBe(MANAGER_INVITE_EMAIL_COPY.en.subject);
+  });
+
+  it('carries nothing an owner typed either, and says as long as the invite does', () => {
+    for (const locale of ['el', 'en'] as const) {
+      const copy = MANAGER_INVITE_EMAIL_COPY[locale];
+      const ours = [
+        copy.subject,
+        copy.heading,
+        copy.body,
+        copy.action,
+        copy.note,
+        copy.linkFallback,
+        copy.footer,
+        `https://parkfairy.gr/${locale}/owner/invite#${TOKEN}`,
+      ];
+      const lines = manager(locale)
+        .text.split('\n')
+        .map((line) => line.trim())
+        .filter((line) => /\p{L}/u.test(line));
+      for (const line of lines) {
+        expect(
+          ours.some((text) => line.includes(text)),
+          line,
+        ).toBe(true);
+      }
+      expect(copy.note).toContain(`${INVITE_EMAIL_DAYS}`);
     }
   });
 });

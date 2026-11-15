@@ -42,7 +42,7 @@ import {
   type ParkingFeature,
   type ProofKind,
 } from '@parkfairy/contracts';
-import { schema, type Database } from '@parkfairy/database';
+import { runsListing, schema, type Database } from '@parkfairy/database';
 import { and, asc, count, desc, eq, gt, gte, inArray, lt, ne, not, or, sql } from 'drizzle-orm';
 import { strandedBookings, type HoursChange } from '../bookings/stranded.js';
 import { DB } from '../database/database.module.js';
@@ -70,6 +70,7 @@ import { slugFromName } from './slug.js';
 const listing = schema.parkingLocations;
 const profile = schema.ownerProfiles;
 const owners = schema.listingOwners;
+const managed = schema.listingManagers;
 const space = schema.parkingSpaces;
 const hours = schema.parkingOpeningHours;
 const exception = schema.parkingHoursExceptions;
@@ -317,7 +318,7 @@ export class OwnerListingsService {
 
   /** The closures page's read: the listing's name and its entries, in two queries. */
   async closures(userId: string, id: string): Promise<OwnerListingClosures> {
-    const row = await this.owned(userId, id);
+    const row = await this.owned(userId, id, { managers: true });
     return OwnerListingClosuresSchema.parse({
       id: row.id,
       name: row.name,
@@ -532,7 +533,7 @@ export class OwnerListingsService {
           exceptions: await this.hoursExceptions(tx, row),
         });
       },
-      { anyStatus: true },
+      { anyStatus: true, managers: true },
     );
   }
 
@@ -1248,8 +1249,21 @@ export class OwnerListingsService {
    * The listing, if this user is one of its owners, primary or co-owner (#53, #55: each may run
    * it). Anything else is the same 404.
    */
-  private async owned(userId: string, id: string): Promise<ListingRow> {
+  private async owned(
+    userId: string,
+    id: string,
+    { managers = false }: { managers?: boolean } = {},
+  ): Promise<ListingRow> {
     if (!UUID.test(id)) throw listingNotFound();
+    // What a manager may also do (#69): the closures, and nothing else of the listing's.
+    if (managers) {
+      const [run] = await this.db
+        .select({ listing })
+        .from(listing)
+        .where(and(eq(listing.id, id), runsListing(userId)));
+      if (!run) throw listingNotFound();
+      return run.listing;
+    }
     const [row] = await this.db
       .select({ listing })
       .from(listing)
@@ -1258,6 +1272,15 @@ export class OwnerListingsService {
       .where(and(eq(listing.id, id), eq(profile.userId, userId)));
     if (!row) throw listingNotFound();
     return row.listing;
+  }
+
+  /** Whether the account manages the listing (#69), read inside a lock. */
+  private async manages(tx: Transaction, userId: string, id: string): Promise<boolean> {
+    const rows = await tx
+      .select({ id: managed.id })
+      .from(managed)
+      .where(and(eq(managed.locationId, id), eq(managed.userId, userId)));
+    return rows.length > 0;
   }
 
   /** This user's role among the listing's owners; none is the same 404. */
@@ -1294,9 +1317,10 @@ export class OwnerListingsService {
     {
       anyStatus = false,
       primaryOnly: primaryOnlyAct = false,
-    }: { anyStatus?: boolean; primaryOnly?: boolean } = {},
+      managers = false,
+    }: { anyStatus?: boolean; primaryOnly?: boolean; managers?: boolean } = {},
   ): Promise<T> {
-    const owned = await this.owned(userId, id);
+    const owned = await this.owned(userId, id, { managers });
     return this.db.transaction(async (tx) => {
       const [row] = await tx.select().from(listing).where(eq(listing.id, owned.id)).for('update');
       // Still one of its owners now the row is locked: one removed meanwhile changes nothing.
@@ -1305,9 +1329,11 @@ export class OwnerListingsService {
         .from(owners)
         .innerJoin(profile, eq(profile.id, owners.ownerId))
         .where(and(eq(owners.locationId, owned.id), eq(profile.userId, userId)));
-      if (!still) throw listingNotFound();
+      if (!still && !(managers && (await this.manages(tx, userId, owned.id)))) {
+        throw listingNotFound();
+      }
       // The role too, read under the lock: a handover accepted meanwhile demotes the one acting.
-      if (primaryOnlyAct && still.role !== 'primary') throw primaryOnly();
+      if (primaryOnlyAct && still?.role !== 'primary') throw primaryOnly();
       if (!row || (!anyStatus && !isEditable(row.status))) throw conflict('LISTING_LOCKED');
       const result = await work(tx, row);
       if (isEditable(row.status)) {

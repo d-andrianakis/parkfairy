@@ -1,13 +1,14 @@
 import {
   inviteListingOwner,
   leaveListing,
+  removeListingManager,
   removeListingOwner,
   setListingShares,
   withdrawListingInvite,
   type ListingOwners,
 } from '@parkfairy/api-client';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
@@ -22,6 +23,7 @@ vi.mock('@parkfairy/api-client', () => ({
   withdrawListingHandover: vi.fn(),
   inviteListingOwner: vi.fn(),
   leaveListing: vi.fn(),
+  removeListingManager: vi.fn(),
   removeListingOwner: vi.fn(),
   setListingShares: vi.fn(),
   withdrawListingInvite: vi.fn(),
@@ -65,11 +67,14 @@ const owners = (overrides: Partial<ListingOwners> = {}): ListingOwners => ({
       invitedBy: 'Maria',
       expiresAt: '2026-11-20T10:00:00.000Z',
       canWithdraw: true,
+      role: 'co_owner',
     },
   ],
+  managers: [],
   handover: null,
   payable: true,
   room: 7,
+  managersRoom: 5,
   ...overrides,
 });
 
@@ -81,7 +86,7 @@ const sentence = (text: string) =>
   screen.getByText((_, element) => element?.tagName === 'P' && element.textContent === text);
 
 /** A refusal with what the API says besides its code. */
-const refusedWith = (code: string, extra: Record<string, unknown>) => ({
+const refusedWith = (code: string, extra: Record<string, unknown> = {}) => ({
   error: { code, statusCode: 409, message: code, ...extra },
   response: new Response(null, { status: 409 }),
 });
@@ -105,7 +110,7 @@ describe('ListingOwnersPanel, as the primary owner', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Owners and shares' })).toBeVisible();
     expect(sentence('Maria (you)')).toBeVisible();
     expect(screen.getByText('Primary owner')).toBeVisible();
-    expect(screen.getByText('Co-owner')).toBeVisible();
+    expect(screen.getAllByText('Co-owner')[0]).toBeVisible();
     expect(screen.getByText('Payouts not set up')).toBeVisible();
     const maria = screen.getByRole('spinbutton', { name: 'Share for Maria' });
     expect(maria).toHaveValue(100);
@@ -346,7 +351,7 @@ describe('ListingOwnersPanel, invitations', () => {
     await waitFor(() =>
       expect(inviteListingOwner).toHaveBeenCalledWith({
         path: { id: LISTING_ID },
-        body: { email: 'kostas@example.gr', locale: 'el' },
+        body: { email: 'kostas@example.gr', locale: 'el', role: 'co_owner' },
       }),
     );
     expect(
@@ -356,12 +361,16 @@ describe('ListingOwnersPanel, invitations', () => {
   });
 
   it('moves the focus to the section’s heading when the last place was taken', async () => {
-    vi.mocked(inviteListingOwner).mockResolvedValue(answer(owners({ room: 0 })) as never);
+    vi.mocked(inviteListingOwner).mockResolvedValue(
+      answer(owners({ room: 0, managersRoom: 0 })) as never,
+    );
     show();
     await userEvent.type(screen.getByRole('textbox', { name: 'Email address' }), 'z@example.gr');
     await userEvent.click(screen.getByRole('button', { name: 'Send invitation' }));
     await waitFor(() =>
-      expect(screen.getByRole('heading', { level: 2, name: 'Invite an owner' })).toHaveFocus(),
+      expect(
+        screen.getByRole('heading', { level: 2, name: 'Invite an owner or a manager' }),
+      ).toHaveFocus(),
     );
     expect(
       screen.getByText('This listing already has the most owners and invitations allowed (10).'),
@@ -425,7 +434,9 @@ describe('ListingOwnersPanel, invitations', () => {
       screen.getByRole('button', { name: 'Withdraw the invitation to nikos@example.gr' }),
     );
     await waitFor(() =>
-      expect(screen.getByRole('heading', { level: 2, name: 'Invite an owner' })).toHaveFocus(),
+      expect(
+        screen.getByRole('heading', { level: 2, name: 'Invite an owner or a manager' }),
+      ).toHaveFocus(),
     );
     expect(
       screen.queryByRole('heading', { name: 'Invitations waiting for an answer' }),
@@ -503,5 +514,127 @@ describe('ListingOwnersPanel, where the focus goes', () => {
     removal.resolve(answer(owners({ owners: owners().owners.slice(0, 1) })));
     await waitFor(() => expect(sentence('Removed Eleni.')).toBeVisible());
     expect(email).toHaveFocus();
+  });
+});
+
+describe('ListingOwnersPanel, managers (#69–#71)', () => {
+  const MANAGER = 'd0d0d0d0-0000-4000-8000-000000000001';
+  const manager = { id: MANAGER, name: 'Nikos', email: 'nikos@example.gr' };
+  /** The managers' own card: their names also appear in other places on the page. */
+  const card = (name = 'Managers') =>
+    within(
+      screen.getByRole('heading', { level: 2, name }).closest('[data-slot="card"]') as HTMLElement,
+    );
+
+  it('lists the managers, with what they may do, and says when there are none', () => {
+    const { unmount } = show(owners());
+    expect(screen.getByRole('heading', { level: 2, name: 'Managers' })).toBeInTheDocument();
+    expect(screen.getByText('No managers yet.')).toBeVisible();
+    expect(screen.getByText(/Managers look after the listing day to day/)).toBeVisible();
+    unmount();
+    show(owners({ managers: [manager] }));
+    expect(card().getByRole('listitem')).toHaveTextContent('Nikos');
+    expect(card().getByText('nikos@example.gr')).toBeVisible();
+    expect(screen.queryByText('No managers yet.')).toBeNull();
+  });
+
+  it('shows a co-owner the managers by name, with no address and no way to remove or add one', () => {
+    show(
+      owners({
+        role: 'co_owner',
+        managers: [{ ...manager, email: null }],
+        owners: owners().owners.map((owner) => ({ ...owner, you: owner.id === ELENI })),
+      }),
+    );
+    expect(card().getByRole('listitem')).toHaveTextContent('Nikos');
+    expect(card().queryByText('nikos@example.gr')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Remove manager/ })).toBeNull();
+    // A co-owner invites co-owners only: no choice of role, and the plain heading.
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.getByRole('heading', { level: 2, name: 'Invite an owner' })).toBeInTheDocument();
+    expect(screen.queryByText(/more managers? or invitations? to manage/)).toBeNull();
+  });
+
+  it('lets the primary owner choose between a co-owner and a manager, co-owner first', async () => {
+    vi.mocked(inviteListingOwner).mockResolvedValue(answer(owners({ managersRoom: 4 })) as never);
+    show();
+    const group = screen.getByRole('radiogroup', { name: 'Role on this listing' });
+    expect(within(group).getByRole('radio', { name: /^Co-owner/ })).toBeChecked();
+    await userEvent.click(within(group).getByRole('radio', { name: /^Manager/ }));
+    expect(screen.getByText('You can add 5 more managers or invitations to manage.')).toBeVisible();
+    await userEvent.type(screen.getByRole('textbox', { name: 'Email address' }), 'z@example.gr');
+    await userEvent.click(screen.getByRole('button', { name: 'Send invitation' }));
+    await waitFor(() =>
+      expect(inviteListingOwner).toHaveBeenCalledWith({
+        path: { id: LISTING_ID },
+        body: { email: 'z@example.gr', locale: 'en', role: 'manager' },
+      }),
+    );
+    expect(await screen.findByText('Invitation to manage sent to z@example.gr.')).toBeVisible();
+  });
+
+  it('marks each waiting invitation as to co-own or to manage', () => {
+    show(
+      owners({
+        invites: [
+          owners().invites[0]!,
+          { ...owners().invites[0]!, id: SECOND, email: 'kostas@example.gr', role: 'manager' },
+        ],
+      }),
+    );
+    const waiting = screen.getByRole('heading', { name: 'Invitations waiting for an answer' });
+    const list = within(waiting.closest('[data-slot="card"]') as HTMLElement);
+    expect(list.getByText('Manager')).toBeVisible();
+    expect(list.getByText('Co-owner')).toBeVisible();
+  });
+
+  it('stops offering managers once there is no room, and says so', () => {
+    show(owners({ managersRoom: 0 }));
+    expect(
+      screen.getByText(
+        'This listing already has the most managers and invitations to manage allowed (5).',
+      ),
+    ).toBeVisible();
+  });
+
+  it('removes a manager in two presses, and says so, the focus on the managers’ heading', async () => {
+    vi.mocked(removeListingManager).mockResolvedValue(answer(owners({ managers: [] })) as never);
+    show(owners({ managers: [manager] }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove manager Nikos' }));
+    expect(removeListingManager).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.tagName === 'P' &&
+          /^Remove Nikos as a manager\?/.test(element.textContent ?? ''),
+      ),
+    ).toHaveFocus();
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
+    expect(removeListingManager).toHaveBeenCalledWith({
+      path: { id: LISTING_ID, managerId: MANAGER },
+    });
+    await waitFor(() => expect(sentence('Removed manager Nikos.')).toBeVisible());
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 2, name: 'Managers' })).toHaveFocus(),
+    );
+    expect(screen.getByText('No managers yet.')).toBeVisible();
+  });
+
+  it('says it in Greek too', () => {
+    show(owners({ managers: [manager] }), 'el');
+    expect(screen.getByRole('heading', { level: 2, name: 'Διαχειριστές' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Ρόλος στον χώρο' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Αφαίρεση διαχειριστή: Nikos' })).toBeVisible();
+  });
+
+  it('tells a refusal in words of ours', async () => {
+    vi.mocked(inviteListingOwner).mockResolvedValue(refusedWith('TOO_MANY_MANAGERS') as never);
+    show();
+    await userEvent.click(screen.getByRole('radio', { name: /^Manager/ }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Email address' }), 'z@example.gr');
+    await userEvent.click(screen.getByRole('button', { name: 'Send invitation' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This listing already has the most managers and invitations to manage allowed.',
+    );
   });
 });

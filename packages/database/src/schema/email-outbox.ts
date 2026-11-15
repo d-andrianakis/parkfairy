@@ -23,6 +23,8 @@ export const OUTBOX_EMAIL_KINDS = [
   // To the listing's owner.
   'booking-received',
   'booking-cancelled-by-driver',
+  // To the primary owner, when a co-owner or a manager called a booking off (#69).
+  'booking-cancelled-by-team',
   // To someone invited to own a listing (#56), who may have no account yet.
   'listing-invite',
   // To the co-owner offered the primary role, and to the primary who gave it up (#61–#64).
@@ -55,6 +57,8 @@ export interface OutboxBooking {
   /** Cancellations only. */
   refundMinor?: number;
   cancelledBy?: 'driver' | 'owner';
+  /** An owner-side cancellation by someone other than the primary: who, by role, never by name. */
+  cancelledByRole?: 'co_owner' | 'manager';
 }
 
 /** What the templates may show. `listingName` is the owner's own text, about their own listing. */
