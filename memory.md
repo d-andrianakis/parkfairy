@@ -205,6 +205,18 @@ Answered by the product owner on 2026-11-15, for handing over the primary role:
 64. **The deeds, status emails and deletion go with the role** (`parking_locations.owner_id` moves
     with it). Status emails still go to the primary alone.
 
+Answered by the product owner on 2026-11-15, to start Phase 5:
+
+65. **The owner side comes first**: calendar, bookings across listings, earnings. Admin approvals
+    follow.
+66. **The admin screens are a separate app** on their own origin and CSP, so a flaw in the public
+    pages can't reach staff screens. It costs its own deployment, auth cookie setup and shared UI
+    plumbing (`packages/ui`); the API stays one (`@Roles('admin')` plus MFA).
+67. **Staff see an owner's tax values masked** (last three characters, as the owner sees them); the
+    full number never leaves the encrypted store through admin screens.
+68. **The audit log is an append-only table** written in the action's own transaction, the database
+    refusing updates and deletes, browsable and filterable in the admin app.
+
 Our readings for co-ownership (2026-11-13), not asked; change any that are wrong:
 
 - **The primary owner is the listing's `owner_id`**, as before; every owner, the primary too, has a
@@ -1500,3 +1512,33 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
 - **2026-11-15 · Two Playwright runs at once fail each other.** Both write `tests/smoke/test-results`,
   and the loser's trace files vanish mid-run (`ENOENT … .playwright-artifacts`) as the context
   closes, which looks like a failure of the test. Run the suite once at a time, from the repo root.
+
+Our readings for 5.1, the owner's calendar and earnings (2026-11-15), not asked; change any that are wrong:
+
+- **The calendar is an agenda, not a grid**: a month at a time, a heading per day, a card per
+  booking, in the listing's own time zone (`GET /owner/calendar`). A list reads the same on a phone
+  and to a screen reader, and a grid would be drawn from it anyway. The month is limited to 24
+  months either side of today, and a busy month is cut at 500 bookings and says so.
+- **A co-owner sees no stay that ended before they joined the listing** (`listing_owners.created_at`):
+  drivers' names and plates are not history for someone just invited (security review). The
+  primary owner sees all of it. Phase 6's retention work should still decide how long they stay.
+- **Earnings are the owner's own `booking_payees` rows**: what was sent, what is worked out and
+  waiting, and a count of paid bookings not worked out yet (`coming`), with how many of those are
+  held by a restricted account (#52) or a dispute (#58). No estimate is shown for a stay that
+  isn't over: the part is worked out 24 hours after it (#4), so a figure before then could be
+  wrong. Months go by the platform's time zone; gross, commission and VAT wait for #18.
+- **The cross-listing bookings list with status and date filters is not built.** The calendar
+  covers every listing by month and the per-listing page still lists upcoming bookings and
+  cancels them; say if a list across listings is still wanted.
+- **2026-11-15 · `pnpm dlx shadcn add` can add an unrelated npm package.** For `table` it added a
+  dependency called `cn` and imported from it. Check `git diff package.json pnpm-lock.yaml` after
+  every `shadcn add`, revert them, and import `cn` from `@parkfairy/ui/lib/utils`. The registry's
+  `whitespace-nowrap` on table cells made tables scroll sideways at 320px in Greek (a scroll region a
+  keyboard can't reach); our `table.tsx` lets cells wrap.
+- **2026-11-15 · A function can't be a plain `t.rich` value in a server component.** `{date}` with
+  a function value renders as a function child and fails the page (Functions cannot be passed to
+  Client Components), which unit tests with a client provider don't show. Use a tag
+  (`<time>{when}</time>` with `time: (chunks) => …`) and let the smoke test catch the rest.
+- **2026-11-15 · One earnings request holds a few of the API's ten pool connections**, so
+  `ownerEarnings` runs its queries two at a time and skips the month and per-listing sums (and the
+  waiting list) on every page after the first. A later page costs a keyset read.

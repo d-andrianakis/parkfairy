@@ -136,3 +136,59 @@ export async function addBookings(listingId: string, count: number): Promise<voi
     [listingId, Array.from({ length: count }, reference)],
   );
 }
+
+/**
+ * What an owner has been paid for a listing (5.1), as the worker would have left it: `sent`
+ * parts already transferred (each from a stay that ended four days ago), `sending` parts worked
+ * out and not sent, and `coming` paid bookings whose stay hasn't ended. The owner is the
+ * listing's, who also books them (the API refuses that, which is why they go straight in).
+ */
+export async function addEarnings(
+  listingId: string,
+  {
+    sent = [],
+    sending = [],
+    coming = 0,
+    due = 0,
+  }: { sent?: number[]; sending?: number[]; coming?: number; due?: number },
+): Promise<void> {
+  const parts: { minor: number | null; status: 'sent' | 'sending' | null; endsInHours: number }[] =
+    [
+      ...sent.map((minor) => ({ minor, status: 'sent' as const, endsInHours: -96 })),
+      ...sending.map((minor) => ({ minor, status: 'sending' as const, endsInHours: -96 })),
+      // Over a day ago and not worked out: what a restricted account holds back (#52).
+      ...Array.from({ length: due }, () => ({ minor: null, status: null, endsInHours: -72 })),
+      ...Array.from({ length: coming }, () => ({
+        minor: null,
+        status: null,
+        endsInHours: 48,
+      })),
+    ];
+  for (const part of parts) {
+    const [booking] = await run<{ id: string }>(
+      `insert into bookings (reference, user_id, location_id, space_label, listing_name,
+         listing_address, listing_locale, starts_at, ends_at, gap_minutes, blocked_until, status,
+         hold_expires_at, total_minor, currency, cancellation_policy, vehicle_plate, confirmed_at,
+         commission_bps, payment_intent_id, payment_status, stripe_charge_id)
+       select $2, p.user_id, l.id, 'A1', l.name, l.address, l.content_locale,
+         now() + $3 * interval '1 hour' - interval '2 hours', now() + $3 * interval '1 hour', 0,
+         now() + $3 * interval '1 hour', 'confirmed', now(), 400, 'EUR', 'oneDay', 'IKB1234', now(),
+         1000, 'pi_smoke' || substr(md5(random()::text), 1, 20), 'succeeded',
+         'ch_smoke' || substr(md5(random()::text), 1, 20)
+       from parking_locations l join owner_profiles p on p.id = l.owner_id
+       where l.id = $1
+       returning id`,
+      [listingId, reference(), part.endsInHours],
+    );
+    if (!booking) throw new Error('No such listing');
+    await run(
+      `insert into booking_payees (booking_id, owner_id, share_bps, transfer_minor, transfer_status,
+         stripe_transfer_id, transferred_at)
+       select $1, l.owner_id, 10000, $2::int, $3::text,
+         case when $3::text = 'sent' and $2::int > 0 then 'tr_smoke' || substr(md5(random()::text), 1, 20) end,
+         case when $3::text = 'sent' then now() - interval '3 days' end
+       from parking_locations l where l.id = $4`,
+      [booking.id, part.minor, part.status, listingId],
+    );
+  }
+}

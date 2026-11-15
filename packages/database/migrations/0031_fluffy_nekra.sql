@@ -1,0 +1,2 @@
+CREATE INDEX "booking_payees_owner_sent_idx" ON "booking_payees" USING btree ("owner_id","transferred_at" DESC NULLS LAST,"id" DESC NULLS LAST) WHERE "booking_payees"."transfer_status" = 'sent';--> statement-breakpoint
+CREATE INDEX "booking_payees_owner_open_idx" ON "booking_payees" USING btree ("owner_id") WHERE "booking_payees"."transfer_status" is null or "booking_payees"."transfer_status" = 'sending';

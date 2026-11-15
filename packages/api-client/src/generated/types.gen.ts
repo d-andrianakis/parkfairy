@@ -667,6 +667,94 @@ export type OwnerListingBookings = {
     next: string | null;
 };
 
+export type EarningHold = 'account' | 'dispute';
+
+export type EarningState = 'sending' | 'sent';
+
+export type OwnerEarningsQuery = {
+    after?: string;
+};
+
+export type EarningListing = {
+    id: string;
+    name: string | null;
+    contentLocale: Locale;
+};
+
+export type EarningLine = {
+    id: string;
+    reference: string;
+    listing: EarningListing;
+    end: string;
+    state: EarningState;
+    amount: Money;
+    sentAt: string | null;
+    hold: EarningHold | null;
+};
+
+export type EarningMonth = {
+    month: string;
+    amount: Money;
+};
+
+export type EarningListingTotal = {
+    listing: EarningListing;
+    amount: Money;
+};
+
+export type OwnerEarnings = {
+    sent: Money;
+    sending: Money;
+    coming: number;
+    held: {
+        account: number;
+        dispute: number;
+    };
+    months: Array<EarningMonth>;
+    listings: Array<EarningListingTotal>;
+    inProgress: Array<EarningLine>;
+    lines: Array<EarningLine>;
+    next: string | null;
+};
+
+export type OwnerCalendarQuery = {
+    month?: string;
+    listing?: string;
+};
+
+export type CalendarListing = {
+    id: string;
+    name: string | null;
+    contentLocale: Locale;
+};
+
+export type CalendarBooking = {
+    id: string;
+    reference: string;
+    listing: CalendarListing;
+    spaceLabel: string;
+    start: string;
+    end: string;
+    timeZone: string;
+    driverName: string;
+    vehiclePlate: string;
+};
+
+export type CalendarDay = {
+    date: string;
+    bookings: Array<CalendarBooking>;
+};
+
+export type OwnerCalendar = {
+    month: string;
+    previous: string | null;
+    next: string | null;
+    listing: string | null;
+    listings: Array<CalendarListing>;
+    days: Array<CalendarDay>;
+    truncated: boolean;
+};
+
 export type PlaceSuggestion = {
     id: string;
     name: string;
@@ -1904,6 +1992,51 @@ export type CancelListingBookingResponses = {
 };
 
 export type CancelListingBookingResponse = CancelListingBookingResponses[keyof CancelListingBookingResponses];
+
+export type GetEarningsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        after?: string;
+    };
+    url: '/v1/owner/earnings';
+};
+
+export type GetEarningsErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+};
+
+export type GetEarningsError = GetEarningsErrors[keyof GetEarningsErrors];
+
+export type GetEarningsResponses = {
+    200: OwnerEarnings;
+};
+
+export type GetEarningsResponse = GetEarningsResponses[keyof GetEarningsResponses];
+
+export type GetCalendarData = {
+    body?: never;
+    path?: never;
+    query?: {
+        listing?: string;
+        month?: string;
+    };
+    url: '/v1/owner/calendar';
+};
+
+export type GetCalendarErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+};
+
+export type GetCalendarError = GetCalendarErrors[keyof GetCalendarErrors];
+
+export type GetCalendarResponses = {
+    200: OwnerCalendar;
+};
+
+export type GetCalendarResponse = GetCalendarResponses[keyof GetCalendarResponses];
 
 export type GetOwnerPayoutsData = {
     body?: never;

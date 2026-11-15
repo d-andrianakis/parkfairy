@@ -150,6 +150,8 @@ test.describe('signed in', () => {
       '/owner/profile',
       '/owner/tax',
       '/owner/payouts',
+      '/owner/earnings',
+      '/owner/calendar',
       '/bookings',
       '/bookings?when=past',
     ]) {

@@ -1463,9 +1463,43 @@ listing limit, and the role's rights (removal, shares, deeds, deletion, status e
 
 ## Phase 5: Owner and admin dashboards
 
+### 5.1 Owner calendar, bookings and earnings (planned 2026-11-15)
+
+Decisions #65–#68 (memory.md): the owner side first; admin approvals follow in a separate app.
+Scope as planned, to confirm while building: one cross-listing bookings list for every listing an
+owner co-owns (keyset pages, filter by listing, status and dates); a calendar of a listing's stays
+by day and space, in the listing's time zone, with a list equivalent for screen readers; earnings
+from `booking_payees` and the ledger: what each payee is owed, what has been sent, what waits (a
+restricted account, #52; a dispute, #58), by month and by listing. Amounts are the owner's own
+part after commission (#50, #51), never another co-owner's. Gross, commission and VAT wait for #18.
+
+Built 2026-11-15: earnings (`GET /owner/earnings`, `/owner/earnings`) and the calendar
+(`GET /owner/calendar`, `/owner/calendar`), linked from the dashboard. Readings in memory.md.
+Not built: the cross-listing bookings list with status and date filters, a grid view, and gross,
+commission and VAT (#18).
+
+- [~] **Implemented** behind the API's authorization rules (no client-trusted roles/IDs): earnings
+  and calendar done; the cross-listing bookings list is not
+- [x] **Unit tests** next to the code (`*.test.ts[x]`) for logic, guards, components
+- [x] **Smoke test** `tests/smoke/specs/owner-earnings.smoke.ts` and `owner-calendar.smoke.ts`
+      (both languages, 320px, no table scrolling sideways, the filter without scripts)
+- [x] **Security** review: co-owners see only their own payee rows and amounts (isolation of
+      sums, counts, lines and waiting list tested); a new co-owner sees no earlier stay
+- [~] **Performance** review: keyset page and calendar window use their indexes (measured on 300k
+  bookings); pool use and later pages fixed. Open, low: the per-listing sum joins `bookings` (a
+  `location_id` on `booking_payees` would drop it), the totals read the owner's rows, the
+  calendar joins `users` before its limit, and a full refund leaves an open payee row for good
+- [~] **Accessibility** review: real tables with captions and row headers, cells wrap, list
+  calendar, filter without scripts; axe in both languages at 1280 and 320px. Open: a manual
+  NVDA and VoiceOver pass over the tables in Greek and what is heard after Next month
+- [~] **i18n** review: both catalogs, plurals agree in count, months and dates by locale; Greek
+  uses «χώρος» and «στάθμευση» as the rest of the catalog. Open: a native speaker on the new
+  Greek (`Owner.earnings`, `Owner.calendar`)
+- [x] **Contracts & docs**: OpenAPI/client regenerated, memory.md updated
+
 - [~] 2FA enrolment UI done (1.3); admin MFA enforced end to end once admin routes exist
   (sessions without a second factor are already ended when it is switched on)
-- [ ] Owner calendar, bookings, listings, earnings
+- [~] Owner calendar and earnings done (5.1); a bookings list across listings is not
 - [ ] Admin approvals (listings, proof of the right to rent), moderation, users, bookings,
       payments, audit logs
 - [ ] Overstay reports: the owner reports, support handles it (#11)

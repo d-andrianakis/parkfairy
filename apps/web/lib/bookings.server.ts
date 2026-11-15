@@ -2,11 +2,15 @@ import 'server-only';
 import {
   createClient,
   createConfig,
+  getCalendar,
+  getEarnings,
   getListingBookings,
   getMyBooking,
   getMyBookings,
   type Booking,
   type BookingList,
+  type OwnerCalendar,
+  type OwnerEarnings,
   type OwnerListingBookings,
 } from '@parkfairy/api-client';
 import { headers } from 'next/headers';
@@ -76,6 +80,41 @@ export const loadOwnerBookings = cache(
       return response?.status === 404 ? 'not-found' : 'unavailable';
     } catch {
       return 'unavailable';
+    }
+  },
+);
+
+/**
+ * The signed-in owner's earnings (5.1): their own part of each booking, after commission. `after`
+ * is a place an earlier page gave out; null when the API could not answer.
+ */
+export const loadOwnerEarnings = cache(async (after = ''): Promise<OwnerEarnings | null> => {
+  try {
+    const { data } = await getEarnings({
+      ...(await asVisitor()),
+      query: after ? { after } : {},
+    });
+    return data ?? null;
+  } catch {
+    return null;
+  }
+});
+
+/**
+ * The signed-in owner's calendar for a month and, optionally, one listing (5.1); null when the API
+ * could not answer, or refused a month or listing that is not one. Strings, not an object, so the
+ * page and its metadata share one request (`cache` keys).
+ */
+export const loadOwnerCalendar = cache(
+  async (month = '', listing = ''): Promise<OwnerCalendar | null> => {
+    try {
+      const { data } = await getCalendar({
+        ...(await asVisitor()),
+        query: { ...(month ? { month } : {}), ...(listing ? { listing } : {}) },
+      });
+      return data ?? null;
+    } catch {
+      return null;
     }
   },
 );

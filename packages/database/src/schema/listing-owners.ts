@@ -184,6 +184,20 @@ export const bookingPayees = pgTable(
   (t) => [
     uniqueIndex('booking_payees_booking_owner_idx').on(t.bookingId, t.ownerId),
     index('booking_payees_owner_idx').on(t.ownerId),
+    // An owner's earnings (5.1): the parts sent, newest first, a page at a time. `transferred_at`
+    // is written from JavaScript, to the millisecond, so a page's last row names its place exactly.
+    index('booking_payees_owner_sent_idx')
+      .on(t.ownerId, t.transferredAt.desc(), t.id.desc())
+      .where(sql`${t.transferStatus} = 'sent'`),
+    // ...the parts worked out and not sent (few, on their way or held)...
+    index('booking_payees_owner_sending_idx')
+      .on(t.ownerId)
+      .where(sql`${t.transferStatus} = 'sending'`),
+    // ...and the parts not worked out yet (a stay under way, or a booking given back in full,
+    // which stays here for good: the count reads only the owner's own).
+    index('booking_payees_owner_open_idx')
+      .on(t.ownerId)
+      .where(sql`${t.transferStatus} is null`),
     check('booking_payees_share_check', sql`${t.shareBps} between 1 and 10000`),
     // Worked out, then sent: by Stripe with its id, or nothing to send (a part rounded to 0).
     check(

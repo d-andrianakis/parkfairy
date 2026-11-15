@@ -13,6 +13,15 @@ import { Label } from './label';
 import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from './native-select';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 import { ScrollArea } from './scroll-area';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './table';
 import { ToggleGroup, ToggleGroupItem } from './toggle-group';
 
 describe('Button', () => {
@@ -76,6 +85,36 @@ describe('Card', () => {
       </Card>,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+});
+
+describe('Table', () => {
+  it('is a real table, named by its caption, with header cells that scope their column and row', async () => {
+    const { container } = render(
+      <Table>
+        <TableCaption>Sent by month</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead scope="col">Month</TableHead>
+            <TableHead scope="col">Amount</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableHead scope="row">November 2026</TableHead>
+            <TableCell>€2.52</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    const table = screen.getByRole('table', { name: 'Sent by month' });
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Month', 'Amount']);
+    expect(within(table).getByRole('rowheader', { name: 'November 2026' })).toBeInTheDocument();
     await expectNoAxeViolations(container);
   });
 });

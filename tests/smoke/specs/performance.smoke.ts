@@ -172,7 +172,14 @@ test.describe('signed in', () => {
   });
 
   // The payouts page too: Stripe sends owners back to it.
-  for (const path of ['/en/owner', '/en/owner/profile', '/en/owner/tax', '/en/owner/payouts']) {
+  for (const path of [
+    '/en/owner',
+    '/en/owner/profile',
+    '/en/owner/tax',
+    '/en/owner/payouts',
+    '/en/owner/earnings',
+    '/en/owner/calendar',
+  ]) {
     test(`${path} stays within the first-visit budget`, async ({ page }) => {
       await expectWithinBudget(page, path);
     });

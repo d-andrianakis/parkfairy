@@ -10,5 +10,7 @@ export * from './parking.js';
 export * from './owner.js';
 export * from './payments.js';
 export * from './bookings.js';
+export * from './earnings.js';
+export * from './owner-calendar.js';
 export * from './places.js';
 export * from './listing-owners.js';

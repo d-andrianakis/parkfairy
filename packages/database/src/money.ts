@@ -296,7 +296,7 @@ export interface TransferDue {
 }
 
 /** A dispute of booking `b` that holds its payout (#58): any not settled for the owners. */
-const heldByDispute = sql`
+export const heldByDispute = sql`
   select 1 from payment_disputes d
   where d.booking_id = b.id and d.status not in (${sql.join(
     DISPUTES_RELEASED.map((status) => sql`${status}`),

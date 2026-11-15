@@ -14,3 +14,9 @@ export const ownersHref = (id: string) => `/owner/listings/${id}/owners`;
 
 /** Where an invite's email leads; its token comes after `#`, so no server sees it. */
 export const INVITE_PATH = '/owner/invite';
+
+/** What the owner has earned (5.1). */
+export const EARNINGS_HREF = '/owner/earnings';
+
+/** The owner's calendar of bookings (5.1). */
+export const CALENDAR_HREF = '/owner/calendar';

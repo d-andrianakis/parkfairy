@@ -75,6 +75,20 @@ export default async function OwnerPage({ params }: LocaleParams) {
           {t('dashboard.title')}
         </h1>
         <p className="text-muted-foreground">{t('dashboard.lead')}</p>
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <Link
+            href="/owner/calendar"
+            className="text-primary underline underline-offset-4 hover:decoration-2"
+          >
+            {t('calendar.link')}
+          </Link>
+          <Link
+            href="/owner/earnings"
+            className="text-primary underline underline-offset-4 hover:decoration-2"
+          >
+            {t('earnings.link')}
+          </Link>
+        </p>
       </div>
       <ContinueCard action={action} progress={setupProgress(onboarding.doneAccountSteps, focus)} />
       <AccountChecklist done={onboarding.doneAccountSteps} />
