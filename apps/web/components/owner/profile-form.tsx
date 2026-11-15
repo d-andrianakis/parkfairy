@@ -67,6 +67,13 @@ export function ProfileForm({ profile, nextHref }: { profile: OwnerProfile; next
     const outcome = await attempt(() =>
       updateOwnerProfile({ body: { [name]: value } as OwnerProfilePatch }),
     );
+    // "Check your connection" would be the wrong advice for a refusal that has a reason of its own
+    // (a share holds these details in place), so that one is said beside the status.
+    setFailure(
+      !outcome.ok && outcome.failure.code === 'PROFILE_HAS_SHARE'
+        ? ownerError(outcome.failure)
+        : null,
+    );
     return outcome.ok;
   });
 

@@ -1381,10 +1381,19 @@ Left open:
       the invite email; «Κύρια ιδιοκτησία» and «Συνιδιοκτησία» as role names; whether «ο κύριος
       ιδιοκτήτης» and «# ιδιοκτήτη» should become «μέλος» wording; «ισχύει έως» or «έως τις»;
       «να αθροίζουν 100%» here and in `Validation.sharesTotal`, both or neither
-- [ ] Security residuals: one inbox can still get a day's 20 invites through `+tag` or dotted
-      variants of its address (the per-address cap is per exact address); a paid owner can make
-      their details incomplete later (switching to a business clears the birth date): refuse
-      that while they have a share, or count it in what makes a listing bookable
+- [x] Security residual (2026-11-15): a paid owner can no longer make their details incomplete
+      (a field emptied, a switch of kind that drops the birth date or registration number) while a
+      listing with staff or live pays them: 409 `PROFILE_HAS_SHARE`, said on the profile form beside
+      the autosave status. The share check and the save lock the profile row against each other
+      (tested by holding one side's lock; each lock removed fails its test). Security review: a
+      lock upgrade that could deadlock two shares or submissions fixed (`no key update`, id order),
+      and the primary no longer locked out on drafts. Test review: both race tests made
+      deterministic, other kind of switch, every field, a share on a second listing, `saveTax`, the
+      form's refusals in both languages. Sending in still checks the details, as a second line
+- [ ] Smoke: `co-ownership.smoke.ts` has no step for the refusal (a co-owner given a share on a live
+      listing empties a field and the page says why); not run in this round
+- [ ] Security residual: one inbox can still get a day's 20 invites through `+tag` or dotted
+      variants of its address (the per-address cap is per exact address)
 - [ ] Accessibility advisories: withdrawing is one press, and with two invites a week per address
       a mistaken one can't always be redone at once; the panel's status line sits at its top,
       far from the button at 200% or 320 px, and moves what follows once it has text

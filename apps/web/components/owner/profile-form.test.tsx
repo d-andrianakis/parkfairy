@@ -113,6 +113,51 @@ describe('ProfileForm', () => {
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
+  describe('when a share holds the details in place (PROFILE_HAS_SHARE)', () => {
+    const SHARE_EN = /You’re paid a share of a listing/;
+
+    it('says so when a field left empty is refused on its way out', async () => {
+      update.mockResolvedValue(refusal('PROFILE_HAS_SHARE', 409) as never);
+      renderInSubtree(<ProfileForm profile={complete} nextHref="/owner/tax" />);
+      await userEvent.clear(screen.getByLabelText('Phone'));
+      await userEvent.tab();
+      expect(await screen.findByText(SHARE_EN)).toBeInTheDocument();
+      expect(screen.getByText(/That didn’t save/)).toBeInTheDocument();
+    });
+
+    it('says so when a switch of kind is refused, and clears it once something saves', async () => {
+      update.mockResolvedValueOnce(refusal('PROFILE_HAS_SHARE', 409) as never);
+      renderInSubtree(<ProfileForm profile={complete} nextHref="/owner/tax" />);
+      await userEvent.click(screen.getByRole('radio', { name: 'A business' }));
+      expect(await screen.findByText(SHARE_EN)).toBeInTheDocument();
+      // The next save goes through (the mock's default): the explanation goes with the refusal.
+      await userEvent.click(screen.getByRole('radio', { name: 'An individual' }));
+      await waitFor(() => expect(screen.queryByText(SHARE_EN)).not.toBeInTheDocument());
+    });
+
+    it('says so, in Greek, on Save and continue, and stays put', async () => {
+      update.mockResolvedValue(refusal('PROFILE_HAS_SHARE', 409) as never);
+      const { container } = renderInSubtree(
+        <ProfileForm profile={complete} nextHref="/owner/tax" />,
+        { locale: 'el' },
+      );
+      await userEvent.click(screen.getByRole('button', { name: /Αποθήκευση/ }));
+      expect(await screen.findByText(/Λαμβάνετε μερίδιο/)).toBeInTheDocument();
+      expect(routerMock.push).not.toHaveBeenCalled();
+      await expectNoAxeViolations(container);
+    });
+
+    it('leaves other refusals to the status line alone', async () => {
+      update.mockResolvedValue(refusal('VALIDATION_FAILED', 400, ['phoneInvalid']) as never);
+      renderInSubtree(<ProfileForm profile={complete} nextHref="/owner/tax" />);
+      await userEvent.clear(screen.getByLabelText('Phone'));
+      await userEvent.type(screen.getByLabelText('Phone'), '+30 210 123 4568');
+      await userEvent.tab();
+      expect(await screen.findByText(/That didn’t save/)).toBeInTheDocument();
+      expect(screen.queryByText(SHARE_EN)).not.toBeInTheDocument();
+    });
+  });
+
   it('copes with a network failure', async () => {
     update.mockRejectedValue(new Error('offline'));
     renderInSubtree(<ProfileForm profile={complete} nextHref="/owner/tax" />);

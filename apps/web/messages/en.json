@@ -884,6 +884,7 @@
       "PHOTO_DUPLICATE": "You’ve already added this photo.",
       "PHOTO_TOO_SMALL": "This photo is too small. Use one at least 960 pixels wide.",
       "PHOTO_UNREADABLE": "We can’t read this file as a photo. Use a JPEG, PNG or WebP.",
+      "PROFILE_HAS_SHARE": "You’re paid a share of a listing that is with us or live, so these details can’t be left incomplete. You can change a value, but not empty it. To go further, a co-owner asks the primary owner to set their share to 0%, and a primary owner contacts support.",
       "PROFILE_INCOMPLETE": "Fill in About you first.",
       "TOO_MANY_LISTINGS": "You’ve reached the number of listings one account can have.",
       "TOO_MANY_PHOTOS": "A listing can have up to 10 photos.",

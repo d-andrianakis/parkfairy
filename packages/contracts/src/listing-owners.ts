@@ -163,5 +163,7 @@ export const LISTING_OWNER_ERROR_CODES = [
   'TOO_MANY_INVITES',
   /** An owner given a share, or one of a listing sent in, hasn't filled in their details and tax. */
   'OWNER_DETAILS_MISSING',
+  /** An owner with a share can't leave their details incomplete: the primary takes the share back first. */
+  'PROFILE_HAS_SHARE',
 ] as const;
 export type ListingOwnerErrorCode = (typeof LISTING_OWNER_ERROR_CODES)[number];

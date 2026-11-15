@@ -1108,7 +1108,8 @@ describe('owner onboarding', () => {
           ],
         })
         .expect(200);
-      // A paid co-owner who took their details back out holds it up, even sent by the primary.
+      // On a draft nothing is paid yet, so a paid co-owner's details can go, and sending in checks
+      // them, and holds the listing up even when the primary sends it.
       await api(coOwner, 'patch', '/profile').send({ phone: '' }).expect(200);
       expect(
         (await api(primary, 'post', `/listings/${id}/submit`).send({ confirmed: true }).expect(409))
@@ -1116,6 +1117,10 @@ describe('owner onboarding', () => {
       ).toMatchObject({ code: 'OWNER_DETAILS_MISSING' });
       await api(coOwner, 'patch', '/profile').send({ phone: profile.phone }).expect(200);
       await api(primary, 'post', `/listings/${id}/submit`).send({ confirmed: true }).expect(200);
+      // With staff now, the share is paid: the co-owner can't take their details back out.
+      expect(
+        (await api(coOwner, 'patch', '/profile').send({ phone: '' }).expect(409)).body,
+      ).toMatchObject({ code: 'PROFILE_HAS_SHARE' });
       // Each of them staff's to verify now.
       for (const user of [primary, coOwner]) {
         const now = OwnerProfileSchema.parse((await api(user, 'get', '/profile').expect(200)).body);

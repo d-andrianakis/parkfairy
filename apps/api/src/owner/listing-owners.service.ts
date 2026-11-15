@@ -568,7 +568,16 @@ export async function everyoneReported(db: Reader, ownerIds: readonly string[]):
 export async function unreported(db: Reader, ownerIds: readonly string[]): Promise<string[]> {
   const asked = [...new Set(ownerIds)];
   if (asked.length === 0) return [];
-  const rows = await db.select().from(profile).where(inArray(profile.id, asked));
+  // Row locks, in id order: a profile save that would leave an owner's details incomplete waits
+  // for this transaction, then sees the share it would be breaking (`OwnerProfileService.patch`).
+  // 'no key update', not 'share': both callers go on to update these rows (`verification`), and
+  // upgrading a shared lock is how two of them deadlock. The order keeps two apart.
+  const rows = await db
+    .select()
+    .from(profile)
+    .where(inArray(profile.id, asked))
+    .orderBy(profile.id)
+    .for('no key update');
   const done = new Set(
     rows.filter((row) => doneAccountSteps(profileFacts(row)).length === 2).map((row) => row.id),
   );

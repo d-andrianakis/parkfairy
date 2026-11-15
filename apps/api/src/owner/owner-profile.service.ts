@@ -7,12 +7,12 @@ import {
   type OwnerTaxInput,
 } from '@parkfairy/contracts';
 import { schema, type Database } from '@parkfairy/database';
-import { eq } from 'drizzle-orm';
+import { and, eq, gt, notInArray } from 'drizzle-orm';
 import { DB } from '../database/database.module.js';
 import { FIELD_CRYPTO } from './field-crypto.provider.js';
 import type { FieldCrypto } from './field-crypto.js';
 import { conflict } from './owner.errors.js';
-import type { ProfileFacts } from './onboarding-progress.js';
+import { doneAccountSteps, type ProfileFacts } from './onboarding-progress.js';
 
 const profiles = schema.ownerProfiles;
 export type OwnerProfileRow = typeof profiles.$inferSelect;
@@ -61,24 +61,70 @@ export class OwnerProfileService {
   }
 
   async patch(userId: string, patch: OwnerProfilePatch): Promise<OwnerProfile> {
-    const current = await this.ensure(userId);
-    const [row] = await this.db
-      .update(profiles)
-      .set({
+    await this.ensure(userId);
+    const row = await this.db.transaction(async (tx) => {
+      // Locked, so a share being given (which reads this row shared) and this save take turns.
+      const [current] = await tx
+        .select()
+        .from(profiles)
+        .where(eq(profiles.userId, userId))
+        .for('no key update');
+      if (!current) throw new Error('Owner profile vanished during an update');
+      const next = {
         ...patch,
         // What applied to the other kind of owner no longer does, so it isn't kept.
         ...(patch.kind === 'business' ? { birthDateEncrypted: null } : {}),
         ...(patch.kind === 'individual' ? { registrationNumberEncrypted: null } : {}),
-        ...reverified(
-          current,
-          IDENTITY_FIELDS.some((field) => field in patch),
-        ),
-        updatedAt: new Date(),
-      })
-      .where(eq(profiles.userId, userId))
-      .returning();
-    if (!row) throw new Error('Owner profile vanished during an update');
+      };
+      // Paid means reported (#22): while an owner has a share of a listing with staff or live, a save that would leave their
+      // details incomplete (a field cleared, a switch of kind that drops the birth date or the
+      // registration number) is refused until the primary owner has taken the share back.
+      if (
+        doneAccountSteps(profileFacts(current)).length === 2 &&
+        doneAccountSteps(profileFacts({ ...current, ...next })).length < 2 &&
+        (await this.hasShare(tx, current.id))
+      ) {
+        throw conflict('PROFILE_HAS_SHARE');
+      }
+      const [saved] = await tx
+        .update(profiles)
+        .set({
+          ...next,
+          ...reverified(
+            current,
+            IDENTITY_FIELDS.some((field) => field in patch),
+          ),
+          updatedAt: new Date(),
+        })
+        .where(eq(profiles.id, current.id))
+        .returning();
+      if (!saved) throw new Error('Owner profile vanished during an update');
+      return saved;
+    });
     return this.toProfile(row);
+  }
+
+  /**
+   * Whether a listing that is with staff or live pays this owner a part (a share above 0). A draft
+   * or a listing sent back pays no one yet, and sending it in checks every paid owner's details.
+   */
+  private async hasShare(tx: Pick<Database, 'select'>, ownerId: string): Promise<boolean> {
+    const [paid] = await tx
+      .select({ id: schema.listingOwners.id })
+      .from(schema.listingOwners)
+      .innerJoin(
+        schema.parkingLocations,
+        eq(schema.parkingLocations.id, schema.listingOwners.locationId),
+      )
+      .where(
+        and(
+          eq(schema.listingOwners.ownerId, ownerId),
+          gt(schema.listingOwners.shareBps, 0),
+          notInArray(schema.parkingLocations.status, ['draft', 'changes_requested']),
+        ),
+      )
+      .limit(1);
+    return paid !== undefined;
   }
 
   /**

@@ -238,7 +238,19 @@ Our readings for co-ownership (2026-11-13), not asked; change any that are wrong
     a submission makes them (the listing may be live already). The refusal names whose details
     are missing (`owners` in the 409), so the form says it at their field.
   - **Co-owners get no onboarding reminder**: they have nothing of their own to finish.
-- **A co-owner sees the listing's bookings and its drivers' names and plates**, as the primary does.
+  - **A share keeps the details complete** (2026-11-15): while an owner has a share above 0 of a
+    listing that is with staff or live (not a draft or one sent back, which pay no one, and whose
+    sending in checks every paid owner's details), a profile save that would leave "About you" or
+    the tax step undone is refused (409 `PROFILE_HAS_SHARE`: a field emptied, or a switch of kind,
+    which drops the birth date or registration number). Why: bookability counts payouts, not
+    details, so otherwise a paid owner could unreport themselves and the DAC7 data (#22) would go
+    missing under live bookings. A value can still be replaced. The way out is the share going
+    back to 0% (the primary's call for a co-owner); a primary owner, whose share can't fall, asks
+    support. The share check (`unreported`) and the save lock the same profile row with
+    `FOR NO KEY UPDATE` (in id order): not `FOR SHARE`, which the callers' later `verification`
+    update would upgrade, and two of them deadlock. `listing-owners.integration.test.ts` holds one
+    side's lock in a second transaction to prove each waits for the other. A direct database edit
+    can still empty the details; sending in checks them again.
 
 Our readings (2026-11-08), not asked; change any that are wrong:
 

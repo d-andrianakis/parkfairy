@@ -49,6 +49,8 @@ const DETAILS = {
 const TAX = { taxCountry: 'GR', taxId: '094259216', birthDate: '1980-02-03' };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+
 describe('co-ownership of a listing (#53–#56)', () => {
   let app: TestApp;
   let db: Database;
@@ -370,6 +372,273 @@ describe('co-ownership of a listing (#53–#56)', () => {
       ).body,
     ).toMatchObject({ code: 'SHARES_MISMATCH' });
     expect((await owners(coOwner, id)).owners.map((owner) => owner.sharePercent)).toEqual([70, 30]);
+  });
+
+  it('keeps an owner with a share from leaving their details incomplete (#22)', async () => {
+    const { primary, coOwner, id } = await coOwned();
+    const [first, second] = (await owners(primary, id)).owners;
+    await report(primary);
+    await report(coOwner);
+    const patch = (user: TestUser) => call(user, 'patch', '/owner/profile');
+
+    // A draft pays no one (sending it in checks every paid owner's details): nothing holds them.
+    await patch(primary).send({ firstName: null }).expect(200);
+    await patch(primary).send({ firstName: 'Ελένη' }).expect(200);
+    await publish(id);
+
+    // The primary has all of the share: no field cleared, no switch that drops the birth date.
+    expect((await patch(primary).send({ firstName: null }).expect(409)).body).toMatchObject({
+      code: 'PROFILE_HAS_SHARE',
+    });
+    expect((await patch(primary).send({ kind: 'business' }).expect(409)).body).toMatchObject({
+      code: 'PROFILE_HAS_SHARE',
+    });
+    // Nothing was kept of the refused saves; a change that leaves them complete is still fine.
+    await patch(primary).send({ firstName: 'Μαρία' }).expect(200);
+    const kept = (await call(primary, 'get', '/owner/profile').expect(200)).body as {
+      kind: string;
+      firstName: string;
+      tax: { birthDateSaved: boolean };
+    };
+    expect(kept).toMatchObject({ kind: 'individual', firstName: 'Μαρία' });
+    expect(kept.tax.birthDateSaved).toBe(true);
+
+    // A co-owner at 0% is paid nothing, so nothing holds their details.
+    await patch(coOwner).send({ firstName: null }).expect(200);
+    await patch(coOwner).send({ firstName: 'Ελένη' }).expect(200);
+
+    // Given a share, they are held to it, and the primary taking it back sets them free.
+    const shares = (a: number, b: number) => ({
+      shares: [
+        { ownerId: first?.id, percent: a },
+        { ownerId: second?.id, percent: b },
+      ],
+    });
+    await call(primary, 'put', `/owner/listings/${id}/shares`).send(shares(70, 30)).expect(200);
+    expect((await patch(coOwner).send({ lastName: null }).expect(409)).body).toMatchObject({
+      code: 'PROFILE_HAS_SHARE',
+    });
+    await call(primary, 'put', `/owner/listings/${id}/shares`).send(shares(100, 0)).expect(200);
+    await patch(coOwner).send({ lastName: null }).expect(200);
+  });
+
+  /** With staff or live: complete enough for the database, and past the stages that pay no one. */
+  async function publish(id: string) {
+    await db
+      .update(schema.parkingLocations)
+      .set({
+        name: 'Κοινό γκαράζ',
+        address: 'Οδός Δοκιμής 7, Καλαμάτα',
+        areaId: 'syntagma',
+        location: HERE,
+        hourlyRateMinor: 200,
+        cancellationPolicy: 'oneDay',
+        status: 'published',
+      })
+      .where(eq(schema.parkingLocations.id, id));
+  }
+
+  // The refusals below need the share and the save to meet: a second transaction holds one side's
+  // lock while the other's request is made, so the order is ours and no timing is left to luck.
+  const settlesWithin = (pending: Promise<unknown>, ms: number) =>
+    Promise.race([
+      pending.then(() => true),
+      new Promise<boolean>((done) => setTimeout(done, ms, false)),
+    ]);
+
+  async function holding(hold: (tx: Transaction) => Promise<void>) {
+    let release!: () => void;
+    const gate = new Promise<void>((open) => (release = open));
+    let held!: () => void;
+    const ready = new Promise<void>((open) => (held = open));
+    const holder = db.transaction(async (tx) => {
+      await hold(tx);
+      held();
+      await gate;
+    });
+    await ready;
+    return async () => {
+      release();
+      await holder;
+    };
+  }
+
+  it('makes a save wait for a share being given, then refuses it (the locks, not luck)', async () => {
+    const { primary, coOwner, id } = await coOwned();
+    await report(primary);
+    await report(coOwner);
+    const mine = await profileOf(coOwner);
+    // A share to the co-owner, given but not yet committed, with their profile row read shared:
+    // what `setShares` is in the middle of.
+    await publish(id);
+    const commit = await holding(async (tx) => {
+      await tx
+        .select()
+        .from(schema.ownerProfiles)
+        .where(eq(schema.ownerProfiles.id, mine?.id ?? ''))
+        .for('share');
+      await tx
+        .update(schema.listingOwners)
+        .set({ shareBps: 3000 })
+        .where(
+          and(
+            eq(schema.listingOwners.locationId, id),
+            eq(schema.listingOwners.ownerId, mine?.id ?? ''),
+          ),
+        );
+    });
+    const save = call(coOwner, 'patch', '/owner/profile')
+      .send({ firstName: null })
+      .then((response) => response);
+    expect(await settlesWithin(save, 500)).toBe(false);
+    await commit();
+    const answered = await save;
+    expect(answered.status).toBe(409);
+    expect(answered.body).toMatchObject({ code: 'PROFILE_HAS_SHARE' });
+  });
+
+  it('makes a share wait for a save being made, then refuses it (the locks, not luck)', async () => {
+    const { primary, coOwner, id } = await coOwned();
+    const [first, second] = (await owners(primary, id)).owners;
+    await report(primary);
+    await report(coOwner);
+    const mine = await profileOf(coOwner);
+    // The co-owner's save, emptying their name, made but not yet committed.
+    const commit = await holding(async (tx) => {
+      await tx
+        .update(schema.ownerProfiles)
+        .set({ firstName: null })
+        .where(eq(schema.ownerProfiles.id, mine?.id ?? ''));
+    });
+    const share = call(primary, 'put', `/owner/listings/${id}/shares`)
+      .send({
+        shares: [
+          { ownerId: first?.id, percent: 70 },
+          { ownerId: second?.id, percent: 30 },
+        ],
+      })
+      .then((response) => response);
+    expect(await settlesWithin(share, 500)).toBe(false);
+    await commit();
+    const answered = await share;
+    expect(answered.status).toBe(409);
+    expect(answered.body).toMatchObject({ code: 'OWNER_DETAILS_MISSING', owners: [second?.id] });
+  });
+
+  /** A co-owner with a share of 30%, their details and tax in. */
+  async function paidCoOwner() {
+    const { primary, coOwner, id } = await coOwned();
+    await report(primary);
+    await report(coOwner);
+    await publish(id);
+    const [first, second] = (await owners(primary, id)).owners;
+    await call(primary, 'put', `/owner/listings/${id}/shares`)
+      .send({
+        shares: [
+          { ownerId: first?.id, percent: 70 },
+          { ownerId: second?.id, percent: 30 },
+        ],
+      })
+      .expect(200);
+    return { primary, coOwner, id };
+  }
+
+  it.each([
+    ['firstName', null],
+    ['lastName', ''],
+    ['phone', null],
+    ['addressLine', ''],
+    ['city', null],
+    ['postalCode', ''],
+  ] as const)('refuses a paid owner emptying %s (as %j)', async (field, empty) => {
+    const { coOwner } = await paidCoOwner();
+    const refused = await call(coOwner, 'patch', '/owner/profile')
+      .send({ [field]: empty })
+      .expect(409);
+    expect(refused.body).toMatchObject({ code: 'PROFILE_HAS_SHARE' });
+    const kept = (await call(coOwner, 'get', '/owner/profile').expect(200)).body as Record<
+      string,
+      unknown
+    >;
+    expect(kept[field]).toBe((DETAILS as Record<string, string>)[field]);
+  });
+
+  it('lets a paid owner change what stays complete, kind sent again included', async () => {
+    const { coOwner } = await paidCoOwner();
+    const patch = (body: object) => call(coOwner, 'patch', '/owner/profile').send(body);
+    await patch({ kind: 'individual' }).expect(200);
+    await patch({ city: 'Πάτρα', phone: '+30 2610 000 000' }).expect(200);
+    // The tax step can't empty anything: a new number, a new birth date, a change of country with
+    // its number are all still theirs to make.
+    const tax = (body: object) => call(coOwner, 'put', '/owner/profile/tax').send(body);
+    await tax({ taxCountry: 'GR', taxId: '094259216', birthDate: '1981-04-05' }).expect(200);
+    await tax({ taxCountry: 'CY', taxId: '10259033P', birthDate: '1981-04-05' }).expect(200);
+    // A country changed with no number is refused, as for anyone.
+    await tax({ taxCountry: 'GR' }).expect(400);
+  });
+
+  it('holds a business owner’s legal name and registration number, and a switch back', async () => {
+    const { primary, coOwner, id } = await coOwned();
+    await report(primary);
+    // A business at 0%: the person's names stay on file, the birth date goes with the switch.
+    await report(coOwner);
+    const patch = (body: object) => call(coOwner, 'patch', '/owner/profile').send(body);
+    await patch({ kind: 'business', legalName: 'Δοκιμή ΙΚΕ' }).expect(200);
+    await call(coOwner, 'put', '/owner/profile/tax')
+      .send({ taxCountry: 'GR', registrationNumber: '123456789012' })
+      .expect(200);
+    // Free to switch while unpaid.
+    await patch({ kind: 'individual' }).expect(200);
+    await call(coOwner, 'put', '/owner/profile/tax').send(TAX).expect(200);
+    await patch({ kind: 'business' }).expect(200);
+    await call(coOwner, 'put', '/owner/profile/tax')
+      .send({ taxCountry: 'GR', registrationNumber: '123456789012' })
+      .expect(200);
+
+    await publish(id);
+    const [first, second] = (await owners(primary, id)).owners;
+    await call(primary, 'put', `/owner/listings/${id}/shares`)
+      .send({
+        shares: [
+          { ownerId: first?.id, percent: 70 },
+          { ownerId: second?.id, percent: 30 },
+        ],
+      })
+      .expect(200);
+    for (const body of [{ legalName: null }, { legalName: '' }, { kind: 'individual' }]) {
+      expect((await patch(body).expect(409)).body).toMatchObject({ code: 'PROFILE_HAS_SHARE' });
+    }
+    await patch({ kind: 'business' }).expect(200);
+    await patch({ legalName: 'Άλλη ΙΚΕ' }).expect(200);
+  });
+
+  it('holds a share on any of an owner’s listings, until the last is gone', async () => {
+    const { primary, coOwner, id } = await coOwned();
+    await report(primary);
+    await report(coOwner);
+    const other = await person();
+    await report(other);
+    const second = await newListing(other);
+    await publish(second);
+    await publish(id);
+    const { token } = await invite(other, second, coOwner.email);
+    await call(coOwner, 'post', '/owner/invites/accept').send({ token }).expect(200);
+    // 0% on the first listing, 30% on the second: the second alone holds them.
+    const [a, b] = (await owners(other, second)).owners;
+    await call(other, 'put', `/owner/listings/${second}/shares`)
+      .send({
+        shares: [
+          { ownerId: a?.id, percent: 70 },
+          { ownerId: b?.id, percent: 30 },
+        ],
+      })
+      .expect(200);
+    const clear = () => call(coOwner, 'patch', '/owner/profile').send({ lastName: null });
+    expect((await clear().expect(409)).body).toMatchObject({ code: 'PROFILE_HAS_SHARE' });
+    // Leaving the listing that paid them frees them; the one that never paid them is no hold.
+    await call(coOwner, 'post', `/owner/listings/${second}/leave`).expect(204);
+    expect(id).not.toBe(second);
+    await clear().expect(200);
   });
 
   it('gives a leaving or removed co-owner’s share back to the primary', async () => {
