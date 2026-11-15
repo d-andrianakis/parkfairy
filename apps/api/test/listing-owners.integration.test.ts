@@ -163,6 +163,17 @@ describe('co-ownership of a listing (#53–#56)', () => {
     const ids = users.map((user) => user.id);
     if (ids.length > 0) {
       await db.delete(schema.emailOutbox).where(inArray(schema.emailOutbox.userId, ids));
+      await db
+        .delete(schema.payoutAccounts)
+        .where(
+          inArray(
+            schema.payoutAccounts.ownerId,
+            db
+              .select({ id: schema.ownerProfiles.id })
+              .from(schema.ownerProfiles)
+              .where(inArray(schema.ownerProfiles.userId, ids)),
+          ),
+        );
       await db.delete(schema.ownerProfiles).where(inArray(schema.ownerProfiles.userId, ids));
       await db.delete(schema.users).where(inArray(schema.users.id, ids));
     }
@@ -641,6 +652,213 @@ describe('co-ownership of a listing (#53–#56)', () => {
     await clear().expect(200);
   });
 
+  describe('handing the primary role to a co-owner (two steps)', () => {
+    /** A payout account in the state given, as Stripe's webhook would leave it. */
+    async function payouts(user: TestUser, status: 'active' | 'restricted' = 'active') {
+      const mine = await profileOf(user);
+      await db
+        .insert(schema.payoutAccounts)
+        .values({
+          ownerId: mine?.id ?? '',
+          stripeAccountId: `acct_${randomUUID().replaceAll('-', '').slice(0, 16)}`,
+          status,
+        })
+        .onConflictDoUpdate({ target: schema.payoutAccounts.ownerId, set: { status } });
+    }
+    const offer = (user: TestUser, id: string, ownerId: string | undefined) =>
+      call(user, 'post', `/owner/listings/${id}/handover`).send({ ownerId });
+
+    /** A listing whose co-owner is ready to lead: details, tax and an active payout account. */
+    async function ready() {
+      const { primary, coOwner, id } = await coOwned();
+      await report(primary);
+      await report(coOwner);
+      await payouts(coOwner);
+      const [first, second] = (await owners(primary, id)).owners;
+      return { primary, coOwner, id, first, second };
+    }
+
+    it('moves the role only when the co-owner accepts, the old primary staying as a co-owner', async () => {
+      const { primary, coOwner, id, second } = await ready();
+      const offered = ListingOwnersSchema.parse(
+        (await offer(primary, id, second?.id).expect(200)).body,
+      );
+      expect(offered.handover).toMatchObject({ toOwnerId: second?.id, canAccept: false });
+      // Nothing changed yet; the co-owner sees it and may accept, everyone may see it.
+      const seen = await owners(coOwner, id);
+      expect(seen.role).toBe('co_owner');
+      expect(seen.handover).toMatchObject({ canAccept: true, canWithdraw: true });
+      await call(primary, 'put', `/owner/listings/${id}/shares`)
+        .send({
+          shares: [
+            { ownerId: offered.owners[0]?.id, percent: 60 },
+            { ownerId: second?.id, percent: 40 },
+          ],
+        })
+        .expect(200);
+
+      const now = ListingOwnersSchema.parse(
+        (await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(200)).body,
+      );
+      expect(now.role).toBe('primary');
+      expect(now.handover).toBeNull();
+      // Roles swapped, shares as they were, the listing's owner_id the new primary's.
+      expect(now.owners.map((owner) => [owner.you, owner.role, owner.sharePercent])).toEqual([
+        [true, 'primary', 40],
+        [false, 'co_owner', 60],
+      ]);
+      const [row] = await db
+        .select({ ownerId: schema.parkingLocations.ownerId })
+        .from(schema.parkingLocations)
+        .where(eq(schema.parkingLocations.id, id));
+      expect(row?.ownerId).toBe(second?.id);
+      // The rights went with the role: the old primary can no longer set shares or remove.
+      for (const refused of [
+        () => call(primary, 'put', `/owner/listings/${id}/shares`).send({ shares: [] }),
+        () => call(primary, 'delete', `/owner/listings/${id}/owners/${second?.id}`),
+      ]) {
+        expect([400, 403]).toContain((await refused()).status);
+      }
+      expect((await owners(primary, id)).role).toBe('co_owner');
+      await call(coOwner, 'put', `/owner/listings/${id}/shares`)
+        .send({
+          shares: [
+            { ownerId: now.owners[1]?.id, percent: 100 },
+            { ownerId: second?.id, percent: 0 },
+          ],
+        })
+        .expect(200);
+      // The new primary is staff's to verify, as a paid owner is.
+      const [verified] = await db
+        .select({ verification: schema.ownerProfiles.verification })
+        .from(schema.ownerProfiles)
+        .where(eq(schema.ownerProfiles.userId, coOwner.id));
+      expect(verified?.verification).toBe('pending');
+      // And only the primary now deletes the draft: the one who handed it over is refused.
+      expect((await call(primary, 'delete', `/owner/listings/${id}`)).status).toBe(403);
+      // Accepting again is no offer.
+      await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(404);
+    });
+
+    it('refuses a draft’s deletion by a primary demoted while it waited on the lock', async () => {
+      const { primary, id, first, second } = await ready();
+      // What accepting does, held open: the listing locked, the roles swapped, not yet committed.
+      const commit = await holding(async (tx) => {
+        await tx
+          .select({ id: schema.parkingLocations.id })
+          .from(schema.parkingLocations)
+          .where(eq(schema.parkingLocations.id, id))
+          .for('update');
+        await tx
+          .update(schema.listingOwners)
+          .set({ role: 'co_owner' })
+          .where(
+            and(
+              eq(schema.listingOwners.locationId, id),
+              eq(schema.listingOwners.ownerId, first?.id ?? ''),
+            ),
+          );
+        await tx
+          .update(schema.listingOwners)
+          .set({ role: 'primary' })
+          .where(
+            and(
+              eq(schema.listingOwners.locationId, id),
+              eq(schema.listingOwners.ownerId, second?.id ?? ''),
+            ),
+          );
+      });
+      // They were the primary when they asked: the check before the lock passes, and waits.
+      const deleting = call(primary, 'delete', `/owner/listings/${id}`).then(
+        (response) => response,
+      );
+      expect(await settlesWithin(deleting, 500)).toBe(false);
+      await commit();
+      expect((await deleting).status).toBe(403);
+      const [still] = await db
+        .select({ id: schema.parkingLocations.id })
+        .from(schema.parkingLocations)
+        .where(eq(schema.parkingLocations.id, id));
+      expect(still?.id).toBe(id);
+    });
+
+    it('is the primary’s to offer, to a co-owner who is ready to lead', async () => {
+      const { primary, coOwner, id, first, second } = await ready();
+      expect((await offer(coOwner, id, first?.id).expect(403)).body).toMatchObject({
+        code: 'PRIMARY_ONLY',
+      });
+      // Not oneself, not a stranger, not nobody.
+      for (const target of [first?.id, randomUUID()]) {
+        expect((await offer(primary, id, target).expect(404)).body).toMatchObject({
+          code: 'OWNER_NOT_FOUND',
+        });
+      }
+      await offer(primary, id, 'not-an-id').expect(400);
+      await offer(await person(), id, second?.id).expect(404);
+      // Ready means details and tax, and an active payout account.
+      await payouts(coOwner, 'restricted');
+      expect((await offer(primary, id, second?.id).expect(409)).body).toMatchObject({
+        code: 'PAYOUTS_NOT_ACTIVE',
+      });
+      await payouts(coOwner);
+      await db
+        .update(schema.ownerProfiles)
+        .set({ phone: null })
+        .where(eq(schema.ownerProfiles.id, second?.id ?? ''));
+      expect((await offer(primary, id, second?.id).expect(409)).body).toMatchObject({
+        code: 'OWNER_DETAILS_MISSING',
+        owners: [second?.id],
+      });
+    });
+
+    it('lets the primary take the offer back and the co-owner decline it, nobody else', async () => {
+      const { primary, coOwner, id, second } = await ready();
+      const third = await person();
+      const { token } = await invite(primary, id, third.email);
+      await call(third, 'post', '/owner/invites/accept').send({ token }).expect(200);
+      const del = (user: TestUser) => call(user, 'delete', `/owner/listings/${id}/handover`);
+
+      await del(primary).expect(404);
+      await offer(primary, id, second?.id).expect(200);
+      expect((await del(third).expect(403)).body).toMatchObject({ code: 'PRIMARY_ONLY' });
+      expect((await del(primary).expect(200)).body).toMatchObject({ handover: null });
+      await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(404);
+
+      await offer(primary, id, second?.id).expect(200);
+      expect((await del(coOwner).expect(200)).body).toMatchObject({ handover: null });
+      expect((await owners(primary, id)).role).toBe('primary');
+    });
+
+    it('lapses after seven days, is replaced by a new offer, and goes with a removed co-owner', async () => {
+      const { primary, coOwner, id, second } = await ready();
+      await offer(primary, id, second?.id).expect(200);
+      await db
+        .update(schema.listingHandovers)
+        .set({ expiresAt: new Date(Date.now() - 1000) })
+        .where(eq(schema.listingHandovers.locationId, id));
+      expect(
+        (await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(409)).body,
+      ).toMatchObject({ code: 'HANDOVER_EXPIRED' });
+      expect((await owners(primary, id)).handover).toBeNull();
+      // A lapsed one isn't in the way of the next.
+      await offer(primary, id, second?.id).expect(200);
+      await call(primary, 'delete', `/owner/listings/${id}/owners/${second?.id}`).expect(200);
+      expect((await owners(primary, id)).handover).toBeNull();
+    });
+
+    it('checks again when accepting: payouts that went wrong since, or a co-owner not offered', async () => {
+      const { primary, coOwner, id, second } = await ready();
+      await offer(primary, id, second?.id).expect(200);
+      await payouts(coOwner, 'restricted');
+      expect(
+        (await call(coOwner, 'post', `/owner/listings/${id}/handover/accept`).expect(409)).body,
+      ).toMatchObject({ code: 'PAYOUTS_NOT_ACTIVE' });
+      // Still the co-owner, the primary still the primary.
+      expect((await owners(coOwner, id)).role).toBe('co_owner');
+      await call(primary, 'post', `/owner/listings/${id}/handover/accept`).expect(404);
+    });
+  });
+
   it('gives a leaving or removed co-owner’s share back to the primary', async () => {
     const { primary, coOwner, id } = await coOwned();
     await report(primary);
@@ -864,6 +1082,29 @@ describe('co-ownership of a listing (#53–#56)', () => {
       .set({ createdAt: new Date(Date.now() - 2 * DAY_MS) })
       .where(eq(schema.listingInvites.invitedBy, me));
     await send(`fresh-${randomUUID()}@example.com`).expect(200);
+  });
+
+  it('counts an inbox once whatever +tag the address carries', async () => {
+    const primary = await person();
+    const id = await newListing(primary);
+    const name = `tagged-${randomUUID()}`;
+    const send = (tag: string) =>
+      call(primary, 'post', `/owner/listings/${id}/invites`).send({
+        email: `${name}${tag}@example.com`,
+        locale: 'en',
+      });
+    for (let n = 1; n <= INVITES_PER_ADDRESS_WEEK; n++) await send(`+${n}`).expect(200);
+    // Another tag, or none: the same inbox, and its week's invitations are used up.
+    for (const tag of ['+more', '']) {
+      expect((await send(tag).expect(409)).body).toMatchObject({
+        code: 'TOO_MANY_INVITES',
+        limit: 'address',
+      });
+    }
+    // Another inbox is unaffected.
+    await call(primary, 'post', `/owner/listings/${id}/invites`)
+      .send({ email: `other-${randomUUID()}@example.com`, locale: 'en' })
+      .expect(200);
   });
 
   it('writes the invitation in the language of the account it goes to, once confirmed', async () => {

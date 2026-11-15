@@ -1375,7 +1375,9 @@ between 4.2 and 4.3.
 
 Left open:
 
-- [ ] Handing the primary role to a co-owner; listing status emails go to the primary alone
+- [~] Handing the primary role to a co-owner (2026-11-15, decisions in memory.md): built and tested
+  through the API and the owners page; see "Handing over the primary role" below. Open: its
+  smoke test, native-speaker pass, and an email to the old and new primary
 - [ ] Native speaker: `Owner.owners.*`, `Owner.invite.*`, `Owner.errors.TOO_MANY_INVITES`,
       `Owner.errors.OWNER_DETAILS_MISSING`, `Owner.dashboard.owners`, `Owner.proof.primaryOnly`,
       the invite email; «Κύρια ιδιοκτησία» and «Συνιδιοκτησία» as role names; whether «ο κύριος
@@ -1392,8 +1394,11 @@ Left open:
       form's refusals in both languages. Sending in still checks the details, as a second line
 - [ ] Smoke: `co-ownership.smoke.ts` has no step for the refusal (a co-owner given a share on a live
       listing empties a field and the page says why); not run in this round
-- [ ] Security residual: one inbox can still get a day's 20 invites through `+tag` or dotted
-      variants of its address (the per-address cap is per exact address)
+- [x] Security residual (2026-11-15): invitations to one listing are counted per inbox, `+tag`
+      stripped (`a+1@x`, `a+2@x` and `a@x` share the week's two). Still open, by design: the same
+      address may be asked to another listing (a day's 20 from one owner is the bound), and dotted
+      Gmail variants count as different inboxes (stripping dots is Gmail's rule, not every
+      provider's)
 - [ ] Accessibility advisories: withdrawing is one press, and with two invites a week per address
       a mistaken one can't always be redone at once; the panel's status line sits at its top,
       far from the button at 200% or 320 px, and moves what follows once it has text
@@ -1403,6 +1408,35 @@ Left open:
       invite page carries the whole owner catalogue; the owners page's metadata asks the API
       before a signed-out visitor is sent to sign in; past the key's day, `transferMadeFor` lists
       a booking's transfers once per payee; `bookableColumns.ownerUserId` is no longer read
+
+### Handing over the primary role (2026-11-15)
+
+Two steps (offer by the primary, accept by the co-owner), the old primary staying as a co-owner
+with their share, the new one needing details, tax, an active payout account and room under the
+listing limit, and the role's rights (removal, shares, deeds, deletion, status emails) moving with it.
+
+- [x] **Implemented**: `listing_handovers` (migration 0028); `POST …/handover`,
+      `POST …/handover/accept`, `DELETE …/handover` (withdraw by the primary, decline by the
+      co-owner); readiness checked at the offer and again under the listing lock at the accept; an
+      offer ends when its co-owner leaves or is removed, lapses after 7 days, and is replaced by
+      the next; the owners page's handover card (two presses each, focus and announcements)
+- [x] **Unit tests**: contracts, the card (offer, take back, accept, decline, refusal, nothing for
+      a co-owner with no offer, Greek, axe)
+- [x] **Integration tests** (`listing-owners.integration.test.ts`): the swap and its rights, who may
+      offer and to whom, readiness (details, payouts), withdraw and decline, lapse and replace,
+      removal, a payout that went wrong before the accept, and a primary demoted while their
+      deletion waited on the lock (fails without the fix)
+- [x] **Security** review: no bypass. Fixed: a demoted primary's deletion of a draft or a deed
+      racing the accept (the role is now read under the lock); the new primary set to pending for
+      staff's verification
+- [ ] Smoke test for the handover; performance, accessibility and i18n review agents not run yet
+- [ ] Security lows: `transferMadeFor`'s `primary` is read live from the listing (only matters for a
+      legacy transfer without owner metadata retried after a handover); an offer's `TOO_MANY_LISTINGS`
+      tells a primary that their co-owner owns that many listings; settled offers are never purged;
+      the old primary can no longer open the deeds they uploaded (GDPR access is support's)
+- [ ] Emails: neither the old nor the new primary is told by email (the outbox has no kind for it)
+- [ ] Native speaker: `Owner.owners.handover*`, `keepOffer`, `Owner.errors.HANDOVER_*`,
+      `PAYOUTS_NOT_ACTIVE`
 
 ## Phase 5: Owner and admin dashboards
 

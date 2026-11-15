@@ -12,10 +12,13 @@ import {
   type ListingInviteInput,
   type ListingOwnerRole,
   type ListingOwners,
+  type ListingHandoverInput,
   type ListingSharesInput,
+  LISTING_HANDOVER_DAYS,
+  OWNER_LISTINGS_MAX,
 } from '@parkfairy/contracts';
 import { hashInviteToken, schema, type Database } from '@parkfairy/database';
-import { and, asc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, or, sql, type AnyColumn } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { DB } from '../database/database.module.js';
 import type { Reader } from '../parking/listing-data.js';
@@ -30,6 +33,7 @@ const profile = schema.ownerProfiles;
 const users = schema.users;
 const payout = schema.payoutAccounts;
 const outbox = schema.emailOutbox;
+const handovers = schema.listingHandovers;
 
 const inviterProfile = alias(schema.ownerProfiles, 'inviter_profile');
 const inviterUser = alias(schema.users, 'inviter_user');
@@ -52,10 +56,14 @@ interface Membership {
   role: ListingOwnerRole;
 }
 
-function notFound(code: 'OWNER_NOT_FOUND' | 'INVITE_NOT_FOUND') {
+function notFound(code: 'OWNER_NOT_FOUND' | 'INVITE_NOT_FOUND' | 'HANDOVER_NOT_FOUND') {
   return new NotFoundException({ statusCode: 404, error: 'Not Found', message: code, code });
 }
 
+/** An offer of the primary role not yet settled: neither accepted nor withdrawn (it may have lapsed). */
+const unsettledHandover = and(isNull(handovers.acceptedAt), isNull(handovers.withdrawnAt));
+/** An offer still open: unsettled and not past its seven days. */
+const openHandover = and(unsettledHandover, gt(handovers.expiresAt, sql`now()`));
 /** An invite still open: neither accepted nor withdrawn, and its link not past its time. */
 const openInvite = and(
   isNull(invites.acceptedAt),
@@ -171,10 +179,12 @@ export class ListingOwnersService {
     inviterId: string,
     address: string,
   ): Promise<void> {
+    // One inbox, whatever tag is on the address: `a+1@x` and `a+2@x` fill the same one.
+    const inbox = inboxOfAddress(address);
     const [recent] = await tx
       .select({
         toAddress: sql<number>`count(*) filter (where ${invites.locationId} = ${listingId}
-          and ${invites.email} = ${address}
+          and ${inboxOf(invites.email)} = ${inbox}
           and ${invites.createdAt} > now() - interval '7 days')::int`,
         byInviter: sql<number>`count(*) filter (where ${invites.invitedBy} = ${inviterId}
           and ${invites.createdAt} > now() - interval '1 day')::int`,
@@ -185,7 +195,7 @@ export class ListingOwnersService {
         or(
           and(
             eq(invites.locationId, listingId),
-            eq(invites.email, address),
+            sql`${inboxOf(invites.email)} = ${inbox}`,
             sql`${invites.createdAt} > now() - interval '7 days'`,
           ),
           and(
@@ -262,6 +272,134 @@ export class ListingOwnersService {
           .where(and(inArray(profile.id, paid), eq(profile.verification, 'unverified')));
       }
     });
+  }
+
+  /**
+   * Offers the primary role to a co-owner, who must accept (two steps). Nothing changes until
+   * they do. The co-owner must be ready to lead (see `readyToLead`); an earlier open offer is
+   * replaced. Only the primary offers it.
+   */
+  async offerHandover(
+    userId: string,
+    listingId: string,
+    { ownerId }: ListingHandoverInput,
+  ): Promise<ListingOwners> {
+    return this.change(userId, listingId, async (tx, me) => {
+      if (me.role !== 'primary') throw primaryOnly();
+      const [target] = await tx
+        .select({ id: owners.id })
+        .from(owners)
+        .where(
+          and(
+            eq(owners.locationId, listingId),
+            eq(owners.ownerId, ownerId),
+            eq(owners.role, 'co_owner'),
+          ),
+        );
+      if (!target) throw notFound('OWNER_NOT_FOUND');
+      await this.readyToLead(tx, ownerId);
+      await tx
+        .update(handovers)
+        .set({ withdrawnAt: new Date() })
+        .where(and(eq(handovers.locationId, listingId), unsettledHandover));
+      await tx.insert(handovers).values({
+        locationId: listingId,
+        fromOwnerId: me.ownerId,
+        toOwnerId: ownerId,
+        expiresAt: new Date(Date.now() + LISTING_HANDOVER_DAYS * 24 * 60 * 60 * 1000),
+      });
+    });
+  }
+
+  /** Takes the offer back (the primary) or declines it (the co-owner offered the role). */
+  async withdrawHandover(userId: string, listingId: string): Promise<ListingOwners> {
+    return this.change(userId, listingId, async (tx, me) => {
+      const [offer] = await tx
+        .select({ id: handovers.id, toOwnerId: handovers.toOwnerId })
+        .from(handovers)
+        .where(and(eq(handovers.locationId, listingId), openHandover));
+      if (!offer) throw notFound('HANDOVER_NOT_FOUND');
+      if (me.role !== 'primary' && offer.toOwnerId !== me.ownerId) throw primaryOnly();
+      await tx.update(handovers).set({ withdrawnAt: new Date() }).where(eq(handovers.id, offer.id));
+    });
+  }
+
+  /**
+   * The co-owner offered the role accepts: they become the primary (the listing's `owner_id`, who
+   * removes owners, sets shares, opens the deeds and gets the status emails), the old primary a
+   * co-owner with their share as it was. Everything is checked again under the listing's lock.
+   */
+  async acceptHandover(userId: string, listingId: string): Promise<ListingOwners> {
+    return this.change(userId, listingId, async (tx, me) => {
+      const [offer] = await tx
+        .select()
+        .from(handovers)
+        .where(
+          and(
+            eq(handovers.locationId, listingId),
+            eq(handovers.toOwnerId, me.ownerId),
+            isNull(handovers.acceptedAt),
+            isNull(handovers.withdrawnAt),
+          ),
+        );
+      if (!offer) throw notFound('HANDOVER_NOT_FOUND');
+      if (offer.expiresAt <= new Date()) throw conflict('HANDOVER_EXPIRED');
+      // Still the one who offered it (a stale offer is no offer).
+      const [from] = await tx
+        .select({ id: owners.id })
+        .from(owners)
+        .where(
+          and(
+            eq(owners.locationId, listingId),
+            eq(owners.ownerId, offer.fromOwnerId),
+            eq(owners.role, 'primary'),
+          ),
+        );
+      if (!from) throw notFound('HANDOVER_NOT_FOUND');
+      await this.readyToLead(tx, me.ownerId, listingId);
+      // The old primary first: only one primary at a time.
+      await tx
+        .update(owners)
+        .set({ role: 'co_owner' })
+        .where(and(eq(owners.locationId, listingId), eq(owners.ownerId, offer.fromOwnerId)));
+      await tx
+        .update(owners)
+        .set({ role: 'primary' })
+        .where(and(eq(owners.locationId, listingId), eq(owners.ownerId, me.ownerId)));
+      await tx.update(listing).set({ ownerId: me.ownerId }).where(eq(listing.id, listingId));
+      // The primary of a listing with staff is theirs to verify, as a share or a submission makes it.
+      await tx
+        .update(profile)
+        .set({ verification: 'pending' })
+        .where(and(eq(profile.id, me.ownerId), eq(profile.verification, 'unverified')));
+      await tx.update(handovers).set({ acceptedAt: new Date() }).where(eq(handovers.id, offer.id));
+      me.role = 'primary';
+    });
+  }
+
+  /**
+   * What the primary must be: their details and tax in (#22), an active payout account (the
+   * listing stays bookable), and room for one more listing of their own. Names who is missing.
+   */
+  private async readyToLead(tx: Transaction, ownerId: string, listingId?: string): Promise<void> {
+    const missing = await unreported(tx, [ownerId]);
+    if (missing.length > 0) throw conflict('OWNER_DETAILS_MISSING', { owners: missing });
+    const [account] = await tx
+      .select({ status: payout.status })
+      .from(payout)
+      .where(eq(payout.ownerId, ownerId));
+    if (account?.status !== 'active') throw conflict('PAYOUTS_NOT_ACTIVE');
+    // Their own listings count against the limit that applies to a primary owner.
+    const [{ count } = { count: 0 }] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(listing)
+      .where(
+        and(
+          eq(listing.ownerId, ownerId),
+          listingId ? sql`${listing.id} <> ${listingId}` : sql`true`,
+        ),
+      );
+    if (count >= OWNER_LISTINGS_MAX) throw conflict('TOO_MANY_LISTINGS');
   }
 
   /** The primary removes a co-owner; their share goes back to the primary. */
@@ -424,6 +562,7 @@ export class ListingOwnersService {
             role: me.role,
             owners: [],
             invites: [],
+            handover: null,
             payable: false,
             room: 0,
           });
@@ -443,6 +582,18 @@ export class ListingOwnersService {
       )
       .returning({ shareBps: owners.shareBps });
     if (!gone) throw notFound('OWNER_NOT_FOUND');
+    // An offer of the primary role to them goes with them.
+    await tx
+      .update(handovers)
+      .set({ withdrawnAt: new Date() })
+      .where(
+        and(
+          eq(handovers.locationId, listingId),
+          eq(handovers.toOwnerId, ownerId),
+          isNull(handovers.acceptedAt),
+          isNull(handovers.withdrawnAt),
+        ),
+      );
     // Their open invites go with them: a removed owner can't come back through one.
     await tx
       .update(invites)
@@ -478,7 +629,7 @@ export class ListingOwnersService {
   }
 
   private async read(db: Reader, me: Membership, userId: string): Promise<ListingOwners> {
-    const [info, rows, open] = await Promise.all([
+    const [info, rows, open, offers] = await Promise.all([
       db
         .select({ name: listing.name, contentLocale: listing.contentLocale })
         .from(listing)
@@ -512,7 +663,12 @@ export class ListingOwnersService {
         .leftJoin(inviterUser, eq(inviterUser.id, inviterProfile.userId))
         .where(and(eq(invites.locationId, me.listingId), openInvite))
         .orderBy(asc(invites.createdAt)),
+      db
+        .select({ toOwnerId: handovers.toOwnerId, expiresAt: handovers.expiresAt })
+        .from(handovers)
+        .where(and(eq(handovers.locationId, me.listingId), openHandover)),
     ]);
+    const [offer] = offers;
     const [row] = info;
     if (!row) throw listingNotFound();
     const primary = me.role === 'primary';
@@ -545,11 +701,30 @@ export class ListingOwnersService {
           canWithdraw: theirs,
         };
       }),
+      handover: offer
+        ? {
+            toOwnerId: offer.toOwnerId,
+            expiresAt: offer.expiresAt.toISOString(),
+            canAccept: offer.toOwnerId === me.ownerId,
+            canWithdraw: primary || offer.toOwnerId === me.ownerId,
+          }
+        : null,
       payable: rows.every((owner) => owner.shareBps === 0 || owner.payouts === 'active'),
       room: Math.max(0, LISTING_OWNERS_MAX - rows.length - open.length),
     });
   }
 }
+
+/** An address without its `+tag`, which mail providers deliver to the same inbox. */
+export function inboxOfAddress(address: string): string {
+  const at = address.lastIndexOf('@');
+  if (at < 0) return address;
+  return `${address.slice(0, at).split('+')[0]}${address.slice(at)}`;
+}
+
+/** The same in SQL, for an address already stored (lower case, as invites keep them). */
+const inboxOf = (email: AnyColumn) =>
+  sql`(split_part(split_part(${email}, '@', 1), '+', 1) || '@' || split_part(${email}, '@', 2))`;
 
 /** The account invited: its address, confirmed. */
 function invitedIs(reader: InviteReader, email: string): boolean {

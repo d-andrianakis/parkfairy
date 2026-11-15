@@ -28,6 +28,7 @@ import {
   InviteAcceptedSchema,
   InvitePreviewSchema,
   InviteTokenInputSchema,
+  ListingHandoverInputSchema,
   ListingInviteInputSchema,
   ListingOwnersSchema,
   ListingSharesInputSchema,
@@ -139,6 +140,51 @@ export class ListingOwnersController {
     @Param('ownerId') ownerId: string,
   ): Promise<ListingOwners> {
     return this.owners.removeOwner(user.id, id, ownerId);
+  }
+
+  @Post('listings/:id/handover')
+  @HttpCode(200)
+  @Throttle(CHANGE_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiBody({ schema: schemaRef(ListingHandoverInputSchema) })
+  @ApiOkResponse({ schema: schemaRef(ListingOwnersSchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiForbiddenResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })
+  offerListingHandover(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<ListingOwners> {
+    return this.owners.offerHandover(user.id, id, parseOrThrow(ListingHandoverInputSchema, body));
+  }
+
+  @Post('listings/:id/handover/accept')
+  @HttpCode(200)
+  @Throttle(CHANGE_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiOkResponse({ schema: schemaRef(ListingOwnersSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })
+  acceptListingHandover(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ): Promise<ListingOwners> {
+    return this.owners.acceptHandover(user.id, id);
+  }
+
+  @Delete('listings/:id/handover')
+  @Throttle(CHANGE_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiOkResponse({ schema: schemaRef(ListingOwnersSchema) })
+  @ApiForbiddenResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  withdrawListingHandover(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ): Promise<ListingOwners> {
+    return this.owners.withdrawHandover(user.id, id);
   }
 
   @Post('listings/:id/leave')

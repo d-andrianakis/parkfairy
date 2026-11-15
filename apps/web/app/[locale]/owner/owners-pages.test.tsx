@@ -59,6 +59,7 @@ const owners = (): ListingOwners => ({
     },
   ],
   invites: [],
+  handover: null,
   payable: false,
   room: 9,
 });

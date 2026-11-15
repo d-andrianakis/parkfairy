@@ -17,6 +17,9 @@ import { ListingOwnersPanel } from './listing-owners';
 
 vi.mock('@parkfairy/api-client', () => ({
   client: { setConfig: vi.fn() },
+  acceptListingHandover: vi.fn(),
+  offerListingHandover: vi.fn(),
+  withdrawListingHandover: vi.fn(),
   inviteListingOwner: vi.fn(),
   leaveListing: vi.fn(),
   removeListingOwner: vi.fn(),
@@ -64,6 +67,7 @@ const owners = (overrides: Partial<ListingOwners> = {}): ListingOwners => ({
       canWithdraw: true,
     },
   ],
+  handover: null,
   payable: true,
   room: 7,
   ...overrides,
@@ -122,6 +126,7 @@ describe('ListingOwnersPanel, as the primary owner', () => {
             ...owner,
             sharePercent: owner.id === MARIA ? 60 : 40,
           })),
+          handover: null,
           payable: false,
         }),
       ) as never,

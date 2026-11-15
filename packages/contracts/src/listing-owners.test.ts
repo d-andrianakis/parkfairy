@@ -5,6 +5,8 @@ import {
   InviteTokenInputSchema,
   LISTING_OWNER_ERROR_CODES,
   ListingInviteInputSchema,
+  ListingHandoverInputSchema,
+  ListingHandoverSchema,
   ListingOwnersSchema,
   ListingSharesInputSchema,
 } from './listing-owners.js';
@@ -119,6 +121,7 @@ describe('ListingOwnersSchema', () => {
         },
       ],
       invites: [],
+      handover: null,
       payable: true,
       room: 8,
     });
@@ -130,5 +133,28 @@ describe('ListingOwnersSchema', () => {
     expect(LISTING_OWNER_ERROR_CODES).toContain('PRIMARY_ONLY');
     expect(LISTING_OWNER_ERROR_CODES).toContain('INVITE_FOR_ANOTHER_ACCOUNT');
     expect(new Set(LISTING_OWNER_ERROR_CODES).size).toBe(LISTING_OWNER_ERROR_CODES.length);
+  });
+});
+
+describe('ListingHandoverSchema', () => {
+  const offer = {
+    toOwnerId: B,
+    expiresAt: '2026-11-22T10:00:00Z',
+    canAccept: false,
+    canWithdraw: true,
+  };
+
+  it('says who is offered the primary role, until when, and what the asker may do', () => {
+    expect(ListingHandoverSchema.parse(offer)).toEqual(offer);
+  });
+
+  it('refuses an offer with no one named or no end', () => {
+    expect(ListingHandoverSchema.safeParse({ ...offer, toOwnerId: 'x' }).success).toBe(false);
+    expect(ListingHandoverSchema.safeParse({ ...offer, expiresAt: null }).success).toBe(false);
+  });
+
+  it('takes one owner’s id as the input', () => {
+    expect(ListingHandoverInputSchema.safeParse({ ownerId: B }).success).toBe(true);
+    expect(ListingHandoverInputSchema.safeParse({ ownerId: 'x' }).success).toBe(false);
   });
 });

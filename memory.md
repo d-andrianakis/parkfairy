@@ -195,6 +195,16 @@ Answered by the product owner on 2026-11-13, for disputes (4.3):
 60. **Nothing automatic happens to the driver's account**: the dispute is recorded on the booking,
     and any action is support's.
 
+Answered by the product owner on 2026-11-15, for handing over the primary role:
+
+61. **Two steps**: the primary offers, the co-owner accepts (7 days, withdrawable, declinable).
+62. **The old primary stays as a co-owner**, keeping their share and losing removal, shares, deeds
+    and deletion.
+63. **The new primary needs details and tax, an active payout account, and room under the listing
+    limit**, checked at the offer and again at the accept.
+64. **The deeds, status emails and deletion go with the role** (`parking_locations.owner_id` moves
+    with it). Status emails still go to the primary alone.
+
 Our readings for co-ownership (2026-11-13), not asked; change any that are wrong:
 
 - **The primary owner is the listing's `owner_id`**, as before; every owner, the primary too, has a

@@ -22,6 +22,8 @@ export const INVITES_PER_DAY = 20;
 export const INVITES_PER_ADDRESS_WEEK = 2;
 /** How long an invite's link works, from when it was sent (#56). */
 export const LISTING_INVITE_DAYS = 7;
+/** How long an offer of the primary role stays open, from when it was made. */
+export const LISTING_HANDOVER_DAYS = 7;
 /** Shares are whole percentages; stored as basis points (100 = 1%). */
 export const SHARE_BPS_PER_PERCENT = 100;
 
@@ -64,6 +66,20 @@ export const ListingInviteSchema = z
   .register(contractsRegistry, { id: 'ListingInvite' });
 export type ListingInvite = z.infer<typeof ListingInviteSchema>;
 
+/** An open offer of the primary role to a co-owner: seen by every owner, by name only. */
+export const ListingHandoverSchema = z
+  .object({
+    /** The co-owner offered the role (their profile id, as in `owners`). */
+    toOwnerId: z.uuid(),
+    expiresAt: z.iso.datetime({ offset: true }),
+    /** The asking owner is the one offered it. */
+    canAccept: z.boolean(),
+    /** The asking owner may take it back: the primary, or the one offered it (declining). */
+    canWithdraw: z.boolean(),
+  })
+  .register(contractsRegistry, { id: 'ListingHandover' });
+export type ListingHandover = z.infer<typeof ListingHandoverSchema>;
+
 export const ListingOwnersSchema = z
   .object({
     listingId: z.uuid(),
@@ -73,6 +89,8 @@ export const ListingOwnersSchema = z
     role: ListingOwnerRoleSchema,
     owners: z.array(ListingOwnerSchema),
     invites: z.array(ListingInviteSchema),
+    /** The open offer of the primary role, if any. */
+    handover: ListingHandoverSchema.nullable(),
     /** Every owner with a share can be paid, so drivers can book (#54). */
     payable: z.boolean(),
     /** Owners and pending invites left before the limit. */
@@ -89,6 +107,11 @@ export const ListingInviteInputSchema = z
   })
   .register(contractsRegistry, { id: 'ListingInviteInput' });
 export type ListingInviteInput = z.infer<typeof ListingInviteInputSchema>;
+
+export const ListingHandoverInputSchema = z
+  .object({ ownerId: z.uuid() })
+  .register(contractsRegistry, { id: 'ListingHandoverInput' });
+export type ListingHandoverInput = z.infer<typeof ListingHandoverInputSchema>;
 
 export const ListingSharesInputSchema = z
   .object({
@@ -165,5 +188,11 @@ export const LISTING_OWNER_ERROR_CODES = [
   'OWNER_DETAILS_MISSING',
   /** An owner with a share can't leave their details incomplete: the primary takes the share back first. */
   'PROFILE_HAS_SHARE',
+  /** No open offer of the primary role (for this owner), or it was taken back. */
+  'HANDOVER_NOT_FOUND',
+  /** The offer's seven days have passed: the primary offers it again. */
+  'HANDOVER_EXPIRED',
+  /** The co-owner offered the role has no active payout account yet. */
+  'PAYOUTS_NOT_ACTIVE',
 ] as const;
 export type ListingOwnerErrorCode = (typeof LISTING_OWNER_ERROR_CODES)[number];

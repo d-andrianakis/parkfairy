@@ -114,6 +114,46 @@ export const listingInvites = pgTable(
 );
 
 /**
+ * An offer to hand a listing's primary role to one of its co-owners, who must accept (two steps).
+ * Nothing changes until then: the old primary becomes a co-owner, the new one the listing's
+ * `owner_id`. One open offer per listing; withdrawn by the primary, declined by the co-owner, or
+ * lapsed after seven days. Holds profile ids only, so nothing personal.
+ */
+export const listingHandovers = pgTable(
+  'listing_handovers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    locationId: uuid('location_id')
+      .notNull()
+      .references(() => parkingLocations.id, { onDelete: 'cascade' }),
+    fromOwnerId: uuid('from_owner_id')
+      .notNull()
+      .references(() => ownerProfiles.id, { onDelete: 'restrict' }),
+    toOwnerId: uuid('to_owner_id')
+      .notNull()
+      .references(() => ownerProfiles.id, { onDelete: 'restrict' }),
+    expiresAt: instant('expires_at').notNull(),
+    acceptedAt: instant('accepted_at'),
+    withdrawnAt: instant('withdrawn_at'),
+    createdAt: instant('created_at').defaultNow().notNull(),
+  },
+  (t) => [
+    // One open offer per listing.
+    uniqueIndex('listing_handovers_open_idx')
+      .on(t.locationId)
+      .where(sql`${t.acceptedAt} is null and ${t.withdrawnAt} is null`),
+    // The owners a profile's removal or leaving must close offers of, and the RESTRICT checks.
+    index('listing_handovers_to_idx').on(t.toOwnerId),
+    index('listing_handovers_from_idx').on(t.fromOwnerId),
+    check('listing_handovers_distinct_check', sql`${t.fromOwnerId} <> ${t.toOwnerId}`),
+    check(
+      'listing_handovers_settled_check',
+      sql`${t.acceptedAt} is null or ${t.withdrawnAt} is null`,
+    ),
+  ],
+);
+
+/**
  * Who a booking's owners' share goes to, copied from the listing's owners with a share when the
  * booking is confirmed (#54): a share changed, or an owner joining or leaving later, changes only
  * bookings made after, and a hold that never books has none.

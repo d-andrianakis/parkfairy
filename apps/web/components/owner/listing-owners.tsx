@@ -4,10 +4,13 @@
 import '@/lib/zod-jitless';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
+  acceptListingHandover,
   inviteListingOwner,
   leaveListing,
+  offerListingHandover,
   removeListingOwner,
   setListingShares,
+  withdrawListingHandover,
   withdrawListingInvite,
   type ListingOwners,
 } from '@parkfairy/api-client';
@@ -53,6 +56,7 @@ type InviteForm = z.infer<typeof InviteFormSchema>;
 const OWNERS_HEADING = 'listing-owners-heading';
 const INVITE_HEADING = 'listing-invite-heading';
 const INVITES_HEADING = 'listing-invites-heading';
+const HANDOVER_HEADING = 'listing-handover-heading';
 /** Focusable for those moves, with the ring the focus shows. */
 const FOCUS_TARGET =
   'rounded-sm outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring/50';
@@ -133,6 +137,14 @@ export function ListingOwnersPanel({ initial }: { initial: ListingOwners }) {
           )}
         </CardContent>
       </Card>
+      <Handover
+        owners={owners}
+        onChanged={(answer, said, next) => {
+          setOwners(answer);
+          done.announce(said);
+          focus(next);
+        }}
+      />
       <InviteOwner
         owners={owners}
         onInvited={(answer, email) => {
@@ -371,6 +383,137 @@ function SharesForm({
   );
 }
 
+/**
+ * Handing the primary role to a co-owner, in two steps: the primary offers, the co-owner accepts.
+ * Nothing changes until then. The offer, its end and what each owner may do about it come from the
+ * API; every press is asked twice, and each answer says what happened and where the focus goes.
+ */
+function Handover({
+  owners,
+  onChanged,
+}: {
+  owners: ListingOwners;
+  onChanged: (owners: ListingOwners, said: ReactNode, focusId: string) => void;
+}) {
+  const t = useTranslations('Owner.owners');
+  const format = useFormatter();
+  const locale = useLocale();
+  const offer = owners.handover;
+  const primary = owners.role === 'primary';
+  const coOwners = owners.owners.filter((owner) => owner.role === 'co_owner');
+  const offered = offer ? owners.owners.find((owner) => owner.id === offer.toOwnerId) : undefined;
+  // Nothing to say to a co-owner when there is no offer, and nobody to offer it to otherwise.
+  if (!offer && (!primary || coOwners.length === 0)) return null;
+  const nameOfOffered = offered ? nameOf(offered) : '';
+  const until = offer
+    ? format.dateTime(new Date(offer.expiresAt), {
+        day: 'numeric',
+        month: 'long',
+        ...timeOptions(locale),
+      })
+    : '';
+  const time = (chunks: ReactNode) => <time dateTime={offer?.expiresAt ?? ''}>{chunks}</time>;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h2 id={HANDOVER_HEADING} tabIndex={-1} className={FOCUS_TARGET}>
+            {t('handoverTitle')}
+          </h2>
+        </CardTitle>
+        {primary && !offer ? (
+          <p className="text-sm text-muted-foreground">{t('handoverLead')}</p>
+        ) : null}
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {offer ? (
+          <p className="text-sm wrap-anywhere">
+            {offer.canAccept
+              ? t.rich('handoverPendingYou', { date: until, time })
+              : t.rich('handoverPending', {
+                  name: nameOfOffered,
+                  date: until,
+                  person: () => <PersonName name={nameOfOffered} lang={locale} />,
+                  time,
+                })}
+          </p>
+        ) : null}
+        {offer?.canAccept ? (
+          <TwoPresses
+            id="handover-accept"
+            label={t('handoverAccept')}
+            question={t('handoverAcceptQuestion')}
+            confirm={t('handoverAcceptConfirm')}
+            keep={t('keepOffer')}
+            act={() => acceptListingHandover({ path: { id: owners.listingId } })}
+            onDone={(answer) => {
+              if (answer) onChanged(answer, t('handoverAccepted'), OWNERS_HEADING);
+            }}
+          />
+        ) : null}
+        {offer?.canWithdraw ? (
+          <TwoPresses
+            id="handover-withdraw"
+            label={offer.canAccept ? t('handoverDecline') : t('handoverWithdraw')}
+            question={
+              offer.canAccept ? t('handoverDeclineQuestion') : t('handoverWithdrawQuestion')
+            }
+            confirm={offer.canAccept ? t('handoverDeclineConfirm') : t('handoverWithdrawConfirm')}
+            keep={t('keepOffer')}
+            act={() => withdrawListingHandover({ path: { id: owners.listingId } })}
+            onDone={(answer) => {
+              if (answer) onChanged(answer, t('handoverClosed'), HANDOVER_HEADING);
+            }}
+          />
+        ) : null}
+        {primary && !offer ? (
+          <ul className="grid gap-2">
+            {coOwners.map((owner) => {
+              const name = nameOf(owner);
+              return (
+                <li key={owner.id}>
+                  <TwoPresses
+                    id={`handover-offer-${owner.id}`}
+                    label={t.rich('handoverOffer', {
+                      name,
+                      person: () => <PersonName name={name} lang={locale} />,
+                    })}
+                    question={t.rich('handoverOfferQuestion', {
+                      name,
+                      person: () => <PersonName name={name} lang={locale} />,
+                    })}
+                    confirm={t('handoverOfferConfirm')}
+                    keep={t('keepOffer')}
+                    act={() =>
+                      offerListingHandover({
+                        path: { id: owners.listingId },
+                        body: { ownerId: owner.id },
+                      })
+                    }
+                    onDone={(answer) => {
+                      if (answer) {
+                        onChanged(
+                          answer,
+                          t.rich('handoverOffered', {
+                            name,
+                            person: () => <PersonName name={name} lang={locale} />,
+                          }),
+                          'handover-withdraw',
+                        );
+                      }
+                    }}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
 /** Two presses for each, in place: removing an owner can't be undone. */
 function RemoveOwners({
   owners,
@@ -431,6 +574,7 @@ function TwoPresses<T>({
   label,
   question,
   confirm,
+  keep,
   act,
   onDone,
 }: {
@@ -438,6 +582,8 @@ function TwoPresses<T>({
   label: ReactNode;
   question: ReactNode;
   confirm: string;
+  /** What declining the question says; "No, keep" fits removals. */
+  keep?: string;
   act: () => Promise<{ data?: T; error?: unknown; response?: Response }>;
   onDone: (answer: T | undefined) => void;
 }) {
@@ -514,7 +660,7 @@ function TwoPresses<T>({
             focusAfter(id);
           }}
         >
-          {t('keep')}
+          {keep ?? t('keep')}
         </Button>
       </div>
     </div>

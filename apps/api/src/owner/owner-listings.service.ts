@@ -358,22 +358,27 @@ export class OwnerListingsService {
 
   async remove(userId: string, id: string): Promise<void> {
     if ((await this.roleOf(userId, id)) !== 'primary') throw primaryOnly();
-    const { keys, storageKeys } = await this.edit(userId, id, async (tx, row) => {
-      if (row.status !== 'draft') throw conflict('LISTING_LOCKED');
-      // Only a listing staff took back from live can have them; bookings are records to keep.
-      const [booked] = await tx
-        .select({ id: booking.id })
-        .from(booking)
-        .where(eq(booking.locationId, row.id))
-        .limit(1);
-      if (booked) throw conflict('LISTING_LOCKED');
-      const [photos, proofs] = await Promise.all([
-        this.photos(tx, row.id),
-        tx.select({ key: proof.storageKey }).from(proof).where(eq(proof.locationId, row.id)),
-      ]);
-      await tx.delete(listing).where(eq(listing.id, row.id));
-      return { keys: photos.map((p) => p.key), storageKeys: proofs.map((p) => p.key) };
-    });
+    const { keys, storageKeys } = await this.edit(
+      userId,
+      id,
+      async (tx, row) => {
+        if (row.status !== 'draft') throw conflict('LISTING_LOCKED');
+        // Only a listing staff took back from live can have them; bookings are records to keep.
+        const [booked] = await tx
+          .select({ id: booking.id })
+          .from(booking)
+          .where(eq(booking.locationId, row.id))
+          .limit(1);
+        if (booked) throw conflict('LISTING_LOCKED');
+        const [photos, proofs] = await Promise.all([
+          this.photos(tx, row.id),
+          tx.select({ key: proof.storageKey }).from(proof).where(eq(proof.locationId, row.id)),
+        ]);
+        await tx.delete(listing).where(eq(listing.id, row.id));
+        return { keys: photos.map((p) => p.key), storageKeys: proofs.map((p) => p.key) };
+      },
+      { primaryOnly: true },
+    );
     await this.deleteFiles([...(await this.unusedPhotoFiles(keys)), ...storageKeys]);
   }
 
@@ -896,14 +901,19 @@ export class OwnerListingsService {
   async removeProof(userId: string, id: string, proofId: string): Promise<void> {
     if (!UUID.test(proofId)) throw listingNotFound();
     if ((await this.roleOf(userId, id)) !== 'primary') throw primaryOnly();
-    const storageKey = await this.edit(userId, id, async (tx, row) => {
-      const [removed] = await tx
-        .delete(proof)
-        .where(and(eq(proof.id, proofId), eq(proof.locationId, row.id)))
-        .returning({ storageKey: proof.storageKey });
-      if (!removed) throw listingNotFound();
-      return removed.storageKey;
-    });
+    const storageKey = await this.edit(
+      userId,
+      id,
+      async (tx, row) => {
+        const [removed] = await tx
+          .delete(proof)
+          .where(and(eq(proof.id, proofId), eq(proof.locationId, row.id)))
+          .returning({ storageKey: proof.storageKey });
+        if (!removed) throw listingNotFound();
+        return removed.storageKey;
+      },
+      { primaryOnly: true },
+    );
     await this.deleteFiles([storageKey]);
   }
 
@@ -1281,18 +1291,23 @@ export class OwnerListingsService {
     userId: string,
     id: string,
     work: (tx: Transaction, row: ListingRow) => Promise<T>,
-    { anyStatus = false }: { anyStatus?: boolean } = {},
+    {
+      anyStatus = false,
+      primaryOnly: primaryOnlyAct = false,
+    }: { anyStatus?: boolean; primaryOnly?: boolean } = {},
   ): Promise<T> {
     const owned = await this.owned(userId, id);
     return this.db.transaction(async (tx) => {
       const [row] = await tx.select().from(listing).where(eq(listing.id, owned.id)).for('update');
       // Still one of its owners now the row is locked: one removed meanwhile changes nothing.
       const [still] = await tx
-        .select({ id: owners.id })
+        .select({ id: owners.id, role: owners.role })
         .from(owners)
         .innerJoin(profile, eq(profile.id, owners.ownerId))
         .where(and(eq(owners.locationId, owned.id), eq(profile.userId, userId)));
       if (!still) throw listingNotFound();
+      // The role too, read under the lock: a handover accepted meanwhile demotes the one acting.
+      if (primaryOnlyAct && still.role !== 'primary') throw primaryOnly();
       if (!row || (!anyStatus && !isEditable(row.status))) throw conflict('LISTING_LOCKED');
       const result = await work(tx, row);
       if (isEditable(row.status)) {

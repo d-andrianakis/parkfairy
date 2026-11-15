@@ -222,6 +222,13 @@ export type ListingInvite = {
     canWithdraw: boolean;
 };
 
+export type ListingHandover = {
+    toOwnerId: string;
+    expiresAt: string;
+    canAccept: boolean;
+    canWithdraw: boolean;
+};
+
 export type ListingOwners = {
     listingId: string;
     name: string | null;
@@ -229,6 +236,7 @@ export type ListingOwners = {
     role: ListingOwnerRole;
     owners: Array<ListingOwner>;
     invites: Array<ListingInvite>;
+    handover: ListingHandover | null;
     payable: boolean;
     room: number;
 };
@@ -236,6 +244,10 @@ export type ListingOwners = {
 export type ListingInviteInput = {
     email: string;
     locale: Locale;
+};
+
+export type ListingHandoverInput = {
+    ownerId: string;
 };
 
 export type ListingSharesInput = {
@@ -1518,6 +1530,77 @@ export type RemoveListingOwnerResponses = {
 };
 
 export type RemoveListingOwnerResponse = RemoveListingOwnerResponses[keyof RemoveListingOwnerResponses];
+
+export type WithdrawListingHandoverData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/handover';
+};
+
+export type WithdrawListingHandoverErrors = {
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type WithdrawListingHandoverError = WithdrawListingHandoverErrors[keyof WithdrawListingHandoverErrors];
+
+export type WithdrawListingHandoverResponses = {
+    200: ListingOwners;
+};
+
+export type WithdrawListingHandoverResponse = WithdrawListingHandoverResponses[keyof WithdrawListingHandoverResponses];
+
+export type OfferListingHandoverData = {
+    body: ListingHandoverInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/handover';
+};
+
+export type OfferListingHandoverErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type OfferListingHandoverError = OfferListingHandoverErrors[keyof OfferListingHandoverErrors];
+
+export type OfferListingHandoverResponses = {
+    200: ListingOwners;
+};
+
+export type OfferListingHandoverResponse = OfferListingHandoverResponses[keyof OfferListingHandoverResponses];
+
+export type AcceptListingHandoverData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/owner/listings/{id}/handover/accept';
+};
+
+export type AcceptListingHandoverErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type AcceptListingHandoverError = AcceptListingHandoverErrors[keyof AcceptListingHandoverErrors];
+
+export type AcceptListingHandoverResponses = {
+    200: ListingOwners;
+};
+
+export type AcceptListingHandoverResponse = AcceptListingHandoverResponses[keyof AcceptListingHandoverResponses];
 
 export type LeaveListingData = {
     body?: never;
