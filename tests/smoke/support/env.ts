@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url';
 const external = Boolean(process.env.SMOKE_WEB_URL);
 
 export const WEB_URL = process.env.SMOKE_WEB_URL ?? 'http://localhost:3000';
+/** The staff app's origin; its screens need the database to make staff, so they run locally. */
+export const ADMIN_URL =
+  process.env.SMOKE_ADMIN_URL ?? (external ? undefined : 'http://localhost:3001');
 export const API_URL =
   process.env.SMOKE_API_URL ?? (external ? undefined : 'http://localhost:4000');
 export const WORKER_URL =

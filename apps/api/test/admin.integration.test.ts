@@ -357,12 +357,16 @@ describe('staff review (5.2: #66–#68)', () => {
         .set('Sec-Fetch-Site', 'cross-site')
         .expect(403);
       expect(await audited(id)).toEqual([]);
-      for (const site of ['same-origin', 'same-site', 'none']) {
+      await call(admin, 'get', `/admin/listings/${id}/proofs/${lease.id}`)
+        .set('Sec-Fetch-Site', 'same-site')
+        .expect(403);
+      expect(await audited(id)).toEqual([]);
+      for (const site of ['same-origin', 'none']) {
         await call(admin, 'get', `/admin/listings/${id}/proofs/${lease.id}`)
           .set('Sec-Fetch-Site', site)
           .expect(200);
       }
-      expect(await audited(id)).toHaveLength(3);
+      expect(await audited(id)).toHaveLength(2);
     });
 
     it('is not recorded as opened when it can not be read, or is of another listing', async () => {

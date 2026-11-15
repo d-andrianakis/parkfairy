@@ -107,9 +107,10 @@ export class AdminController {
     @Headers('sec-fetch-site') fetchSite: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<StreamableFile> {
-    // A GET that writes a line of the log: not from a link on another site, which a browser says
-    // (`Sec-Fetch-Site`) and cookies marked Lax would otherwise let through as a navigation.
-    if (fetchSite === 'cross-site') {
+    // A GET that writes a line of the log: not from a link on another site, nor from a sibling
+    // subdomain (`same-site`): a browser says so in `Sec-Fetch-Site`, and cookies marked Lax would
+    // otherwise let either through as a navigation.
+    if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') {
       throw new ForbiddenException({
         statusCode: 403,
         error: 'Forbidden',

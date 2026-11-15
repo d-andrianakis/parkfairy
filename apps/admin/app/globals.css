@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+@import '@parkfairy/ui/globals.css';
+
+/* Shared components live outside this app, so point Tailwind at them explicitly. */
+@source '../../../packages/ui/src';
+/* Test files mention token names as strings, which would otherwise emit stray utilities. */
+@source not '../../../packages/ui/src/**/*.test.*';

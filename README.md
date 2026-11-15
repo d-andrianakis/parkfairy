@@ -10,6 +10,7 @@ one set of domain packages.
 | Path                  | What it is                                                                                                |
 | --------------------- | --------------------------------------------------------------------------------------------------------- |
 | `apps/web`            | Next.js (App Router). Hosts the Better Auth handlers at `/api/auth/*` and proxies `/api/v1/*` to the API. |
+| `apps/admin`          | Next.js staff app on its own origin (:3001): sign-in with a second factor, listing review, audit log.     |
 | `apps/api`            | NestJS REST API under `/v1`. Verifies Better Auth sessions; owns all business rules and authorization.    |
 | `apps/worker`         | BullMQ workers for scheduled and asynchronous jobs.                                                       |
 | `packages/database`   | Drizzle schema, versioned SQL migrations, connection factory.                                             |
@@ -39,7 +40,7 @@ cp .env.example .env            # then set BETTER_AUTH_SECRET: openssl rand -bas
 pnpm db:up                      # Postgres 17 + PostGIS on :5434, Redis on :6380
 pnpm db:migrate
 pnpm db:seed                    # demo listings + demo account (local only)
-pnpm dev                        # web :3000, API :4000 (Swagger at /docs), worker health :4100
+pnpm dev                        # web :3000, staff app :3001, API :4000 (Swagger at /docs), worker health :4100
 ```
 
 Open http://localhost:3000 (redirects to `/el` or `/en` from your browser language) to browse

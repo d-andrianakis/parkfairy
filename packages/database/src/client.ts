@@ -35,6 +35,12 @@ export function createDatabase({
     statement_timeout: statementTimeoutMs,
     connectionTimeoutMillis: connectionTimeoutMs,
   });
+  // An idle connection that Postgres drops (a restart, a failover) is an `error` on the pool; with no
+  // listener Node ends the process. The pool replaces the client by itself. Name and code only:
+  // database errors quote their parameters.
+  pool.on('error', (error: Error & { code?: string }) => {
+    console.error('Idle database connection failed', { name: error.name, code: error.code });
+  });
   const db = drizzle({ client: pool, schema, casing: 'snake_case' });
   return { db, pool, close: () => pool.end() };
 }

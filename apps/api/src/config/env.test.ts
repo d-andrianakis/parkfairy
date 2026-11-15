@@ -18,6 +18,14 @@ describe('loadEnv', () => {
     expect(env.trustedOrigins).toEqual(['https://app.example.gr', 'https://admin.example.gr']);
   });
 
+  it('trusts the staff origin only through ADMIN_URL, never as a path or a blank', () => {
+    expect(
+      loadEnv({ ...base, ADMIN_URL: 'https://staff.example.gr/some/path' }).trustedOrigins,
+    ).toEqual(['https://app.example.gr', 'https://staff.example.gr']);
+    expect(loadEnv({ ...base, ADMIN_URL: '' }).trustedOrigins).toEqual(['https://app.example.gr']);
+    expect(() => loadEnv({ ...base, ADMIN_URL: 'not a url' })).toThrow(/ADMIN_URL/);
+  });
+
   it('confirms bookings without payment on this machine only (decision #33)', () => {
     expect(loadEnv({ ...base }).bookingWithoutPayment).toBe(false);
     expect(

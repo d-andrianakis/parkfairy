@@ -47,7 +47,12 @@ export async function refundOf(
   };
 }
 
-/** What staff do by hand until the admin screen (Phase 5); see GETTING_STARTED.md. */
+/** Makes an account platform staff, which no screen does: by hand, as in GETTING_STARTED.md. */
+export async function makeStaff(email: string): Promise<void> {
+  await run(`update users set role = 'admin' where email = $1`, [email]);
+}
+
+/** What staff did by hand before the staff app (5.2b), for tests that need a state it skips. */
 export async function sendListingBack(id: string, note: string): Promise<void> {
   await run(
     `update parking_locations set status = 'changes_requested', review_note = $2 where id = $1`,

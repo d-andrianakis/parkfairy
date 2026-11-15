@@ -19,6 +19,8 @@ env:
   # CI-only value; real secrets live in each environment's secret store.
   BETTER_AUTH_SECRET: ci-only-secret-never-used-outside-ci-0123456789
   BETTER_AUTH_URL: http://localhost:3000
+  # The staff app, on its own origin (#66); the API takes writes from it through ADMIN_URL.
+  ADMIN_URL: http://localhost:3001
   TRUSTED_ORIGINS: http://localhost:3000
   # Visitors (the smoke browser) connect directly; the API sits behind the web server on loopback.
   TRUSTED_PROXIES: none

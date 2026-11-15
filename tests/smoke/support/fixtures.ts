@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, type Browser, type Page } from '@playwright/test';
 import { emailLink, waitForEmail } from './email';
 import { TEST_PASSWORD, visitorAddress } from './env';
+import { totp } from './totp';
 
 export const uniqueEmail = (prefix = 'smoke') => `${prefix}-${randomUUID()}@example.com`;
 
@@ -99,4 +100,22 @@ export async function ownDriver(browser: Browser, prefix = 'driver') {
   const page = await context.newPage();
   await registerAndSignIn(page, uniqueEmail(prefix), 'Smoke Driver');
   return { context, page };
+}
+
+/**
+ * Turns two-factor on from the signed-in account's page (English), and returns the key an
+ * authenticator app would hold: sign-ins afterwards ask for `totp(key)`. Rotates the session.
+ */
+export async function enrolTwoFactor(page: Page): Promise<string> {
+  await page.goto('/en/account');
+  await page.getByRole('button', { name: 'Set up two-factor authentication' }).click();
+  await page.getByLabel('Password', { exact: true }).fill(TEST_PASSWORD);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const key = ((await page.getByTestId('two-factor-key').textContent()) ?? '').replace(/\s/g, '');
+  await page.getByLabel('Authentication code').fill(totp(key));
+  await page.getByRole('button', { name: 'Turn on' }).click();
+  await expect(page.getByRole('heading', { name: 'Save your backup codes' })).toBeFocused();
+  await page.getByRole('button', { name: 'I’ve saved them' }).click();
+  await expect(page.getByTestId('two-factor-status')).toContainText('On.');
+  return key;
 }

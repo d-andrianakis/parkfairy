@@ -1553,6 +1553,14 @@ Answered by the product owner on 2026-11-15, for a manager role (alongside owner
     manager can leave on their own.
 71. **A manager needs only an account**: no owner profile, tax details, share or payouts.
 
+Answered by the product owner on 2026-11-15, for the staff app (5.2b):
+
+72. **The staff app speaks Greek and English**, as the public site does: both catalogs, a language
+    switcher, `/el` and `/en` routes, and the same native-speaker pass.
+73. **Staff turn on their second factor on the public account page**, not in the staff app. The
+    staff app only signs in with the code; an admin without a second factor is told where to turn it
+    on and sees no data (the API refuses them as well).
+
 Our readings for managers (2026-11-15), not asked; change any that are wrong:
 
 - **A manager is an account, not an owner**: `listing_managers (location_id, user_id)`, no owner
@@ -1611,3 +1619,45 @@ Our readings for staff review, 5.2a (2026-11-15), not asked; change any that are
   Not yet decided, for Phase 6 with retention (#18): the log keeps staff by account (restricted) and
   a staff-typed note for good, so erasing a former staff member or what a note says needs a
   decision (pseudonymous actor, a retention period, or a warning to staff).
+
+Our readings for the staff app, 5.2b (2026-11-15), not asked; change any that are wrong:
+
+- **`apps/admin` is a second Next app on its own origin** (`ADMIN_URL`, :3001 here), built from the
+  same Better Auth (`createAuth`, same database and secret, so the API reads its cookie) but serving
+  only four endpoints: sign-in, the two second-factor checks and sign-out (`lib/auth-routes.ts`, a
+  default-deny allowlist; everything else is an empty 404). Nothing there makes an account, resets a
+  password or changes one. The same-origin rewrite carries `/api/v1/admin/*` only, so a script bug on
+  that origin doesn't get the rest of the API. `trustDevice` on the second step is refused (400): it
+  would remember the browser for 30 days and skip the second factor.
+- **Cookies ignore ports.** `localhost:3000` and `:3001` share one cookie jar, so on this machine
+  signing in on one signs in on the other (the smoke suite uses separate browser contexts). In
+  production the app refuses to start unless `ADMIN_URL` is https and on another hostname than
+  `BETTER_AUTH_URL` (`lib/server-env.ts`; keyed on the origin being loopback, not on `NODE_ENV`,
+  because the smoke suite runs production builds here). Both apps use cookie name `parkfairy`, host-only.
+- **The API learns the staff origin from `ADMIN_URL`, not `TRUSTED_ORIGINS`.** That list also feeds the
+  public site's Better Auth, which would then take sign-up, password and two-factor changes from the
+  staff origin (security review, medium). `.env`, `.env.example` and CI keep it to the public site.
+- **A staff session ends a week after sign-in whatever the activity**: nothing there refreshes the
+  cookie (`getSession` passes `disableRefresh`, no `SessionRefresh`). Not shortened: a staff-only rule
+  in `AuthGuard` (say, admin routes need a session under 12 hours old) is open, as is `SameSite=Strict`.
+- **A staff member sees three things**: the queue (status filters, oldest first, 25 a page, places in
+  the URL), a listing's review (what was sent in, owners as blocks with tax numbers' last three
+  characters, proof documents as downloads, which the API logs) and the audit log (filter by action).
+  Approving asks twice (the question takes the focus, "Not yet" gives it back); sending back needs a
+  note. A decision is final for that review: the buttons give way to a heading that takes the focus.
+- **The theme follows the system**, with no toggle and no cookie (nothing to keep for staff). The
+  header has a language switcher, the two screens and sign-out; the auth client loads only on press.
+- **The Greek says «χώρος», never «αγγελία»** (the public catalog has no «αγγελία»), and
+  «έλεγχος ταυτότητας δύο παραγόντων» for the second factor. The log shows names it doesn't know as
+  written, and an action it doesn't know as "Other action", since a newer API may log more than this
+  screen has words for. Nested catalog keys for the actions (`listing: { approved }`): a dot in a key
+  is a path to next-intl.
+- **Made staff by hand**: `update users set role = 'admin'`, after the account has a second factor
+  (GETTING_STARTED.md). No screen or script does it (#13's support tools are 5.2c).
+- **Pool errors are logged, not fatal** (`createDatabase`): an idle connection Postgres drops used to
+  be an unhandled `error` event, which ends the process; every app is protected now. Name and code only.
+- The proof download refuses anything but `Sec-Fetch-Site: same-origin`, `none` or no header (a
+  sibling subdomain, `same-site`, used to pass and could write audit lines).
+- Staff pages measured by the smoke suite (`admin-app.smoke.ts`, the shared 250 KiB / 40 requests
+  budget in `support/budgets.ts`): sign-in, queue, review and log, each in a browser that has cached
+  nothing.

@@ -21,6 +21,12 @@ const EnvSchema = z
     BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET must be at least 32 characters'),
     BETTER_AUTH_URL: z.url(),
     TRUSTED_ORIGINS: z.string().default(''),
+    /**
+     * The staff app's origin (apps/admin), allowed to send cookie-authenticated writes to this API.
+     * Its own variable, not part of TRUSTED_ORIGINS: that list also feeds the public site's Better
+     * Auth, which must not trust the staff origin.
+     */
+    ADMIN_URL: z.preprocess((value) => (value === '' ? undefined : value), z.url().optional()),
     API_CORS_ORIGINS: z.string().default(''),
     /**
      * Express "trust proxy": the addresses/CIDRs of the web servers (and any proxy between
@@ -154,7 +160,13 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env) {
     ...env,
     isProduction: env.NODE_ENV === 'production',
     /** Origins allowed to send cookie-authenticated, state-changing requests. */
-    trustedOrigins: [...new Set([authOrigin, ...parseOrigins(env.TRUSTED_ORIGINS)])],
+    trustedOrigins: [
+      ...new Set([
+        authOrigin,
+        ...parseOrigins(env.TRUSTED_ORIGINS),
+        ...(env.ADMIN_URL ? [new URL(env.ADMIN_URL).origin] : []),
+      ]),
+    ],
     corsOrigins: parseOrigins(env.API_CORS_ORIGINS),
     trustProxy: parseTrustProxy(env.TRUST_PROXY ?? 'loopback'),
     objectStoreDir: env.OBJECT_STORE_DIR ?? DEFAULT_OBJECT_STORE_DIR,

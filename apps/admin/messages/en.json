@@ -1,0 +1,287 @@
+{
+  "Metadata": {
+    "title": "Parkfairy staff",
+    "description": "Review what people send in to Parkfairy."
+  },
+  "Layout": {
+    "skipToContent": "Skip to main content",
+    "brand": "Parkfairy staff"
+  },
+  "Header": {
+    "staffNav": "Staff",
+    "listings": "Listings",
+    "audit": "Audit log",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…"
+  },
+  "LocaleSwitcher": {
+    "label": "Language"
+  },
+  "SignIn": {
+    "metaTitle": "Staff sign-in",
+    "title": "Staff sign-in",
+    "description": "For Parkfairy staff only. You will be asked for your two-factor code next.",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…"
+  },
+  "TwoFactor": {
+    "metaTitle": "Two-factor verification",
+    "title": "Two-factor verification",
+    "description": "Enter the 6-digit code from your authenticator app.",
+    "code": "Authentication code",
+    "submit": "Verify",
+    "submitting": "Verifying…",
+    "useBackupCode": "Use a backup code instead",
+    "useAuthenticator": "Use your authenticator app instead",
+    "backupCode": "Backup code",
+    "backupDescription": "Enter one of the backup codes you saved when you set up two-factor authentication. Each one works once."
+  },
+  "Validation": {
+    "emailInvalid": "Enter a valid email address",
+    "passwordRequired": "Enter your password",
+    "codeInvalid": "Enter the 6-digit code",
+    "backupCodeRequired": "Enter one of your backup codes",
+    "textTooLong": "This is too long",
+    "invalid": "Check this field"
+  },
+  "Forms": {
+    "invalidSummary": "{count, plural, one {# field needs your attention} other {# fields need your attention}}"
+  },
+  "AuthErrors": {
+    "INVALID_EMAIL_OR_PASSWORD": "The email or password is incorrect. If you’ve just signed up, first follow the link we emailed you.",
+    "INVALID_PASSWORD": "That password is incorrect.",
+    "INVALID_EMAIL": "Enter a valid email address.",
+    "PASSWORD_TOO_SHORT": "That password is too short.",
+    "PASSWORD_TOO_LONG": "That password is too long.",
+    "INVALID_CODE": "That code is not valid. Try again.",
+    "OTP_HAS_EXPIRED": "That code has expired. Try a new one.",
+    "TOO_MANY_ATTEMPTS": "Too many attempts. Sign in again to get a new code.",
+    "ACCOUNT_TEMPORARILY_LOCKED": "Too many wrong codes. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+    "INVALID_TWO_FACTOR_COOKIE": "Your verification session expired. Sign in again.",
+    "INVALID_LOCALE": "That language is not supported.",
+    "TOO_MANY_REQUESTS": "Too many attempts. Wait a moment and try again.",
+    "UNKNOWN": "Something went wrong. Please try again.",
+    "INVALID_BACKUP_CODE": "That backup code is not valid or has already been used.",
+    "INVALID_TOKEN": "This link has expired or has already been used. Request a new one."
+  },
+  "NotFound": {
+    "metaTitle": "Page not found",
+    "title": "We couldn’t find that page",
+    "description": "The link may be broken or the page may have moved.",
+    "home": "Go to the listings"
+  },
+  "Error": {
+    "title": "Something went wrong",
+    "description": "This page couldn’t be loaded. Please try again.",
+    "retry": "Try again"
+  },
+  "Admin": {
+    "notGiven": "Not given",
+    "status": {
+      "draft": "Draft",
+      "in_review": "Waiting for review",
+      "changes_requested": "Sent back",
+      "published": "Live",
+      "suspended": "Suspended"
+    },
+    "areas": {
+      "syntagma": "Syntagma",
+      "monastiraki": "Monastiraki",
+      "kolonaki": "Kolonaki",
+      "koukaki": "Koukaki",
+      "piraeusPort": "Piraeus Port",
+      "glyfada": "Glyfada",
+      "marousi": "Marousi",
+      "athensAirport": "Athens Airport",
+      "thessalonikiCentre": "Central Thessaloniki",
+      "ladadika": "Ladadika",
+      "thessalonikiAirport": "Thessaloniki Airport"
+    },
+    "proofKinds": {
+      "titleDeed": "Title deed",
+      "lease": "Lease allowing subletting",
+      "operatingLicence": "Operating licence",
+      "other": "Other document"
+    },
+    "standing": {
+      "not-staff": {
+        "title": "This account is not staff",
+        "alertTitle": "No access",
+        "text": "These screens are for Parkfairy staff. Sign out and use a staff account, or go to the public site."
+      },
+      "no-second-factor": {
+        "title": "Turn on two-factor first",
+        "alertTitle": "A second factor is required",
+        "text": "Staff screens only open for accounts with two-factor verification on. Turn it on from your account page on the public site, then sign in here again."
+      },
+      "enrolLink": "Open your account page on the public site"
+    },
+    "missing": {
+      "forbidden": {
+        "title": "You can’t see this",
+        "text": "The server did not allow this request. Sign out and in again, and check that your account has two-factor verification on."
+      },
+      "unavailable": {
+        "title": "This could not be loaded",
+        "text": "The server did not answer. Reload the page in a moment."
+      }
+    },
+    "queue": {
+      "metaTitle": "Listings",
+      "title": "Listings",
+      "lead": "Signed in as {name}. Oldest first.",
+      "filter": "Listing status",
+      "caption": "Listings, status: {status}",
+      "empty": "Nothing here.",
+      "listing": "Listing",
+      "address": "Address",
+      "owner": "Owner",
+      "sentIn": "Sent in",
+      "status": "Status",
+      "unnamed": "Unnamed listing",
+      "pages": "Pages",
+      "first": "First page",
+      "next": "Next page"
+    },
+    "review": {
+      "metaTitle": "Review a listing",
+      "back": "Back to the listings",
+      "lastNote": "What was last asked of the owner",
+      "listing": "The listing",
+      "address": "Address",
+      "area": "Area",
+      "rate": "Hourly rate",
+      "perHour": "{amount} an hour",
+      "spaces": "Spaces",
+      "spaceCount": "{count, plural, one {# space} other {# spaces}}",
+      "photos": "Photos",
+      "landRegistration": "Land registration number",
+      "sentIn": "Sent in",
+      "description": "Description",
+      "owners": "Owners",
+      "ownersLead": "Tax numbers show only their last three characters. Everyone paid a share is checked here.",
+      "ownersCaption": "The listing’s owners and their details",
+      "ownerName": "Account",
+      "ownerRole": "Role",
+      "ownerKind": "Kind",
+      "ownerCountry": "Country / tax country",
+      "ownerTax": "Tax details",
+      "ownerShare": "Share",
+      "ownerVerification": "Verification",
+      "ownerDetails": "Details",
+      "roles": {
+        "primary": "Primary owner",
+        "co_owner": "Co-owner"
+      },
+      "kinds": {
+        "individual": "Individual",
+        "business": "Business"
+      },
+      "verification": {
+        "unverified": "Not verified",
+        "pending": "Waiting for this review",
+        "verified": "Verified",
+        "rejected": "Rejected"
+      },
+      "percent": "{percent}%",
+      "complete": "Complete",
+      "incomplete": "Incomplete",
+      "taxEnding": "{label}: ending in {ending}",
+      "taxId": "Tax number",
+      "vatId": "VAT number",
+      "registration": "Registration number",
+      "proofs": "Proof of the right to rent",
+      "noProofs": "No document was sent in.",
+      "proofsLead": "Opening a document is recorded in the audit log, with your name.",
+      "proofLink": "{kind}: {name}",
+      "proofMeta": "{size}",
+      "decision": "Decision"
+    },
+    "audit": {
+      "metaTitle": "Audit log",
+      "title": "Audit log",
+      "lead": "Everything staff change, and every proof document opened. Newest first. It cannot be edited or deleted.",
+      "filter": "Kind of action",
+      "all": "Everything",
+      "actions": {
+        "listing": {
+          "approved": "Listing approved",
+          "changes_requested": "Listing sent back",
+          "proof_opened": "Proof document opened"
+        }
+      },
+      "unknownAction": "Other action",
+      "yes": "Yes",
+      "no": "No",
+      "detailKeys": {
+        "from": "Was",
+        "note": "Note",
+        "kind": "Kind",
+        "proofId": "Document",
+        "ownersVerified": "Owners verified"
+      },
+      "caption": "Audit log",
+      "empty": "Nothing has been recorded yet.",
+      "when": "When",
+      "who": "Who",
+      "what": "What",
+      "target": "Listing",
+      "details": "Details",
+      "listingLink": "Open the listing",
+      "pages": "Pages",
+      "first": "Newest",
+      "next": "Older"
+    }
+  },
+  "AdminReview": {
+    "own": "You own, co-own or manage this listing, so someone else on the staff has to decide it.",
+    "notWaiting": "This listing is not waiting for a decision. Its status is: {status}.",
+    "status": {
+      "draft": "Draft",
+      "in_review": "Waiting for review",
+      "changes_requested": "Sent back",
+      "published": "Live",
+      "suspended": "Suspended"
+    },
+    "approve": {
+      "heading": "Approve",
+      "text": "The listing goes live, and the owners who are paid a share are marked verified.",
+      "button": "Approve this listing",
+      "question": "Publish this listing now?",
+      "confirm": "Yes, publish it",
+      "busy": "Publishing…",
+      "cancel": "Not yet"
+    },
+    "changes": {
+      "heading": "Send back for changes",
+      "text": "The owner reads your note, fixes the listing and sends it in again.",
+      "note": "What should the owner change?",
+      "hint": "Plain words, up to {max, number} characters. The owner sees this exactly as written.",
+      "submit": "Send back with this note",
+      "busy": "Sending back…"
+    },
+    "done": {
+      "approved": {
+        "title": "Listing approved",
+        "text": "It is live, and the owners will be told. The decision is in the audit log."
+      },
+      "changes": {
+        "title": "Listing sent back",
+        "text": "The owner will be told and can send it in again. The decision is in the audit log."
+      }
+    }
+  },
+  "AdminErrors": {
+    "LISTING_NOT_FOUND": "That listing no longer exists.",
+    "NOT_IN_REVIEW": "Someone decided this listing already, or the owner took it back. The page now shows where it stands.",
+    "OWN_LISTING": "You own, co-own or manage this listing, so someone else has to decide it.",
+    "OWNER_DETAILS_MISSING": "An owner changed their details since they sent this in, and they are incomplete now: {owners}. The listing can’t go live until they are filled in; send it back instead.",
+    "MFA_REQUIRED": "Two-factor verification must be on for your account.",
+    "INVALID_ORIGIN": "This request did not come from this site. Reload the page and try again.",
+    "SESSION_ENDED": "Your session has ended. Sign in again; nothing you typed here was sent.",
+    "TOO_MANY_REQUESTS": "Too many decisions in a short time. Wait a moment and try again.",
+    "UNKNOWN": "Something went wrong. Please try again."
+  }
+}

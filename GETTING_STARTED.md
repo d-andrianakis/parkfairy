@@ -77,12 +77,13 @@ Run these once, from the repository root.
 
 ## Check that it works
 
-| What          | URL                                | Expected                                               |
-| ------------- | ---------------------------------- | ------------------------------------------------------ |
-| Web app       | http://localhost:3000              | Redirects to `/el` or `/en` from your browser language |
-| API docs      | http://localhost:4000/docs         | Swagger UI                                             |
-| API readiness | http://localhost:4000/health/ready | `{"status":"ok","checks":{"database":"up"}}`           |
-| Worker health | http://localhost:4100              | `{"status":"ok"}`                                      |
+| What          | URL                                | Expected                                                   |
+| ------------- | ---------------------------------- | ---------------------------------------------------------- |
+| Web app       | http://localhost:3000              | Redirects to `/el` or `/en` from your browser language     |
+| Staff app     | http://localhost:3001              | Redirects to the staff sign-in (see "Reviewing a listing") |
+| API docs      | http://localhost:4000/docs         | Swagger UI                                                 |
+| API readiness | http://localhost:4000/health/ready | `{"status":"ok","checks":{"database":"up"}}`               |
+| Worker health | http://localhost:4100              | `{"status":"ok"}`                                          |
 
 The home page shows featured demo parking, and the search finds listings by area or your
 location for any half-hour window. Listings are public, so no account is needed to browse.
@@ -130,26 +131,32 @@ restricted to your site's URLs, and restart the web app. Without one, the locati
 "Use my location" and typed coordinates instead. Address search stores what it finds, so it uses
 Mapbox's permanent geocoding, which needs a card on the Mapbox account.
 
-**Reviewing a listing by hand.** There is no admin screen until Phase 5, so staff change a
-listing's status in the database. Open a database shell, see what's waiting, then either publish
-it or send it back. The worker notices the change and emails the owner within about two minutes.
+**Reviewing a listing.** Staff use their own app, http://localhost:3001 (`apps/admin`, on its own
+origin so its cookie never reaches the public site). Nothing there creates accounts, so make a staff
+account by hand, in three steps:
+
+1. Sign up on the public site as usual and confirm the email (the link is a file in `.emails/`).
+2. Turn on two-factor from the account page (http://localhost:3000/en/account). The staff screens and
+   every admin API route refuse an account without it.
+3. Make the account staff in the database, then sign in at http://localhost:3001 with your password
+   and a code from the authenticator app:
 
 ```sh
 docker exec -it parkfairy-postgres-1 psql -U parkfairy -d parkfairy
 ```
 
 ```sql
-select slug, name, submitted_at from parking_locations
-where status = 'in_review' order by submitted_at;
-
--- Goes live.
-update parking_locations set status = 'published', review_note = null where slug = '...';
-
--- Goes back to the owner, who sees the note and can fix and resend it.
-update parking_locations
-set status = 'changes_requested', review_note = 'What needs to change'
-where slug = '...';
+update users set role = 'admin' where email = 'you@example.com';
 ```
+
+The queue lists what owners sent in, oldest first. Open one to see the listing, its owners (tax
+numbers only by their last three characters) and the proof documents; then approve it or send it back
+with a note. Staff can't decide a listing they own, co-own or manage. Every decision, and every proof
+document opened, is a line in the audit log. The worker notices the status change and emails the owner
+within about two minutes. A staff session ends a week after sign-in whatever you do, on purpose.
+
+The staff app needs `ADMIN_URL` in `.env` (see `.env.example`); the API reads the same variable to accept
+its writes. Don't add it to `TRUSTED_ORIGINS`, which the public site's sign-in also trusts.
 
 Proof documents are in `.uploads/proofs/<listing id>/`. They have no file extension; the type is in
 `parking_proof_documents`.
@@ -175,7 +182,7 @@ trying injection payloads against your own forms.
 - **First use:** Claude Code asks you to approve the project's MCP server. Check it with
   `/mcp`. A session that was already open must be restarted to pick it up.
 - **Limits:** the browser starts with a fresh profile every session, so sign in each time. It
-  is restricted to `localhost:3000`, `4000` and `4100`. That prevents accidental visits to
+  is restricted to `localhost:3000`, `4000` and `4100` (not the staff app on `3001`). That prevents accidental visits to
   real sites, but it is not a security boundary, because redirects and WebSockets aren't
   filtered. Test only your local instance, never staging, production or third-party
   services.

@@ -11,6 +11,7 @@
     "REDIS_URL",
     "BETTER_AUTH_SECRET",
     "BETTER_AUTH_URL",
+    "ADMIN_URL",
     "API_URL",
     "API_PORT",
     "WORKER_HEALTH_PORT",
@@ -35,6 +36,7 @@
     "AWS_SECRET_ACCESS_KEY",
     "AWS_SESSION_TOKEN",
     "SMOKE_WEB_URL",
+    "SMOKE_ADMIN_URL",
     "SMOKE_API_URL",
     "SMOKE_WORKER_URL",
     "SMOKE_DEMO_DATA",
@@ -62,7 +64,12 @@
       "persistent": true
     },
     "test:smoke": {
-      "dependsOn": ["@parkfairy/api#build", "@parkfairy/web#build", "@parkfairy/worker#build"],
+      "dependsOn": [
+        "@parkfairy/api#build",
+        "@parkfairy/web#build",
+        "@parkfairy/admin#build",
+        "@parkfairy/worker#build"
+      ],
       "cache": false
     }
   }

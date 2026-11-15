@@ -1555,13 +1555,50 @@ payments, overstay reports, removing two-factor).
       test gaps (rollback, ties, several owners, self-review, races). Open, low: the queue sorts
       every listing of a status (an expression can't be indexed; fine to ~100k), the staff
       account and note are kept for good (retention, Phase 6)
-- [ ] **Accessibility / i18n**: with the admin app (5.2b); the API has no copy of its own
+- [x] **5.2b The staff app** (2026-11-15, #72, #73): `apps/admin`, a second Next app on its own origin
+      and policy. Sign-in with a second factor, the queue, a listing's review with the decision, the
+      audit log, both languages; an admin without a second factor, and any other account, see why and
+      no data. Only sign-in and sign-out of Better Auth are served there. Made staff by hand
+      (GETTING_STARTED.md)
+- [x] **5.2b Unit tests** (194 in the app): the auth allowlist and route (every method), the `trustDevice`
+      refusal, env, CSP (exact directives), proxy, session (`disableRefresh`, redirect, logging),
+      `getAuth`, the loaders' status mapping, redirects (hostile `next`), every page and form in both
+      languages with axe, catalog parity and the enums it must name
+- [x] **5.2b Smoke test** `admin-app.smoke.ts` (7): policy and the only doors, a foreign origin on
+      sign-in, sign-in and back through a deep link and the second step, a hostile `next`, an ordinary
+      account, staff without a second factor, the whole review (send back, approve, log, filters),
+      Greek at 320 px, host-only cookie, JS budget per page, no CSP violations
+- [x] **5.2b Security** review: no critical or high. Fixed: production needs its own hostname and
+      https for `ADMIN_URL` (cookies ignore ports), the staff origin stays out of the public site's
+      `TRUSTED_ORIGINS` (the API takes it from `ADMIN_URL`), proof downloads only same-origin,
+      `trustDevice` refused, the rewrite narrowed to `/v1/admin`, `API_URL` required, redirect
+      hardening. Open: a shorter staff session or `SameSite=Strict` (memory.md)
+- [x] **5.2b Performance** review: nothing high. Fixed: the auth client left the layout (13 KiB on
+      every page), budgets in the smoke suite, the pool's `error` event (all apps). Open, low: the
+      queue's order can't use an index (`published` is every listing: add one if it is slow at about
+      10,000), no `loading.tsx`, cold start of `getAuth`
+- [~] **5.2b Accessibility** review: fixed the question's focus, notices that clipped or shouted, row
+  headers, long names wrapping, "not given" in words, the backup code's hint, heading level.
+  Open: a pasted code with a space is refused (the shared `TotpInputSchema`, the public site too),
+  a 401 has no link back to sign-in, a manual NVDA and VoiceOver pass over the review, the
+  question and the tables in Greek, 200% text on a phone
+- [~] **5.2b i18n** review: Greek says «χώρος» and the public site's terms; `lang` only on owners' own
+  text; unknown log entries said generally. Open: a native speaker on `apps/admin/messages/el.json`
+  (the reviewer's list: «απόδειξη» for the lease proof, «Ποιος/Τι» as headings, «διαχειριστής» for a
+  manager next to the platform role, the status words against the public ones); the space list and
+  country codes are not locale-formatted
+- [~] **5.2b Test** review: P1 and P2 done. Open: ports of `focus-heading`, `form-field`, `route-focus`
+  and error-page tests, `standing-notice`/`missing-notice` direct tests, the layout's `staff` flag
+  unit test, an exhaustive allowlist test against Better Auth's endpoint list
+- [x] **5.2b Contracts & docs**: no contract or schema change; README, GETTING_STARTED, `.env.example`,
+      CI, memory.md
+- [ ] **5.2c** moderation, users, bookings, payments, overstay reports, removing two-factor (below)
 
 - [~] 2FA enrolment UI done (1.3); admin MFA enforced end to end once admin routes exist
   (sessions without a second factor are already ended when it is switched on)
 - [~] Owner calendar and earnings done (5.1); a bookings list across listings is not
-- [ ] Admin approvals (listings, proof of the right to rent), moderation, users, bookings,
-      payments, audit logs
+- [~] Admin approvals (listings, proof of the right to rent) and the audit log: done (5.2a, 5.2b).
+  Moderation, users, bookings, payments: 5.2c
 - [ ] Overstay reports: the owner reports, support handles it (#11)
 - [ ] Support removes two-factor after an identity check: audited action, email to the address,
       written procedure (#13)

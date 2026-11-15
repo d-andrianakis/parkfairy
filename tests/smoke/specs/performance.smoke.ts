@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { API_URL, DEMO_DATA, EMAIL_OUTBOX, SIGNED_IN_STATE, WEB_URL } from '../support/env';
+import { FIRST_VISIT, measureFirstVisit } from '../support/budgets';
 import { ownDriver } from '../support/fixtures';
 
 // Feature: performance budgets — catch regressions in what the browser must download
@@ -7,29 +8,13 @@ import { ownDriver } from '../support/fixtures';
 // recorded in memory.md.
 
 const BUDGETS = {
-  /** Compressed JavaScript transferred for a first visit (baseline 2026-10-28: 218–233 KiB). */
-  javascriptBytes: 250 * 1024,
-  requests: 40,
+  ...FIRST_VISIT,
   apiReadinessMs: 500,
   /** Median of a public catalogue read (search, listing) on the API. */
   apiCatalogueMs: 300,
   /** Layout shift of the page shell while it loads; pages add their own content later. */
   layoutShift: 0.01,
 };
-
-async function measureFirstVisit(page: Page, path: string) {
-  const scripts: Promise<number>[] = [];
-  let requests = 0;
-  page.on('requestfinished', (request) => {
-    requests++;
-    if (request.resourceType() === 'script') {
-      scripts.push(request.sizes().then((sizes) => sizes.responseBodySize));
-    }
-  });
-  await page.goto(path, { waitUntil: 'networkidle' });
-  const javascriptBytes = (await Promise.all(scripts)).reduce((sum, size) => sum + size, 0);
-  return { javascriptBytes, requests };
-}
 
 /**
  * A hold of the shared account's on a demo listing, far ahead, for a page to show; let go after.

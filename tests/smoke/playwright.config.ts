@@ -47,6 +47,13 @@ export default defineConfig({
           timeout: 60_000,
         },
         {
+          // The staff app (#66): its own origin, so its cookie and policy are its own.
+          command: 'pnpm --filter @parkfairy/admin start',
+          url: 'http://localhost:3001/en/sign-in',
+          reuseExistingServer: !isCI,
+          timeout: 60_000,
+        },
+        {
           command: 'pnpm --filter @parkfairy/web start',
           url: 'http://localhost:3000/en',
           // A key in a developer's .env must not send real mail to the suite's addresses.
