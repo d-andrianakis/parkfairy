@@ -40,6 +40,16 @@ export class AuthGuard implements CanActivate {
     if (!result) {
       throw new UnauthorizedException();
     }
+    // Suspended by staff (5.2c, #79): its sessions were ended and it can't open another, so this is
+    // the belt for one made in the same instant. Not for the public routes, which return above.
+    if (result.user.suspendedAt) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        message: 'This account has been suspended',
+        code: 'ACCOUNT_SUSPENDED',
+      });
+    }
     request.user = result.user;
     request.authSession = result.session;
 

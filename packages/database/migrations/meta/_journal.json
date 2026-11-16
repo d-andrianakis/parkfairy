@@ -267,6 +267,27 @@
       "when": 1794760255442,
       "tag": "0037_audit_log_triggers_always",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794769088354,
+      "tag": "0038_elite_silver_samurai",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794770950195,
+      "tag": "0039_breezy_harry_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794773596390,
+      "tag": "0040_bizarre_green_goblin",
+      "breakpoints": true
     }
   ]
 }

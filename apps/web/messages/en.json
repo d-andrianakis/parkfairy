@@ -373,6 +373,7 @@
     "OTP_HAS_EXPIRED": "That code has expired. Try a new one.",
     "TOO_MANY_ATTEMPTS": "Too many attempts. Sign in again to get a new code.",
     "ACCOUNT_TEMPORARILY_LOCKED": "Too many wrong codes. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+    "ACCOUNT_SUSPENDED": "This account has been suspended, so you can’t sign in. Contact Parkfairy support if you think this is a mistake.",
     "INVALID_TWO_FACTOR_COOKIE": "Your verification session expired. Sign in again.",
     "INVALID_LOCALE": "That language is not supported.",
     "TOO_MANY_REQUESTS": "Too many attempts. Wait a moment and try again.",
@@ -870,6 +871,7 @@
       "resubmit": "Send it again",
       "submitting": "Sending…",
       "noteHeading": "What needs changing",
+      "suspendedHeading": "Why this listing is suspended",
       "locked": "You can’t change this listing while we’re checking it, or once it’s live.",
       "policy": "Cancellation policy: {policy}"
     },

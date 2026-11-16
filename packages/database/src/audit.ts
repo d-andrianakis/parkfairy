@@ -14,7 +14,7 @@ export async function recordAudit(
   entry: {
     actorId: string;
     action: AuditAction;
-    targetType: 'listing';
+    targetType: 'listing' | 'user';
     targetId: string;
     details?: AuditDetails;
   },

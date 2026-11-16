@@ -13,14 +13,17 @@ import {
   type Database,
 } from '@parkfairy/database';
 import {
+  ACCOUNT_EMAIL_KINDS,
   BOOKING_EMAIL_KINDS,
   HANDOVER_EMAIL_KINDS,
   OWNER_EMAIL_KINDS,
+  renderAccountEmail,
   renderBookingEmail,
   renderHandoverEmail,
   renderInviteEmail,
   renderOwnerEmail,
   SendStopped,
+  type AccountEmailKind,
   type BookingEmailKind,
   type HandoverEmailKind,
   type OutgoingEmail,
@@ -55,6 +58,7 @@ export const SEND_RUN_MS = 25_000;
 const OWNER_KINDS = new Set<string>(OWNER_EMAIL_KINDS);
 const BOOKING_KINDS = new Set<string>(BOOKING_EMAIL_KINDS);
 const HANDOVER_KINDS = new Set<string>(HANDOVER_EMAIL_KINDS);
+const ACCOUNT_KINDS = new Set<string>(ACCOUNT_EMAIL_KINDS);
 
 /** The message for an outbox row. A kind nobody knows, or a booking email without its booking, throws. */
 function render(row: ClaimedEmail, webUrl: string): OutgoingEmail {
@@ -90,6 +94,9 @@ function render(row: ClaimedEmail, webUrl: string): OutgoingEmail {
       webUrl,
       listingId,
     });
+  }
+  if (ACCOUNT_KINDS.has(row.kind)) {
+    return renderAccountEmail({ kind: row.kind as AccountEmailKind, to: row.to, locale, webUrl });
   }
   throw new Error(`Unknown email kind "${row.kind}"`);
 }

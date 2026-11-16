@@ -10,6 +10,7 @@
   "Header": {
     "staffNav": "Staff",
     "listings": "Listings",
+    "users": "Accounts",
     "audit": "Audit log",
     "signOut": "Sign out",
     "signingOut": "Signing out…"
@@ -59,6 +60,7 @@
     "OTP_HAS_EXPIRED": "That code has expired. Try a new one.",
     "TOO_MANY_ATTEMPTS": "Too many attempts. Sign in again to get a new code.",
     "ACCOUNT_TEMPORARILY_LOCKED": "Too many wrong codes. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+    "ACCOUNT_SUSPENDED": "This account has been suspended, so you can’t sign in. Contact Parkfairy support if you think this is a mistake.",
     "INVALID_TWO_FACTOR_COOKIE": "Your verification session expired. Sign in again.",
     "INVALID_LOCALE": "That language is not supported.",
     "TOO_MANY_REQUESTS": "Too many attempts. Wait a moment and try again.",
@@ -197,7 +199,8 @@
       "proofsLead": "Opening a document is recorded in the audit log, with your name.",
       "proofLink": "{kind}: {name}",
       "proofMeta": "{size}",
-      "decision": "Decision"
+      "decision": "Decision",
+      "moderation": "Take it down or bring it back"
     },
     "audit": {
       "metaTitle": "Audit log",
@@ -209,7 +212,15 @@
         "listing": {
           "approved": "Listing approved",
           "changes_requested": "Listing sent back",
-          "proof_opened": "Proof document opened"
+          "proof_opened": "Proof document opened",
+          "suspended": "Listing suspended",
+          "reinstated": "Listing reinstated"
+        },
+        "user": {
+          "two_factor_removed": "Two-factor authentication removed from an account",
+          "viewed": "Account page opened",
+          "suspended": "Account suspended",
+          "reinstated": "Account reinstated"
         }
       },
       "unknownAction": "Other action",
@@ -220,19 +231,58 @@
         "note": "Note",
         "kind": "Kind",
         "proofId": "Document",
-        "ownersVerified": "Owners verified"
+        "ownersVerified": "Owners verified",
+        "sessionsEnded": "Sessions ended",
+        "passwordRevoked": "Password cancelled",
+        "cancelBookings": "Bookings also cancelled",
+        "bookingsCancelled": "Bookings cancelled"
       },
       "caption": "Audit log",
       "empty": "Nothing has been recorded yet.",
       "when": "When",
       "who": "Who",
       "what": "What",
-      "target": "Listing",
+      "target": "About",
       "details": "Details",
       "listingLink": "Open the listing",
       "pages": "Pages",
       "first": "Newest",
-      "next": "Older"
+      "next": "Older",
+      "userLink": "Open the account"
+    },
+    "users": {
+      "metaTitle": "Accounts",
+      "title": "Accounts",
+      "lead": "Find a person’s account to help them, by their whole email address. Nothing else about accounts is listed here."
+    },
+    "user": {
+      "metaTitle": "Account",
+      "back": "Back to accounts",
+      "facts": "The account",
+      "name": "Name",
+      "email": "Email address",
+      "role": "Kind",
+      "verified": "Address confirmed",
+      "twoFactor": "Two-factor authentication",
+      "language": "Language",
+      "created": "Created",
+      "roles": {
+        "user": "Standard account",
+        "admin": "Staff account"
+      },
+      "on": "On",
+      "off": "Off",
+      "locales": {
+        "el": "Ελληνικά",
+        "en": "English"
+      },
+      "security": "Security",
+      "yes": "Yes",
+      "no": "No",
+      "status": "Account status",
+      "active": "Active",
+      "suspended": "Suspended",
+      "moderation": "Suspension"
     }
   },
   "AdminReview": {
@@ -273,15 +323,120 @@
       }
     }
   },
+  "AdminLookup": {
+    "email": "Email address",
+    "hint": "The whole address, as the person gave it.",
+    "submit": "Find the account",
+    "busy": "Looking…",
+    "notFound": "No account has this address."
+  },
   "AdminErrors": {
     "LISTING_NOT_FOUND": "That listing no longer exists.",
     "NOT_IN_REVIEW": "Someone decided this listing already, or the owner took it back. The page now shows where it stands.",
     "OWN_LISTING": "You own, co-own or manage this listing, so someone else has to decide it.",
     "OWNER_DETAILS_MISSING": "An owner changed their details since they sent this in, and they are incomplete now: {owners}. The listing can’t go live until they are filled in; send it back instead.",
+    "USER_NOT_FOUND": "That account no longer exists.",
+    "OWN_ACCOUNT": "This is your own account, so someone else on the staff has to do this.",
+    "STAFF_ACCOUNT": "This is a staff account. Staff recover their own two-factor authentication by hand, not here.",
+    "NO_TWO_FACTOR": "This account has no two-factor authentication now: someone may have removed it already. The page now shows where it stands.",
+    "NOT_PUBLISHED": "This listing is not live now, so it can’t be suspended: someone may have done it already. The page now shows where it stands.",
+    "NOT_SUSPENDED": "The suspension is already lifted: someone may have done it. The page now shows where it stands.",
+    "ALREADY_SUSPENDED": "This account is suspended already. The page now shows where it stands.",
     "MFA_REQUIRED": "Two-factor verification must be on for your account.",
     "INVALID_ORIGIN": "This request did not come from this site. Reload the page and try again.",
     "SESSION_ENDED": "Your session has ended. Sign in again; nothing you typed here was sent.",
     "TOO_MANY_REQUESTS": "Too many decisions in a short time. Wait a moment and try again.",
     "UNKNOWN": "Something went wrong. Please try again."
+  },
+  "AdminUser": {
+    "own": "This is your own account, so someone else on the staff has to change its security.",
+    "staff": "This is a staff account. Staff recover their own two-factor authentication by hand, not here.",
+    "none": "This account has no two-factor authentication to remove.",
+    "heading": "Remove two-factor authentication",
+    "text": "Only after you have checked who is asking. The person is signed out on every device, their password is cancelled (they set a new one by email), their address is emailed, and your note stays in the audit log for good.",
+    "note": "How did you check who they are?",
+    "hint": "A ticket reference and the kind of check, up to {max, number} characters, for example “Video call, ticket 4821”. No names, ID numbers or document details: the note stays in the audit log for good.",
+    "submit": "Remove two-factor authentication…",
+    "busy": "Removing…",
+    "question": "Remove two-factor authentication from this account now? The person is signed out on every device and must set a new password by email.",
+    "confirm": "Yes, remove it",
+    "cancel": "Not yet",
+    "doneTitle": "Two-factor authentication removed",
+    "doneText": "The person is signed out everywhere, their password is cancelled and their address has been emailed so they can set a new one. The removal, with your note, is in the audit log."
+  },
+  "AdminModeration": {
+    "cancel": "Not yet",
+    "own": "You own, co-own or manage this listing, so someone else on the staff has to do this.",
+    "none": "This listing is neither live nor suspended, so there is nothing to take down or bring back.",
+    "suspend": {
+      "heading": "Suspend this listing",
+      "text": "It leaves search and can’t be booked. The primary owner is emailed, and all its owners and managers read your note on their dashboard, so write it for them.",
+      "note": "Why is it suspended? (its owners read this)",
+      "hint": "Plain words, up to {max, number} characters. The owners see this exactly as written.",
+      "cancelBookings": "{count, plural, one {Also cancel its # upcoming booking} other {Also cancel its # upcoming bookings}}",
+      "cancelHint": "Drivers are refunded in full and emailed. A stay that has begun is not cancelled. Left unticked, bookings that exist stand.",
+      "submit": "Suspend this listing…",
+      "question": "Suspend this listing now?",
+      "questionCancel": "{count, plural, one {Suspend this listing and cancel its # upcoming booking now? The driver is refunded in full.} other {Suspend this listing and cancel its # upcoming bookings now? The drivers are refunded in full.}}",
+      "confirm": "Yes, suspend it",
+      "busy": "Suspending…"
+    },
+    "reinstate": {
+      "heading": "Reinstate this listing",
+      "text": "It is live again and can be booked. The primary owner is emailed. Your note stays in the audit log; the owners don’t read it.",
+      "note": "Why is it reinstated? (for the audit log only)",
+      "hint": "A ticket reference and a few words, up to {max, number} characters.",
+      "submit": "Reinstate this listing…",
+      "question": "Put this listing back on the site now?",
+      "confirm": "Yes, reinstate it",
+      "busy": "Reinstating…"
+    },
+    "done": {
+      "suspended": {
+        "title": "Listing suspended",
+        "text": "It is off the site and the primary owner is told. The suspension is in the audit log."
+      },
+      "reinstated": {
+        "title": "Listing reinstated",
+        "text": "It is live again and the primary owner is told. The decision is in the audit log."
+      }
+    }
+  },
+  "AdminAccount": {
+    "cancel": "Not yet",
+    "own": "This is your own account, so someone else on the staff has to change it.",
+    "staff": "This is a staff account. Staff accounts are not suspended here.",
+    "none": "Nothing to do here.",
+    "suspend": {
+      "heading": "Suspend this account",
+      "text": "The person can’t sign in, is signed out on every device, and is emailed that the account is suspended, without your reason. Nothing they own is changed.",
+      "liveListings": "{count, plural, one {They are the primary owner of # live listing, which stays live until you suspend it.} other {They are the primary owner of # live listings, which stay live until you suspend them.}}",
+      "note": "Why? (for the audit log only)",
+      "hint": "A ticket reference and a few words, up to {max, number} characters. The person never sees this.",
+      "submit": "Suspend this account…",
+      "question": "Suspend this account now? The person is signed out on every device.",
+      "confirm": "Yes, suspend it",
+      "busy": "Suspending…"
+    },
+    "reinstate": {
+      "heading": "Reinstate this account",
+      "text": "The person can sign in again with their password and is emailed that the suspension is lifted. Nothing is republished or restored for them.",
+      "note": "Why is it reinstated? (for the audit log only)",
+      "hint": "A ticket reference and a few words, up to {max, number} characters.",
+      "submit": "Reinstate this account…",
+      "question": "Lift the suspension of this account now?",
+      "confirm": "Yes, reinstate it",
+      "busy": "Reinstating…"
+    },
+    "done": {
+      "suspended": {
+        "title": "Account suspended",
+        "text": "The person is signed out and told. The suspension, with your note, is in the audit log."
+      },
+      "reinstated": {
+        "title": "Account reinstated",
+        "text": "The person can sign in again and is told. The decision is in the audit log."
+      }
+    }
   }
 }

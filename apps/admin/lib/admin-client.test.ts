@@ -7,6 +7,13 @@ describe('what a refusal from the admin routes is called', () => {
     'NOT_IN_REVIEW',
     'OWN_LISTING',
     'OWNER_DETAILS_MISSING',
+    'USER_NOT_FOUND',
+    'OWN_ACCOUNT',
+    'STAFF_ACCOUNT',
+    'NO_TWO_FACTOR',
+    'NOT_PUBLISHED',
+    'NOT_SUSPENDED',
+    'ALREADY_SUSPENDED',
     'MFA_REQUIRED',
     'INVALID_ORIGIN',
   ])('knows %s', (code) => {

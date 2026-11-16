@@ -27,7 +27,11 @@ function contextFor(handler: keyof ProbeController, request: Partial<Authenticat
   } as unknown as ExecutionContext;
 }
 
-function sessionFor(user: { role: 'user' | 'admin'; twoFactorEnabled?: boolean }) {
+function sessionFor(user: {
+  role: 'user' | 'admin';
+  twoFactorEnabled?: boolean;
+  suspendedAt?: Date | null;
+}) {
   return { user: { id: 'user-1', ...user }, session: { id: 'session-1' } };
 }
 
@@ -64,6 +68,34 @@ describe('AuthGuard', () => {
     expect(query).toEqual({ disableRefresh: true });
     expect(request.user?.id).toBe('user-1');
     expect(request.authSession?.id).toBe('session-1');
+  });
+
+  it('turns a suspended account away, with a word of its own, and attaches nothing', async () => {
+    getSession.mockResolvedValue(sessionFor({ role: 'user', suspendedAt: new Date() }));
+    const request: Partial<AuthenticatedRequest> = { headers: {} };
+    const error = await guard.canActivate(contextFor('member', request)).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ForbiddenException);
+    expect((error as ForbiddenException).getResponse()).toMatchObject({
+      code: 'ACCOUNT_SUSPENDED',
+    });
+    expect(request.user).toBeUndefined();
+  });
+
+  it('turns a suspended administrator away too, before the role is looked at', async () => {
+    getSession.mockResolvedValue(
+      sessionFor({ role: 'admin', twoFactorEnabled: true, suspendedAt: new Date() }),
+    );
+    const error = await guard
+      .canActivate(contextFor('admin', { headers: {} }))
+      .catch((e: unknown) => e);
+    expect((error as ForbiddenException).getResponse()).toMatchObject({
+      code: 'ACCOUNT_SUSPENDED',
+    });
+  });
+
+  it('admits an account whose suspension was lifted', async () => {
+    getSession.mockResolvedValue(sessionFor({ role: 'user', suspendedAt: null }));
+    await expect(guard.canActivate(contextFor('member', { headers: {} }))).resolves.toBe(true);
   });
 
   it('forbids non-admins from admin routes', async () => {

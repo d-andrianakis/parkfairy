@@ -12,4 +12,10 @@ export const CLIENT_NAMESPACES = {
   auth: ['SignIn', 'TwoFactor', 'AuthErrors', 'Validation', 'Forms'],
   /** A listing's review: the decision buttons and the note to the owner. */
   review: ['AdminReview', 'AdminErrors', 'Validation', 'Forms'],
+  /** The account lookup: one whole address, sent in a body. */
+  lookup: ['AdminLookup', 'AdminErrors', 'Validation', 'Forms'],
+  /** An account's page: removing its second factor, with the note of the identity check. */
+  account: ['AdminUser', 'AdminAccount', 'AdminErrors', 'Validation', 'Forms'],
+  /** A live or suspended listing: taking it down, bringing it back. */
+  moderation: ['AdminModeration', 'AdminErrors', 'Validation', 'Forms'],
 } as const satisfies Record<string, readonly Namespace[]>;

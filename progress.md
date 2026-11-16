@@ -1592,7 +1592,62 @@ payments, overstay reports, removing two-factor).
   unit test, an exhaustive allowlist test against Better Auth's endpoint list
 - [x] **5.2b Contracts & docs**: no contract or schema change; README, GETTING_STARTED, `.env.example`,
       CI, memory.md
-- [ ] **5.2c** moderation, users, bookings, payments, overstay reports, removing two-factor (below)
+- [ ] **5.2c** moderation, users, bookings, payments, overstay reports, removing two-factor: built in
+      order (#74–#81); 5.2c1 and 5.2c2 below are done, the rest are open
+
+#### 5.2c1 Accounts and removing two-factor (2026-11-15, #13, #77)
+
+- [x] **Implemented**: `POST /admin/users/lookup` (a whole address in the body, the id back),
+      `GET /admin/users/:id` (the account's page, logged as `user.viewed`), `POST
+/admin/users/:id/remove-two-factor` (note; ends every session, revokes the password, clears old
+      reset links and trusted devices, emails the address, `user.two_factor_removed`; never on staff or
+      on yourself); `/users` and `/users/[id]` in the staff app, both languages; migrations 0038, 0039
+- [x] **Unit and integration tests**: contracts, the `two-factor-removed` email, the worker, 38 API
+      integration tests (authorization, origin, race of five admins, rollback, throttles, the reset
+      getting the person back in, other accounts untouched, the email claimed for the right address
+      and language), 245 in the staff app
+- [x] **Smoke test** `admin-support.smoke.ts` (2): lookup, the field's error, the removal with its
+      confirmation, the person signed out and their old password refused, the email, the log, own
+      account, Greek at 320 px, JS budget; `/users` in the signed-out redirects
+- [x] **Reviews**: security (no high; M1 password revoked, L1-L4 fixed: verifications, invisible
+      characters, ticket-only note, audited views), performance (no high; `for no key update`),
+      accessibility (the refusal's reason and focus survive the refresh, the field carries "not found",
+      required), i18n (the email's button, gendered Greek, role labels, endonyms, 24-hour clock, Greek
+      marked), test (order-dependent audit-filter test fixed, bystander, throttle, claim, standing)
+- [ ] **Open**: a native speaker on the new Greek (the admin catalog's `Admin.users`, `Admin.user`,
+      `AdminLookup`, `AdminUser`, the email in `packages/email/src/account-emails.ts`); a manual
+      NVDA/VoiceOver pass over the removal; a per-day cap on removals (needs a second throttler); a
+      support address for the email ("contact support" names none); `NOT VALID` constraints on the
+      outbox after launch
+
+#### 5.2c2 Moderation (2026-11-15, #78–#81)
+
+- [x] **Implemented**: `POST /admin/listings/:id/suspend` (the owners' note, and whether to cancel the
+      upcoming bookings: drivers refunded in full and told) and `…/reinstate`; `POST
+/admin/users/:id/suspend` and `…/reinstate` (a note for the log only); `users.suspended_at`
+      (migration 0040), refused at sign-in (Better Auth's session hook), by the API's guard and on the
+      sign-in screens; four emails (two for owners, two for accounts); panels on the review and account
+      pages in both languages; the owners read a suspension's note on their dashboard
+- [x] **Unit and integration tests**: contracts, the four emails, the worker, the guard and the auth
+      hook, the API integration tests (authorization, origin, bookings cancelled and refunds owed, the
+      sweep staying quiet, sign-in refused, rollback, races, throttles), the staff app's panels, pages
+      and nav
+- [x] **Smoke test** `admin-moderation.smoke.ts` (3): a listing suspended with its bookings cancelled and
+      brought back (what the owner reads, the emails, the log, Greek at 320 px), an account suspended and
+      reinstated (sign-in refused with the message, a wrong password learns nothing, the emails)
+- [x] **Reviews**: security (no high; the sign-in race closed by an `after` hook, the apps read a suspended
+      session as signed out, the throttle's wording corrected), performance (bulk cancel set-based in
+      chunks, the count only for a live listing), accessibility (buttons wrap at 320 px in Greek, a refusal
+      that the page then catches up with keeps its reason and the focus, one alert at a time), i18n (the
+      email goes to the primary owner and the screens say so, «επιστροφή χρημάτων», the lifted-suspension
+      wording), test (a driver's cancel racing staff's, two-factor and reset roads, a manager as staff,
+      the audit page, the allowlist, the kind coverage, the after hook)
+- [ ] **Open**: a native speaker on the new Greek (`AdminModeration`, `AdminAccount`, the four emails,
+      `AuthErrors.ACCOUNT_SUSPENDED`, `Owner.review.suspendedHeading`); a manual NVDA/VoiceOver pass over
+      the two-step form and the refused-as-out-of-date focus; measure a bulk cancel on thousands of
+      bookings; the retention of audit notes; a shared throttle across the destructive routes; the
+      owner calendar and driver views of a staff-cancelled booking and the refund sweep for one are not
+      tested end to end (the booking and its refund are)
 
 - [~] 2FA enrolment UI done (1.3); admin MFA enforced end to end once admin routes exist
   (sessions without a second factor are already ended when it is switched on)
@@ -1600,8 +1655,8 @@ payments, overstay reports, removing two-factor).
 - [~] Admin approvals (listings, proof of the right to rent) and the audit log: done (5.2a, 5.2b).
   Moderation, users, bookings, payments: 5.2c
 - [ ] Overstay reports: the owner reports, support handles it (#11)
-- [ ] Support removes two-factor after an identity check: audited action, email to the address,
-      written procedure (#13)
+- [x] Support removes two-factor after an identity check: audited action, email to the address,
+      written procedure (#13): done (5.2c1; the procedure is in GETTING_STARTED.md)
 
 ## Phase 6: Production readiness
 

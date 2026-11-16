@@ -66,6 +66,8 @@ const space = schema.parkingSpaces;
 const profile = schema.ownerProfiles;
 const users = schema.users;
 const outbox = schema.emailOutbox;
+/** How many bookings one statement calls off when staff suspend a listing. */
+const CANCEL_CHUNK = 400;
 const owners = schema.listingOwners;
 const managers = schema.listingManagers;
 const settings = schema.platformSettings;
@@ -1182,6 +1184,78 @@ export class BookingsService {
       return cancelled;
     });
     await this.sendCancelRefund(owed);
+  }
+
+  /**
+   * Staff suspended the listing and chose to call off what is booked (#78): every confirmed booking
+   * that hasn't started, each driver refunded in full and told. Inside the suspension's own
+   * transaction, with the listing's lock held (before the bookings', as every path takes them), so
+   * none is booked or cancelled between the choice and the suspension. The refunds are recorded
+   * `owed` and the worker sends them (a listing can have many, and staff shouldn't wait on Stripe
+   * for each); the cancelling account is the staff member's.
+   *
+   * Set-based, a few hundred at a time: one statement for the bookings and one for their emails per
+   * chunk, not two round trips each, so a busy listing doesn't hold its lock (and every driver
+   * waiting on it, each with a pool connection) for seconds, and no statement meets the timeout.
+   * The update takes each row's lock as it goes, and one a driver cancelled meanwhile is passed over.
+   */
+  async cancelUpcomingForStaff(
+    tx: Transaction,
+    staffId: string,
+    listingId: string,
+  ): Promise<number> {
+    const now = new Date();
+    const info = await this.listingOf(tx, listingId);
+    let cancelled = 0;
+    for (;;) {
+      const chunk = await tx
+        .update(booking)
+        .set({
+          status: 'cancelled',
+          cancelledAt: now,
+          cancelledBy: 'owner',
+          cancelledByUserId: staffId,
+          refundMinor: sql`${booking.totalMinor}`,
+          // As `owesRefund` says it: paid at Stripe, and something goes back.
+          refundStatus: sql`case when ${booking.paymentStatus} = 'succeeded' and ${booking.totalMinor} > 0 then 'owed' end`,
+        })
+        .where(
+          inArray(
+            booking.id,
+            tx
+              .select({ id: booking.id })
+              .from(booking)
+              .where(
+                and(
+                  eq(booking.locationId, listingId),
+                  eq(booking.status, 'confirmed'),
+                  gt(booking.startsAt, now),
+                ),
+              )
+              .orderBy(booking.startsAt, booking.id)
+              .limit(CANCEL_CHUNK),
+          ),
+        )
+        .returning();
+      if (chunk.length === 0) break;
+      await tx
+        .insert(outbox)
+        .values(
+          chunk.map((row) => ({
+            kind: 'booking-cancelled' as const,
+            userId: row.userId,
+            payload: {
+              listingName: row.listingName ?? undefined,
+              booking: outboxBooking(row, info),
+            },
+            dedupeKey: `booking:${row.id}:cancelled:driver`,
+          })),
+        )
+        .onConflictDoNothing({ target: outbox.dedupeKey });
+      cancelled += chunk.length;
+      if (chunk.length < CANCEL_CHUNK) break;
+    }
+    return cancelled;
   }
 
   /**

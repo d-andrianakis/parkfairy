@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AcceptListingHandoverData, AcceptListingHandoverErrors, AcceptListingHandoverResponses, AcceptListingInviteData, AcceptListingInviteErrors, AcceptListingInviteResponses, ApproveAdminListingData, ApproveAdminListingErrors, ApproveAdminListingResponses, CancelListingBookingData, CancelListingBookingErrors, CancelListingBookingResponses, CancelMyBookingData, CancelMyBookingErrors, CancelMyBookingResponses, ConfirmMyBookingData, ConfirmMyBookingErrors, ConfirmMyBookingResponses, CopyListingHoursData, CopyListingHoursErrors, CopyListingHoursExceptionsData, CopyListingHoursExceptionsErrors, CopyListingHoursExceptionsResponses, CopyListingHoursResponses, CreateOwnerListingData, CreateOwnerListingErrors, CreateOwnerListingResponses, DeleteListingPhotoData, DeleteListingPhotoErrors, DeleteListingPhotoResponses, DeleteListingProofData, DeleteListingProofErrors, DeleteListingProofResponses, DeleteOwnerListingData, DeleteOwnerListingErrors, DeleteOwnerListingResponses, DownloadAdminProofData, DownloadAdminProofErrors, DownloadAdminProofResponses, DownloadListingProofData, DownloadListingProofErrors, DownloadListingProofResponses, ExtendMyHoldData, ExtendMyHoldErrors, ExtendMyHoldResponses, FindPlacesData, FindPlacesErrors, FindPlacesResponses, GetAdminListingData, GetAdminListingErrors, GetAdminListingResponses, GetAdminQueueData, GetAdminQueueErrors, GetAdminQueueResponses, GetAuditLogData, GetAuditLogErrors, GetAuditLogResponses, GetCalendarData, GetCalendarErrors, GetCalendarResponses, GetEarningsData, GetEarningsErrors, GetEarningsResponses, GetFeaturedParkingData, GetFeaturedParkingResponses, GetListingBookingsData, GetListingBookingsErrors, GetListingBookingsResponses, GetListingHoursExceptionsData, GetListingHoursExceptionsErrors, GetListingHoursExceptionsResponses, GetListingOwnersData, GetListingOwnersErrors, GetListingOwnersResponses, GetListingPhotoData, GetListingPhotoErrors, GetListingPhotoResponses, GetLivenessData, GetLivenessResponses, GetManagedListingsData, GetManagedListingsErrors, GetManagedListingsResponses, GetMeData, GetMeErrors, GetMeResponses, GetMyBookingData, GetMyBookingErrors, GetMyBookingResponses, GetMyBookingsData, GetMyBookingsErrors, GetMyBookingsResponses, GetOtherOwnerListingsData, GetOtherOwnerListingsErrors, GetOtherOwnerListingsResponses, GetOwnerListingData, GetOwnerListingErrors, GetOwnerListingResponses, GetOwnerOnboardingData, GetOwnerOnboardingErrors, GetOwnerOnboardingResponses, GetOwnerPayoutsData, GetOwnerPayoutsErrors, GetOwnerPayoutsResponses, GetOwnerProfileData, GetOwnerProfileErrors, GetOwnerProfileResponses, GetParkingListingData, GetParkingListingErrors, GetParkingListingResponses, GetPlaceSuggestionsData, GetPlaceSuggestionsErrors, GetPlaceSuggestionsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, HoldParkingSpaceData, HoldParkingSpaceErrors, HoldParkingSpaceResponses, InviteListingOwnerData, InviteListingOwnerErrors, InviteListingOwnerResponses, LeaveListingData, LeaveListingErrors, LeaveListingResponses, OfferListingHandoverData, OfferListingHandoverErrors, OfferListingHandoverResponses, OpenPayoutDashboardData, OpenPayoutDashboardErrors, OpenPayoutDashboardResponses, PayForMyBookingData, PayForMyBookingErrors, PayForMyBookingResponses, PreviewListingInviteData, PreviewListingInviteErrors, PreviewListingInviteResponses, RemoveListingManagerData, RemoveListingManagerErrors, RemoveListingManagerResponses, RemoveListingOwnerData, RemoveListingOwnerErrors, RemoveListingOwnerResponses, ReorderListingPhotosData, ReorderListingPhotosErrors, ReorderListingPhotosResponses, RequestAdminListingChangesData, RequestAdminListingChangesErrors, RequestAdminListingChangesResponses, RetrievePlaceData, RetrievePlaceErrors, RetrievePlaceResponses, SaveListingHoursData, SaveListingHoursErrors, SaveListingHoursExceptionsData, SaveListingHoursExceptionsErrors, SaveListingHoursExceptionsResponses, SaveListingHoursResponses, SaveListingLocationData, SaveListingLocationErrors, SaveListingLocationResponses, SaveListingPricesData, SaveListingPricesErrors, SaveListingPricesResponses, SaveListingProofDetailsData, SaveListingProofDetailsErrors, SaveListingProofDetailsResponses, SaveListingSpacesData, SaveListingSpacesErrors, SaveListingSpacesResponses, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsErrors, SaveOwnerTaxDetailsResponses, SearchParkingData, SearchParkingErrors, SearchParkingResponses, SetListingSharesData, SetListingSharesErrors, SetListingSharesResponses, SettleMyPaymentData, SettleMyPaymentErrors, SettleMyPaymentResponses, StartPayoutOnboardingData, StartPayoutOnboardingErrors, StartPayoutOnboardingResponses, SubmitOwnerListingData, SubmitOwnerListingErrors, SubmitOwnerListingResponses, UpdateListingPhotoData, UpdateListingPhotoErrors, UpdateListingPhotoResponses, UpdateOwnerProfileData, UpdateOwnerProfileErrors, UpdateOwnerProfileResponses, UploadListingPhotoData, UploadListingPhotoErrors, UploadListingPhotoResponses, UploadListingProofData, UploadListingProofErrors, UploadListingProofResponses, WithdrawListingHandoverData, WithdrawListingHandoverErrors, WithdrawListingHandoverResponses, WithdrawListingInviteData, WithdrawListingInviteErrors, WithdrawListingInviteResponses } from './types.gen';
+import type { AcceptListingHandoverData, AcceptListingHandoverErrors, AcceptListingHandoverResponses, AcceptListingInviteData, AcceptListingInviteErrors, AcceptListingInviteResponses, ApproveAdminListingData, ApproveAdminListingErrors, ApproveAdminListingResponses, CancelListingBookingData, CancelListingBookingErrors, CancelListingBookingResponses, CancelMyBookingData, CancelMyBookingErrors, CancelMyBookingResponses, ConfirmMyBookingData, ConfirmMyBookingErrors, ConfirmMyBookingResponses, CopyListingHoursData, CopyListingHoursErrors, CopyListingHoursExceptionsData, CopyListingHoursExceptionsErrors, CopyListingHoursExceptionsResponses, CopyListingHoursResponses, CreateOwnerListingData, CreateOwnerListingErrors, CreateOwnerListingResponses, DeleteListingPhotoData, DeleteListingPhotoErrors, DeleteListingPhotoResponses, DeleteListingProofData, DeleteListingProofErrors, DeleteListingProofResponses, DeleteOwnerListingData, DeleteOwnerListingErrors, DeleteOwnerListingResponses, DownloadAdminProofData, DownloadAdminProofErrors, DownloadAdminProofResponses, DownloadListingProofData, DownloadListingProofErrors, DownloadListingProofResponses, ExtendMyHoldData, ExtendMyHoldErrors, ExtendMyHoldResponses, FindPlacesData, FindPlacesErrors, FindPlacesResponses, GetAdminListingData, GetAdminListingErrors, GetAdminListingResponses, GetAdminQueueData, GetAdminQueueErrors, GetAdminQueueResponses, GetAdminUserData, GetAdminUserErrors, GetAdminUserResponses, GetAuditLogData, GetAuditLogErrors, GetAuditLogResponses, GetCalendarData, GetCalendarErrors, GetCalendarResponses, GetEarningsData, GetEarningsErrors, GetEarningsResponses, GetFeaturedParkingData, GetFeaturedParkingResponses, GetListingBookingsData, GetListingBookingsErrors, GetListingBookingsResponses, GetListingHoursExceptionsData, GetListingHoursExceptionsErrors, GetListingHoursExceptionsResponses, GetListingOwnersData, GetListingOwnersErrors, GetListingOwnersResponses, GetListingPhotoData, GetListingPhotoErrors, GetListingPhotoResponses, GetLivenessData, GetLivenessResponses, GetManagedListingsData, GetManagedListingsErrors, GetManagedListingsResponses, GetMeData, GetMeErrors, GetMeResponses, GetMyBookingData, GetMyBookingErrors, GetMyBookingResponses, GetMyBookingsData, GetMyBookingsErrors, GetMyBookingsResponses, GetOtherOwnerListingsData, GetOtherOwnerListingsErrors, GetOtherOwnerListingsResponses, GetOwnerListingData, GetOwnerListingErrors, GetOwnerListingResponses, GetOwnerOnboardingData, GetOwnerOnboardingErrors, GetOwnerOnboardingResponses, GetOwnerPayoutsData, GetOwnerPayoutsErrors, GetOwnerPayoutsResponses, GetOwnerProfileData, GetOwnerProfileErrors, GetOwnerProfileResponses, GetParkingListingData, GetParkingListingErrors, GetParkingListingResponses, GetPlaceSuggestionsData, GetPlaceSuggestionsErrors, GetPlaceSuggestionsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, HoldParkingSpaceData, HoldParkingSpaceErrors, HoldParkingSpaceResponses, InviteListingOwnerData, InviteListingOwnerErrors, InviteListingOwnerResponses, LeaveListingData, LeaveListingErrors, LeaveListingResponses, LookUpAdminUserData, LookUpAdminUserErrors, LookUpAdminUserResponses, OfferListingHandoverData, OfferListingHandoverErrors, OfferListingHandoverResponses, OpenPayoutDashboardData, OpenPayoutDashboardErrors, OpenPayoutDashboardResponses, PayForMyBookingData, PayForMyBookingErrors, PayForMyBookingResponses, PreviewListingInviteData, PreviewListingInviteErrors, PreviewListingInviteResponses, ReinstateAdminListingData, ReinstateAdminListingErrors, ReinstateAdminListingResponses, ReinstateAdminUserData, ReinstateAdminUserErrors, ReinstateAdminUserResponses, RemoveAdminUserTwoFactorData, RemoveAdminUserTwoFactorErrors, RemoveAdminUserTwoFactorResponses, RemoveListingManagerData, RemoveListingManagerErrors, RemoveListingManagerResponses, RemoveListingOwnerData, RemoveListingOwnerErrors, RemoveListingOwnerResponses, ReorderListingPhotosData, ReorderListingPhotosErrors, ReorderListingPhotosResponses, RequestAdminListingChangesData, RequestAdminListingChangesErrors, RequestAdminListingChangesResponses, RetrievePlaceData, RetrievePlaceErrors, RetrievePlaceResponses, SaveListingHoursData, SaveListingHoursErrors, SaveListingHoursExceptionsData, SaveListingHoursExceptionsErrors, SaveListingHoursExceptionsResponses, SaveListingHoursResponses, SaveListingLocationData, SaveListingLocationErrors, SaveListingLocationResponses, SaveListingPricesData, SaveListingPricesErrors, SaveListingPricesResponses, SaveListingProofDetailsData, SaveListingProofDetailsErrors, SaveListingProofDetailsResponses, SaveListingSpacesData, SaveListingSpacesErrors, SaveListingSpacesResponses, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsErrors, SaveOwnerTaxDetailsResponses, SearchParkingData, SearchParkingErrors, SearchParkingResponses, SetListingSharesData, SetListingSharesErrors, SetListingSharesResponses, SettleMyPaymentData, SettleMyPaymentErrors, SettleMyPaymentResponses, StartPayoutOnboardingData, StartPayoutOnboardingErrors, StartPayoutOnboardingResponses, SubmitOwnerListingData, SubmitOwnerListingErrors, SubmitOwnerListingResponses, SuspendAdminListingData, SuspendAdminListingErrors, SuspendAdminListingResponses, SuspendAdminUserData, SuspendAdminUserErrors, SuspendAdminUserResponses, UpdateListingPhotoData, UpdateListingPhotoErrors, UpdateListingPhotoResponses, UpdateOwnerProfileData, UpdateOwnerProfileErrors, UpdateOwnerProfileResponses, UploadListingPhotoData, UploadListingPhotoErrors, UploadListingPhotoResponses, UploadListingProofData, UploadListingProofErrors, UploadListingProofResponses, WithdrawListingHandoverData, WithdrawListingHandoverErrors, WithdrawListingHandoverResponses, WithdrawListingInviteData, WithdrawListingInviteErrors, WithdrawListingInviteResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -549,6 +549,100 @@ export const requestAdminListingChanges = <ThrowOnError extends boolean = false>
             type: 'apiKey'
         }],
     url: '/v1/admin/listings/{id}/request-changes',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const lookUpAdminUser = <ThrowOnError extends boolean = false>(options: Options<LookUpAdminUserData, ThrowOnError>): RequestResult<LookUpAdminUserResponses, LookUpAdminUserErrors, ThrowOnError> => (options.client ?? client).post<LookUpAdminUserResponses, LookUpAdminUserErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/admin/users/lookup',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getAdminUser = <ThrowOnError extends boolean = false>(options: Options<GetAdminUserData, ThrowOnError>): RequestResult<GetAdminUserResponses, GetAdminUserErrors, ThrowOnError> => (options.client ?? client).get<GetAdminUserResponses, GetAdminUserErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/admin/users/{id}',
+    ...options
+});
+
+export const removeAdminUserTwoFactor = <ThrowOnError extends boolean = false>(options: Options<RemoveAdminUserTwoFactorData, ThrowOnError>): RequestResult<RemoveAdminUserTwoFactorResponses, RemoveAdminUserTwoFactorErrors, ThrowOnError> => (options.client ?? client).post<RemoveAdminUserTwoFactorResponses, RemoveAdminUserTwoFactorErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/admin/users/{id}/remove-two-factor',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const suspendAdminListing = <ThrowOnError extends boolean = false>(options: Options<SuspendAdminListingData, ThrowOnError>): RequestResult<SuspendAdminListingResponses, SuspendAdminListingErrors, ThrowOnError> => (options.client ?? client).post<SuspendAdminListingResponses, SuspendAdminListingErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/admin/listings/{id}/suspend',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const reinstateAdminListing = <ThrowOnError extends boolean = false>(options: Options<ReinstateAdminListingData, ThrowOnError>): RequestResult<ReinstateAdminListingResponses, ReinstateAdminListingErrors, ThrowOnError> => (options.client ?? client).post<ReinstateAdminListingResponses, ReinstateAdminListingErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/admin/listings/{id}/reinstate',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const suspendAdminUser = <ThrowOnError extends boolean = false>(options: Options<SuspendAdminUserData, ThrowOnError>): RequestResult<SuspendAdminUserResponses, SuspendAdminUserErrors, ThrowOnError> => (options.client ?? client).post<SuspendAdminUserResponses, SuspendAdminUserErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/admin/users/{id}/suspend',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const reinstateAdminUser = <ThrowOnError extends boolean = false>(options: Options<ReinstateAdminUserData, ThrowOnError>): RequestResult<ReinstateAdminUserResponses, ReinstateAdminUserErrors, ThrowOnError> => (options.client ?? client).post<ReinstateAdminUserResponses, ReinstateAdminUserErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'parkfairy.session_token',
+            type: 'apiKey'
+        }],
+    url: '/v1/admin/users/{id}/reinstate',
     ...options,
     headers: {
         'Content-Type': 'application/json',

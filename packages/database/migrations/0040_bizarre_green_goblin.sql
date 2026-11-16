@@ -1,0 +1,5 @@
+ALTER TABLE "email_outbox" DROP CONSTRAINT "email_outbox_kind_check";--> statement-breakpoint
+ALTER TABLE "audit_log" DROP CONSTRAINT "audit_log_action_check";--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "suspended_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "email_outbox" ADD CONSTRAINT "email_outbox_kind_check" CHECK ("email_outbox"."kind" in ('listing-submitted', 'listing-approved', 'listing-changes-requested', 'onboarding-reminder', 'booking-confirmed', 'booking-cancelled', 'booking-payment-refunded', 'booking-received', 'booking-cancelled-by-driver', 'booking-cancelled-by-team', 'listing-invite', 'listing-handover-offered', 'listing-handover-accepted', 'two-factor-removed', 'listing-suspended', 'listing-reinstated', 'account-suspended', 'account-reinstated'));--> statement-breakpoint
+ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_action_check" CHECK ("audit_log"."action" in ('listing.approved', 'listing.changes_requested', 'listing.proof_opened', 'user.two_factor_removed', 'user.viewed', 'listing.suspended', 'listing.reinstated', 'user.suspended', 'user.reinstated'));

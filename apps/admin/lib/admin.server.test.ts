@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const sdk = vi.hoisted(() => ({
   getAdminQueue: vi.fn(),
   getAdminListing: vi.fn(),
+  getAdminUser: vi.fn(),
   getAuditLog: vi.fn(),
 }));
 vi.mock('@parkfairy/api-client', () => ({
@@ -15,7 +16,7 @@ let incoming = new Headers();
 vi.mock('next/headers', () => ({ headers: () => Promise.resolve(incoming) }));
 vi.mock('server-only', () => ({}));
 
-const { loadAudit, loadQueue, loadReview } = await import('./admin.server');
+const { loadAudit, loadQueue, loadReview, loadUser } = await import('./admin.server');
 const answer = (status: number, data?: unknown) => ({
   data,
   response: new Response(null, { status }),
@@ -44,6 +45,8 @@ describe('what staff pages learn from the API', () => {
     sdk.getAuditLog.mockResolvedValue(answer(status));
     expect(await loadQueue('in_review', `q${status}`)).toBe(expected);
     expect(await loadReview(`id${status}`)).toBe(expected);
+    sdk.getAdminUser.mockResolvedValue(answer(status));
+    expect(await loadUser(`user${status}`)).toBe(expected);
     expect(await loadAudit(undefined, `a${status}`)).toBe(expected);
   });
 
@@ -81,6 +84,19 @@ describe('what staff pages learn from the API', () => {
       action: 'listing.approved',
       after: 'place',
     });
+  });
+
+  it('asks for an account by its own id, as the signed-in staff member, and reads a throw as unavailable', async () => {
+    sdk.getAdminUser.mockResolvedValue(answer(200, { id: 'x' }));
+    expect(await loadUser('7f1f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f')).toEqual({ id: 'x' });
+    expect(lastOptions(sdk.getAdminUser).path).toEqual({
+      id: '7f1f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f',
+    });
+    expect(lastOptions(sdk.getAdminUser).headers).toMatchObject({
+      cookie: 'parkfairy.session_token=abc',
+    });
+    sdk.getAdminUser.mockRejectedValue(new Error('timeout'));
+    expect(await loadUser('thrown')).toBe('unavailable');
   });
 
   it('asks for a listing by its own id', async () => {

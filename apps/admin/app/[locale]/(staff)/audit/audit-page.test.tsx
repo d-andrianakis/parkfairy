@@ -83,11 +83,165 @@ describe('the audit log', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('names the removal of a second factor and links to the account, not a listing', async () => {
+    const ACCOUNT = '8a2f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f';
+    vi.mocked(loadAudit).mockResolvedValue({
+      entries: [
+        entry({
+          action: 'user.two_factor_removed',
+          targetType: 'user',
+          targetId: ACCOUNT,
+          details: { note: 'Video call, ticket 4821', sessionsEnded: 2 },
+        }),
+      ],
+      next: null,
+    });
+    const { container } = await show();
+    const row = within(screen.getByRole('table', { name: 'Audit log' })).getAllByRole('row')[1]!;
+    expect(row).toHaveTextContent('Two-factor authentication removed from an account');
+    expect(row).toHaveTextContent('Video call, ticket 4821');
+    expect(row).toHaveTextContent('Sessions ended2');
+    expect(within(row).getByRole('link', { name: 'Open the account' })).toHaveAttribute(
+      'href',
+      `/en/users/${ACCOUNT}`,
+    );
+    expect(within(row).queryByRole('link', { name: 'Open the listing' })).toBeNull();
+    await expectNoAxeViolations(container);
+  });
+
+  it('names the removal and the opening of an account in Greek, on the 24-hour clock', async () => {
+    vi.mocked(loadAudit).mockResolvedValue({
+      entries: [
+        entry({
+          action: 'user.two_factor_removed',
+          targetType: 'user',
+          at: '2026-11-15T13:05:09.000Z',
+          details: { note: 'Βιντεοκλήση, αίτημα 4821', sessionsEnded: 2, passwordRevoked: true },
+        }),
+        entry({ action: 'user.viewed', targetType: 'user', details: {} }),
+      ],
+      next: null,
+    });
+    const { container } = await show({}, 'el');
+    const rows = within(screen.getByRole('table', { name: 'Αρχείο ενεργειών' })).getAllByRole(
+      'row',
+    );
+    expect(rows[1]).toHaveTextContent('Αφαίρεση ελέγχου ταυτότητας δύο παραγόντων από λογαριασμό');
+    expect(rows[1]).toHaveTextContent('Βιντεοκλήση, αίτημα 4821');
+    expect(rows[1]).toHaveTextContent('Ακυρώθηκε ο κωδικός πρόσβασηςΝαι');
+    expect(rows[1]).toHaveTextContent('Συνεδρίες που έληξαν2');
+    expect(within(rows[1]!).getByRole('time').textContent).toMatch(/15:05/);
+    expect(rows[2]).toHaveTextContent('Άνοιγμα σελίδας λογαριασμού');
+    await expectNoAxeViolations(container);
+  });
+
+  it('marks Greek in a note on an English page as Greek, and isolates the actor’s name', async () => {
+    vi.mocked(loadAudit).mockResolvedValue({
+      entries: [
+        entry({
+          actor: { id: crypto.randomUUID(), name: 'Ελένη Παπά', email: 'e@parkfairy.test' },
+          details: { note: 'Βιντεοκλήση 4821' },
+        }),
+      ],
+      next: null,
+    });
+    await show();
+    const row = within(screen.getByRole('table', { name: 'Audit log' })).getAllByRole('row')[1]!;
+    expect(row.querySelector('bdi span[lang="el"]')).toHaveTextContent('Ελένη Παπά');
+    expect(row.querySelector('dd span[lang="el"]')?.textContent).toBe('Βιντεοκλήση');
+    expect(row).toHaveTextContent('Βιντεοκλήση 4821');
+  });
+
+  it('puts the four moderation actions and their details in words, each linked to what it was done to', async () => {
+    const ACCOUNT = '8a2f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f';
+    vi.mocked(loadAudit).mockResolvedValue({
+      entries: [
+        entry({
+          action: 'listing.suspended',
+          details: {
+            from: 'published',
+            note: 'The deed shows another owner.',
+            cancelBookings: true,
+            bookingsCancelled: 3,
+          },
+        }),
+        entry({
+          action: 'listing.reinstated',
+          details: { from: 'suspended', note: 'Ticket 4822.' },
+        }),
+        entry({
+          action: 'user.suspended',
+          targetType: 'user',
+          targetId: ACCOUNT,
+          details: { note: 'Ticket 4821.', sessionsEnded: 2 },
+        }),
+        entry({
+          action: 'user.reinstated',
+          targetType: 'user',
+          targetId: ACCOUNT,
+          details: { note: 'Ticket 4823.' },
+        }),
+      ],
+      next: null,
+    });
+    const { container } = await show();
+    const rows = within(screen.getByRole('table', { name: 'Audit log' }))
+      .getAllByRole('row')
+      .slice(1);
+    expect(rows[0]).toHaveTextContent('Listing suspended');
+    expect(rows[0]).toHaveTextContent('Was');
+    expect(rows[0]).toHaveTextContent('Live');
+    expect(rows[0]).toHaveTextContent('Bookings also cancelledYes');
+    expect(rows[0]).toHaveTextContent('Bookings cancelled3');
+    expect(rows[1]).toHaveTextContent('Listing reinstated');
+    expect(rows[1]).toHaveTextContent('Suspended');
+    expect(rows[2]).toHaveTextContent('Account suspended');
+    expect(rows[2]).toHaveTextContent('Sessions ended2');
+    expect(rows[3]).toHaveTextContent('Account reinstated');
+    expect(within(rows[0]!).getByRole('link', { name: 'Open the listing' })).toHaveAttribute(
+      'href',
+      `/en/listings/${ID}`,
+    );
+    expect(within(rows[2]!).getByRole('link', { name: 'Open the account' })).toHaveAttribute(
+      'href',
+      `/en/users/${ACCOUNT}`,
+    );
+    // No detail the screen has no word for: each key the API writes is named.
+    for (const row of rows)
+      expect(row.textContent).not.toMatch(/cancelBookings|bookingsCancelled|sessionsEnded/);
+    await expectNoAxeViolations(container);
+  });
+
+  it('names the same four in Greek', async () => {
+    vi.mocked(loadAudit).mockResolvedValue({
+      entries: [
+        entry({
+          action: 'listing.suspended',
+          details: { from: 'published', cancelBookings: false, bookingsCancelled: 0 },
+        }),
+        entry({ action: 'listing.reinstated', details: { from: 'suspended' } }),
+        entry({ action: 'user.suspended', targetType: 'user', details: { sessionsEnded: 1 } }),
+        entry({ action: 'user.reinstated', targetType: 'user', details: {} }),
+      ],
+      next: null,
+    });
+    const { container } = await show({}, 'el');
+    const rows = within(screen.getByRole('table', { name: 'Αρχείο ενεργειών' }))
+      .getAllByRole('row')
+      .slice(1);
+    expect(rows[0]).toHaveTextContent('Αναστολή χώρου');
+    expect(rows[0]).toHaveTextContent('Ακυρώθηκαν και οι κρατήσειςΌχι');
+    expect(rows[1]).toHaveTextContent('Άρση αναστολής χώρου');
+    expect(rows[2]).toHaveTextContent('Αναστολή λογαριασμού');
+    expect(rows[3]).toHaveTextContent('Άρση αναστολής λογαριασμού');
+    await expectNoAxeViolations(container);
+  });
+
   it('says what it can of an action it does not know yet, and shows each kind of value in words', async () => {
     vi.mocked(loadAudit).mockResolvedValue({
       entries: [
         entry({
-          action: 'listing.suspended' as never,
+          action: 'listing.vanished' as never,
           details: { flag: true, other: false, count: 12345, missing: null },
         }),
       ],
@@ -96,7 +250,7 @@ describe('the audit log', () => {
     await show();
     const row = within(screen.getByRole('table', { name: 'Audit log' })).getAllByRole('row')[1];
     expect(row).toHaveTextContent('Other action');
-    expect(row).not.toHaveTextContent('listing.suspended');
+    expect(row).not.toHaveTextContent('listing.vanished');
     expect(row).toHaveTextContent('flagYes');
     expect(row).toHaveTextContent('otherNo');
     expect(row).toHaveTextContent('count12,345');

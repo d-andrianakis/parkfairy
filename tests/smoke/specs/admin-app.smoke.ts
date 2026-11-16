@@ -115,6 +115,8 @@ test('signed out, every staff screen goes to sign-in and comes back', async ({ p
     ['en', '/listings'],
     ['el', '/audit'],
     ['en', `/listings/${randomUUID()}`],
+    ['en', '/users'],
+    ['el', `/users/${randomUUID()}`],
   ] as const) {
     await page.goto(admin(`/${locale}${path}`));
     await expect(page).toHaveURL(admin(`/${locale}/sign-in?next=${encodeURIComponent(path)}`));

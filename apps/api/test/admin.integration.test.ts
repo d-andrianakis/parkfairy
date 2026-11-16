@@ -661,7 +661,9 @@ describe('staff review (5.2: #66–#68)', () => {
         const only = AuditLogSchema.parse(
           (await call(admin, 'get', `/admin/audit?action=${action}`).expect(200)).body,
         );
-        expect(only.entries.length).toBeGreaterThan(0);
+        // Only what this file did is certain to be there: other actions have their own specs, and
+        // a fresh database has none of theirs when this one runs first.
+        if (action === 'listing.approved') expect(only.entries.length).toBeGreaterThan(0);
         expect(only.entries.every((entry) => entry.action === action)).toBe(true);
       }
       const approved = AuditLogSchema.parse(

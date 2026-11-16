@@ -2,8 +2,16 @@
 
 import {
   approveAdminListing,
+  lookUpAdminUser,
+  reinstateAdminListing,
+  reinstateAdminUser,
+  removeAdminUserTwoFactor,
   requestAdminListingChanges,
+  suspendAdminListing,
+  suspendAdminUser,
   type AdminListingReview,
+  type AdminUser,
+  type AdminUserLookupResult,
 } from '@parkfairy/api-client';
 import { useTranslations } from 'next-intl';
 import { attempt, type ApiFailure, type Outcome } from './api-call';
@@ -14,12 +22,41 @@ export const approve = (id: string): Promise<Outcome<AdminListingReview>> =>
 export const requestChanges = (id: string, note: string): Promise<Outcome<AdminListingReview>> =>
   attempt(() => requestAdminListingChanges({ path: { id }, body: { note } }));
 
+export const suspendListing = (
+  id: string,
+  note: string,
+  cancelBookings: boolean,
+): Promise<Outcome<AdminListingReview>> =>
+  attempt(() => suspendAdminListing({ path: { id }, body: { note, cancelBookings } }));
+
+export const reinstateListing = (id: string, note: string): Promise<Outcome<AdminListingReview>> =>
+  attempt(() => reinstateAdminListing({ path: { id }, body: { note } }));
+
+export const suspendUser = (id: string, note: string): Promise<Outcome<AdminUser>> =>
+  attempt(() => suspendAdminUser({ path: { id }, body: { note } }));
+
+export const reinstateUser = (id: string, note: string): Promise<Outcome<AdminUser>> =>
+  attempt(() => reinstateAdminUser({ path: { id }, body: { note } }));
+
+export const lookUpUser = (email: string): Promise<Outcome<AdminUserLookupResult>> =>
+  attempt(() => lookUpAdminUser({ body: { email } }));
+
+export const removeTwoFactor = (id: string, note: string): Promise<Outcome<AdminUser>> =>
+  attempt(() => removeAdminUserTwoFactor({ path: { id }, body: { note } }));
+
 /** The codes the admin routes answer with that the screens explain; anything else is `UNKNOWN`. */
 const KNOWN_CODES = [
   'LISTING_NOT_FOUND',
   'NOT_IN_REVIEW',
   'OWN_LISTING',
   'OWNER_DETAILS_MISSING',
+  'USER_NOT_FOUND',
+  'OWN_ACCOUNT',
+  'STAFF_ACCOUNT',
+  'NO_TWO_FACTOR',
+  'NOT_PUBLISHED',
+  'NOT_SUSPENDED',
+  'ALREADY_SUSPENDED',
   'MFA_REQUIRED',
   'INVALID_ORIGIN',
 ] as const;

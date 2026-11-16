@@ -4,8 +4,17 @@ import {
   PASSWORD_POLICY,
   SUPPORTED_LOCALES,
 } from '@parkfairy/contracts';
+import type * as database from '@parkfairy/database';
 import { createDatabase, type Database } from '@parkfairy/database';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+
+const suspended = vi.hoisted(() => vi.fn());
+const endSessions = vi.hoisted(() => vi.fn());
+vi.mock('@parkfairy/database', async (importOriginal) => ({
+  ...(await importOriginal<typeof database>()),
+  isAccountSuspended: suspended,
+  endSessionsOf: endSessions,
+}));
 import {
   ANSWER_FLOOR_MS,
   AUTH_COOKIE_PREFIX,
@@ -264,6 +273,58 @@ describe('createAuth', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe('suspended accounts (5.2c, #79)', () => {
+    const sessionHooks = options.databaseHooks?.session;
+    const session = { userId: 'u', token: 't', expiresAt: new Date(), createdAt: new Date() };
+
+    it('opens no session for one, by whatever road it signs in, with a code the screens know', async () => {
+      suspended.mockResolvedValue(true);
+      const error = await Promise.resolve(sessionHooks?.create?.before?.(session as never)).catch(
+        (e: unknown) => e,
+      );
+      expect(error).toMatchObject({ status: 'FORBIDDEN', body: { code: 'ACCOUNT_SUSPENDED' } });
+      expect(suspended).toHaveBeenCalledWith(connection.db, 'u');
+    });
+
+    it('ends the session of one suspended in the instant between the check and the insert', async () => {
+      endSessions.mockReset();
+      suspended.mockResolvedValue(true);
+      const error = await Promise.resolve(sessionHooks?.create?.after?.(session as never)).catch(
+        (e: unknown) => e,
+      );
+      expect(error).toMatchObject({ status: 'FORBIDDEN', body: { code: 'ACCOUNT_SUSPENDED' } });
+      expect(endSessions).toHaveBeenCalledWith(connection.db, 'u');
+    });
+
+    it('leaves the session of an account that is not suspended alone, after it opens too', async () => {
+      endSessions.mockReset();
+      suspended.mockResolvedValue(false);
+      await expect(sessionHooks?.create?.after?.(session as never)).resolves.toBeUndefined();
+      expect(endSessions).not.toHaveBeenCalled();
+    });
+
+    it('opens one for an account that is not', async () => {
+      suspended.mockResolvedValue(false);
+      await expect(sessionHooks?.create?.before?.(session as never)).resolves.toBeUndefined();
+    });
+
+    it('keeps the suspension out of what a client may set, and in what the API reads', () => {
+      expect(options.user?.additionalFields?.suspendedAt).toMatchObject({
+        type: 'date',
+        input: false,
+      });
+    });
+
+    it('gives the answer for a taken address a suspension too, so it has every field', () => {
+      const synthetic = options.emailAndPassword?.customSyntheticUser?.({
+        coreFields: {},
+        additionalFields: {},
+        id: 'x',
+      } as never);
+      expect(synthetic).toMatchObject({ suspendedAt: null });
     });
   });
 

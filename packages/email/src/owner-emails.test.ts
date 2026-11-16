@@ -24,6 +24,8 @@ describe('renderOwnerEmail', () => {
       'listing-submitted',
       'listing-approved',
       'listing-changes-requested',
+      'listing-suspended',
+      'listing-reinstated',
     ] as const) {
       expect(renderOwnerEmail({ ...base, kind, listingName: 'Γκαράζ Ερμού' }).text).toContain(
         'Γκαράζ Ερμού',
@@ -108,5 +110,52 @@ describe('copy', () => {
       expect(OWNER_EMAIL_COPY.en.kinds[kind].subject).not.toMatch(greek);
       expect(OWNER_EMAIL_COPY.en.kinds[kind].body('x')).not.toMatch(greek);
     }
+  });
+});
+
+describe('the moderation emails (#78, #79, #81)', () => {
+  it('tell an owner their listing is suspended, where the reason is, and that bookings may be called off', () => {
+    const en = renderOwnerEmail({
+      ...base,
+      locale: 'en',
+      kind: 'listing-suspended',
+      listingName: 'Ermou Garage',
+    });
+    expect(en.subject).toBe('Your listing has been suspended');
+    expect(en.text).toContain('“Ermou Garage”');
+    expect(en.text).toContain('The reason is on your listing’s page');
+    expect(en.text).toContain('any bookings we cancelled show on your calendar');
+    const el = renderOwnerEmail({
+      ...base,
+      kind: 'listing-suspended',
+      listingName: 'Γκαράζ Ερμού',
+    });
+    expect(el.text).toContain('Ο λόγος αναγράφεται στη σελίδα του χώρου σας');
+  });
+
+  it('carry no reason in the email: it is read on the page, after signing in', () => {
+    for (const locale of OWNER_EMAIL_LOCALES) {
+      const email = renderOwnerEmail({
+        ...base,
+        locale,
+        kind: 'listing-suspended',
+        listingName: 'X',
+      });
+      expect(email.text).not.toMatch(/deed|fraud|ticket|τίτλο|απάτη/i);
+    }
+  });
+
+  it('tell an owner their listing is live again', () => {
+    expect(
+      renderOwnerEmail({
+        ...base,
+        locale: 'en',
+        kind: 'listing-reinstated',
+        listingName: 'Ermou Garage',
+      }).subject,
+    ).toBe('Your listing is live again');
+    expect(
+      renderOwnerEmail({ ...base, kind: 'listing-reinstated', listingName: 'Γκαράζ' }).subject,
+    ).toBe('Ο χώρος στάθμευσής σας είναι ξανά ενεργός');
   });
 });

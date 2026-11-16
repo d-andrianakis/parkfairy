@@ -153,6 +153,21 @@ describe('ListingMilestones', () => {
     expect(note.parentElement).toHaveTextContent(/^Χρειάζεται καλύτερη φωτογραφία\.$/);
   });
 
+  it('says why a listing is suspended, under a heading that says so and not "what needs changing"', () => {
+    const suspended = progressFixture({
+      status: 'suspended',
+      nextStep: null,
+      reviewNote: 'Ο τίτλος ιδιοκτησίας δεν ταιριάζει.',
+    });
+    const { unmount } = renderInSubtree(<ListingMilestones listing={suspended} />);
+    expect(screen.getByText('Why this listing is suspended')).toBeInTheDocument();
+    expect(screen.queryByText('What needs changing')).toBeNull();
+    expect(screen.getByText('Ο τίτλος ιδιοκτησίας δεν ταιριάζει')).toHaveAttribute('lang', 'el');
+    unmount();
+    renderInSubtree(<ListingMilestones listing={suspended} />, { locale: 'el' });
+    expect(screen.getByText('Γιατί ο χώρος είναι σε αναστολή')).toBeInTheDocument();
+  });
+
   it('leaves staff’s words alone on a Greek page', () => {
     renderInSubtree(
       <ListingMilestones
@@ -394,6 +409,17 @@ describe('StepShell', () => {
     expect(screen.getByText('Μια αλλαγή')).toHaveAttribute('lang', 'el');
     // One element in the description's grid, the runs inside it.
     expect(screen.getByText('Μια αλλαγή').parentElement?.tagName).toBe('P');
+  });
+
+  it('keeps the reason for a suspension in view on every step, under its own heading', () => {
+    const suspended = progressFixture({ status: 'suspended', reviewNote: 'Λόγος αναστολής.' });
+    renderInSubtree(
+      <StepShell listing={listingFixture({ progress: suspended })} step="photos">
+        <p>form</p>
+      </StepShell>,
+    );
+    expect(screen.getByText('Why this listing is suspended')).toBeInTheDocument();
+    expect(screen.queryByText('What needs changing')).toBeNull();
   });
 });
 

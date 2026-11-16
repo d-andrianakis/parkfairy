@@ -4,9 +4,11 @@ import {
   createConfig,
   getAdminListing,
   getAdminQueue,
+  getAdminUser,
   getAuditLog,
   type AdminListingReview,
   type AdminQueue,
+  type AdminUser,
   type AuditLog,
 } from '@parkfairy/api-client';
 import type { AdminAuditQuery, AdminQueueQuery } from '@parkfairy/contracts';
@@ -70,6 +72,15 @@ export const loadQueue = cache(
 export const loadReview = cache(async (id: string): Promise<AdminListingReview | Missing> => {
   try {
     const { data, response } = await getAdminListing({ ...(await request()), path: { id } });
+    return data ?? missing(response?.status);
+  } catch {
+    return 'unavailable';
+  }
+});
+
+export const loadUser = cache(async (id: string): Promise<AdminUser | Missing> => {
+  try {
+    const { data, response } = await getAdminUser({ ...(await request()), path: { id } });
     return data ?? missing(response?.status);
   } catch {
     return 'unavailable';

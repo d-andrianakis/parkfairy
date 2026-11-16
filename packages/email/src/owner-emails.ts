@@ -6,6 +6,9 @@ export const OWNER_EMAIL_KINDS = [
   'listing-approved',
   'listing-changes-requested',
   'onboarding-reminder',
+  // Staff took the listing down, and brought it back (#78, #81).
+  'listing-suspended',
+  'listing-reinstated',
 ] as const;
 export type OwnerEmailKind = (typeof OWNER_EMAIL_KINDS)[number];
 
@@ -61,6 +64,22 @@ export const OWNER_EMAIL_COPY: Record<OwnerEmailLocale, OwnerEmailCatalog> = {
         action: 'Δείτε τι χρειάζεται',
         note: 'Όσα έχετε συμπληρώσει είναι αποθηκευμένα. Κάντε την αλλαγή και στείλτε τον ξανά.',
       },
+      'listing-suspended': {
+        subject: 'Ο χώρος στάθμευσής σας τέθηκε σε αναστολή',
+        heading: 'Ο χώρος στάθμευσής σας τέθηκε σε αναστολή',
+        body: (listing) =>
+          `Θέσαμε σε αναστολή τον χώρο «${listing}» στο Parkfairy. Δεν εμφανίζεται πλέον στην αναζήτηση και δεν μπορεί να κρατηθεί.`,
+        action: 'Δείτε γιατί',
+        note: 'Ο λόγος αναγράφεται στη σελίδα του χώρου σας και τυχόν κρατήσεις που ακυρώσαμε εμφανίζονται στο ημερολόγιό σας. Αν πιστεύετε ότι πρόκειται για λάθος, επικοινωνήστε με την υποστήριξη του Parkfairy.',
+      },
+      'listing-reinstated': {
+        subject: 'Ο χώρος στάθμευσής σας είναι ξανά ενεργός',
+        heading: 'Ο χώρος στάθμευσής σας είναι ξανά ενεργός',
+        body: (listing) =>
+          `Ο χώρος «${listing}» είναι ξανά ενεργός στο Parkfairy και μπορεί να κρατηθεί.`,
+        action: 'Δείτε τους χώρους σας',
+        note: 'Σας ευχαριστούμε για την υπομονή σας.',
+      },
       'onboarding-reminder': {
         subject: 'Ολοκληρώστε την καταχώριση του χώρου σας',
         heading: 'Ολοκληρώστε την καταχώριση του χώρου σας',
@@ -97,6 +116,21 @@ export const OWNER_EMAIL_COPY: Record<OwnerEmailLocale, OwnerEmailCatalog> = {
         body: (listing) => `We checked “${listing}”, and it needs a change before it can go live.`,
         action: 'See what’s needed',
         note: 'Everything you entered is saved. Make the change and send it again.',
+      },
+      'listing-suspended': {
+        subject: 'Your listing has been suspended',
+        heading: 'Your listing has been suspended',
+        body: (listing) =>
+          `We’ve suspended “${listing}” on Parkfairy. It no longer appears in search and can’t be booked.`,
+        action: 'See why',
+        note: 'The reason is on your listing’s page, and any bookings we cancelled show on your calendar. If you think this is a mistake, contact Parkfairy support.',
+      },
+      'listing-reinstated': {
+        subject: 'Your listing is live again',
+        heading: 'Your listing is live again',
+        body: (listing) => `“${listing}” is live again on Parkfairy and can be booked.`,
+        action: 'See your listings',
+        note: 'Thank you for your patience.',
       },
       'onboarding-reminder': {
         subject: 'Finish listing your parking',

@@ -12,11 +12,13 @@ import {
 import { cn } from '@parkfairy/ui/lib/utils';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import { MarkedText, PersonName } from '@/components/marked-text';
 import { MissingNotice } from '@/components/missing-notice';
 import { StandingNotice } from '@/components/standing-notice';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { loadAudit } from '@/lib/admin.server';
+import { withClock } from '@/lib/clock';
 import { accountPageUrl } from '@/lib/site';
 import { requireSession } from '@/lib/session';
 
@@ -70,7 +72,11 @@ export default async function AuditPage({
                 asChild
                 variant={value === action ? 'default' : 'outline'}
                 size="sm"
-                className={cn(value === action && 'font-semibold')}
+                // Wraps: the names of some actions are longer than a phone's width (WCAG 1.4.10).
+                className={cn(
+                  'h-auto min-h-8 py-1.5 text-start whitespace-normal',
+                  value === action && 'font-semibold',
+                )}
               >
                 <Link
                   href={{ pathname: '/audit', query: value ? { action: value } : {} }}
@@ -106,14 +112,14 @@ export default async function AuditPage({
                 <TableRow key={entry.id}>
                   <TableHead scope="row" className="font-normal">
                     <time dateTime={entry.at}>
-                      {format.dateTime(new Date(entry.at), {
-                        dateStyle: 'medium',
-                        timeStyle: 'medium',
-                      })}
+                      {format.dateTime(
+                        new Date(entry.at),
+                        withClock(locale, { dateStyle: 'medium', timeStyle: 'medium' }),
+                      )}
                     </time>
                   </TableHead>
                   <TableCell className="whitespace-normal">
-                    {entry.actor.name}
+                    <PersonName name={entry.actor.name} lang={locale} />
                     <span className="block text-sm text-muted-foreground">{entry.actor.email}</span>
                   </TableCell>
                   <TableCell className="whitespace-normal">
@@ -121,10 +127,10 @@ export default async function AuditPage({
                   </TableCell>
                   <TableCell>
                     <Link
-                      href={`/listings/${entry.targetId}`}
+                      href={`/${entry.targetType === 'user' ? 'users' : 'listings'}/${entry.targetId}`}
                       className="text-primary underline underline-offset-4 hover:decoration-2"
                     >
-                      {t('audit.listingLink')}
+                      {t(entry.targetType === 'user' ? 'audit.userLink' : 'audit.listingLink')}
                     </Link>
                   </TableCell>
                   <TableCell className="whitespace-normal">
@@ -132,6 +138,7 @@ export default async function AuditPage({
                       details={entry.details}
                       t={t as unknown as Translator}
                       format={format}
+                      locale={locale}
                     />
                   </TableCell>
                 </TableRow>
@@ -172,10 +179,12 @@ function Details({
   details,
   t,
   format,
+  locale,
 }: {
   details: Record<string, string | number | boolean | null>;
   t: Translator;
   format: Awaited<ReturnType<typeof getFormatter>>;
+  locale: string;
 }) {
   const entries = Object.entries(details);
   if (entries.length === 0) return null;
@@ -191,7 +200,8 @@ function Details({
     if (typeof value === 'boolean') return t(value ? 'audit.yes' : 'audit.no');
     if (typeof value === 'number') return format.number(value);
     if (value === null) return t('notGiven');
-    return value;
+    // Words staff typed (a note): Greek in them is marked Greek on an English page.
+    return <MarkedText text={value} lang={locale} />;
   };
   return (
     <dl className="grid gap-x-2 sm:grid-cols-[max-content_1fr]">

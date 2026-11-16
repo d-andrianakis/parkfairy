@@ -1,3 +1,4 @@
+import type * as database from '@parkfairy/database';
 import {
   claimDueEmails,
   countOverdueEmails,
@@ -615,6 +616,91 @@ describe('owner emails processor', () => {
         expect.objectContaining({ id: 'email-1' }),
         'Email "listing-handover-offered" has no listing',
       );
+    });
+  });
+
+  describe('account security emails (#13)', () => {
+    it('tells a person their two-factor authentication was removed, in their language, to set a new password', async () => {
+      vi.mocked(claimDueEmails).mockResolvedValue([
+        row({ id: 'email-7', kind: 'two-factor-removed', locale: 'el', payload: {} }),
+        row({ id: 'email-8', kind: 'two-factor-removed', locale: 'en', payload: {} }),
+      ]);
+      await expect(run('send-owner-emails')).resolves.toEqual({
+        sent: 2,
+        failed: 0,
+        handedBack: 0,
+      });
+      const [el, en] = send.mock.calls.map(([email]) => email);
+      expect(el?.subject).toContain('έλεγχος ταυτότητας δύο παραγόντων');
+      expect(el?.text).toContain('https://parkfairy.example/el/forgot-password');
+      expect(en?.text).toContain('https://parkfairy.example/en/forgot-password');
+      expect(en?.idempotencyKey).toBe('email-8');
+      expect(mintInviteToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('every kind the outbox can hold', () => {
+    it('has a template: a kind added to the outbox and not here would throw for ever', async () => {
+      const { schema } = await vi.importActual<typeof database>('@parkfairy/database');
+      const email = await import('@parkfairy/email');
+      const known = new Set<string>([
+        ...email.OWNER_EMAIL_KINDS,
+        ...email.BOOKING_EMAIL_KINDS,
+        ...email.HANDOVER_EMAIL_KINDS,
+        ...email.ACCOUNT_EMAIL_KINDS,
+        // Rendered from its own row (the link is minted as it is sent).
+        'listing-invite',
+      ]);
+      expect([...schema.OUTBOX_EMAIL_KINDS].filter((kind) => !known.has(kind))).toEqual([]);
+      // And no kind is claimed by two renderers.
+      const all = [
+        ...email.OWNER_EMAIL_KINDS,
+        ...email.BOOKING_EMAIL_KINDS,
+        ...email.HANDOVER_EMAIL_KINDS,
+        ...email.ACCOUNT_EMAIL_KINDS,
+      ];
+      expect(new Set(all).size).toBe(all.length);
+    });
+  });
+
+  describe('moderation emails (#78, #79, #81)', () => {
+    it('tells an owner their listing was suspended and reinstated, naming it, and the holder of an account', async () => {
+      vi.mocked(claimDueEmails).mockResolvedValue([
+        row({
+          id: 'email-9',
+          kind: 'listing-suspended',
+          locale: 'en',
+          payload: { listingName: 'Ermou Garage', contentLocale: 'en' },
+        }),
+        row({
+          id: 'email-10',
+          kind: 'listing-reinstated',
+          locale: 'el',
+          payload: { listingName: 'Γκαράζ' },
+        }),
+        row({ id: 'email-11', kind: 'account-suspended', locale: 'en', payload: {} }),
+        row({ id: 'email-12', kind: 'account-reinstated', locale: 'el', payload: {} }),
+      ]);
+      await expect(run('send-owner-emails')).resolves.toEqual({
+        sent: 4,
+        failed: 0,
+        handedBack: 0,
+      });
+      const [suspended, reinstated, held, back] = send.mock.calls.map(([email]) => email);
+      expect(suspended?.subject).toBe('Your listing has been suspended');
+      expect(suspended?.text).toContain('https://parkfairy.example/en/owner');
+      expect(reinstated?.text).toContain('https://parkfairy.example/el/owner');
+      expect(suspended?.text).toContain('“Ermou Garage”');
+      expect(reinstated?.subject).toBe('Ο χώρος στάθμευσής σας είναι ξανά ενεργός');
+      expect(held?.subject).toBe('Your Parkfairy account has been suspended');
+      expect(back?.text).toContain('https://parkfairy.example/el/sign-in');
+      // Each is its own email to Resend: the outbox row's id is the key.
+      expect(send.mock.calls.map(([email]) => email.idempotencyKey)).toEqual([
+        'email-9',
+        'email-10',
+        'email-11',
+        'email-12',
+      ]);
     });
   });
 

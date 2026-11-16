@@ -18,6 +18,16 @@ describe('authErrorKey', () => {
     expect(authErrorKey({ code: 'INVALID_BACKUP_CODE', status: 401 })).toBe('INVALID_BACKUP_CODE');
   });
 
+  it('says a suspended account is suspended, by the code and whatever the status', () => {
+    expect(authErrorKey({ code: 'ACCOUNT_SUSPENDED', status: 403 })).toBe('ACCOUNT_SUSPENDED');
+    expect(authErrorKey({ code: 'ACCOUNT_SUSPENDED' })).toBe('ACCOUNT_SUSPENDED');
+    expect(AUTH_ERROR_KEYS).toContain('ACCOUNT_SUSPENDED');
+    // Not mistaken for the ordinary refusal, which says nothing of why.
+    expect(authErrorKey({ code: 'INVALID_EMAIL_OR_PASSWORD', status: 403 })).not.toBe(
+      'ACCOUNT_SUSPENDED',
+    );
+  });
+
   it('folds code variants into one message', () => {
     expect(authErrorKey({ code: 'TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE' })).toBe('TOO_MANY_ATTEMPTS');
   });

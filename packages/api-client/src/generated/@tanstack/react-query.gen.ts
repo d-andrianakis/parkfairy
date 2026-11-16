@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { acceptListingHandover, acceptListingInvite, approveAdminListing, cancelListingBooking, cancelMyBooking, confirmMyBooking, copyListingHours, copyListingHoursExceptions, createOwnerListing, deleteListingPhoto, deleteListingProof, deleteOwnerListing, downloadAdminProof, downloadListingProof, extendMyHold, findPlaces, getAdminListing, getAdminQueue, getAuditLog, getCalendar, getEarnings, getFeaturedParking, getListingBookings, getListingHoursExceptions, getListingOwners, getListingPhoto, getLiveness, getManagedListings, getMe, getMyBooking, getMyBookings, getOtherOwnerListings, getOwnerListing, getOwnerOnboarding, getOwnerPayouts, getOwnerProfile, getParkingListing, getPlaceSuggestions, getReadiness, holdParkingSpace, inviteListingOwner, leaveListing, offerListingHandover, openPayoutDashboard, type Options, payForMyBooking, previewListingInvite, removeListingManager, removeListingOwner, reorderListingPhotos, requestAdminListingChanges, retrievePlace, saveListingHours, saveListingHoursExceptions, saveListingLocation, saveListingPrices, saveListingProofDetails, saveListingSpaces, saveOwnerTaxDetails, searchParking, setListingShares, settleMyPayment, startPayoutOnboarding, submitOwnerListing, updateListingPhoto, updateOwnerProfile, uploadListingPhoto, uploadListingProof, withdrawListingHandover, withdrawListingInvite } from '../sdk.gen';
-import type { AcceptListingHandoverData, AcceptListingHandoverError, AcceptListingHandoverResponse, AcceptListingInviteData, AcceptListingInviteError, AcceptListingInviteResponse, ApproveAdminListingData, ApproveAdminListingError, ApproveAdminListingResponse, CancelListingBookingData, CancelListingBookingError, CancelListingBookingResponse, CancelMyBookingData, CancelMyBookingError, CancelMyBookingResponse, ConfirmMyBookingData, ConfirmMyBookingError, ConfirmMyBookingResponse, CopyListingHoursData, CopyListingHoursError, CopyListingHoursExceptionsData, CopyListingHoursExceptionsError, CopyListingHoursExceptionsResponse, CopyListingHoursResponse, CreateOwnerListingData, CreateOwnerListingError, CreateOwnerListingResponse, DeleteListingPhotoData, DeleteListingPhotoError, DeleteListingPhotoResponse, DeleteListingProofData, DeleteListingProofError, DeleteListingProofResponse, DeleteOwnerListingData, DeleteOwnerListingError, DeleteOwnerListingResponse, DownloadAdminProofData, DownloadAdminProofError, DownloadAdminProofResponse, DownloadListingProofData, DownloadListingProofError, DownloadListingProofResponse, ExtendMyHoldData, ExtendMyHoldError, ExtendMyHoldResponse, FindPlacesData, FindPlacesError, FindPlacesResponse, GetAdminListingData, GetAdminListingError, GetAdminListingResponse, GetAdminQueueData, GetAdminQueueError, GetAdminQueueResponse, GetAuditLogData, GetAuditLogError, GetAuditLogResponse, GetCalendarData, GetCalendarError, GetCalendarResponse, GetEarningsData, GetEarningsError, GetEarningsResponse, GetFeaturedParkingData, GetFeaturedParkingResponse, GetListingBookingsData, GetListingBookingsError, GetListingBookingsResponse, GetListingHoursExceptionsData, GetListingHoursExceptionsError, GetListingHoursExceptionsResponse, GetListingOwnersData, GetListingOwnersError, GetListingOwnersResponse, GetListingPhotoData, GetListingPhotoError, GetListingPhotoResponse, GetLivenessData, GetLivenessResponse, GetManagedListingsData, GetManagedListingsError, GetManagedListingsResponse, GetMeData, GetMeError, GetMeResponse, GetMyBookingData, GetMyBookingError, GetMyBookingResponse, GetMyBookingsData, GetMyBookingsError, GetMyBookingsResponse, GetOtherOwnerListingsData, GetOtherOwnerListingsError, GetOtherOwnerListingsResponse, GetOwnerListingData, GetOwnerListingError, GetOwnerListingResponse, GetOwnerOnboardingData, GetOwnerOnboardingError, GetOwnerOnboardingResponse, GetOwnerPayoutsData, GetOwnerPayoutsError, GetOwnerPayoutsResponse, GetOwnerProfileData, GetOwnerProfileError, GetOwnerProfileResponse, GetParkingListingData, GetParkingListingError, GetParkingListingResponse, GetPlaceSuggestionsData, GetPlaceSuggestionsError, GetPlaceSuggestionsResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, HoldParkingSpaceData, HoldParkingSpaceError, HoldParkingSpaceResponse, InviteListingOwnerData, InviteListingOwnerError, InviteListingOwnerResponse, LeaveListingData, LeaveListingError, LeaveListingResponse, OfferListingHandoverData, OfferListingHandoverError, OfferListingHandoverResponse, OpenPayoutDashboardData, OpenPayoutDashboardError, OpenPayoutDashboardResponse, PayForMyBookingData, PayForMyBookingError, PayForMyBookingResponse, PreviewListingInviteData, PreviewListingInviteError, PreviewListingInviteResponse, RemoveListingManagerData, RemoveListingManagerError, RemoveListingManagerResponse, RemoveListingOwnerData, RemoveListingOwnerError, RemoveListingOwnerResponse, ReorderListingPhotosData, ReorderListingPhotosError, ReorderListingPhotosResponse, RequestAdminListingChangesData, RequestAdminListingChangesError, RequestAdminListingChangesResponse, RetrievePlaceData, RetrievePlaceError, RetrievePlaceResponse, SaveListingHoursData, SaveListingHoursError, SaveListingHoursExceptionsData, SaveListingHoursExceptionsError, SaveListingHoursExceptionsResponse, SaveListingHoursResponse, SaveListingLocationData, SaveListingLocationError, SaveListingLocationResponse, SaveListingPricesData, SaveListingPricesError, SaveListingPricesResponse, SaveListingProofDetailsData, SaveListingProofDetailsError, SaveListingProofDetailsResponse, SaveListingSpacesData, SaveListingSpacesError, SaveListingSpacesResponse, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsError, SaveOwnerTaxDetailsResponse, SearchParkingData, SearchParkingError, SearchParkingResponse, SetListingSharesData, SetListingSharesError, SetListingSharesResponse, SettleMyPaymentData, SettleMyPaymentError, SettleMyPaymentResponse, StartPayoutOnboardingData, StartPayoutOnboardingError, StartPayoutOnboardingResponse, SubmitOwnerListingData, SubmitOwnerListingError, SubmitOwnerListingResponse, UpdateListingPhotoData, UpdateListingPhotoError, UpdateListingPhotoResponse, UpdateOwnerProfileData, UpdateOwnerProfileError, UpdateOwnerProfileResponse, UploadListingPhotoData, UploadListingPhotoError, UploadListingPhotoResponse, UploadListingProofData, UploadListingProofError, UploadListingProofResponse, WithdrawListingHandoverData, WithdrawListingHandoverError, WithdrawListingHandoverResponse, WithdrawListingInviteData, WithdrawListingInviteError, WithdrawListingInviteResponse } from '../types.gen';
+import { acceptListingHandover, acceptListingInvite, approveAdminListing, cancelListingBooking, cancelMyBooking, confirmMyBooking, copyListingHours, copyListingHoursExceptions, createOwnerListing, deleteListingPhoto, deleteListingProof, deleteOwnerListing, downloadAdminProof, downloadListingProof, extendMyHold, findPlaces, getAdminListing, getAdminQueue, getAdminUser, getAuditLog, getCalendar, getEarnings, getFeaturedParking, getListingBookings, getListingHoursExceptions, getListingOwners, getListingPhoto, getLiveness, getManagedListings, getMe, getMyBooking, getMyBookings, getOtherOwnerListings, getOwnerListing, getOwnerOnboarding, getOwnerPayouts, getOwnerProfile, getParkingListing, getPlaceSuggestions, getReadiness, holdParkingSpace, inviteListingOwner, leaveListing, lookUpAdminUser, offerListingHandover, openPayoutDashboard, type Options, payForMyBooking, previewListingInvite, reinstateAdminListing, reinstateAdminUser, removeAdminUserTwoFactor, removeListingManager, removeListingOwner, reorderListingPhotos, requestAdminListingChanges, retrievePlace, saveListingHours, saveListingHoursExceptions, saveListingLocation, saveListingPrices, saveListingProofDetails, saveListingSpaces, saveOwnerTaxDetails, searchParking, setListingShares, settleMyPayment, startPayoutOnboarding, submitOwnerListing, suspendAdminListing, suspendAdminUser, updateListingPhoto, updateOwnerProfile, uploadListingPhoto, uploadListingProof, withdrawListingHandover, withdrawListingInvite } from '../sdk.gen';
+import type { AcceptListingHandoverData, AcceptListingHandoverError, AcceptListingHandoverResponse, AcceptListingInviteData, AcceptListingInviteError, AcceptListingInviteResponse, ApproveAdminListingData, ApproveAdminListingError, ApproveAdminListingResponse, CancelListingBookingData, CancelListingBookingError, CancelListingBookingResponse, CancelMyBookingData, CancelMyBookingError, CancelMyBookingResponse, ConfirmMyBookingData, ConfirmMyBookingError, ConfirmMyBookingResponse, CopyListingHoursData, CopyListingHoursError, CopyListingHoursExceptionsData, CopyListingHoursExceptionsError, CopyListingHoursExceptionsResponse, CopyListingHoursResponse, CreateOwnerListingData, CreateOwnerListingError, CreateOwnerListingResponse, DeleteListingPhotoData, DeleteListingPhotoError, DeleteListingPhotoResponse, DeleteListingProofData, DeleteListingProofError, DeleteListingProofResponse, DeleteOwnerListingData, DeleteOwnerListingError, DeleteOwnerListingResponse, DownloadAdminProofData, DownloadAdminProofError, DownloadAdminProofResponse, DownloadListingProofData, DownloadListingProofError, DownloadListingProofResponse, ExtendMyHoldData, ExtendMyHoldError, ExtendMyHoldResponse, FindPlacesData, FindPlacesError, FindPlacesResponse, GetAdminListingData, GetAdminListingError, GetAdminListingResponse, GetAdminQueueData, GetAdminQueueError, GetAdminQueueResponse, GetAdminUserData, GetAdminUserError, GetAdminUserResponse, GetAuditLogData, GetAuditLogError, GetAuditLogResponse, GetCalendarData, GetCalendarError, GetCalendarResponse, GetEarningsData, GetEarningsError, GetEarningsResponse, GetFeaturedParkingData, GetFeaturedParkingResponse, GetListingBookingsData, GetListingBookingsError, GetListingBookingsResponse, GetListingHoursExceptionsData, GetListingHoursExceptionsError, GetListingHoursExceptionsResponse, GetListingOwnersData, GetListingOwnersError, GetListingOwnersResponse, GetListingPhotoData, GetListingPhotoError, GetListingPhotoResponse, GetLivenessData, GetLivenessResponse, GetManagedListingsData, GetManagedListingsError, GetManagedListingsResponse, GetMeData, GetMeError, GetMeResponse, GetMyBookingData, GetMyBookingError, GetMyBookingResponse, GetMyBookingsData, GetMyBookingsError, GetMyBookingsResponse, GetOtherOwnerListingsData, GetOtherOwnerListingsError, GetOtherOwnerListingsResponse, GetOwnerListingData, GetOwnerListingError, GetOwnerListingResponse, GetOwnerOnboardingData, GetOwnerOnboardingError, GetOwnerOnboardingResponse, GetOwnerPayoutsData, GetOwnerPayoutsError, GetOwnerPayoutsResponse, GetOwnerProfileData, GetOwnerProfileError, GetOwnerProfileResponse, GetParkingListingData, GetParkingListingError, GetParkingListingResponse, GetPlaceSuggestionsData, GetPlaceSuggestionsError, GetPlaceSuggestionsResponse, GetReadinessData, GetReadinessError, GetReadinessResponse, HoldParkingSpaceData, HoldParkingSpaceError, HoldParkingSpaceResponse, InviteListingOwnerData, InviteListingOwnerError, InviteListingOwnerResponse, LeaveListingData, LeaveListingError, LeaveListingResponse, LookUpAdminUserData, LookUpAdminUserError, LookUpAdminUserResponse, OfferListingHandoverData, OfferListingHandoverError, OfferListingHandoverResponse, OpenPayoutDashboardData, OpenPayoutDashboardError, OpenPayoutDashboardResponse, PayForMyBookingData, PayForMyBookingError, PayForMyBookingResponse, PreviewListingInviteData, PreviewListingInviteError, PreviewListingInviteResponse, ReinstateAdminListingData, ReinstateAdminListingError, ReinstateAdminListingResponse, ReinstateAdminUserData, ReinstateAdminUserError, ReinstateAdminUserResponse, RemoveAdminUserTwoFactorData, RemoveAdminUserTwoFactorError, RemoveAdminUserTwoFactorResponse, RemoveListingManagerData, RemoveListingManagerError, RemoveListingManagerResponse, RemoveListingOwnerData, RemoveListingOwnerError, RemoveListingOwnerResponse, ReorderListingPhotosData, ReorderListingPhotosError, ReorderListingPhotosResponse, RequestAdminListingChangesData, RequestAdminListingChangesError, RequestAdminListingChangesResponse, RetrievePlaceData, RetrievePlaceError, RetrievePlaceResponse, SaveListingHoursData, SaveListingHoursError, SaveListingHoursExceptionsData, SaveListingHoursExceptionsError, SaveListingHoursExceptionsResponse, SaveListingHoursResponse, SaveListingLocationData, SaveListingLocationError, SaveListingLocationResponse, SaveListingPricesData, SaveListingPricesError, SaveListingPricesResponse, SaveListingProofDetailsData, SaveListingProofDetailsError, SaveListingProofDetailsResponse, SaveListingSpacesData, SaveListingSpacesError, SaveListingSpacesResponse, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsError, SaveOwnerTaxDetailsResponse, SearchParkingData, SearchParkingError, SearchParkingResponse, SetListingSharesData, SetListingSharesError, SetListingSharesResponse, SettleMyPaymentData, SettleMyPaymentError, SettleMyPaymentResponse, StartPayoutOnboardingData, StartPayoutOnboardingError, StartPayoutOnboardingResponse, SubmitOwnerListingData, SubmitOwnerListingError, SubmitOwnerListingResponse, SuspendAdminListingData, SuspendAdminListingError, SuspendAdminListingResponse, SuspendAdminUserData, SuspendAdminUserError, SuspendAdminUserResponse, UpdateListingPhotoData, UpdateListingPhotoError, UpdateListingPhotoResponse, UpdateOwnerProfileData, UpdateOwnerProfileError, UpdateOwnerProfileResponse, UploadListingPhotoData, UploadListingPhotoError, UploadListingPhotoResponse, UploadListingProofData, UploadListingProofError, UploadListingProofResponse, WithdrawListingHandoverData, WithdrawListingHandoverError, WithdrawListingHandoverResponse, WithdrawListingInviteData, WithdrawListingInviteError, WithdrawListingInviteResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -857,6 +857,105 @@ export const requestAdminListingChangesMutation = (options?: Partial<Options<Req
     const mutationOptions: UseMutationOptions<RequestAdminListingChangesResponse, RequestAdminListingChangesError, Options<RequestAdminListingChangesData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await requestAdminListingChanges({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const lookUpAdminUserMutation = (options?: Partial<Options<LookUpAdminUserData>>): UseMutationOptions<LookUpAdminUserResponse, LookUpAdminUserError, Options<LookUpAdminUserData>> => {
+    const mutationOptions: UseMutationOptions<LookUpAdminUserResponse, LookUpAdminUserError, Options<LookUpAdminUserData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await lookUpAdminUser({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getAdminUserQueryKey = (options: Options<GetAdminUserData>) => createQueryKey('getAdminUser', options);
+
+export const getAdminUserOptions = (options: Options<GetAdminUserData>) => queryOptions<GetAdminUserResponse, GetAdminUserError, GetAdminUserResponse, ReturnType<typeof getAdminUserQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getAdminUser({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getAdminUserQueryKey(options)
+});
+
+export const removeAdminUserTwoFactorMutation = (options?: Partial<Options<RemoveAdminUserTwoFactorData>>): UseMutationOptions<RemoveAdminUserTwoFactorResponse, RemoveAdminUserTwoFactorError, Options<RemoveAdminUserTwoFactorData>> => {
+    const mutationOptions: UseMutationOptions<RemoveAdminUserTwoFactorResponse, RemoveAdminUserTwoFactorError, Options<RemoveAdminUserTwoFactorData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await removeAdminUserTwoFactor({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const suspendAdminListingMutation = (options?: Partial<Options<SuspendAdminListingData>>): UseMutationOptions<SuspendAdminListingResponse, SuspendAdminListingError, Options<SuspendAdminListingData>> => {
+    const mutationOptions: UseMutationOptions<SuspendAdminListingResponse, SuspendAdminListingError, Options<SuspendAdminListingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await suspendAdminListing({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const reinstateAdminListingMutation = (options?: Partial<Options<ReinstateAdminListingData>>): UseMutationOptions<ReinstateAdminListingResponse, ReinstateAdminListingError, Options<ReinstateAdminListingData>> => {
+    const mutationOptions: UseMutationOptions<ReinstateAdminListingResponse, ReinstateAdminListingError, Options<ReinstateAdminListingData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await reinstateAdminListing({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const suspendAdminUserMutation = (options?: Partial<Options<SuspendAdminUserData>>): UseMutationOptions<SuspendAdminUserResponse, SuspendAdminUserError, Options<SuspendAdminUserData>> => {
+    const mutationOptions: UseMutationOptions<SuspendAdminUserResponse, SuspendAdminUserError, Options<SuspendAdminUserData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await suspendAdminUser({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const reinstateAdminUserMutation = (options?: Partial<Options<ReinstateAdminUserData>>): UseMutationOptions<ReinstateAdminUserResponse, ReinstateAdminUserError, Options<ReinstateAdminUserData>> => {
+    const mutationOptions: UseMutationOptions<ReinstateAdminUserResponse, ReinstateAdminUserError, Options<ReinstateAdminUserData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await reinstateAdminUser({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

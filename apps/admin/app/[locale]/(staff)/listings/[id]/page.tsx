@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { ClientMessages } from '@/components/client-messages';
+import { MarkedText } from '@/components/marked-text';
 import { MissingNotice } from '@/components/missing-notice';
 import { None } from '@/components/none';
 import { StandingNotice } from '@/components/standing-notice';
@@ -13,9 +14,11 @@ import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { loadReview } from '@/lib/admin.server';
+import { withClock } from '@/lib/clock';
 import { accountPageUrl } from '@/lib/site';
 import { requireSession } from '@/lib/session';
 import { DecisionPanel } from './decision-panel';
+import { ModerationPanel } from './moderation-panel';
 
 type Props = LocaleParams & { params: Promise<{ locale: string; id: string }> };
 
@@ -48,7 +51,10 @@ export default async function ReviewPage({ params }: Props) {
   const format = await getFormatter({ locale });
   const when = (iso: string) => (
     <time dateTime={iso}>
-      {format.dateTime(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' })}
+      {format.dateTime(
+        new Date(iso),
+        withClock(locale, { dateStyle: 'medium', timeStyle: 'short' }),
+      )}
     </time>
   );
 
@@ -66,7 +72,9 @@ export default async function ReviewPage({ params }: Props) {
         <Alert role="note" className="mb-6">
           <AlertTitle className="line-clamp-none">{t('review.lastNote')}</AlertTitle>
           <AlertDescription>
-            <p className="whitespace-pre-line">{review.reviewNote}</p>
+            <p className="whitespace-pre-line">
+              <MarkedText text={review.reviewNote} lang={locale} />
+            </p>
           </AlertDescription>
         </Alert>
       ) : null}
@@ -181,6 +189,24 @@ export default async function ReviewPage({ params }: Props) {
           />
         </ClientMessages>
       </section>
+
+      {/* A live listing can be taken down and a suspended one brought back (#78, #81). */}
+      {review.status === 'published' || review.status === 'suspended' ? (
+        <section aria-labelledby="moderation-heading" className="mt-8">
+          <h2 id="moderation-heading" className="mb-3 text-lg font-semibold">
+            {t('review.moderation')}
+          </h2>
+          <ClientMessages namespaces={CLIENT_NAMESPACES.moderation}>
+            <ModerationPanel
+              id={review.id}
+              own={review.own}
+              canSuspend={review.canSuspend}
+              canReinstate={review.canReinstate}
+              upcomingBookings={review.upcomingBookings}
+            />
+          </ClientMessages>
+        </section>
+      ) : null}
     </>
   );
 }

@@ -13,7 +13,13 @@ import {
   TWO_FACTOR_LOCKOUT,
   type Locale,
 } from '@parkfairy/contracts';
-import { deleteUserVerifications, schema, type Database } from '@parkfairy/database';
+import {
+  deleteUserVerifications,
+  endSessionsOf,
+  isAccountSuspended,
+  schema,
+  type Database,
+} from '@parkfairy/database';
 import { BASE_ERROR_CODES, betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware, getIP, isAPIError } from 'better-auth/api';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
@@ -79,6 +85,14 @@ export const SESSION_TIMING = {
   updateAgeSeconds: 60 * 60 * 24,
 };
 
+/** What a suspended account is told, once its password is right: the code the screens translate. */
+function suspendedAnswer() {
+  return new APIError('FORBIDDEN', {
+    message: 'This account has been suspended',
+    code: 'ACCOUNT_SUSPENDED',
+  });
+}
+
 /**
  * The least these answers take. A new account writes two rows, a reset token one, and sign-in
  * reads more for a known address: a few milliseconds that tell a free address from a taken one
@@ -143,6 +157,7 @@ export function createAuth({
         role: 'user',
         locale: DEFAULT_LOCALE,
         twoFactorEnabled: false,
+        suspendedAt: null,
         ...additionalFields,
         id,
       }),
@@ -198,6 +213,8 @@ export function createAuth({
           defaultValue: DEFAULT_LOCALE,
           input: true,
         },
+        // Set by staff (5.2c), never by the account: read by the API's guard on every request.
+        suspendedAt: { type: 'date', required: false, input: false },
       },
     },
     // Better Auth does not enforce enum values on additional fields, so validate before any write.
@@ -220,6 +237,26 @@ export function createAuth({
         // page (decision #35), and `/update-user` takes any body Better Auth doesn't know.
         update: {
           before: (user) => withValidName(user).then(({ data }) => withSupportedLocale(data)),
+        },
+      },
+      session: {
+        create: {
+          // A suspended account gets no session, by whatever road it signs in (password, second
+          // step, a reset): read here, after the password has been checked, so only its holder
+          // learns it (5.2c, #79). Sessions that exist were ended when it was suspended.
+          before: async (session) => {
+            if (await isAccountSuspended(db, session.userId)) throw suspendedAnswer();
+          },
+          // The same question once the session exists: a sign-in that read "not suspended" just
+          // before staff's transaction deleted the account's sessions would otherwise insert its
+          // session after that delete and keep it. Either the suspension's delete sees this
+          // session, or this sees the suspension: one of them always does.
+          after: async (session) => {
+            if (await isAccountSuspended(db, session.userId)) {
+              await endSessionsOf(db, session.userId);
+              throw suspendedAnswer();
+            }
+          },
         },
       },
     },

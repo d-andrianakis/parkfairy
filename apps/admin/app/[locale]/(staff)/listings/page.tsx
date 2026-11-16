@@ -23,6 +23,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { loadQueue } from '@/lib/admin.server';
+import { withClock } from '@/lib/clock';
 import { accountPageUrl } from '@/lib/site';
 import { requireSession } from '@/lib/session';
 
@@ -130,10 +131,10 @@ export default async function QueuePage({
                   <TableCell>
                     {listing.submittedAt ? (
                       <time dateTime={listing.submittedAt}>
-                        {format.dateTime(new Date(listing.submittedAt), {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        })}
+                        {format.dateTime(
+                          new Date(listing.submittedAt),
+                          withClock(locale, { dateStyle: 'medium', timeStyle: 'short' }),
+                        )}
                       </time>
                     ) : (
                       <None />

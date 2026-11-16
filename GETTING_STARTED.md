@@ -155,6 +155,34 @@ with a note. Staff can't decide a listing they own, co-own or manage. Every deci
 document opened, is a line in the audit log. The worker notices the status change and emails the owner
 within about two minutes. A staff session ends a week after sign-in whatever you do, on purpose.
 
+**When someone loses their authenticator (#13).** Support removes the second factor, after checking
+who is asking. Staff open Accounts, type the person's whole email address (there is no list and no
+partial search), and use "Remove two-factor authentication" with a note of how they were identified
+(a ticket reference and the kind of check, up to 100 characters: never names, ID numbers or document
+details, since the note stays in the audit log for good and nothing can erase it). The person is
+signed out everywhere, their password is cancelled, and they are emailed a link to set a new one:
+the reset proves they hold the mailbox, which a note nobody can check does not. Opening an account's
+page is itself a line in the audit log. The procedure around it:
+
+1. Never act on a message alone. Check who is asking by a way the account's holder controls: a video
+   call with an ID next to their face, or a reply from a different channel you already trust.
+2. Write the check into the note, remove the factor, and tell the person to use the email's link to set
+   a new password, sign in and turn two-factor on again from their account page.
+3. A staff member's own factor, or another staff member's, is not removed in the app (a stolen staff
+   session must not open the others' accounts). Recover it by hand, with two people present:
+   `delete from two_factors where user_id = '…'; update users set two_factor_enabled = false where id = '…';
+delete from sessions where user_id = '…';`, then they turn it on again.
+
+**Taking a listing down, or an account (moderation).** On a live listing's review page, "Suspend this
+listing" takes it out of search and stops new bookings. Its note is read by its owners on their
+dashboard, so write it for them; tick "Also cancel its upcoming bookings" to refund and tell the drivers
+(a stay that has begun is never cancelled; unticked, bookings that exist stand). "Reinstate" brings it
+back; that note is for the audit log only. On an account's page, "Suspend this account" ends its
+sessions and stops it signing in; the person is told without your reason, which stays in the audit
+log (a ticket reference and a few words). Nothing the account owns changes: the page counts the live
+listings it is the primary owner of, which stay live until you suspend them one by one. Staff accounts,
+and your own, are never suspended from the app. Each moderation button is limited to five a minute per person.
+
 The staff app needs `ADMIN_URL` in `.env` (see `.env.example`); the API reads the same variable to accept
 its writes. Don't add it to `TRUSTED_ORIGINS`, which the public site's sign-in also trusts.
 

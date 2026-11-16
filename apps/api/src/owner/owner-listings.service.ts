@@ -1115,7 +1115,9 @@ export class OwnerListingsService {
         : null,
       doneSteps: done,
       nextStep: nextListingStep(row.status, done),
-      reviewNote: row.status === 'changes_requested' ? row.reviewNote : null,
+      // What staff wrote the owners: what to change, or why the listing is suspended (#79).
+      reviewNote:
+        row.status === 'changes_requested' || row.status === 'suspended' ? row.reviewNote : null,
       submittedAt: row.submittedAt?.toISOString() ?? null,
       updatedAt: row.updatedAt.toISOString(),
     });

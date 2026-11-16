@@ -18,6 +18,8 @@ vi.mock('@/lib/server-env', () => ({
 vi.mock('@/lib/admin-client', () => ({
   approve: vi.fn(),
   requestChanges: vi.fn(),
+  suspendListing: vi.fn(),
+  reinstateListing: vi.fn(),
   useAdminError: () => () => 'error',
 }));
 vi.mock('next-intl/server', async () => (await import('@/test/server-mocks')).serverIntl());
@@ -85,6 +87,9 @@ const review = (over: Partial<AdminListingReview> = {}): AdminListingReview => (
     },
   ],
   canDecide: true,
+  canSuspend: false,
+  canReinstate: false,
+  upcomingBookings: 0,
   own: false,
   ...over,
 });
@@ -291,6 +296,43 @@ describe('a listing’s review', () => {
       screen.getByText(/not waiting for a decision. Its status is: Sent back/),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve this listing' })).toBeNull();
+  });
+
+  it('offers a live listing’s suspension, with the bookings it could cancel, and no decision', async () => {
+    vi.mocked(loadReview).mockResolvedValue(
+      review({ status: 'published', canDecide: false, canSuspend: true, upcomingBookings: 2 }),
+    );
+    const { container } = await show(page());
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Take it down or bring it back' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Suspend this listing…' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: 'Also cancel its 2 upcoming bookings' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve this listing' })).toBeNull();
+    await expectNoAxeViolations(container);
+  });
+
+  it('offers a suspended listing’s reinstatement, and shows the owners’ note on it', async () => {
+    vi.mocked(loadReview).mockResolvedValue(
+      review({
+        status: 'suspended',
+        canDecide: false,
+        canReinstate: true,
+        reviewNote: 'The deed shows another owner.',
+      }),
+    );
+    await show(page());
+    expect(screen.getByRole('button', { name: 'Reinstate this listing…' })).toBeInTheDocument();
+    expect(screen.getByText('The deed shows another owner.')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+
+  it('shows no moderation for a listing still being reviewed, nor a draft’s way in', async () => {
+    vi.mocked(loadReview).mockResolvedValue(review({ status: 'in_review' }));
+    await show(page());
+    expect(screen.queryByRole('heading', { name: 'Take it down or bring it back' })).toBeNull();
   });
 
   it('keeps people from deciding their own listing', async () => {

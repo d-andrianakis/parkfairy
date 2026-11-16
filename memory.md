@@ -1561,6 +1561,15 @@ Answered by the product owner on 2026-11-15, for the staff app (5.2b):
     staff app only signs in with the code; an admin without a second factor is told where to turn it
     on and sees no data (the API refuses them as well).
 
+Answered by the product owner on 2026-11-15, to scope 5.2c:
+
+74. **5.2c is built in order, all six**: accounts and removing two-factor, moderation, bookings,
+    payments, overstay reports, in sub-slices (5.2c1 …), each with its own reviews.
+75. **Moderation is suspending listings and accounts**, with a reason, audited, the owner or person
+    told; reversible. (A suspended listing is already a status; suspending an account is new.)
+76. **An overstay report is recorded and triaged only**: the owner reports it, staff see a queue and
+    resolve it with a note. No automatic charge, no refund from the app; money stays manual (#11).
+
 Our readings for managers (2026-11-15), not asked; change any that are wrong:
 
 - **A manager is an account, not an owner**: `listing_managers (location_id, user_id)`, no owner
@@ -1661,3 +1670,131 @@ Our readings for the staff app, 5.2b (2026-11-15), not asked; change any that ar
 - Staff pages measured by the smoke suite (`admin-app.smoke.ts`, the shared 250 KiB / 40 requests
   budget in `support/budgets.ts`): sign-in, queue, review and log, each in a browser that has cached
   nothing.
+
+Our readings for support and accounts, 5.2c1 (2026-11-15), not asked; change any that are wrong:
+
+- **Accounts are found by one whole email address and no other way.** No list, no partial or prefix
+  match, no browsing: staff find the person who is asking, and can't harvest everyone's addresses
+  (minimisation). The lookup is `POST /admin/users/lookup` with the address in the body, never a query
+  string: an address in a URL reaches every access log on the way (the reset-token note applies).
+  Throttled to 30 a minute per account. **The lookup answers only the account's id** (or none); the
+  page it opens shows the name and address, and **opening that page is an audit line**,
+  `user.viewed` (#77), written by `GET /admin/users/:id`, which like the proof download refuses a
+  `Sec-Fetch-Site` other than same-origin or none. The removal is throttled to 5 a minute per admin
+  (a per-day cap needs a second named throttler, not built).
+- **Removing a second factor (#13, #77)**: one transaction under the account's row lock (`for no key
+update`) deletes its `two_factors` row, clears `two_factor_enabled`, deletes every session, **revokes
+  the password** (`accounts.password = null` on the credential account), deletes the account's
+  `verifications` (old reset links, trusted devices), queues the `two-factor-removed` email and writes
+  `user.two_factor_removed` with the note, sessions ended and `passwordRevoked`. A second admin
+  pressing at once finds `NO_TWO_FACTOR`. The person gets back in through the emailed reset (Better
+  Auth's reset makes the credential account's password again; tested end to end), then turns
+  two-factor on. Why: a free-text note is the only proof of who asked, so the control must not be
+  only as strong as the password (security review M1).
+- **Not on staff, not on yourself** (`STAFF_ACCOUNT`, `OWN_ACCOUNT`): a stolen admin session must not
+  be able to open the others' accounts, so staff recover by hand (GETTING_STARTED.md). Not asked.
+- **The identity note is a ticket reference and the kind of check, up to 100 characters (#77), kept for
+  good in the log.** Plain words: no control, format, default-ignorable (Hangul fillers), line or
+  paragraph separator characters, one Unicode form (NFC); the owner-facing review note shares the
+  rule. The screen says what not to write (names, ID numbers, document details), since nothing can
+  erase an audit line. The email never carries it.
+- **The email uses the public site's words** («έλεγχος ταυτότητας δύο παραγόντων», "two-factor
+  authentication"), not "second step", and links to the account page where it is turned on again.
+- **2026-11-15 · `AUDIT_ACTIONS`/`AUDIT_TARGETS`/`OUTBOX_EMAIL_KINDS` feed CHECK constraints, and the
+  database package reads `@parkfairy/contracts` from `dist`.** Run `pnpm --filter @parkfairy/contracts
+build` before `db:generate`, or the migration silently misses the new action (it did, once: the
+  generated file only had the outbox kind).
+- **2026-11-15 · A button can't wrap, so a long label in a row of filter buttons overflows a phone.**
+  The new Greek audit action («Αφαίρεση ελέγχου ταυτότητας δύο παραγόντων από λογαριασμό») pushed
+  `/el/audit` 150 px wide at 320 px (found by the smoke suite). The audit filter links now wrap
+  (`h-auto whitespace-normal`).
+- **2026-11-15 · A hook rule: don't read a ref inside a `handleSubmit` callback built during render**
+  (`react-hooks/refs`). Move the focus into an effect keyed on the state that shows the question.
+
+Answered by the product owner on 2026-11-15, after the security review of 5.2c1:
+
+77. **Removing two-factor also cancels the password** (the person sets a new one by the emailed
+    reset), with a throttle of 5 a minute per admin; **opening an account's page is audited**
+    (`user.viewed`); **the identity note is a ticket reference only**, 100 characters, with the
+    screen saying what not to write.
+
+- **2026-11-15 · The staff app marks Greek in typed text and uses the 24-hour clock in Greek**
+  (`components/marked-text.tsx`, `lib/clock.ts`: put `withClock(locale, …)` on every `dateTime`).
+  Names, emails and notes go through `PersonName`/`MarkedText`; a language is shown in its own words
+  with its own `lang`.
+- **2026-11-15 · A throttled route throttles refusals too**, so a test that sends many bad bodies
+  to `remove-two-factor` needs a new admin every few requests (the guard runs before validation).
+- **2026-11-15 · Test order**: an action filter test must not expect rows another file creates
+  (`admin.integration.test.ts` asserts rows only for `listing.approved`); audit rows survive, so a
+  dev database hides the order problem a fresh one shows.
+
+Answered by the product owner on 2026-11-15, for moderation (5.2c2):
+
+78. **Suspending a listing lets staff choose, each time, whether to cancel its upcoming bookings**
+    (drivers refunded in full and told). Unticked, bookings that exist stand; new ones are always
+    blocked.
+79. **The reason is shown to a listing's owner, never to an account's holder.** The listing's note is
+    read by its owners as the review note is; an account's note stays in the audit log, and the
+    person is told to contact support.
+80. **Suspending an account changes none of its listings.** Staff are warned of the live listings it
+    is the primary owner of and suspend them one by one; reinstating never republishes anything.
+81. **Reinstating takes a note (audit only) and tells the person** (the owner for a listing, the
+    holder for an account).
+
+Our readings for moderation, 5.2c2 (2026-11-15), not asked; change any that are wrong:
+
+- **A listing is suspended only from `published`, reinstated only from `suspended`**, under the listing's
+  row lock, never for a listing staff own or manage (`OWN_LISTING`), never a draft (the same 404). A
+  second admin finds `NOT_PUBLISHED` / `NOT_SUSPENDED`. The note is `reviewNote` and the owners read it
+  on their dashboard under its own heading («Γιατί ο χώρος είναι σε αναστολή»); the owner API returns it
+  for `suspended` as well as `changes_requested`. The email carries no reason: the page does.
+- **The status sweep stays quiet**: moderation writes its own outbox rows (a random key each, since a
+  listing can go down and come back more than once) and sets `notified_status` in the same transaction,
+  so the sweep sends no "approved" after a reinstatement. The sweep's dedupe key (listing, status,
+  submission) would have swallowed a second `published` email.
+- **Cancelling bookings with a suspension (#78)** uses one transaction with the listing's lock held:
+  every confirmed booking not yet begun is cancelled (`cancelled_by = 'owner'`, `cancelled_by_user_id`
+  the staff member), refunded in full, `refund_status = owed`; the worker's five-minute refund sweep sends
+  the refunds (no Stripe call while staff wait, since a listing can have many). Held bookings are left:
+  a payment that arrives for one is refunded, as for any listing that is not live. Drivers get the
+  ordinary cancellation email.
+- **An account is suspended with `users.suspended_at`**, no reason column (the note is in the audit log
+  only, #79). Effects: every session and reset link deleted, the person emailed without the reason, and
+  three places refuse it: Better Auth's `session.create.before` hook (so a password, a second step or a
+  reset all fail, after the password is right: only the holder learns it, code `ACCOUNT_SUSPENDED`), the
+  API's `AuthGuard` (403 on every non-public route, a belt for a session opened in the same instant),
+  and the sign-in screens, which say it. Nothing it holds changes (#80): its listings, bookings and
+  payouts stand; staff's page for the account counts the live listings it is the primary owner of.
+- **Never on yourself or on staff** (`OWN_ACCOUNT`, `STAFF_ACCOUNT`), as with removing two-factor.
+  The four moderation routes and removal each have a 5-a-minute throttle per admin (`MODERATE_LIMIT`),
+  **a bucket per route** (Nest keys it by class, handler and throttler), so 25 a minute across them: a
+  shared ceiling would need a custom key (as `places-visitor.guard.ts` has), not built.
+- **The audit log has four more lines** (`listing.suspended`, `listing.reinstated`, `user.suspended`,
+  `user.reinstated`); a suspension's line holds the owners' note, whether bookings were cancelled and how
+  many, and, for an account, the sessions ended.
+- **The staff app's `NoteConfirm`** is the one two-step form (note, then a question that takes the focus,
+  "not yet" back to the note) for suspend and reinstate, listings and accounts; callers give each action
+  its own `key` (the same component at the same place would keep the first action's question), and
+  a refusal that says the page is out of date is shown by the panel with the focus on it, since the
+  refreshed page replaces the form it came from.
+- **Closing the sign-in race**: Better Auth's `session.create.before` hook reads `suspended_at` before
+  the insert, so a sign-in racing staff's transaction could insert a session after the delete. The
+  `after` hook asks again and, if the account is suspended now, ends its sessions and refuses; the web
+  and staff apps' `getSession` also read a suspended session as signed out.
+- **Bulk cancel is set-based, 400 at a time** (`CANCEL_CHUNK`): one `update … returning` and one outbox
+  insert per chunk, inside the suspension's transaction and the listing's lock. A listing with thousands
+  of bookings still holds its lock for the length of the run; measure with 2k–5k seeded bookings. The
+  cancellation emails queue ahead of other mail (about 2 a second at the sender's pace) and the refund
+  sweep sends 20 pages every 5 minutes: bounded, but slow for a big listing.
+- **Known, not changed**: staff-cancelled bookings are `cancelled_by = 'owner'`, so a dispute's evidence
+  says the owner cancelled (`disputes.service.ts`); `refund_status = owed` with a transfer already made
+  is refused by a check constraint (when Connect transfers start before the stay, bulk cancel could
+  fail on it: recheck then); migrations 0038–0040 each drop and re-add the audit and outbox CHECKs
+  without `NOT VALID` (pre-launch policy, and one migration would have done); audit notes (100
+  characters of text about a person) and `user.viewed` lines are kept for good, so their retention and
+  erasure need the adviser (#18, Phase 6); a suspended account's primary-owned listings stay live
+  (#80) and reinstating a listing whose owner is suspended is allowed; a hold that exists when its
+  listing is suspended is covered by the same `status !== 'published'` guards that stop any listing
+  that isn't live (tested with other statuses in `bookings.integration.test.ts`).
+- **The "reason" email has nowhere to point** for a suspended account: no support address exists yet, so
+  its button goes to the site. Open with the other support-address note.

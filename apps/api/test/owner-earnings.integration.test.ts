@@ -252,8 +252,8 @@ describe('owner earnings (5.1: #50, #51, #54)', () => {
     expect(theirs.sent.amountMinor).toBe(108);
     expect(theirs.lines.map((line) => line.amount.amountMinor)).toEqual([108]);
     // Nothing in what either gets back is the other's, in any field.
-    expect(JSON.stringify(mine)).not.toContain('108');
-    expect(JSON.stringify(theirs)).not.toContain('252');
+    expect(JSON.stringify(mine)).not.toMatch(/"amountMinor":108(?!\d)/);
+    expect(JSON.stringify(theirs)).not.toMatch(/"amountMinor":252(?!\d)/);
     expect(JSON.stringify(theirs)).not.toContain(primary.profileId);
     expect(JSON.stringify(mine)).not.toContain(co.profileId);
   });
@@ -323,7 +323,8 @@ describe('owner earnings (5.1: #50, #51, #54)', () => {
     expect(fine.sending.amountMinor).toBe(504);
     expect(fine.lines).toEqual([]);
     expect(fine.inProgress.map((line) => line.amount.amountMinor)).toEqual([252, 252]);
-    expect(JSON.stringify(fine.inProgress)).not.toContain('108');
+    // The other owner's amount, as an amount: an id may hold the digits by chance.
+    expect(JSON.stringify(fine.inProgress)).not.toMatch(/"amountMinor":108(?!\d)/);
     expect(fine.inProgress).toHaveLength(2);
     const byReference = new Map(fine.inProgress.map((line) => [line.reference, line]));
     expect(byReference.get(plain.reference)).toMatchObject({ state: 'sending', hold: null });
@@ -339,7 +340,7 @@ describe('owner earnings (5.1: #50, #51, #54)', () => {
     expect(stuckBy.get(disputed.reference)).toMatchObject({ hold: 'dispute' });
     expect(stuck.sending.amountMinor).toBe(216);
     expect(stuck.inProgress.map((line) => line.amount.amountMinor)).toEqual([108, 108]);
-    expect(JSON.stringify(stuck.inProgress)).not.toContain('252');
+    expect(JSON.stringify(stuck.inProgress)).not.toMatch(/"amountMinor":252(?!\d)/);
   });
 
   it('counts what is due and held, by the account or by a dispute', async () => {

@@ -72,7 +72,13 @@ export function StepShell({
         {reviewNote ? (
           <Alert role={undefined} variant="destructive">
             <CircleAlert aria-hidden />
-            <AlertTitle className="line-clamp-none">{t('review.noteHeading')}</AlertTitle>
+            <AlertTitle className="line-clamp-none">
+              {t(
+                listing.progress.status === 'suspended'
+                  ? 'review.suspendedHeading'
+                  : 'review.noteHeading',
+              )}
+            </AlertTitle>
             <AlertDescription className="whitespace-pre-line">
               {/* Staff's words, in a language nobody told us: Greek script is marked on /en. One
                   element, as the description is a grid and loose runs would each take a row. */}

@@ -778,7 +778,7 @@ export type OwnerCalendar = {
     truncated: boolean;
 };
 
-export type AuditAction = 'listing.approved' | 'listing.changes_requested' | 'listing.proof_opened';
+export type AuditAction = 'listing.approved' | 'listing.changes_requested' | 'listing.proof_opened' | 'user.two_factor_removed' | 'user.viewed' | 'listing.suspended' | 'listing.reinstated' | 'user.suspended' | 'user.reinstated';
 
 export type AdminQueueQuery = {
     status: 'in_review' | 'changes_requested' | 'published' | 'suspended';
@@ -843,10 +843,51 @@ export type AdminListingReview = {
     owners: Array<AdminOwner>;
     proofs: Array<AdminProof>;
     canDecide: boolean;
+    canSuspend: boolean;
+    canReinstate: boolean;
+    upcomingBookings: number;
     own: boolean;
 };
 
+export type AdminSuspendListingInput = {
+    note: string;
+    cancelBookings: boolean;
+};
+
+export type AdminReasonInput = {
+    note: string;
+};
+
 export type AdminChangesInput = {
+    note: string;
+};
+
+export type AdminUserLookup = {
+    email: string;
+};
+
+export type AdminUser = {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    locale: Locale;
+    emailVerified: boolean;
+    twoFactorEnabled: boolean;
+    createdAt: string;
+    own: boolean;
+    canRemoveTwoFactor: boolean;
+    suspended: boolean;
+    canSuspend: boolean;
+    canReinstate: boolean;
+    liveListings: number;
+};
+
+export type AdminUserLookupResult = {
+    id: string | null;
+};
+
+export type AdminRemoveTwoFactorInput = {
     note: string;
 };
 
@@ -864,7 +905,7 @@ export type AuditEntry = {
         name: string;
         email: string;
     };
-    targetType: 'listing';
+    targetType: 'listing' | 'user';
     targetId: string;
     details: {
         [key: string]: string | number | boolean | null;
@@ -2039,6 +2080,175 @@ export type RequestAdminListingChangesResponses = {
 };
 
 export type RequestAdminListingChangesResponse = RequestAdminListingChangesResponses[keyof RequestAdminListingChangesResponses];
+
+export type LookUpAdminUserData = {
+    body: AdminUserLookup;
+    path?: never;
+    query?: never;
+    url: '/v1/admin/users/lookup';
+};
+
+export type LookUpAdminUserErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+};
+
+export type LookUpAdminUserError = LookUpAdminUserErrors[keyof LookUpAdminUserErrors];
+
+export type LookUpAdminUserResponses = {
+    200: AdminUserLookupResult;
+};
+
+export type LookUpAdminUserResponse = LookUpAdminUserResponses[keyof LookUpAdminUserResponses];
+
+export type GetAdminUserData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/users/{id}';
+};
+
+export type GetAdminUserErrors = {
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type GetAdminUserError = GetAdminUserErrors[keyof GetAdminUserErrors];
+
+export type GetAdminUserResponses = {
+    200: AdminUser;
+};
+
+export type GetAdminUserResponse = GetAdminUserResponses[keyof GetAdminUserResponses];
+
+export type RemoveAdminUserTwoFactorData = {
+    body: AdminRemoveTwoFactorInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/users/{id}/remove-two-factor';
+};
+
+export type RemoveAdminUserTwoFactorErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type RemoveAdminUserTwoFactorError = RemoveAdminUserTwoFactorErrors[keyof RemoveAdminUserTwoFactorErrors];
+
+export type RemoveAdminUserTwoFactorResponses = {
+    200: AdminUser;
+};
+
+export type RemoveAdminUserTwoFactorResponse = RemoveAdminUserTwoFactorResponses[keyof RemoveAdminUserTwoFactorResponses];
+
+export type SuspendAdminListingData = {
+    body: AdminSuspendListingInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/listings/{id}/suspend';
+};
+
+export type SuspendAdminListingErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SuspendAdminListingError = SuspendAdminListingErrors[keyof SuspendAdminListingErrors];
+
+export type SuspendAdminListingResponses = {
+    200: AdminListingReview;
+};
+
+export type SuspendAdminListingResponse = SuspendAdminListingResponses[keyof SuspendAdminListingResponses];
+
+export type ReinstateAdminListingData = {
+    body: AdminReasonInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/listings/{id}/reinstate';
+};
+
+export type ReinstateAdminListingErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type ReinstateAdminListingError = ReinstateAdminListingErrors[keyof ReinstateAdminListingErrors];
+
+export type ReinstateAdminListingResponses = {
+    200: AdminListingReview;
+};
+
+export type ReinstateAdminListingResponse = ReinstateAdminListingResponses[keyof ReinstateAdminListingResponses];
+
+export type SuspendAdminUserData = {
+    body: AdminReasonInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/users/{id}/suspend';
+};
+
+export type SuspendAdminUserErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SuspendAdminUserError = SuspendAdminUserErrors[keyof SuspendAdminUserErrors];
+
+export type SuspendAdminUserResponses = {
+    200: AdminUser;
+};
+
+export type SuspendAdminUserResponse = SuspendAdminUserResponses[keyof SuspendAdminUserResponses];
+
+export type ReinstateAdminUserData = {
+    body: AdminReasonInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/users/{id}/reinstate';
+};
+
+export type ReinstateAdminUserErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type ReinstateAdminUserError = ReinstateAdminUserErrors[keyof ReinstateAdminUserErrors];
+
+export type ReinstateAdminUserResponses = {
+    200: AdminUser;
+};
+
+export type ReinstateAdminUserResponse = ReinstateAdminUserResponses[keyof ReinstateAdminUserResponses];
 
 export type GetAuditLogData = {
     body?: never;

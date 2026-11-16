@@ -30,6 +30,14 @@ export const OUTBOX_EMAIL_KINDS = [
   // To the co-owner offered the primary role, and to the primary who gave it up (#61–#64).
   'listing-handover-offered',
   'listing-handover-accepted',
+  // To an account whose second factor support removed (#13).
+  'two-factor-removed',
+  // To a listing's primary owner when staff took it down or brought it back (#78, #81).
+  'listing-suspended',
+  'listing-reinstated',
+  // To an account's holder when it was suspended or reinstated (#79, #81).
+  'account-suspended',
+  'account-reinstated',
 ] as const;
 export type OutboxEmailKind = (typeof OUTBOX_EMAIL_KINDS)[number];
 

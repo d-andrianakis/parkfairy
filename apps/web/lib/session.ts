@@ -14,7 +14,13 @@ import { getAuth } from './auth';
 export const getSession = cache(async () => {
   // Read request headers first: it marks the route dynamic before any runtime config is touched.
   const requestHeaders = await headers();
-  return getAuth().api.getSession({ headers: requestHeaders, query: { disableRefresh: true } });
+  const session = await getAuth().api.getSession({
+    headers: requestHeaders,
+    query: { disableRefresh: true },
+  });
+  // Suspended by staff (5.2c, #79): its sessions were ended, so this is the belt for one that
+  // opened in the same instant. Signed out, as far as any page can tell.
+  return session?.user.suspendedAt ? null : session;
 });
 
 /** For the layout: if the lookup fails (database down), render signed out, not an error page. */

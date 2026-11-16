@@ -7,6 +7,7 @@ import { Link, usePathname } from '@/i18n/navigation';
 
 const ITEMS = [
   { href: '/listings', key: 'listings' },
+  { href: '/users', key: 'users' },
   { href: '/audit', key: 'audit' },
 ] as const;
 
