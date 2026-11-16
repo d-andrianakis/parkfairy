@@ -42,9 +42,10 @@ export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 /**
  * A cancellation's refund at Stripe (4.2): `owed` in the cancel's own transaction, `sent` once
  * Stripe has it. The worker sends what is still owed. `failed`: Stripe took it and it failed later
- * (a closed card, say), the money back with the platform; support's to settle with the driver.
+ * (a closed card, say), the money back with the platform; support's to settle with the driver:
+ * asked again (`owed`, a new attempt) or `settled` once the driver was paid another way (5.2c3, #84).
  */
-export const REFUND_STATUSES = ['owed', 'sent', 'failed'] as const;
+export const REFUND_STATUSES = ['owed', 'sent', 'failed', 'settled'] as const;
 export type RefundStatus = (typeof REFUND_STATUSES)[number];
 
 /**
@@ -69,6 +70,13 @@ export const DISPUTE_STATUSES = [
   'prevented',
 ] as const;
 export type DisputeStatus = (typeof DISPUTE_STATUSES)[number];
+
+/**
+ * Who bears a lost dispute (#57, #83): Parkfairy, so the owners' payout is released as normal, or
+ * the owners, so their transfers for that booking never go. Decided by staff, once.
+ */
+export const DISPUTE_DECISIONS = ['parkfairy_bears', 'owners_bear'] as const;
+export type DisputeDecision = (typeof DISPUTE_DECISIONS)[number];
 /** A dispute that leaves the booking's money where it was: its payout may go. */
 export const DISPUTES_RELEASED = ['won', 'warning_closed', 'prevented'] as const;
 /** Decided for good: an open status read after one of these is an older reading. */

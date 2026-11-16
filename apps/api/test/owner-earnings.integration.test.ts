@@ -343,6 +343,57 @@ describe('owner earnings (5.1: #50, #51, #54)', () => {
     expect(JSON.stringify(stuck.inProgress)).not.toMatch(/"amountMinor":252(?!\d)/);
   });
 
+  it('tells a part staff decided the owners bear that it will not be paid, and one Parkfairy bears that it will (#83)', async () => {
+    const driver = await person();
+    const active = await owner('active');
+    const id = await listingOf('lostdispute', active.profileId);
+    const mine = [{ ownerId: active.profileId, shareBps: 10_000, sending: 360 }];
+    const forfeited = await booking(driver, id, 72, mine);
+    const released = await booking(driver, id, 72, mine);
+    const [admin] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.id, active.user.id));
+    const lose = async (bookingId: string, decision: 'owners_bear' | 'parkfairy_bears' | null) => {
+      const [row] = await db
+        .insert(schema.paymentDisputes)
+        .values({
+          bookingId,
+          stripeDisputeId: `dp_it${randomUUID().slice(0, 12)}`,
+          status: 'lost',
+          reason: 'fraudulent',
+          amountMinor: 400,
+          currency: 'EUR',
+          ...(decision ? { decision, decidedBy: admin?.id, decidedAt: new Date() } : {}),
+        })
+        .returning({ id: schema.paymentDisputes.id });
+      return row?.id ?? '';
+    };
+    // Lost and nobody has decided: held, as a dispute.
+    await lose(forfeited.id, null);
+    await lose(released.id, null);
+    const waiting = new Map(
+      (await earnings(active.user)).inProgress.map((line) => [line.reference, line]),
+    );
+    expect(waiting.get(forfeited.reference)).toMatchObject({ hold: 'dispute' });
+    expect(waiting.get(released.reference)).toMatchObject({ hold: 'dispute' });
+    // Decided: the owners bear it, and the part says it will not be paid; Parkfairy bears it, and
+    // the part is no longer held.
+    await db
+      .update(schema.paymentDisputes)
+      .set({ decision: 'owners_bear', decidedBy: admin?.id ?? '', decidedAt: new Date() })
+      .where(eq(schema.paymentDisputes.bookingId, forfeited.id));
+    await db
+      .update(schema.paymentDisputes)
+      .set({ decision: 'parkfairy_bears', decidedBy: admin?.id ?? '', decidedAt: new Date() })
+      .where(eq(schema.paymentDisputes.bookingId, released.id));
+    const decided = new Map(
+      (await earnings(active.user)).inProgress.map((line) => [line.reference, line]),
+    );
+    expect(decided.get(forfeited.reference)).toMatchObject({ state: 'sending', hold: 'lost' });
+    expect(decided.get(released.reference)).toMatchObject({ state: 'sending', hold: null });
+  });
+
   it('counts what is due and held, by the account or by a dispute', async () => {
     const driver = await person();
     const restricted = await owner('restricted');

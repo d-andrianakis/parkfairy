@@ -127,6 +127,8 @@ export interface RefundOwed {
   amountMinor: number;
   /** When it was decided: past a day, Stripe's idempotency key no longer stands for it. */
   updatedAt: Date;
+  /** How often staff asked again after a failure (#84): a new attempt is a new idempotency key. */
+  attempt: number;
   cursor: MoneyCursor;
 }
 
@@ -145,10 +147,11 @@ export async function refundsOwed(
     refund_status: string | null;
     refund_minor: number | null;
     total_minor: number;
+    refund_attempts: number;
     updated_at: string;
   }>(sql`
     select b.id, b.payment_intent_id, b.refund_status, b.refund_minor, b.total_minor,
-      b.updated_at::text as updated_at
+      b.refund_attempts, b.updated_at::text as updated_at
     from bookings b
     where (b.refund_status = 'owed' or b.payment_status = 'refunding')
       and b.payment_intent_id is not null
@@ -164,6 +167,7 @@ export async function refundsOwed(
     kind: row.refund_status === 'owed' ? ('cancelled' as const) : ('unbooked' as const),
     amountMinor: Number(row.refund_status === 'owed' ? (row.refund_minor ?? 0) : row.total_minor),
     updatedAt: new Date(row.updated_at),
+    attempt: Number(row.refund_attempts),
     cursor: { at: row.updated_at, id: row.id },
   }));
 }
@@ -295,13 +299,23 @@ export interface TransferDue {
   cursor: MoneyCursor;
 }
 
-/** A dispute of booking `b` that holds its payout (#58): any not settled for the owners. */
+/**
+ * A dispute of booking `b` that holds its payout (#58): any not settled for the owners. A lost one
+ * stays held until staff decide who bears it (#57, #83): Parkfairy, and it is released; the owners,
+ * and it is held for good.
+ */
 export const heldByDispute = sql`
   select 1 from payment_disputes d
-  where d.booking_id = b.id and d.status not in (${sql.join(
-    DISPUTES_RELEASED.map((status) => sql`${status}`),
-    sql`, `,
-  )})
+  where d.booking_id = b.id and d.decision is distinct from 'parkfairy_bears'
+    and d.status not in (${sql.join(
+      DISPUTES_RELEASED.map((status) => sql`${status}`),
+      sql`, `,
+    )})
+`;
+
+/** A dispute of booking `b` that staff decided the owners bear (#83): their payout never goes. */
+export const lostByOwners = sql`
+  select 1 from payment_disputes d where d.booking_id = b.id and d.decision = 'owners_bear'
 `;
 
 /**
@@ -325,7 +339,7 @@ const dueWhere = (dueBefore: Date) => sql`
   and b.status in ('confirmed', 'cancelled')
   and (b.transfer_status is null or b.transfer_status = 'sending')
   and b.ends_at <= ${dueBefore.toISOString()}::timestamptz
-  and (b.refund_status is null or b.refund_status in ('sent', 'failed'))
+  and (b.refund_status is null or b.refund_status in ('sent', 'failed', 'settled'))
   and (b.refund_minor is null or b.refund_minor < b.total_minor)
   and not exists (${heldByDispute})
 `;

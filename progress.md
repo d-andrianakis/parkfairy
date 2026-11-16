@@ -1593,7 +1593,7 @@ payments, overstay reports, removing two-factor).
 - [x] **5.2b Contracts & docs**: no contract or schema change; README, GETTING_STARTED, `.env.example`,
       CI, memory.md
 - [ ] **5.2c** moderation, users, bookings, payments, overstay reports, removing two-factor: built in
-      order (#74–#81); 5.2c1 and 5.2c2 below are done, the rest are open
+      order (#74–#85); 5.2c1, 5.2c2 and 5.2c3 below are done, overstay reports are open
 
 #### 5.2c1 Accounts and removing two-factor (2026-11-15, #13, #77)
 
@@ -1648,6 +1648,40 @@ payments, overstay reports, removing two-factor).
       bookings; the retention of audit notes; a shared throttle across the destructive routes; the
       owner calendar and driver views of a staff-cancelled booking and the refund sweep for one are not
       tested end to end (the booking and its refund are)
+
+#### 5.2c3 Bookings and payments (2026-11-16, #82–#85)
+
+- [x] **Implemented**: `POST /admin/bookings/lookup` (a reference in a body, an id back), `GET
+/admin/bookings/:id` (the booking with its driver, plate, money and disputes; opening it is logged),
+      `POST /admin/bookings/:id/cancel` (full refund, driver and owners told), `…/refund/retry` and
+      `…/refund/settle`, `GET /admin/payments` (lost disputes, open disputes, failed refunds), `POST
+/admin/disputes/:id/decide` (who bears a lost dispute); migrations 0041–0043 (`refund_attempts`, the
+      `settled` refund status, the dispute decision, audit actions, outbox kinds, two partial indexes);
+      the worker sends a retried refund under a new key; the transfer sweep honours the decision; owners'
+      earnings say a part will not be paid; three emails; `/bookings`, `/bookings/[id]`, `/payments` in
+      the staff app in both languages
+- [x] **Unit and integration tests**: contracts, the gateway's key, the worker, the emails, the earnings
+      label, 50+ API integration tests (authorization, origin, who is refused, races of several admins and
+      of a driver, rollback, throttles, retry then fail then retry, a payout already made, decided
+      once, the hold released or kept, the owners' earnings), the staff app's panels, pages and audit
+- [x] **Smoke test** `admin-money.smoke.ts` (3): a booking found and cancelled (note, question naming the
+      refund, the owner's email, the log), a refund asked again then settled, a lost dispute decided each
+      way (the lists, the owners' emails), Greek at 320 px, JS budget; the CSP check caught zod's `eval`
+- [x] **Reviews and the gate** (2026-11-16): the five reviewers ran; what they found is fixed and tested:
+      a disputed booking can't be cancelled or have its refund retried (`DISPUTED`, or the driver is paid
+      twice); "the owners bear it" needs a payout still held (`NOT_HELD`, `payoutHeld`); a retried refund
+      can be settled; a decided dispute is never reopened by a late Stripe event; money POSTs are
+      `no-store` and the payments list is throttled; the dispute panel's ids, the h1 of an unavailable
+      booking, wrapping Greek buttons, amounts as euros in the log, owners' emails reworded. The gate:
+      `format:check`, `lint`, `typecheck`, `build`, `db:migrate` twice, `db:generate` (no changes),
+      `api:generate` (stable), `pnpm test` (918 API, 351 staff app, 1119 web) and `test:smoke` (269 passed,
+      4 skipped) all green. Smoke reads the audit log through its kind filter: the log is shared by every
+      spec and shows 25 lines a page. One run of `booking.smoke.ts` found a missing `<title>` on a web page
+      (axe `document-title`) and passed on rerun: watch for it
+- [ ] **Left open on purpose** (in memory.md, none loses money): owners' "on its way" sums count a part
+      marked `sending` whose dispute is then lost; the ledger check has no rule for `settled` refunds;
+      deciding one of two disputes tells the owners as if the payout moved; native Greek review of the
+      new strings; a manual NVDA/VoiceOver pass over the booking and payments pages
 
 - [~] 2FA enrolment UI done (1.3); admin MFA enforced end to end once admin routes exist
   (sessions without a second factor are already ended when it is switched on)

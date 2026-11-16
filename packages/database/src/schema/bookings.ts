@@ -118,6 +118,11 @@ export const bookings = pgTable(
     refundStatus: text('refund_status').$type<RefundStatus>(),
     stripeRefundId: text('stripe_refund_id'),
     /**
+     * How many times staff asked Stripe again after a failed refund (#84): part of the idempotency
+     * key, since the same key would give the same failed refund back.
+     */
+    refundAttempts: smallint('refund_attempts').default(0).notNull(),
+    /**
      * The owner's share (#4, #50, #51), worked out when it goes, 24 hours after the stay: what's
      * kept less Parkfairy's commission, both kept here as sent.
      */
@@ -162,6 +167,13 @@ export const bookings = pgTable(
       .on(t.holdExpiresAt)
       .where(sql`${t.status} = 'held'`),
     // The money the worker moves: refunds owed (a cancellation's, or a paid hold's finishing)…
+    // A refund that failed after Stripe took it, or that staff asked again and Stripe keeps refusing
+    // (#84): the few staff settle, oldest change first.
+    index('bookings_refund_failed_idx')
+      .on(t.updatedAt, t.id)
+      .where(
+        sql`${t.refundStatus} = 'failed' or (${t.refundStatus} = 'owed' and ${t.refundAttempts} > 0)`,
+      ),
     index('bookings_refunds_owed_idx')
       .on(t.updatedAt)
       .where(sql`${t.refundStatus} = 'owed' or ${t.paymentStatus} = 'refunding'`),
@@ -227,7 +239,7 @@ export const bookings = pgTable(
     // A cancellation's refund: paid, cancelled, something to give back; sent with Stripe's id.
     check(
       'bookings_refund_status_check',
-      sql`${t.refundStatus} is null or (${t.refundStatus} in (${sqlList(REFUND_STATUSES)}) and ${t.status} = 'cancelled' and ${t.paymentStatus} = 'succeeded' and ${t.refundMinor} is not null and ${t.refundMinor} > 0 and (${t.refundStatus} in ('sent', 'failed')) = (${t.stripeRefundId} is not null))`,
+      sql`${t.refundStatus} is null or (${t.refundStatus} in (${sqlList(REFUND_STATUSES)}) and ${t.status} = 'cancelled' and ${t.paymentStatus} = 'succeeded' and ${t.refundMinor} is not null and ${t.refundMinor} > 0 and ((${t.refundStatus} in ('sent', 'failed')) = (${t.stripeRefundId} is not null) or ${t.refundStatus} = 'settled'))`,
     ),
     // A transfer: paid for, its refund settled, its amounts worked out and adding up to what's
     // kept (#50), sent with Stripe's id and its time. Nulls stated: a CHECK passes on null.

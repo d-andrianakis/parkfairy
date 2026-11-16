@@ -38,6 +38,10 @@ export const OUTBOX_EMAIL_KINDS = [
   // To an account's holder when it was suspended or reinstated (#79, #81).
   'account-suspended',
   'account-reinstated',
+  // To a booking's owners when support called it off, and when a lost dispute was decided (#82, #83).
+  'booking-cancelled-by-staff',
+  'dispute-parkfairy-bears',
+  'dispute-owners-bear',
 ] as const;
 export type OutboxEmailKind = (typeof OUTBOX_EMAIL_KINDS)[number];
 

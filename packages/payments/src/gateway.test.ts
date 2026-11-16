@@ -274,6 +274,30 @@ describe('stripeGateway', () => {
     });
   });
 
+  it('asks again after a failed refund under a key of its own: the old one would give the failure back (#84)', async () => {
+    const client = fakeClient();
+    await gatewayWith(client).refundCancelled({
+      paymentIntentId: 'pi_1',
+      bookingId: 'b1',
+      amountMinor: 250,
+      attempt: 2,
+    });
+    expect(client.refunds.create).toHaveBeenCalledWith(
+      { payment_intent: 'pi_1', amount: 250, metadata: { bookingId: 'b1', reason: 'cancelled' } },
+      { idempotencyKey: 'refund-cancelled-b1-2' },
+    );
+    // The first attempt keeps the key it always had, so a refund sent before this is found again.
+    await gatewayWith(client).refundCancelled({
+      paymentIntentId: 'pi_1',
+      bookingId: 'b1',
+      amountMinor: 250,
+      attempt: 0,
+    });
+    expect(client.refunds.create).toHaveBeenLastCalledWith(expect.anything(), {
+      idempotencyKey: 'refund-cancelled-b1',
+    });
+  });
+
   it('reads a refund as it stands, a failed one included', async () => {
     const client = fakeClient();
     client.refunds.retrieve.mockResolvedValueOnce({

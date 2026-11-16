@@ -212,6 +212,67 @@ describe('the audit log', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('names a booking’s lines and a dispute’s, each linked to its booking, with who bears it in words', async () => {
+    const BOOKING = '3b2f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f';
+    vi.mocked(loadAudit).mockResolvedValue({
+      entries: [
+        entry({
+          action: 'booking.viewed',
+          targetType: 'booking',
+          targetId: BOOKING,
+          details: { reference: 'K7M4-Q2ZD' },
+        }),
+        entry({
+          action: 'booking.cancelled',
+          targetType: 'booking',
+          targetId: BOOKING,
+          details: { reference: 'K7M4-Q2ZD', refundMinor: 1250, note: 'Ticket 1.' },
+        }),
+        entry({
+          action: 'booking.refund_retried',
+          targetType: 'booking',
+          targetId: BOOKING,
+          details: { reference: 'K7M4-Q2ZD', attempt: 2, note: 'Ticket 2.' },
+        }),
+        entry({
+          action: 'dispute.decided',
+          targetType: 'dispute',
+          targetId: '4c2f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f',
+          details: {
+            bookingId: BOOKING,
+            decision: 'owners_bear',
+            amountMinor: 1250,
+            note: 'Ticket 3.',
+          },
+        }),
+      ],
+      next: null,
+    });
+    const { container } = await show();
+    const rows = within(screen.getByRole('table', { name: 'Audit log' }))
+      .getAllByRole('row')
+      .slice(1);
+    expect(rows[0]).toHaveTextContent('Booking opened');
+    expect(rows[1]).toHaveTextContent('Booking cancelled');
+    expect(rows[1]).toHaveTextContent('Refund€12.50');
+    expect(rows[2]).toHaveTextContent('Refund asked again');
+    expect(rows[2]).toHaveTextContent('Attempt2');
+    expect(rows[3]).toHaveTextContent('Lost dispute decided');
+    expect(rows[3]).toHaveTextContent('Who bears the lossThe owners bear the loss');
+    for (const row of rows.slice(0, 3)) {
+      expect(within(row).getByRole('link', { name: 'Open the booking' })).toHaveAttribute(
+        'href',
+        `/en/bookings/${BOOKING}`,
+      );
+    }
+    // A dispute has no page of its own: its link is its booking's, and the booking's id is no fact.
+    expect(
+      within(rows[3]!).getByRole('link', { name: 'Open the booking of the dispute' }),
+    ).toHaveAttribute('href', `/en/bookings/${BOOKING}`);
+    expect(rows[3]).not.toHaveTextContent(BOOKING);
+    await expectNoAxeViolations(container);
+  });
+
   it('names the same four in Greek', async () => {
     vi.mocked(loadAudit).mockResolvedValue({
       entries: [

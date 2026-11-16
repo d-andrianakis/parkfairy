@@ -7,9 +7,22 @@ import {
   OwnerVerificationSchema,
   ProofKindSchema,
 } from './owner.js';
-import { bookingsCursor, parseBookingsCursor } from './bookings.js';
+import {
+  BOOKING_REFERENCE_PATTERN,
+  BookingCancellerSchema,
+  BookingStatusSchema,
+  bookingsCursor,
+  parseBookingsCursor,
+} from './bookings.js';
 import { ListingOwnerRoleSchema } from './listing-owners.js';
 import { ListingStatusSchema, MoneySchema } from './parking.js';
+import {
+  DISPUTE_DECISIONS,
+  DISPUTE_STATUSES,
+  PaymentStatusSchema,
+  REFUND_STATUSES,
+  TRANSFER_STATUSES,
+} from './payments.js';
 import { contractsRegistry } from './registry.js';
 import { UserRoleSchema } from './users.js';
 import { message } from './validation.js';
@@ -37,6 +50,15 @@ export const AUDIT_ACTIONS = [
   /** An account that can no longer sign in; its note is for the log alone (#79, #80). */
   'user.suspended',
   'user.reinstated',
+  /** Someone on the staff opened a booking: the driver's name, email and plate are on it (#85). */
+  'booking.viewed',
+  /** Support called a booking off with a full refund (#82). */
+  'booking.cancelled',
+  /** A failed refund asked of Stripe again, or marked settled another way (#84). */
+  'booking.refund_retried',
+  'booking.refund_settled',
+  /** Who bears a lost dispute, decided (#83). */
+  'dispute.decided',
 ] as const;
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS).register(contractsRegistry, {
   id: 'AuditAction',
@@ -44,7 +66,7 @@ export const AuditActionSchema = z.enum(AUDIT_ACTIONS).register(contractsRegistr
 export type AuditAction = z.infer<typeof AuditActionSchema>;
 
 /** What an action was done to. */
-export const AUDIT_TARGETS = ['listing', 'user'] as const;
+export const AUDIT_TARGETS = ['listing', 'user', 'booking', 'dispute'] as const;
 
 /** Staff see this many to a page, in the queue and in the log. */
 export const ADMIN_PAGE_SIZE = 25;
@@ -323,6 +345,149 @@ export const AuditLogSchema = z
   .register(contractsRegistry, { id: 'AuditLog' });
 export type AuditLog = z.infer<typeof AuditLogSchema>;
 
+/**
+ * A booking by its reference, the one the driver quotes: sent in a body, so no reference is in a URL
+ * or a log, and the answer is the booking's id (what opening its page then logs, #85).
+ */
+export const AdminBookingLookupSchema = z
+  .object({
+    reference: z
+      .string(message('invalid'))
+      .trim()
+      .toUpperCase()
+      .regex(BOOKING_REFERENCE_PATTERN, message('invalid')),
+  })
+  .strict()
+  .register(contractsRegistry, { id: 'AdminBookingLookup' });
+export type AdminBookingLookup = z.infer<typeof AdminBookingLookupSchema>;
+
+export const AdminBookingLookupResultSchema = z
+  .object({ id: z.uuid().nullable() })
+  .register(contractsRegistry, { id: 'AdminBookingLookupResult' });
+export type AdminBookingLookupResult = z.infer<typeof AdminBookingLookupResultSchema>;
+
+/** A dispute of a booking's payment as staff see it (#57, #83). */
+export const AdminDisputeSchema = z
+  .object({
+    id: z.uuid(),
+    status: z.enum(DISPUTE_STATUSES),
+    /** Stripe's category (`fraudulent`, …): its own words, shown as written. */
+    reason: z.string(),
+    amount: MoneySchema,
+    dueBy: z.iso.datetime().nullable(),
+    /** How many responses went to the bank: none, and support must act in Stripe. */
+    submissions: z.int().nonnegative(),
+    decision: z.enum(DISPUTE_DECISIONS).nullable(),
+    decidedAt: z.iso.datetime().nullable(),
+    /** It is lost and nobody has decided who bears it: staff's to decide. */
+    canDecide: z.boolean(),
+    /**
+     * The owners' payout for the booking is still to come, so either decision means something. When
+     * it was paid already, or nothing was kept, only "Parkfairy bears it" can be recorded.
+     */
+    payoutHeld: z.boolean(),
+  })
+  .register(contractsRegistry, { id: 'AdminDispute' });
+export type AdminDispute = z.infer<typeof AdminDisputeSchema>;
+
+/**
+ * A booking as support sees it (#82, #85): what was booked and by whom, what was paid and what
+ * went back, and where its payout and any dispute stand. The driver's name, email and plate are on
+ * it, so opening it is a line of the audit log.
+ */
+export const AdminBookingSchema = z
+  .object({
+    id: z.uuid(),
+    reference: z.string(),
+    status: BookingStatusSchema,
+    /** The listing as it was when booked: what the driver saw. */
+    listing: z.object({
+      id: z.uuid(),
+      name: z.string().nullable(),
+      address: z.string().nullable(),
+      contentLocale: LocaleSchema,
+    }),
+    spaceLabel: z.string(),
+    startsAt: z.iso.datetime(),
+    endsAt: z.iso.datetime(),
+    driver: z.object({ id: z.uuid(), name: z.string(), email: z.string() }),
+    vehiclePlate: z.string().nullable(),
+    total: MoneySchema,
+    paymentStatus: PaymentStatusSchema.nullable(),
+    refund: z.object({
+      status: z.enum(REFUND_STATUSES).nullable(),
+      amount: MoneySchema.nullable(),
+      /** How often staff asked Stripe again after a failed refund (#84). */
+      attempts: z.int().nonnegative(),
+    }),
+    cancelledBy: BookingCancellerSchema.nullable(),
+    cancelledAt: z.iso.datetime().nullable(),
+    transferStatus: z.enum(TRANSFER_STATUSES).nullable(),
+    disputes: z.array(AdminDisputeSchema),
+    /** Confirmed and not begun: staff may call it off with a full refund (#82). */
+    canCancel: z.boolean(),
+    /** A refund that failed, before any payout was made: staff may ask Stripe again (#84). */
+    canRetryRefund: z.boolean(),
+    /**
+     * A refund that failed, or that staff asked again and Stripe keeps refusing: staff may mark it
+     * settled, the driver paid another way (#84).
+     */
+    canSettleRefund: z.boolean(),
+  })
+  .register(contractsRegistry, { id: 'AdminBooking' });
+export type AdminBooking = z.infer<typeof AdminBookingSchema>;
+
+/** Who bears a lost dispute, and a note for the log (#83): decided once, never shown to the owners. */
+export const AdminDisputeDecisionInputSchema = z
+  .object({
+    decision: z.enum(DISPUTE_DECISIONS, message('invalid')),
+    note: staffNote(ADMIN_REASON_NOTE_MAX),
+  })
+  .strict()
+  .register(contractsRegistry, { id: 'AdminDisputeDecisionInput' });
+export type AdminDisputeDecisionInput = z.infer<typeof AdminDisputeDecisionInputSchema>;
+
+/** What needs support in money: a row of the payments page. */
+export const AdminPaymentItemSchema = z
+  .object({
+    bookingId: z.uuid(),
+    reference: z.string(),
+    listingName: z.string().nullable(),
+    contentLocale: LocaleSchema,
+    amount: MoneySchema,
+    /** Dispute rows: its id, status, reason and due date; refund rows: how often it was retried. */
+    disputeId: z.uuid().nullable(),
+    disputeStatus: z.enum(DISPUTE_STATUSES).nullable(),
+    reason: z.string().nullable(),
+    dueBy: z.iso.datetime().nullable(),
+    attempts: z.int().nonnegative(),
+    /** When it last changed: what the lists are ordered by, oldest first. */
+    at: z.iso.datetime(),
+  })
+  .register(contractsRegistry, { id: 'AdminPaymentItem' });
+export type AdminPaymentItem = z.infer<typeof AdminPaymentItemSchema>;
+
+/** At most this many to a list: what needs support is few, and a pile is itself the finding. */
+export const ADMIN_PAYMENTS_LIST_MAX = 50;
+
+export const AdminPaymentsSchema = z
+  .object({
+    /** Lost, and nobody has said who bears it (#57): the payout is held until they do. */
+    lostDisputes: z.array(AdminPaymentItemSchema).max(ADMIN_PAYMENTS_LIST_MAX),
+    /** Still to answer or under review at the bank: answered in Stripe, shown here to be seen. */
+    openDisputes: z.array(AdminPaymentItemSchema).max(ADMIN_PAYMENTS_LIST_MAX),
+    /** Refunds Stripe took and then failed: the driver is owed money (#84). */
+    failedRefunds: z.array(AdminPaymentItemSchema).max(ADMIN_PAYMENTS_LIST_MAX),
+    /** A list that is full has more than it shows. */
+    more: z.object({
+      lostDisputes: z.boolean(),
+      openDisputes: z.boolean(),
+      failedRefunds: z.boolean(),
+    }),
+  })
+  .register(contractsRegistry, { id: 'AdminPayments' });
+export type AdminPayments = z.infer<typeof AdminPaymentsSchema>;
+
 /** Every `code` an admin route answers with, for clients to translate. */
 export const ADMIN_ERROR_CODES = [
   'LISTING_NOT_FOUND',
@@ -346,5 +511,21 @@ export const ADMIN_ERROR_CODES = [
   'NOT_SUSPENDED',
   /** The account is suspended already. */
   'ALREADY_SUSPENDED',
+  'BOOKING_NOT_FOUND',
+  /** Only a confirmed booking that hasn't started can be called off (#82). */
+  'NOT_CANCELLABLE',
+  /** The booking has no failed refund to retry or settle (#84). */
+  'REFUND_NOT_FAILED',
+  /** Its owners were paid already: a refund can't be asked again, only settled (#84). */
+  'TRANSFER_MADE',
+  'DISPUTE_NOT_FOUND',
+  /** A dispute holds the booking: it can't be cancelled or its refund asked again (#82, #84). */
+  'DISPUTED',
+  /** No payout is held for it, so the owners can't be said to bear the loss (#83). */
+  'NOT_HELD',
+  /** Only a lost dispute is decided (#57). */
+  'NOT_LOST',
+  /** Decided already: once, and for good (#83). */
+  'ALREADY_DECIDED',
 ] as const;
 export type AdminErrorCode = (typeof ADMIN_ERROR_CODES)[number];

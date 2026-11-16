@@ -37,6 +37,7 @@ import {
 import {
   copyPayees,
   enterCharge,
+  heldByDispute,
   ownedByUser,
   runsListing,
   payableListing,
@@ -1184,6 +1185,103 @@ export class BookingsService {
       return cancelled;
     });
     await this.sendCancelRefund(owed);
+  }
+
+  /**
+   * Support calls one booking off (#82): confirmed and not begun, the driver refunded in full and
+   * told, and every owner of the listing told too. In the caller's transaction, the listing's lock
+   * first and then the booking's, as every path takes them; asked again, it is already done and says
+   * so (`not-cancellable`). The refund is recorded `owed` and the worker sends it.
+   */
+  async cancelForStaff(
+    tx: Transaction,
+    staffId: string,
+    bookingId: string,
+  ): Promise<
+    'not-cancellable' | 'not-found' | 'disputed' | { reference: string; refundMinor: number }
+  > {
+    const [located] = await tx
+      .select({ locationId: booking.locationId })
+      .from(booking)
+      .where(eq(booking.id, bookingId));
+    if (!located) return 'not-found';
+    await tx
+      .select({ id: listing.id })
+      .from(listing)
+      .where(eq(listing.id, located.locationId))
+      .for('share');
+    const [current] = await tx
+      .select()
+      .from(booking)
+      .where(eq(booking.id, bookingId))
+      .for('update');
+    if (!current) return 'not-found';
+    const now = new Date();
+    if (current.status !== 'confirmed' || current.startsAt <= now) return 'not-cancellable';
+    // A booking the bank is disputing is not refunded by us as well: the driver would be paid twice,
+    // and the loss would be ours (#82). Read under the booking's lock, as a dispute is recorded.
+    const held = await tx.execute<{ held: boolean }>(
+      sql`select exists (${heldByDispute}) as held from ${booking} b where b.id = ${bookingId}`,
+    );
+    if (held.rows[0]?.held === true) return 'disputed';
+    const [cancelled] = await tx
+      .update(booking)
+      .set({
+        status: 'cancelled',
+        cancelledAt: now,
+        cancelledBy: 'owner',
+        cancelledByUserId: staffId,
+        refundMinor: current.totalMinor,
+        refundStatus: owesRefund(current, current.totalMinor),
+      })
+      .where(eq(booking.id, bookingId))
+      .returning();
+    if (!cancelled) return 'not-found';
+    const info = await this.listingOf(tx, current.locationId);
+    await this.queueEmails(tx, cancelled, info, [
+      { kind: 'booking-cancelled', userId: current.userId, to: 'driver' },
+      ...(await this.ownerUsersOf(tx, current.locationId)).map((userId) => ({
+        kind: 'booking-cancelled-by-staff' as const,
+        userId,
+        to: 'owner' as const,
+      })),
+    ]);
+    return { reference: cancelled.reference, refundMinor: current.totalMinor };
+  }
+
+  /**
+   * Tells each owner paid for a booking who bears its lost dispute (#83), in the transaction that
+   * decided it: the facts of the booking, never the driver. Each owner once per booking and kind.
+   */
+  async tellPayees(
+    tx: Transaction,
+    bookingId: string,
+    kind: 'dispute-parkfairy-bears' | 'dispute-owners-bear',
+  ): Promise<void> {
+    const [current] = await tx.select().from(booking).where(eq(booking.id, bookingId));
+    if (!current) return;
+    const info = await this.listingOf(tx, current.locationId);
+    const payees = await tx
+      .select({ userId: profile.userId })
+      .from(schema.bookingPayees)
+      .innerJoin(profile, eq(profile.id, schema.bookingPayees.ownerId))
+      .where(eq(schema.bookingPayees.bookingId, bookingId));
+    if (payees.length === 0) return;
+    await tx
+      .insert(outbox)
+      .values(
+        payees.map(({ userId }) => ({
+          kind,
+          userId,
+          payload: {
+            listingName: current.listingName ?? undefined,
+            contentLocale: current.listingLocale,
+            booking: outboxBooking(current, info),
+          },
+          dedupeKey: `booking:${bookingId}:${kind}:${userId}`,
+        })),
+      )
+      .onConflictDoNothing({ target: outbox.dedupeKey });
   }
 
   /**

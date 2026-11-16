@@ -690,7 +690,7 @@ export type OwnerListingBookings = {
     next: string | null;
 };
 
-export type EarningHold = 'account' | 'dispute';
+export type EarningHold = 'account' | 'dispute' | 'lost';
 
 export type EarningState = 'sending' | 'sent';
 
@@ -778,7 +778,7 @@ export type OwnerCalendar = {
     truncated: boolean;
 };
 
-export type AuditAction = 'listing.approved' | 'listing.changes_requested' | 'listing.proof_opened' | 'user.two_factor_removed' | 'user.viewed' | 'listing.suspended' | 'listing.reinstated' | 'user.suspended' | 'user.reinstated';
+export type AuditAction = 'listing.approved' | 'listing.changes_requested' | 'listing.proof_opened' | 'user.two_factor_removed' | 'user.viewed' | 'listing.suspended' | 'listing.reinstated' | 'user.suspended' | 'user.reinstated' | 'booking.viewed' | 'booking.cancelled' | 'booking.refund_retried' | 'booking.refund_settled' | 'dispute.decided';
 
 export type AdminQueueQuery = {
     status: 'in_review' | 'changes_requested' | 'published' | 'suspended';
@@ -905,7 +905,7 @@ export type AuditEntry = {
         name: string;
         email: string;
     };
-    targetType: 'listing' | 'user';
+    targetType: 'listing' | 'user' | 'booking' | 'dispute';
     targetId: string;
     details: {
         [key: string]: string | number | boolean | null;
@@ -915,6 +915,92 @@ export type AuditEntry = {
 export type AuditLog = {
     entries: Array<AuditEntry>;
     next: string | null;
+};
+
+export type AdminBookingLookup = {
+    reference: string;
+};
+
+export type AdminBookingLookupResult = {
+    id: string | null;
+};
+
+export type AdminDispute = {
+    id: string;
+    status: 'warning_needs_response' | 'warning_under_review' | 'warning_closed' | 'needs_response' | 'under_review' | 'won' | 'lost' | 'prevented';
+    reason: string;
+    amount: Money;
+    dueBy: string | null;
+    submissions: number;
+    decision: 'parkfairy_bears' | 'owners_bear';
+    decidedAt: string | null;
+    canDecide: boolean;
+    payoutHeld: boolean;
+};
+
+export type AdminBooking = {
+    id: string;
+    reference: string;
+    status: BookingStatus;
+    listing: {
+        id: string;
+        name: string | null;
+        address: string | null;
+        contentLocale: Locale;
+    };
+    spaceLabel: string;
+    startsAt: string;
+    endsAt: string;
+    driver: {
+        id: string;
+        name: string;
+        email: string;
+    };
+    vehiclePlate: string | null;
+    total: Money;
+    paymentStatus: PaymentStatus | null;
+    refund: {
+        status: 'owed' | 'sent' | 'failed' | 'settled';
+        amount: Money | null;
+        attempts: number;
+    };
+    cancelledBy: BookingCanceller | null;
+    cancelledAt: string | null;
+    transferStatus: 'sending' | 'sent';
+    disputes: Array<AdminDispute>;
+    canCancel: boolean;
+    canRetryRefund: boolean;
+    canSettleRefund: boolean;
+};
+
+export type AdminDisputeDecisionInput = {
+    decision: 'parkfairy_bears' | 'owners_bear';
+    note: string;
+};
+
+export type AdminPaymentItem = {
+    bookingId: string;
+    reference: string;
+    listingName: string | null;
+    contentLocale: Locale;
+    amount: Money;
+    disputeId: string | null;
+    disputeStatus: 'warning_needs_response' | 'warning_under_review' | 'warning_closed' | 'needs_response' | 'under_review' | 'won' | 'lost' | 'prevented';
+    reason: string | null;
+    dueBy: string | null;
+    attempts: number;
+    at: string;
+};
+
+export type AdminPayments = {
+    lostDisputes: Array<AdminPaymentItem>;
+    openDisputes: Array<AdminPaymentItem>;
+    failedRefunds: Array<AdminPaymentItem>;
+    more: {
+        lostDisputes: boolean;
+        openDisputes: boolean;
+        failedRefunds: boolean;
+    };
 };
 
 export type PlaceSuggestion = {
@@ -2249,6 +2335,170 @@ export type ReinstateAdminUserResponses = {
 };
 
 export type ReinstateAdminUserResponse = ReinstateAdminUserResponses[keyof ReinstateAdminUserResponses];
+
+export type LookUpAdminBookingData = {
+    body: AdminBookingLookup;
+    path?: never;
+    query?: never;
+    url: '/v1/admin/bookings/lookup';
+};
+
+export type LookUpAdminBookingErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+};
+
+export type LookUpAdminBookingError = LookUpAdminBookingErrors[keyof LookUpAdminBookingErrors];
+
+export type LookUpAdminBookingResponses = {
+    200: AdminBookingLookupResult;
+};
+
+export type LookUpAdminBookingResponse = LookUpAdminBookingResponses[keyof LookUpAdminBookingResponses];
+
+export type GetAdminBookingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/bookings/{id}';
+};
+
+export type GetAdminBookingErrors = {
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+};
+
+export type GetAdminBookingError = GetAdminBookingErrors[keyof GetAdminBookingErrors];
+
+export type GetAdminBookingResponses = {
+    200: AdminBooking;
+};
+
+export type GetAdminBookingResponse = GetAdminBookingResponses[keyof GetAdminBookingResponses];
+
+export type CancelAdminBookingData = {
+    body: AdminReasonInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/bookings/{id}/cancel';
+};
+
+export type CancelAdminBookingErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type CancelAdminBookingError = CancelAdminBookingErrors[keyof CancelAdminBookingErrors];
+
+export type CancelAdminBookingResponses = {
+    200: AdminBooking;
+};
+
+export type CancelAdminBookingResponse = CancelAdminBookingResponses[keyof CancelAdminBookingResponses];
+
+export type RetryAdminBookingRefundData = {
+    body: AdminReasonInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/bookings/{id}/refund/retry';
+};
+
+export type RetryAdminBookingRefundErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type RetryAdminBookingRefundError = RetryAdminBookingRefundErrors[keyof RetryAdminBookingRefundErrors];
+
+export type RetryAdminBookingRefundResponses = {
+    200: AdminBooking;
+};
+
+export type RetryAdminBookingRefundResponse = RetryAdminBookingRefundResponses[keyof RetryAdminBookingRefundResponses];
+
+export type SettleAdminBookingRefundData = {
+    body: AdminReasonInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/bookings/{id}/refund/settle';
+};
+
+export type SettleAdminBookingRefundErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type SettleAdminBookingRefundError = SettleAdminBookingRefundErrors[keyof SettleAdminBookingRefundErrors];
+
+export type SettleAdminBookingRefundResponses = {
+    200: AdminBooking;
+};
+
+export type SettleAdminBookingRefundResponse = SettleAdminBookingRefundResponses[keyof SettleAdminBookingRefundResponses];
+
+export type GetAdminPaymentsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/admin/payments';
+};
+
+export type GetAdminPaymentsErrors = {
+    401: ErrorResponse;
+    403: ErrorResponse;
+};
+
+export type GetAdminPaymentsError = GetAdminPaymentsErrors[keyof GetAdminPaymentsErrors];
+
+export type GetAdminPaymentsResponses = {
+    200: AdminPayments;
+};
+
+export type GetAdminPaymentsResponse = GetAdminPaymentsResponses[keyof GetAdminPaymentsResponses];
+
+export type DecideAdminDisputeData = {
+    body: AdminDisputeDecisionInput;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/admin/disputes/{id}/decide';
+};
+
+export type DecideAdminDisputeErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    403: ErrorResponse;
+    404: ErrorResponse;
+    409: ErrorResponse;
+};
+
+export type DecideAdminDisputeError = DecideAdminDisputeErrors[keyof DecideAdminDisputeErrors];
+
+export type DecideAdminDisputeResponses = {
+    200: AdminBooking;
+};
+
+export type DecideAdminDisputeResponse = DecideAdminDisputeResponses[keyof DecideAdminDisputeResponses];
 
 export type GetAuditLogData = {
     body?: never;

@@ -14,6 +14,13 @@ describe('what a refusal from the admin routes is called', () => {
     'NOT_PUBLISHED',
     'NOT_SUSPENDED',
     'ALREADY_SUSPENDED',
+    'BOOKING_NOT_FOUND',
+    'NOT_CANCELLABLE',
+    'REFUND_NOT_FAILED',
+    'TRANSFER_MADE',
+    'DISPUTE_NOT_FOUND',
+    'NOT_LOST',
+    'ALREADY_DECIDED',
     'MFA_REQUIRED',
     'INVALID_ORIGIN',
   ])('knows %s', (code) => {

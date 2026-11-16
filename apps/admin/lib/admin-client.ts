@@ -2,13 +2,20 @@
 
 import {
   approveAdminListing,
+  cancelAdminBooking,
+  decideAdminDispute,
+  lookUpAdminBooking,
   lookUpAdminUser,
   reinstateAdminListing,
   reinstateAdminUser,
   removeAdminUserTwoFactor,
+  retryAdminBookingRefund,
+  settleAdminBookingRefund,
   requestAdminListingChanges,
   suspendAdminListing,
   suspendAdminUser,
+  type AdminBooking,
+  type AdminBookingLookupResult,
   type AdminListingReview,
   type AdminUser,
   type AdminUserLookupResult,
@@ -38,6 +45,25 @@ export const suspendUser = (id: string, note: string): Promise<Outcome<AdminUser
 export const reinstateUser = (id: string, note: string): Promise<Outcome<AdminUser>> =>
   attempt(() => reinstateAdminUser({ path: { id }, body: { note } }));
 
+export const lookUpBooking = (reference: string): Promise<Outcome<AdminBookingLookupResult>> =>
+  attempt(() => lookUpAdminBooking({ body: { reference } }));
+
+export const cancelBooking = (id: string, note: string): Promise<Outcome<AdminBooking>> =>
+  attempt(() => cancelAdminBooking({ path: { id }, body: { note } }));
+
+export const retryRefund = (id: string, note: string): Promise<Outcome<AdminBooking>> =>
+  attempt(() => retryAdminBookingRefund({ path: { id }, body: { note } }));
+
+export const settleRefund = (id: string, note: string): Promise<Outcome<AdminBooking>> =>
+  attempt(() => settleAdminBookingRefund({ path: { id }, body: { note } }));
+
+export const decideDispute = (
+  id: string,
+  decision: 'parkfairy_bears' | 'owners_bear',
+  note: string,
+): Promise<Outcome<AdminBooking>> =>
+  attempt(() => decideAdminDispute({ path: { id }, body: { decision, note } }));
+
 export const lookUpUser = (email: string): Promise<Outcome<AdminUserLookupResult>> =>
   attempt(() => lookUpAdminUser({ body: { email } }));
 
@@ -57,6 +83,13 @@ const KNOWN_CODES = [
   'NOT_PUBLISHED',
   'NOT_SUSPENDED',
   'ALREADY_SUSPENDED',
+  'BOOKING_NOT_FOUND',
+  'NOT_CANCELLABLE',
+  'REFUND_NOT_FAILED',
+  'TRANSFER_MADE',
+  'DISPUTE_NOT_FOUND',
+  'NOT_LOST',
+  'ALREADY_DECIDED',
   'MFA_REQUIRED',
   'INVALID_ORIGIN',
 ] as const;

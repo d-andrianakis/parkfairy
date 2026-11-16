@@ -1798,3 +1798,86 @@ Our readings for moderation, 5.2c2 (2026-11-15), not asked; change any that are 
   that isn't live (tested with other statuses in `bookings.integration.test.ts`).
 - **The "reason" email has nowhere to point** for a suspended account: no support address exists yet, so
   its button goes to the site. Open with the other support-address note.
+
+Answered by the product owner on 2026-11-16, for bookings and payments (5.2c3):
+
+82. **Staff look a booking up by its reference, and can cancel it with a full refund**: a note for
+    the log, the driver and the owners told. A new money action, throttled like the other
+    destructive ones.
+83. **A lost dispute is decided either way, per dispute** (#57): "Parkfairy bears it" releases the
+    owners' payout as normal; "the owners bear it" cancels their transfers for that booking for
+    good. A note, audited, the owners told.
+84. **A failed refund can be retried, or marked settled** after the driver was paid another way,
+    with a note in the audit log.
+85. **A booking page shows staff the driver's account name, email and the plate**; opening one is an
+    audit line, as opening an account is.
+
+Our readings for bookings and payments, 5.2c3 (2026-11-16), not asked; change any that are wrong:
+
+- **A booking is found by its reference and nothing else**: `POST /admin/bookings/lookup` takes it in a
+  body (never a URL or a log) and answers an id, or none; opening the page (`GET /admin/bookings/:id`,
+  refused for a cross-site `Sec-Fetch-Site`) is the `booking.viewed` line, since the driver's name, email
+  and plate are on it (#85). There is no list of bookings.
+- **Support cancels with `BookingsService.cancelForStaff`**: a confirmed booking that hasn't begun, under
+  the listing's lock then the booking's, `cancelled_by = 'owner'` with `cancelled_by_user_id` the staff
+  member, refund in full `owed` (only if paid), the driver told (`booking-cancelled`) and **every owner of
+  the listing** told by a new kind (`booking-cancelled-by-staff`), who won't receive a share. The worker's
+  sweep sends the refund. Asked twice, the second finds `NOT_CANCELLABLE`.
+- **A failed refund is retried or settled** (#84). Retrying sets `refund_status = 'owed'`, clears the failed
+  refund's id and adds one to `bookings.refund_attempts`; the worker sends it under the key
+  `refund-cancelled-<booking>-<attempt>` (attempt 0 keeps the old key, so a refund sent before this is found
+  again; the same key would hand back the failed refund for a day). Only while no payout was made
+  (`transfer_status` is null): the check constraint forbids `owed` beside a transfer, and what was kept is
+  final then, so `TRANSFER_MADE` and settle by hand. Settling is a new status `settled`, which keeps the
+  failed refund's id and counts as settled for the transfer sweep. Retry and settle race under the
+  booking's row lock: one wins, the other finds `REFUND_NOT_FAILED`.
+- **A lost dispute is decided once** (#57, #83): `payment_disputes.decision` (`parkfairy_bears` |
+  `owners_bear`), `decided_by`, `decided_at`, only for a `lost` dispute (a check). The booking's row is
+  locked first, as the dispute is recorded and a transfer is marked. `heldByDispute` skips a dispute
+  decided `parkfairy_bears`, so the transfer sweep pays on; `owners_bear` stays held for good. Every owner
+  paid for the booking is told (`dispute-parkfairy-bears` or `dispute-owners-bear`, the booking's facts,
+  never the driver). `check-money`'s count of lost disputes waiting leaves decided ones out.
+- **Owners see it**: an earnings line held by a lost dispute decided against them says "Not paid: the bank
+  decided for the driver" (`EARNING_HOLDS` gained `lost`), and such a booking isn't counted as coming.
+  Known gap: a part already marked `sending` when its dispute is lost still counts in "on its way"
+  (`sending` sums) though it will never go.
+- **The payments page is three short lists** (lost disputes to decide, disputes open at the bank, failed
+  refunds), up to 50 each with a "more" flag, on two partial indexes (`payment_disputes_undecided_idx`,
+  `bookings_refund_failed_idx`). Open disputes are answered in Stripe's dashboard; the page only shows them.
+- **Throttles**: the lookups 30 a minute, the four money actions 5 a minute each (`MODERATE_LIMIT`).
+- **2026-11-16 · A client component that imports a contracts schema must import `@/lib/zod-jitless`
+  first**, or zod builds its validators with `new Function` and the staff app's CSP (no `unsafe-eval`)
+  reports it; `booking-actions.tsx` forgot, and the smoke suite's CSP check caught it.
+- **2026-11-16 · A panel that stops being offered after its own refresh must stay mounted to say so**
+  (`ChangePanel`'s `available`): the page refreshes after a change and then offers something else, which
+  would take the "done" heading, and a stale refusal's reason, with it.
+
+After the five reviews of 5.2c3 (2026-11-16), what changed and why:
+
+- **2026-11-16 · A disputed booking can be neither cancelled nor have its refund retried** (`409 DISPUTED`):
+  the bank has taken the money back already, so a second refund pays the driver twice. Settle the dispute
+  (decide it) first. `cancelForStaff` answers `'disputed'`; `retryRefund` checks it under the booking lock.
+- **2026-11-16 · "The owners bear it" needs a payout still held** (`409 NOT_HELD`): once the transfer was
+  sent, or a booking was refunded in full, nothing is kept and a decision against the owners would be a
+  false notice. `AdminDispute.payoutHeld` tells the page, which then offers only "Parkfairy bears the
+  loss", and no owner email is queued when nothing is held.
+- **2026-11-16 · Settle works after a retry too**: a refund asked again is `owed` with attempts > 0; if it
+  fails again it is `failed`, and staff may settle it either way. `bookings_refund_failed_idx` covers failed
+  OR owed-with-attempts, and the settled check (migration 0044) doesn't insist on a refund id, since a
+  retry clears it.
+- **2026-11-16 · `recordDispute`'s upsert never overwrites a decided dispute** (`decision is null`): a
+  late Stripe event can't reopen what staff decided.
+- **2026-11-16 · Money POSTs answer `Cache-Control: no-store`**, and `GET /admin/payments` is throttled
+  like a lookup. Each route has its own bucket, so a hurried admin is not stopped by another route.
+- **Known gaps, left on purpose** (none loses money; revisit with the adviser or in Phase 6):
+  - owners' "on its way" sums still count a part marked `sending` whose dispute is then lost to the owners;
+  - `ledgerMismatches` has no rule for `settled` refunds (the money moved outside Stripe, so no ledger
+    entry exists; `refund_status = 'sent'` is the only one it checks against `refund_minor`);
+  - when a second dispute still holds a booking, deciding one tells the owners as if the payout moved;
+  - deleting a staff account is refused while it has decisions (`decided_by` restricts), as audit lines do;
+  - migrations 0041 and 0042 swap the same outbox kinds and could be squashed before first deploy; the
+    locks they take (table rewrites of `bookings` for the new check) matter only on a large table;
+  - `decide` answers with the driver's name and email (the booking page shows them anyway, #85);
+  - `open()` of an account reads, then writes its audit line, and returns the page only if the line was
+    written (a failed insert is an error, never an unlogged page); it is two statements, not one
+    transaction, so a read can be logged a moment after it happened.

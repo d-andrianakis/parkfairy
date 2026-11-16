@@ -197,3 +197,79 @@ export async function addEarnings(
     );
   }
 }
+
+/** A listing's bookings, soonest first, as `addBookings` made them: the id and the reference to quote. */
+export async function bookingsOf(listingId: string): Promise<{ id: string; reference: string }[]> {
+  return run<{ id: string; reference: string }>(
+    `select id, reference from bookings where location_id = $1 order by starts_at, id`,
+    [listingId],
+  );
+}
+
+/**
+ * A booking whose refund Stripe took and then failed (4.2): paid, cancelled, its refund `failed`
+ * with Stripe's id. As it stands after a closed card; support settles it (5.2c3, #84).
+ */
+export async function failRefund(bookingId: string): Promise<void> {
+  await run(
+    `update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'driver',
+       refund_minor = total_minor, payment_intent_id = coalesce(payment_intent_id, 'pi_smoke' || substr(md5(random()::text), 1, 12)),
+       payment_status = 'succeeded', refund_status = 'failed',
+       stripe_refund_id = 're_smoke' || substr(md5(random()::text), 1, 12)
+     where id = $1`,
+    [bookingId],
+  );
+}
+
+/** A booking paid for, as Stripe's charge would leave it, with the listing's owner as its payee. */
+export async function makePaid(bookingId: string): Promise<void> {
+  await run(
+    `update bookings set payment_intent_id = coalesce(payment_intent_id, 'pi_smoke' || substr(md5(random()::text), 1, 12)),
+       payment_status = 'succeeded' where id = $1`,
+    [bookingId],
+  );
+  await run(
+    `insert into booking_payees (booking_id, owner_id, share_bps)
+     select b.id, l.owner_id, 10000 from bookings b join parking_locations l on l.id = b.location_id
+     where b.id = $1 on conflict do nothing`,
+    [bookingId],
+  );
+}
+
+/** A dispute the bank decided for the driver, as the webhook would record it; nobody has decided yet. */
+export async function loseDispute(bookingId: string): Promise<string> {
+  await makePaid(bookingId);
+  const [row] = await run<{ id: string }>(
+    `insert into payment_disputes (booking_id, stripe_dispute_id, status, reason, amount_minor, currency)
+     values ($1, 'dp_smoke' || substr(md5(random()::text), 1, 12), 'lost', 'fraudulent', 400, 'EUR')
+     returning id`,
+    [bookingId],
+  );
+  return row?.id ?? '';
+}
+
+/** What staff's actions left on a booking: its refund, its attempts, and who bears a lost dispute. */
+export async function moneyOf(bookingId: string): Promise<{
+  status: string;
+  refundStatus: string | null;
+  attempts: number;
+  decision: string | null;
+}> {
+  const [row] = await run<{
+    status: string;
+    refund_status: string | null;
+    refund_attempts: number;
+    decision: string | null;
+  }>(
+    `select b.status, b.refund_status, b.refund_attempts,
+       (select d.decision from payment_disputes d where d.booking_id = b.id limit 1) as decision
+     from bookings b where b.id = $1`,
+    [bookingId],
+  );
+  return {
+    status: row?.status ?? '',
+    refundStatus: row?.refund_status ?? null,
+    attempts: Number(row?.refund_attempts ?? 0),
+    decision: row?.decision ?? null,
+  };
+}

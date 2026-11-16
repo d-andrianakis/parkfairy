@@ -17,7 +17,7 @@ describe('the staff navigation', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Listings', 'Accounts', 'Audit log']);
+    ).toEqual(['Listings', 'Accounts', 'Bookings', 'Payments', 'Audit log']);
     expect(within(nav).getByRole('link', { name: 'Accounts' })).toHaveAttribute(
       'href',
       '/en/users',

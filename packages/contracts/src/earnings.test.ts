@@ -61,7 +61,7 @@ describe('the earnings view', () => {
   });
 
   it('names why a part worked out has not gone, and only then', () => {
-    expect(EARNING_HOLDS).toEqual(['account', 'dispute']);
+    expect(EARNING_HOLDS).toEqual(['account', 'dispute', 'lost']);
     expect(EARNING_STATES).toEqual(['sending', 'sent']);
     for (const hold of EARNING_HOLDS) {
       expect(

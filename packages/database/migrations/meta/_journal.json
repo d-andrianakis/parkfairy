@@ -288,6 +288,34 @@
       "when": 1794773596390,
       "tag": "0040_bizarre_green_goblin",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794849066098,
+      "tag": "0041_complete_firelord",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794849158692,
+      "tag": "0042_redundant_dreadnoughts",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794849298633,
+      "tag": "0043_greedy_katie_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794850986189,
+      "tag": "0044_cool_storm",
+      "breakpoints": true
     }
   ]
 }

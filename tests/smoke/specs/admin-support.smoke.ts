@@ -185,19 +185,23 @@ test('support finds an account by its address and removes its two-factor authent
     expect(mail.text).not.toContain(check);
 
     // The log has it, in the staff member's name, with the note and a link back to the account.
-    await staff.goto(admin('/en/audit'));
+    await staff.goto(admin('/en/audit?action=user.two_factor_removed'));
     const log = staff.getByRole('table', { name: 'Audit log' });
     const row = log.getByRole('row', { name: /Two-factor authentication removed from an account/ });
     await expect(row.first()).toContainText(staffEmail);
     await expect(row.first()).toContainText(check);
     await expect(row.first()).toContainText('Password cancelled');
-    await expect(log.getByRole('row', { name: /Account page opened/ }).first()).toContainText(
-      staffEmail,
-    );
     await expect(row.first().getByRole('link', { name: 'Open the account' })).toHaveAttribute(
       'href',
       `/en/users/${accountId}`,
     );
+    await staff.goto(admin('/en/audit?action=user.viewed'));
+    await expect(
+      log
+        .getByRole('row', { name: /Account page opened/ })
+        .filter({ hasText: staffEmail })
+        .first(),
+    ).toBeVisible();
     await expectAccessible(staff);
 
     // What the two pages cost a first visit, in a browser of its own that has cached nothing.

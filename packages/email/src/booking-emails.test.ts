@@ -40,11 +40,86 @@ describe('renderBookingEmail', () => {
     const path =
       kind === 'booking-cancelled-by-team'
         ? `/${locale}/owner/listings/${booking.listingId}/owners`
-        : kind.startsWith('booking-cancelled-by') || kind === 'booking-received'
-          ? `/${locale}/owner/listings/${booking.listingId}/bookings`
-          : `/${locale}/bookings/${booking.id}`;
+        : kind === 'dispute-owners-bear'
+          ? `/${locale}/owner/earnings`
+          : kind.startsWith('booking-cancelled-by') ||
+              kind === 'booking-received' ||
+              kind === 'dispute-parkfairy-bears'
+            ? `/${locale}/owner/listings/${booking.listingId}/bookings`
+            : `/${locale}/bookings/${booking.id}`;
     expect(email.text).toContain(`https://parkfairy.example${path}`);
     expect(email.html).toContain(`href="https://parkfairy.example${path}"`);
+  });
+
+  it('tells owners support called a booking off, the driver refunded, and that no share comes of it', () => {
+    const en = renderBookingEmail({
+      ...base,
+      locale: 'en',
+      kind: 'booking-cancelled-by-staff',
+      listingName: 'Ermou Garage',
+    });
+    expect(en.subject).toBe('Support cancelled a booking for “Ermou Garage”');
+    expect(en.text).toContain('refunded in full');
+    expect(en.text).toContain('You won’t receive a share of this booking');
+    const el = renderBookingEmail({
+      ...base,
+      locale: 'el',
+      kind: 'booking-cancelled-by-staff',
+      listingName: 'Γκαράζ Ερμού',
+    });
+    expect(el.text).toContain('Η υποστήριξη του Parkfairy ακύρωσε μια κράτηση');
+    expect(el.text).toContain('Δεν θα λάβετε μερίδιο');
+  });
+
+  it('tells owners who bears a lost dispute: the payout goes on, or it never goes, in both languages', () => {
+    const goes = renderBookingEmail({
+      ...base,
+      locale: 'en',
+      kind: 'dispute-parkfairy-bears',
+      listingName: 'Ermou Garage',
+    });
+    expect(goes.subject).toContain('K7M4-Q2ZD');
+    expect(goes.subject).toContain('will be sent as usual');
+    expect(goes.text).toContain('Parkfairy bears the cost');
+    const stays = renderBookingEmail({
+      ...base,
+      locale: 'en',
+      kind: 'dispute-owners-bear',
+      listingName: 'Ermou Garage',
+    });
+    expect(stays.subject).toContain('will not be sent');
+    expect(stays.text).toContain('your share of this booking will not be sent');
+    const el = renderBookingEmail({
+      ...base,
+      locale: 'el',
+      kind: 'dispute-owners-bear',
+      listingName: 'Γκαράζ Ερμού',
+    });
+    expect(el.text).toContain('δεν θα σταλεί');
+    expect(
+      renderBookingEmail({
+        ...base,
+        locale: 'el',
+        kind: 'dispute-parkfairy-bears',
+        listingName: 'Γκαράζ Ερμού',
+      }).text,
+    ).toContain('το αναλαμβάνει το Parkfairy');
+  });
+
+  it('carries no driver in the dispute emails: the booking, never the person or the plate', () => {
+    for (const kind of [
+      'dispute-parkfairy-bears',
+      'dispute-owners-bear',
+      'booking-cancelled-by-staff',
+    ] as const) {
+      const { text } = renderBookingEmail({
+        ...base,
+        locale: 'en',
+        kind,
+        listingName: 'Ermou Garage',
+      });
+      expect(text).not.toMatch(/IKB|@example/);
+    }
   });
 
   it('writes the stay in the listing’s zone, on a 24-hour clock in Greek', () => {

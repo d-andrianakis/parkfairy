@@ -122,6 +122,32 @@ describe('EarningsView', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('says a part will not be paid when staff decided the owners bear a lost dispute, in both languages', async () => {
+    const lost = earnings({
+      sending: eur(31_600),
+      held: { account: 0, dispute: 0 },
+      inProgress: [
+        line({
+          id: '4'.repeat(8) + ID.slice(8),
+          reference: 'C8GT-K7C0',
+          state: 'sending',
+          sentAt: null,
+          hold: 'lost',
+        }),
+      ],
+    });
+    const { container, unmount } = renderWithProviders(
+      <EarningsView earnings={lost} place={first} />,
+    );
+    expect(screen.getByText('Not paid: the bank decided for the driver')).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+    unmount();
+    renderWithProviders(<EarningsView earnings={lost} place={first} />, { locale: 'el' });
+    expect(
+      screen.getByText('Δεν καταβάλλεται: η τράπεζα έκρινε υπέρ του οδηγού'),
+    ).toBeInTheDocument();
+  });
+
   it('says so, without an empty table, when nothing has been sent', () => {
     renderWithProviders(
       <EarningsView

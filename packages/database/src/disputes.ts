@@ -47,7 +47,9 @@ export async function recordDispute(
       on conflict (stripe_dispute_id) do update set
         status = excluded.status, reason = excluded.reason, amount_minor = excluded.amount_minor,
         due_by = excluded.due_by, submissions = excluded.submissions, updated_at = now()
-      where ${paymentDisputes.status} not in (${settled}) or excluded.status in (${settled})
+      where (${paymentDisputes.status} not in (${settled}) or excluded.status in (${settled}))
+        -- Decided by staff (#83): Stripe's later word changes nothing, and can't break the decision's check.
+        and ${paymentDisputes.decision} is null
       returning (xmax = 0) as opened, evidence_staged_at
     `);
     const [row] = rows.rows;
@@ -85,7 +87,7 @@ export async function lostDisputesHeld(db: Database): Promise<number> {
   const rows = await db.execute<{ count: number }>(sql`
     select count(*)::int as count from ${paymentDisputes} d
     join bookings b on b.id = d.booking_id
-    where d.status = 'lost' and b.transfer_status is distinct from 'sent'
+    where d.status = 'lost' and d.decision is null and b.transfer_status is distinct from 'sent'
       and b.payment_status = 'succeeded'
   `);
   return Number(rows.rows[0]?.count ?? 0);

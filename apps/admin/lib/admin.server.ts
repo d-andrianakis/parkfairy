@@ -2,11 +2,15 @@ import 'server-only';
 import {
   createClient,
   createConfig,
+  getAdminBooking,
   getAdminListing,
+  getAdminPayments,
   getAdminQueue,
   getAdminUser,
   getAuditLog,
+  type AdminBooking,
   type AdminListingReview,
+  type AdminPayments,
   type AdminQueue,
   type AdminUser,
   type AuditLog,
@@ -81,6 +85,24 @@ export const loadReview = cache(async (id: string): Promise<AdminListingReview |
 export const loadUser = cache(async (id: string): Promise<AdminUser | Missing> => {
   try {
     const { data, response } = await getAdminUser({ ...(await request()), path: { id } });
+    return data ?? missing(response?.status);
+  } catch {
+    return 'unavailable';
+  }
+});
+
+export const loadBooking = cache(async (id: string): Promise<AdminBooking | Missing> => {
+  try {
+    const { data, response } = await getAdminBooking({ ...(await request()), path: { id } });
+    return data ?? missing(response?.status);
+  } catch {
+    return 'unavailable';
+  }
+});
+
+export const loadPayments = cache(async (): Promise<AdminPayments | Missing> => {
+  try {
+    const { data, response } = await getAdminPayments(await request());
     return data ?? missing(response?.status);
   } catch {
     return 'unavailable';

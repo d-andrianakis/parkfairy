@@ -963,7 +963,8 @@
       "holdLabel": {
         "none": "Being sent",
         "account": "Waiting: Stripe can’t pay you yet",
-        "dispute": "On hold: disputed payment"
+        "dispute": "On hold: disputed payment",
+        "lost": "Not paid: the bank decided for the driver"
       },
       "monthsTitle": "Sent by month",
       "monthsCaption": "Amount sent to you in each of the last {count} months",

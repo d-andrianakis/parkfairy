@@ -1,0 +1,2 @@
+CREATE INDEX "bookings_refund_failed_idx" ON "bookings" USING btree ("updated_at","id") WHERE "bookings"."refund_status" = 'failed';--> statement-breakpoint
+CREATE INDEX "payment_disputes_undecided_idx" ON "payment_disputes" USING btree ("updated_at","id") WHERE "payment_disputes"."status" = 'lost' and "payment_disputes"."decision" is null;

@@ -5,6 +5,8 @@ const sdk = vi.hoisted(() => ({
   getAdminQueue: vi.fn(),
   getAdminListing: vi.fn(),
   getAdminUser: vi.fn(),
+  getAdminBooking: vi.fn(),
+  getAdminPayments: vi.fn(),
   getAuditLog: vi.fn(),
 }));
 vi.mock('@parkfairy/api-client', () => ({
@@ -16,7 +18,8 @@ let incoming = new Headers();
 vi.mock('next/headers', () => ({ headers: () => Promise.resolve(incoming) }));
 vi.mock('server-only', () => ({}));
 
-const { loadAudit, loadQueue, loadReview, loadUser } = await import('./admin.server');
+const { loadAudit, loadBooking, loadPayments, loadQueue, loadReview, loadUser } =
+  await import('./admin.server');
 const answer = (status: number, data?: unknown) => ({
   data,
   response: new Response(null, { status }),
@@ -47,6 +50,10 @@ describe('what staff pages learn from the API', () => {
     expect(await loadReview(`id${status}`)).toBe(expected);
     sdk.getAdminUser.mockResolvedValue(answer(status));
     expect(await loadUser(`user${status}`)).toBe(expected);
+    sdk.getAdminBooking.mockResolvedValue(answer(status));
+    expect(await loadBooking(`booking${status}`)).toBe(expected);
+    sdk.getAdminPayments.mockResolvedValue(answer(status));
+    expect(await loadPayments()).toBe(expected);
     expect(await loadAudit(undefined, `a${status}`)).toBe(expected);
   });
 
@@ -97,6 +104,24 @@ describe('what staff pages learn from the API', () => {
     });
     sdk.getAdminUser.mockRejectedValue(new Error('timeout'));
     expect(await loadUser('thrown')).toBe('unavailable');
+  });
+
+  it('asks for a booking by its own id, and for the payments, as the signed-in staff member', async () => {
+    sdk.getAdminBooking.mockResolvedValue(answer(200, { id: 'x' }));
+    expect(await loadBooking('7f1f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f')).toEqual({ id: 'x' });
+    expect(lastOptions(sdk.getAdminBooking).path).toEqual({
+      id: '7f1f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f',
+    });
+    expect(lastOptions(sdk.getAdminBooking).headers).toMatchObject({
+      cookie: 'parkfairy.session_token=abc',
+    });
+    sdk.getAdminPayments.mockResolvedValue(answer(200, { lostDisputes: [] }));
+    await loadPayments();
+    expect(lastOptions(sdk.getAdminPayments).headers).toMatchObject({
+      cookie: 'parkfairy.session_token=abc',
+    });
+    sdk.getAdminBooking.mockRejectedValue(new Error('timeout'));
+    expect(await loadBooking('thrown')).toBe('unavailable');
   });
 
   it('asks for a listing by its own id', async () => {

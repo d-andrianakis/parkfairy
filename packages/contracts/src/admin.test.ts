@@ -10,6 +10,10 @@ import {
   AdminOwnerSchema,
   AdminQueueQuerySchema,
   AdminQueueSchema,
+  AdminBookingLookupSchema,
+  AdminBookingSchema,
+  AdminDisputeDecisionInputSchema,
+  AdminPaymentsSchema,
   AdminReasonInputSchema,
   AdminRemoveTwoFactorInputSchema,
   AdminSuspendListingInputSchema,
@@ -140,7 +144,7 @@ describe('the queue and the log', () => {
     expect(AuditEntrySchema.safeParse({ ...entry, details: { nested: { a: 1 } } }).success).toBe(
       false,
     );
-    expect(AuditEntrySchema.safeParse({ ...entry, targetType: 'booking' }).success).toBe(false);
+    expect(AuditEntrySchema.safeParse({ ...entry, targetType: 'payout' }).success).toBe(false);
     expect(AuditEntrySchema.safeParse({ ...entry, targetType: 'user' }).success).toBe(true);
   });
 });
@@ -353,6 +357,93 @@ describe('moderation (#78–#81)', () => {
 
   it('names the codes the moderation routes answer with', () => {
     for (const code of ['NOT_PUBLISHED', 'NOT_SUSPENDED', 'ALREADY_SUSPENDED']) {
+      expect(ADMIN_ERROR_CODES).toContain(code);
+    }
+  });
+});
+
+describe('bookings and payments (#82–#85)', () => {
+  it('logs the five actions, each filterable', () => {
+    for (const action of [
+      'booking.viewed',
+      'booking.cancelled',
+      'booking.refund_retried',
+      'booking.refund_settled',
+      'dispute.decided',
+    ]) {
+      expect(AdminAuditQuerySchema.parse({ action }).action).toBe(action);
+    }
+    expect(AUDIT_TARGETS).toEqual(expect.arrayContaining(['booking', 'dispute']));
+  });
+
+  it('finds a booking by its reference alone, trimmed and in capitals', () => {
+    expect(AdminBookingLookupSchema.parse({ reference: ' k7m4-q2zd ' }).reference).toBe(
+      'K7M4-Q2ZD',
+    );
+    for (const reference of ['', 'K7M4Q2ZD', 'K7M4-Q2Z', 'K7M4-Q2ZDD', 'K7M4-Q2ZU', 42, null]) {
+      expect(AdminBookingLookupSchema.safeParse({ reference }).success, String(reference)).toBe(
+        false,
+      );
+    }
+    expect(AdminBookingLookupSchema.safeParse({ reference: 'K7M4-Q2ZD', extra: 1 }).success).toBe(
+      false,
+    );
+  });
+
+  it('says who bears a lost dispute, one of two, with a short note', () => {
+    for (const decision of ['parkfairy_bears', 'owners_bear']) {
+      expect(AdminDisputeDecisionInputSchema.parse({ decision, note: ' Ticket 1. ' })).toEqual({
+        decision,
+        note: 'Ticket 1.',
+      });
+    }
+    for (const bad of [
+      {},
+      { note: 'Ticket 1.' },
+      { decision: 'owners_bear' },
+      { decision: 'both', note: 'Ticket 1.' },
+      { decision: 'owners_bear', note: '' },
+      { decision: 'owners_bear', note: 'x'.repeat(ADMIN_REASON_NOTE_MAX + 1) },
+      { decision: 'owners_bear', note: 'Ticket 1.', extra: 1 },
+    ]) {
+      expect(AdminDisputeDecisionInputSchema.safeParse(bad).success, JSON.stringify(bad)).toBe(
+        false,
+      );
+    }
+  });
+
+  it('gives a booking with who booked it, its money and its disputes, and the lists a cap', () => {
+    expect(Object.keys(AdminBookingSchema.shape)).toEqual(
+      expect.arrayContaining([
+        'driver',
+        'vehiclePlate',
+        'total',
+        'refund',
+        'disputes',
+        'canCancel',
+        'canRetryRefund',
+        'canSettleRefund',
+      ]),
+    );
+    const empty = {
+      lostDisputes: [],
+      openDisputes: [],
+      failedRefunds: [],
+      more: { lostDisputes: false, openDisputes: false, failedRefunds: false },
+    };
+    expect(AdminPaymentsSchema.parse(empty)).toEqual(empty);
+  });
+
+  it('names the codes the booking and payment routes answer with', () => {
+    for (const code of [
+      'BOOKING_NOT_FOUND',
+      'NOT_CANCELLABLE',
+      'REFUND_NOT_FAILED',
+      'TRANSFER_MADE',
+      'DISPUTE_NOT_FOUND',
+      'NOT_LOST',
+      'ALREADY_DECIDED',
+    ]) {
       expect(ADMIN_ERROR_CODES).toContain(code);
     }
   });

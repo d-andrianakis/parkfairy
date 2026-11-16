@@ -120,6 +120,7 @@ const owedRefund = (overrides: Partial<RefundOwed> = {}): RefundOwed => ({
   paymentIntentId: 'pi_1',
   kind: 'cancelled',
   amountMinor: 200,
+  attempt: 0,
   updatedAt: ago(HOUR_MS),
   cursor: cursor(overrides.id ?? 'b1'),
   ...overrides,
@@ -226,6 +227,17 @@ describe('payments processor', () => {
       expect(refundsOwed).toHaveBeenNthCalledWith(2, db, expect.any(Date), cursor('b2'));
     });
 
+    it('sends a refund staff asked for again under its attempt: a new key, never the failed one', async () => {
+      vi.mocked(refundsOwed).mockResolvedValueOnce([owedRefund({ id: 'b9', attempt: 2 })]);
+      await expect(run('send-refunds')).resolves.toEqual({ done: 1, failed: 0 });
+      expect(stripe.refundCancelled).toHaveBeenCalledWith({
+        paymentIntentId: 'pi_1',
+        bookingId: 'b9',
+        amountMinor: 200,
+        attempt: 2,
+      });
+    });
+
     it('stops when its time is up, the rest for the next run', async () => {
       vi.mocked(refundsOwed).mockResolvedValueOnce([owedRefund({ id: 'b1' }), owedRefund()]);
       stripe.refundCancelled.mockImplementationOnce(() => {
@@ -293,6 +305,7 @@ describe('payments processor', () => {
         paymentIntentId: 'pi_1',
         bookingId: 'b1',
         amountMinor: 200,
+        attempt: 0,
       });
       expect(recordCancelRefund).toHaveBeenCalledWith(db, 'b1', 're_new');
     });

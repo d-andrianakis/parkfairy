@@ -24,8 +24,11 @@ export const EARNINGS_MONTHS = 12;
  */
 export const EARNINGS_IN_PROGRESS_MAX = 50;
 
-/** Why a part worked out has not gone: the owner's account can't be paid, or a dispute holds it. */
-export const EARNING_HOLDS = ['account', 'dispute'] as const;
+/**
+ * Why a part worked out has not gone: the owner's account can't be paid, or a dispute holds it, or
+ * staff decided the owners bear a lost dispute and it never will (#83).
+ */
+export const EARNING_HOLDS = ['account', 'dispute', 'lost'] as const;
 export const EarningHoldSchema = z.enum(EARNING_HOLDS).register(contractsRegistry, {
   id: 'EarningHold',
 });

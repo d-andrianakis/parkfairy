@@ -1,4 +1,9 @@
-import { AUDIT_ACTIONS, AdminAuditQuerySchema, type AdminAuditQuery } from '@parkfairy/contracts';
+import {
+  AUDIT_ACTIONS,
+  AdminAuditQuerySchema,
+  type AdminAuditQuery,
+  type AuditEntry,
+} from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
 import {
   Table,
@@ -14,6 +19,7 @@ import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { MarkedText, PersonName } from '@/components/marked-text';
 import { MissingNotice } from '@/components/missing-notice';
+import { None } from '@/components/none';
 import { StandingNotice } from '@/components/standing-notice';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
@@ -126,12 +132,7 @@ export default async function AuditPage({
                     {actionLabel(t as unknown as Translator, entry.action)}
                   </TableCell>
                   <TableCell>
-                    <Link
-                      href={`/${entry.targetType === 'user' ? 'users' : 'listings'}/${entry.targetId}`}
-                      className="text-primary underline underline-offset-4 hover:decoration-2"
-                    >
-                      {t(entry.targetType === 'user' ? 'audit.userLink' : 'audit.listingLink')}
-                    </Link>
+                    <TargetLink entry={entry} t={t as unknown as Translator} />
                   </TableCell>
                   <TableCell className="whitespace-normal">
                     <Details
@@ -165,6 +166,30 @@ export default async function AuditPage({
   );
 }
 
+/**
+ * Where a line of the log points: the thing it was done to. A dispute has no page of its own: its
+ * booking has, and the line says which.
+ */
+function TargetLink({ entry, t }: { entry: AuditEntry; t: Translator }) {
+  const { targetType, targetId, details } = entry;
+  const [path, key] =
+    targetType === 'user'
+      ? [`/users/${targetId}`, 'audit.userLink']
+      : targetType === 'booking'
+        ? [`/bookings/${targetId}`, 'audit.bookingLink']
+        : targetType === 'dispute'
+          ? typeof details.bookingId === 'string'
+            ? [`/bookings/${details.bookingId}`, 'audit.disputeLink']
+            : [null, 'audit.disputeLink']
+          : [`/listings/${targetId}`, 'audit.listingLink'];
+  if (!path) return <None />;
+  return (
+    <Link href={path} className="text-primary underline underline-offset-4 hover:decoration-2">
+      {t(key)}
+    </Link>
+  );
+}
+
 /** The log can hold names this catalog doesn't know, so these lookups are by name, not by type. */
 interface Translator {
   (key: string): string;
@@ -186,7 +211,8 @@ function Details({
   format: Awaited<ReturnType<typeof getFormatter>>;
   locale: string;
 }) {
-  const entries = Object.entries(details);
+  // The booking a dispute's line names is where its link goes, not a fact to read.
+  const entries = Object.entries(details).filter(([key]) => key !== 'bookingId');
   if (entries.length === 0) return null;
   const label = (key: string) =>
     t.has(`audit.detailKeys.${key}`) ? t(`audit.detailKeys.${key}`) : key;
@@ -194,10 +220,17 @@ function Details({
     if (key === 'from' && typeof value === 'string' && t.has(`status.${value}`)) {
       return t(`status.${value}`);
     }
+    if (key === 'decision' && typeof value === 'string' && t.has(`booking.decisions.${value}`)) {
+      return t(`booking.decisions.${value}`);
+    }
     if (key === 'kind' && typeof value === 'string' && t.has(`proofKinds.${value}`)) {
       return t(`proofKinds.${value}`);
     }
     if (typeof value === 'boolean') return t(value ? 'audit.yes' : 'audit.no');
+    // Amounts are logged in cents (the only currency is the euro): said as money.
+    if (typeof value === 'number' && key.endsWith('Minor')) {
+      return format.number(value / 100, { style: 'currency', currency: 'EUR' });
+    }
     if (typeof value === 'number') return format.number(value);
     if (value === null) return t('notGiven');
     // Words staff typed (a note): Greek in them is marked Greek on an English page.

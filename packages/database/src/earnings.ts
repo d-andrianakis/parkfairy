@@ -6,7 +6,7 @@ import {
 } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import type { Database } from './client.js';
-import { heldByDispute, TRANSFER_AFTER_HOURS } from './money.js';
+import { heldByDispute, lostByOwners, TRANSFER_AFTER_HOURS } from './money.js';
 
 /**
  * What one owner has earned (5.1): their own `booking_payees` rows and nothing of another payee's,
@@ -28,7 +28,7 @@ export interface EarningRow {
   amountMinor: number;
   currency: string;
   sentAt: Date | null;
-  hold: 'account' | 'dispute' | null;
+  hold: 'account' | 'dispute' | 'lost' | null;
 }
 
 export interface OwnerEarningsRows {
@@ -59,7 +59,7 @@ type RawRow = {
   amount_minor: number;
   currency: string;
   sent_at: string | null;
-  hold: 'account' | 'dispute' | null;
+  hold: 'account' | 'dispute' | 'lost' | null;
 };
 
 const toRow = (row: RawRow): EarningRow => ({
@@ -83,6 +83,7 @@ const lineColumns = sql`
   b.currency, p.transferred_at::text as sent_at,
   case
     when p.transfer_status = 'sent' then null
+    when exists (${lostByOwners}) then 'lost'
     when exists (${heldByDispute}) then 'dispute'
     when p.transfer_minor > 0 and pa.status is distinct from 'active' then 'account'
   end as hold
@@ -130,6 +131,8 @@ export async function ownerEarnings(
       where p.owner_id = ${ownerId} and p.transfer_status is null
         and b.payment_status = 'succeeded' and b.status in ('confirmed', 'cancelled')
         and (b.refund_minor is null or b.refund_minor < b.total_minor)
+        -- Never paid, by staff's decision (#83): not coming.
+        and not exists (${lostByOwners})
     `),
   ]);
   const [lines, inProgress] = await Promise.all([

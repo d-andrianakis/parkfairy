@@ -30,7 +30,12 @@ import { Throttle } from '@nestjs/throttler';
 import type { AuthUser } from '@parkfairy/auth';
 import {
   AdminAuditQuerySchema,
+  AdminBookingLookupResultSchema,
+  AdminBookingLookupSchema,
+  AdminBookingSchema,
   AdminChangesInputSchema,
+  AdminDisputeDecisionInputSchema,
+  AdminPaymentsSchema,
   AdminReasonInputSchema,
   AdminSuspendListingInputSchema,
   AdminListingReviewSchema,
@@ -43,7 +48,10 @@ import {
   AuditLogSchema,
   ErrorResponseSchema,
   PROOF_CONTENT_TYPES,
+  type AdminBooking,
+  type AdminBookingLookupResult,
   type AdminListingReview,
+  type AdminPayments,
   type AdminQueue,
   type AdminUser,
   type AdminUserLookupResult,
@@ -56,7 +64,9 @@ import { SESSION_COOKIE_SECURITY } from '../openapi/document.js';
 import { schemaRef } from '../openapi/zod-openapi.js';
 import { AccountThrottlerGuard } from '../rate-limit/account-throttler.guard.js';
 import { AdminAuditService } from './admin-audit.service.js';
+import { AdminBookingsService } from './admin-bookings.service.js';
 import { AdminListingsService } from './admin-listings.service.js';
+import { AdminPaymentsService } from './admin-payments.service.js';
 import { AdminUsersService } from './admin-users.service.js';
 
 const MINUTE_MS = 60_000;
@@ -103,6 +113,8 @@ export class AdminController {
     private readonly listings: AdminListingsService,
     private readonly audit: AdminAuditService,
     private readonly accounts: AdminUsersService,
+    private readonly bookingsAdmin: AdminBookingsService,
+    private readonly payments: AdminPaymentsService,
   ) {}
 
   @Get('listings')
@@ -305,6 +317,126 @@ export class AdminController {
     @Body() body: unknown,
   ): Promise<AdminUser> {
     return this.accounts.reinstate(user.id, id, parseOrThrow(AdminReasonInputSchema, body));
+  }
+
+  /** A booking by its reference, or none: its id only, in a body so no reference is in a URL (#85). */
+  @Post('bookings/lookup')
+  @HttpCode(200)
+  @Throttle(LOOKUP_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiBody({ schema: schemaRef(AdminBookingLookupSchema) })
+  @ApiOkResponse({ schema: schemaRef(AdminBookingLookupResultSchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  lookUpAdminBooking(@Body() body: unknown): Promise<AdminBookingLookupResult> {
+    return this.bookingsAdmin.lookup(parseOrThrow(AdminBookingLookupSchema, body));
+  }
+
+  /** A booking's page: the driver's name, email and plate are on it, so opening it is logged (#85). */
+  @Get('bookings/:id')
+  @Throttle(LOOKUP_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOkResponse({ schema: schemaRef(AdminBookingSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  getAdminBooking(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Headers('sec-fetch-site') fetchSite: string | undefined,
+  ): Promise<AdminBooking> {
+    refuseOtherSites(fetchSite);
+    return this.bookingsAdmin.open(user.id, id);
+  }
+
+  /** Calls a booking off with a full refund, the driver and the owners told (#82). */
+  @Post('bookings/:id/cancel')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  @Throttle(MODERATE_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiBody({ schema: schemaRef(AdminReasonInputSchema) })
+  @ApiOkResponse({ schema: schemaRef(AdminBookingSchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })
+  cancelAdminBooking(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<AdminBooking> {
+    return this.bookingsAdmin.cancel(user.id, id, parseOrThrow(AdminReasonInputSchema, body));
+  }
+
+  /** Asks Stripe again for a refund that failed (#84). */
+  @Post('bookings/:id/refund/retry')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  @Throttle(MODERATE_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiBody({ schema: schemaRef(AdminReasonInputSchema) })
+  @ApiOkResponse({ schema: schemaRef(AdminBookingSchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })
+  retryAdminBookingRefund(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<AdminBooking> {
+    return this.bookingsAdmin.retryRefund(user.id, id, parseOrThrow(AdminReasonInputSchema, body));
+  }
+
+  /** The driver was paid another way: the failed refund is settled (#84). */
+  @Post('bookings/:id/refund/settle')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  @Throttle(MODERATE_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiBody({ schema: schemaRef(AdminReasonInputSchema) })
+  @ApiOkResponse({ schema: schemaRef(AdminBookingSchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })
+  settleAdminBookingRefund(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<AdminBooking> {
+    return this.bookingsAdmin.settleRefund(user.id, id, parseOrThrow(AdminReasonInputSchema, body));
+  }
+
+  /** What needs support in money: lost disputes to decide, disputes open, refunds that failed. */
+  @Get('payments')
+  @Throttle(LOOKUP_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOkResponse({ schema: schemaRef(AdminPaymentsSchema) })
+  getAdminPayments(): Promise<AdminPayments> {
+    return this.payments.list();
+  }
+
+  /** Who bears a lost dispute (#57, #83): once, for good, the owners told. */
+  @Post('disputes/:id/decide')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  @Throttle(MODERATE_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiBody({ schema: schemaRef(AdminDisputeDecisionInputSchema) })
+  @ApiOkResponse({ schema: schemaRef(AdminBookingSchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })
+  async decideAdminDispute(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<AdminBooking> {
+    const { bookingId } = await this.payments.decide(
+      user.id,
+      id,
+      parseOrThrow(AdminDisputeDecisionInputSchema, body),
+    );
+    return this.bookingsAdmin.show(bookingId);
   }
 
   @Get('audit')

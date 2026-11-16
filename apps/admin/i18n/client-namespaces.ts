@@ -16,6 +16,10 @@ export const CLIENT_NAMESPACES = {
   lookup: ['AdminLookup', 'AdminErrors', 'Validation', 'Forms'],
   /** An account's page: removing its second factor, with the note of the identity check. */
   account: ['AdminUser', 'AdminAccount', 'AdminErrors', 'Validation', 'Forms'],
+  /** The booking lookup: one reference, sent in a body. */
+  bookingLookup: ['AdminBookingLookup', 'AdminErrors', 'Validation', 'Forms'],
+  /** A booking's page: calling it off, its refund, a lost dispute. */
+  booking: ['AdminBooking', 'AdminErrors', 'Validation', 'Forms'],
   /** A live or suspended listing: taking it down, bringing it back. */
   moderation: ['AdminModeration', 'AdminErrors', 'Validation', 'Forms'],
 } as const satisfies Record<string, readonly Namespace[]>;

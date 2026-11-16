@@ -3,8 +3,10 @@
  * events already handled. A booking's own payment lives on the booking (`payment_intent_id`).
  */
 import {
+  DISPUTE_DECISIONS,
   DISPUTE_STATUSES,
   PAYOUT_STATUSES,
+  type DisputeDecision,
   type DisputeStatus,
   type PayoutStatus,
 } from '@parkfairy/contracts';
@@ -21,6 +23,7 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { users } from './auth.js';
 import { bookings } from './bookings.js';
 import { ownerProfiles } from './owners.js';
 
@@ -162,6 +165,13 @@ export const paymentDisputes = pgTable(
     /** How many responses went to the bank (from Stripe): none yet, and support must act. */
     submissions: integer('submissions').default(0).notNull(),
     evidenceStagedAt: instant('evidence_staged_at'),
+    /**
+     * Who bears a lost dispute, as staff decided it (#57, #83): null until they do. `parkfairy_bears`
+     * releases the booking's payout; `owners_bear` keeps it held for good.
+     */
+    decision: text('decision').$type<DisputeDecision>(),
+    decidedBy: uuid('decided_by').references(() => users.id, { onDelete: 'restrict' }),
+    decidedAt: instant('decided_at'),
     createdAt: instant('created_at').defaultNow().notNull(),
     updatedAt: instant('updated_at')
       .defaultNow()
@@ -170,6 +180,10 @@ export const paymentDisputes = pgTable(
   },
   (t) => [
     index('payment_disputes_booking_idx').on(t.bookingId),
+    // Lost, and nobody has said who bears it (#83): staff's list.
+    index('payment_disputes_undecided_idx')
+      .on(t.updatedAt, t.id)
+      .where(sql`${t.status} = 'lost' and ${t.decision} is null`),
     // The day's look at disputes still to answer, by when.
     index('payment_disputes_open_idx')
       .on(t.dueBy)
@@ -178,5 +192,10 @@ export const paymentDisputes = pgTable(
     check('payment_disputes_amount_check', sql`${t.amountMinor} > 0`),
     check('payment_disputes_currency_check', sql`${t.currency} ~ '^[A-Z]{3}$'`),
     check('payment_disputes_submissions_check', sql`${t.submissions} >= 0`),
+    // Decided once, and only for a lost dispute, with who and when.
+    check(
+      'payment_disputes_decision_check',
+      sql`(${t.decision} is null and ${t.decidedBy} is null and ${t.decidedAt} is null) or (${t.decision} in (${sqlList(DISPUTE_DECISIONS)}) and ${t.status} = 'lost' and ${t.decidedBy} is not null and ${t.decidedAt} is not null)`,
+    ),
   ],
 );

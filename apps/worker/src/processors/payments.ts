@@ -135,6 +135,7 @@ async function sendRefunds(payments: PaymentsGateway, ctx: ProcessorContext): Pr
             paymentIntentId: owed.paymentIntentId,
             bookingId: owed.id,
             amountMinor: owed.amountMinor,
+            attempt: owed.attempt,
           }));
         await recordCancelRefund(db, owed.id, id);
         return true;

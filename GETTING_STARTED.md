@@ -183,6 +183,18 @@ log (a ticket reference and a few words). Nothing the account owns changes: the 
 listings it is the primary owner of, which stay live until you suspend them one by one. Staff accounts,
 and your own, are never suspended from the app. Each moderation button is limited to five a minute per person.
 
+**A booking, a refund that failed, a lost dispute (support and money).** Under Bookings, type the
+reference the driver quotes (like `K7M4-Q2ZD`); the booking's page shows who booked it (name, email and
+number plate: opening it is a line of the audit log), what was paid, refunded and held. "Cancel this
+booking" refunds the driver in full and tells the driver and the owners, who won't receive a share; it
+can't cancel a stay that has begun. A refund that failed at Stripe (a closed card, say) appears under
+Payments: "Ask again" queues a new attempt (not once the owners were paid), "Mark as settled" records that
+you paid the driver another way. A dispute the bank decided for the driver is lost, and holds the owners'
+payout for that booking until you decide, once, who bears it: Parkfairy (the payout goes on) or the owners
+(it never goes). The owners are told either way. Disputes still open are answered in Stripe's dashboard.
+Each money action takes a note for the audit log (a ticket reference and a few words) and is limited to
+five a minute per person.
+
 The staff app needs `ADMIN_URL` in `.env` (see `.env.example`); the API reads the same variable to accept
 its writes. Don't add it to `TRUSTED_ORIGINS`, which the public site's sign-in also trusts.
 

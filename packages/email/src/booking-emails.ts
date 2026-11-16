@@ -12,6 +12,11 @@ export const BOOKING_EMAIL_KINDS = [
   'booking-cancelled-by-driver',
   // To the primary owner, when a co-owner or a manager called a booking off (#69).
   'booking-cancelled-by-team',
+  // To a booking's owners: support called it off, with the driver refunded in full (#82); and who
+  // bears a lost dispute over it, as support decided (#83).
+  'booking-cancelled-by-staff',
+  'dispute-parkfairy-bears',
+  'dispute-owners-bear',
 ] as const;
 export type BookingEmailKind = (typeof BOOKING_EMAIL_KINDS)[number];
 
@@ -149,6 +154,30 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         action: 'Δείτε τους ιδιοκτήτες',
         note: 'Στη σελίδα των ιδιοκτητών βλέπετε ποιοι έχουν πρόσβαση στον χώρο.',
       },
+      'booking-cancelled-by-staff': {
+        subject: (_reference, listing) => `Η υποστήριξη ακύρωσε κράτηση για τον χώρο «${listing}»`,
+        heading: 'Η υποστήριξη ακύρωσε μια κράτηση',
+        body: (listing) =>
+          `Η υποστήριξη του Parkfairy ακύρωσε μια κράτηση για τον χώρο «${listing}». Ο οδηγός ενημερώθηκε και θα λάβει πλήρη επιστροφή χρημάτων.`,
+        action: 'Δείτε τις κρατήσεις',
+        note: 'Δεν θα λάβετε μερίδιο γι’ αυτή την κράτηση. Αν έχετε απορίες, επικοινωνήστε με την υποστήριξη του Parkfairy.',
+      },
+      'dispute-parkfairy-bears': {
+        subject: (reference) => `Το μερίδιό σας από την κράτηση ${reference} θα σταλεί κανονικά`,
+        heading: 'Το μερίδιό σας θα σταλεί κανονικά',
+        body: (listing) =>
+          `Η τράπεζα του οδηγού αμφισβήτησε την πληρωμή μιας κράτησης για τον χώρο «${listing}» και η αμφισβήτηση χάθηκε. Το κόστος το αναλαμβάνει το Parkfairy.`,
+        action: 'Δείτε τις κρατήσεις',
+        note: 'Το μερίδιό σας για αυτή την κράτηση θα σταλεί όπως πάντα, χωρίς καμία αλλαγή.',
+      },
+      'dispute-owners-bear': {
+        subject: (reference) => `Το μερίδιό σας από την κράτηση ${reference} δεν θα σταλεί`,
+        heading: 'Το μερίδιό σας από αυτή την κράτηση δεν θα σταλεί',
+        body: (listing) =>
+          `Η τράπεζα του οδηγού αμφισβήτησε την πληρωμή μιας κράτησης για τον χώρο «${listing}» και η αμφισβήτηση χάθηκε. Το κόστος το φέρνουν οι ιδιοκτήτες του χώρου: το μερίδιό σας για αυτή την κράτηση δεν θα σταλεί.`,
+        action: 'Δείτε τα έσοδά σας',
+        note: 'Οι υπόλοιπες κρατήσεις σας δεν επηρεάζονται. Αν έχετε απορίες, επικοινωνήστε με την υποστήριξη του Parkfairy.',
+      },
     },
   },
   en: {
@@ -225,6 +254,30 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
           `A co-owner of “${listing}” cancelled a booking. The driver has been told and is being refunded in full.`,
         action: 'See the owners',
         note: 'The owners’ page shows who has access to the listing.',
+      },
+      'booking-cancelled-by-staff': {
+        subject: (_reference, listing) => `Support cancelled a booking for “${listing}”`,
+        heading: 'Support cancelled a booking',
+        body: (listing) =>
+          `Parkfairy support cancelled a booking for “${listing}”. The driver has been told and is being refunded in full.`,
+        action: 'See the bookings',
+        note: 'You won’t receive a share of this booking. If you have questions, contact Parkfairy support.',
+      },
+      'dispute-parkfairy-bears': {
+        subject: (reference) => `Your share of booking ${reference} will be sent as usual`,
+        heading: 'Your share will be sent as usual',
+        body: (listing) =>
+          `The driver’s bank disputed the payment for a booking at “${listing}”, and the dispute was lost. Parkfairy bears the cost.`,
+        action: 'See the bookings',
+        note: 'Your share of this booking will be sent as always, with no change.',
+      },
+      'dispute-owners-bear': {
+        subject: (reference) => `Your share of booking ${reference} will not be sent`,
+        heading: 'Your share of this booking will not be sent',
+        body: (listing) =>
+          `The driver’s bank disputed the payment for a booking at “${listing}”, and the dispute was lost. The owners of the listing bear the cost: your share of this booking will not be sent.`,
+        action: 'See your earnings',
+        note: 'Your other bookings are not affected. If you have questions, contact Parkfairy support.',
       },
     },
   },
@@ -307,7 +360,9 @@ export function renderBookingEmail({
     ? `/${locale}/bookings/${booking.id}`
     : kind === 'booking-cancelled-by-team'
       ? `/${locale}/owner/listings/${booking.listingId}/owners`
-      : `/${locale}/owner/listings/${booking.listingId}/bookings`;
+      : kind === 'dispute-owners-bear'
+        ? `/${locale}/owner/earnings`
+        : `/${locale}/owner/listings/${booking.listingId}/bookings`;
   return renderEmail({
     to,
     locale,

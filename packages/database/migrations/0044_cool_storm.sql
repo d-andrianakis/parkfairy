@@ -1,0 +1,4 @@
+ALTER TABLE "bookings" DROP CONSTRAINT "bookings_refund_status_check";--> statement-breakpoint
+DROP INDEX "bookings_refund_failed_idx";--> statement-breakpoint
+CREATE INDEX "bookings_refund_failed_idx" ON "bookings" USING btree ("updated_at","id") WHERE "bookings"."refund_status" = 'failed' or ("bookings"."refund_status" = 'owed' and "bookings"."refund_attempts" > 0);--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_refund_status_check" CHECK ("bookings"."refund_status" is null or ("bookings"."refund_status" in ('owed', 'sent', 'failed', 'settled') and "bookings"."status" = 'cancelled' and "bookings"."payment_status" = 'succeeded' and "bookings"."refund_minor" is not null and "bookings"."refund_minor" > 0 and (("bookings"."refund_status" in ('sent', 'failed')) = ("bookings"."stripe_refund_id" is not null) or "bookings"."refund_status" = 'settled')));

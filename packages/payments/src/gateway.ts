@@ -127,7 +127,7 @@ export interface PaymentsGateway {
    * sends it otherwise.
    */
   refundCancelled(
-    input: { paymentIntentId: string; bookingId: string; amountMinor: number },
+    input: { paymentIntentId: string; bookingId: string; amountMinor: number; attempt?: number },
     options?: { quick?: boolean },
   ): Promise<string>;
   /** A refund as it stands now, to check one Stripe says changed. */
@@ -409,7 +409,7 @@ export function stripeGateway(
           { idempotencyKey: `refund-unbooked-${paymentIntentId}` },
         );
       }),
-    refundCancelled: ({ paymentIntentId, bookingId, amountMinor }, options) =>
+    refundCancelled: ({ paymentIntentId, bookingId, amountMinor, attempt = 0 }, options) =>
       call(async () => {
         const refund = await client.refunds.create(
           {
@@ -418,7 +418,12 @@ export function stripeGateway(
             metadata: { bookingId, reason: 'cancelled' },
           },
           {
-            idempotencyKey: `refund-cancelled-${bookingId}`,
+            // A new attempt after a failed refund is a new key: the old one would give the failed
+            // refund back (#84).
+            idempotencyKey:
+              attempt > 0
+                ? `refund-cancelled-${bookingId}-${attempt}`
+                : `refund-cancelled-${bookingId}`,
             ...(options?.quick ? { timeout: 3_000, maxNetworkRetries: 0 } : {}),
           },
         );

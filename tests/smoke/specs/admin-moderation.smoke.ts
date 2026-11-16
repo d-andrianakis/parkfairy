@@ -171,12 +171,14 @@ test('staff suspend a listing and call off its bookings, and bring it back', asy
     await waitForEmail(ownerEmail, 'Your listing is live again', { timeout: 120_000 });
 
     // The log has both, in the staff member's name, with the choice about bookings.
-    await staff.goto(admin('/en/audit'));
+    // Through the filter: the log is shared with every other spec and shows 25 lines a page.
+    await staff.goto(admin('/en/audit?action=listing.suspended'));
     const log = staff.getByRole('table', { name: 'Audit log' });
     const suspended = log.getByRole('row', { name: /Listing suspended/ }).first();
     await expect(suspended).toContainText(staffEmail);
     await expect(suspended).toContainText(why);
     await expect(suspended).toContainText('Bookings cancelled2');
+    await staff.goto(admin('/en/audit?action=listing.reinstated'));
     await expect(log.getByRole('row', { name: /Listing reinstated/ }).first()).toContainText(
       'Ticket 4822, deed received.',
     );
@@ -282,7 +284,7 @@ test('staff suspend an account: it can’t sign in, is told nothing of why, and 
     await waitForEmail(personEmail, 'Your Parkfairy account is active again', { timeout: 120_000 });
 
     // The log has both, the reason in the first, and the account page opened.
-    await staff.goto(admin('/en/audit'));
+    await staff.goto(admin('/en/audit?action=user.suspended'));
     const log = staff.getByRole('table', { name: 'Audit log' });
     const row = log.getByRole('row', { name: /Account suspended/ }).first();
     await expect(row).toContainText(staffEmail);
@@ -291,6 +293,7 @@ test('staff suspend an account: it can’t sign in, is told nothing of why, and 
       'href',
       `/en/users/${accountId}`,
     );
+    await staff.goto(admin('/en/audit?action=user.reinstated'));
     await expect(log.getByRole('row', { name: /Account reinstated/ }).first()).toBeVisible();
 
     // Greek, on a phone.

@@ -11,6 +11,8 @@
     "staffNav": "Staff",
     "listings": "Listings",
     "users": "Accounts",
+    "bookings": "Bookings",
+    "payments": "Payments",
     "audit": "Audit log",
     "signOut": "Sign out",
     "signingOut": "Signing out…"
@@ -221,6 +223,15 @@
           "viewed": "Account page opened",
           "suspended": "Account suspended",
           "reinstated": "Account reinstated"
+        },
+        "booking": {
+          "viewed": "Booking opened",
+          "cancelled": "Booking cancelled",
+          "refund_retried": "Refund asked again",
+          "refund_settled": "Refund marked settled"
+        },
+        "dispute": {
+          "decided": "Lost dispute decided"
         }
       },
       "unknownAction": "Other action",
@@ -235,7 +246,12 @@
         "sessionsEnded": "Sessions ended",
         "passwordRevoked": "Password cancelled",
         "cancelBookings": "Bookings also cancelled",
-        "bookingsCancelled": "Bookings cancelled"
+        "bookingsCancelled": "Bookings cancelled",
+        "reference": "Booking reference",
+        "refundMinor": "Refund",
+        "amountMinor": "Amount",
+        "attempt": "Attempt",
+        "decision": "Who bears the loss"
       },
       "caption": "Audit log",
       "empty": "Nothing has been recorded yet.",
@@ -248,7 +264,9 @@
       "pages": "Pages",
       "first": "Newest",
       "next": "Older",
-      "userLink": "Open the account"
+      "userLink": "Open the account",
+      "bookingLink": "Open the booking",
+      "disputeLink": "Open the booking of the dispute"
     },
     "users": {
       "metaTitle": "Accounts",
@@ -283,6 +301,138 @@
       "active": "Active",
       "suspended": "Suspended",
       "moderation": "Suspension"
+    },
+    "bookings": {
+      "metaTitle": "Bookings",
+      "title": "Bookings",
+      "lead": "Find a booking by the reference the driver quotes. Nothing else about bookings is listed here."
+    },
+    "booking": {
+      "metaTitle": "Booking",
+      "back": "Back to bookings",
+      "facts": "The booking",
+      "reference": "Booking reference",
+      "status": "Status",
+      "listing": "Listing",
+      "space": "Space",
+      "when": "When",
+      "driver": "Driver",
+      "plate": "Number plate",
+      "total": "Total",
+      "payment": "Payment",
+      "refund": "Refund",
+      "payout": "Owners’ payout",
+      "cancelled": "Called off",
+      "disputes": "Disputes",
+      "actions": "What support can do",
+      "none": "None",
+      "noPayout": "Not paid out yet",
+      "notPaid": "Nothing paid",
+      "statuses": {
+        "held": "Being held",
+        "confirmed": "Confirmed",
+        "cancelled": "Cancelled",
+        "expired": "Expired",
+        "released": "Released"
+      },
+      "paymentStatuses": {
+        "pending": "Waiting for payment",
+        "processing": "Being processed",
+        "succeeded": "Paid",
+        "refunding": "Being refunded",
+        "refunded": "Refunded",
+        "canceled": "Never paid"
+      },
+      "refundStatuses": {
+        "owed": "Owed, not sent yet",
+        "sent": "Sent",
+        "failed": "Failed at Stripe",
+        "settled": "Settled by hand"
+      },
+      "transferStatuses": {
+        "sending": "Being sent",
+        "sent": "Sent"
+      },
+      "cancellers": {
+        "driver": "By the driver",
+        "owner": "By an owner, a manager or support"
+      },
+      "noDisputes": "No disputes.",
+      "dispute": {
+        "status": "Status",
+        "reason": "Reason",
+        "amount": "Amount",
+        "due": "Response due",
+        "decision": "Who bears the loss",
+        "undecided": "Waiting for a decision",
+        "submissions": "Responses sent to the bank"
+      },
+      "disputeStatuses": {
+        "warning_needs_response": "Inquiry: needs a response",
+        "warning_under_review": "Inquiry: under review",
+        "warning_closed": "Inquiry: closed",
+        "needs_response": "Needs a response",
+        "under_review": "Under review",
+        "won": "Won",
+        "lost": "Lost",
+        "prevented": "Prevented"
+      },
+      "decisions": {
+        "parkfairy_bears": "Parkfairy bears the loss",
+        "owners_bear": "The owners bear the loss"
+      },
+      "openAccount": "Open the driver’s account",
+      "refundLine": "{status}{amount, select, other { · {amount}}}{count, plural, =0 {} one {, asked again once} other {, asked again # times}}",
+      "disputeReasons": {
+        "bank_cannot_process": "The bank could not process it",
+        "check_returned": "Check returned",
+        "credit_not_processed": "Credit not processed",
+        "customer_initiated": "Started by the customer",
+        "debit_not_authorized": "Debit not authorised",
+        "duplicate": "Duplicate charge",
+        "fraudulent": "Fraud",
+        "general": "General",
+        "incorrect_account_details": "Incorrect account details",
+        "insufficient_funds": "Insufficient funds",
+        "product_not_received": "Service not received",
+        "product_unacceptable": "Service not as described",
+        "subscription_canceled": "Subscription cancelled",
+        "unrecognized": "Not recognised"
+      }
+    },
+    "payments": {
+      "metaTitle": "Payments",
+      "title": "Payments",
+      "lead": "What needs support’s attention on money matters. Open a booking to act on it.",
+      "booking": "Booking",
+      "listing": "Listing",
+      "amount": "Amount",
+      "status": "Status",
+      "reason": "Reason",
+      "due": "Response due",
+      "since": "Since",
+      "retries": "Retries",
+      "open": {
+        "heading": "Disputes still open at the bank",
+        "hint": "Answered in Stripe’s dashboard; shown here to be seen. A dispute with no response sent is lost when it falls due.",
+        "caption": "Disputes still open at the bank",
+        "empty": "None open."
+      },
+      "unnamed": "Unnamed listing",
+      "more": "Showing the first {max, number}; there are more.",
+      "none": "None",
+      "lost": {
+        "heading": "Lost disputes waiting for a decision",
+        "hint": "Each holds the owners’ payout for that booking until you decide who bears the loss.",
+        "caption": "Lost disputes waiting for a decision",
+        "empty": "Nothing waiting."
+      },
+      "failed": {
+        "heading": "Refunds that failed",
+        "hint": "Stripe took the refund and it failed, so the driver is owed money.",
+        "caption": "Refunds that failed",
+        "empty": "None failed."
+      }
     }
   },
   "AdminReview": {
@@ -342,11 +492,20 @@
     "NOT_PUBLISHED": "This listing is not live now, so it can’t be suspended: someone may have done it already. The page now shows where it stands.",
     "NOT_SUSPENDED": "The suspension is already lifted: someone may have done it. The page now shows where it stands.",
     "ALREADY_SUSPENDED": "This account is suspended already. The page now shows where it stands.",
+    "BOOKING_NOT_FOUND": "That booking no longer exists.",
+    "NOT_CANCELLABLE": "This booking can’t be cancelled now: it has begun, or it is already off. The page now shows where it stands.",
+    "REFUND_NOT_FAILED": "This booking has no failed refund now: someone may have dealt with it already. The page now shows where it stands.",
+    "TRANSFER_MADE": "The owners were paid already, so the refund can only be marked settled, not asked for again.",
+    "DISPUTE_NOT_FOUND": "That dispute no longer exists.",
+    "NOT_LOST": "This dispute is not lost, so there is nothing to decide yet. The page now shows where it stands.",
+    "ALREADY_DECIDED": "Someone decided this dispute already. The page now shows where it stands.",
     "MFA_REQUIRED": "Two-factor verification must be on for your account.",
     "INVALID_ORIGIN": "This request did not come from this site. Reload the page and try again.",
     "SESSION_ENDED": "Your session has ended. Sign in again; nothing you typed here was sent.",
     "TOO_MANY_REQUESTS": "Too many decisions in a short time. Wait a moment and try again.",
-    "UNKNOWN": "Something went wrong. Please try again."
+    "UNKNOWN": "Something went wrong. Please try again.",
+    "DISPUTED": "This booking is disputed at the bank, so it can’t be cancelled or its refund asked for again: the driver could be paid twice. Settle the dispute first.",
+    "NOT_HELD": "No payout is held for this booking (it was paid out, or nothing was kept), so the owners can’t be made to bear the loss. Only “Parkfairy bears the loss” can be recorded."
   },
   "AdminUser": {
     "own": "This is your own account, so someone else on the staff has to change its security.",
@@ -437,6 +596,74 @@
         "title": "Account reinstated",
         "text": "The person can sign in again and is told. The decision is in the audit log."
       }
+    }
+  },
+  "AdminBookingLookup": {
+    "reference": "Booking reference",
+    "hint": "The reference the driver quotes, like K7M4-Q2ZD.",
+    "submit": "Find the booking",
+    "busy": "Looking…",
+    "notFound": "No booking has this reference."
+  },
+  "AdminBooking": {
+    "hint": "A ticket reference and a few words, up to {max, number} characters.",
+    "notYet": "Not yet",
+    "nothing": "Nothing to do here: this booking can’t be cancelled now, and has no failed refund or lost dispute waiting.",
+    "cancel": {
+      "heading": "Cancel this booking",
+      "text": "The driver is refunded in full and told, and so are the owners, who won’t receive a share of it. Your note stays in the audit log.",
+      "note": "Why? (for the audit log only)",
+      "submit": "Cancel this booking…",
+      "question": "Cancel this booking now? The driver is refunded in full: {amount}.",
+      "confirm": "Yes, cancel it",
+      "busy": "Cancelling…",
+      "doneTitle": "Booking cancelled",
+      "doneText": "The refund is on its way, and the driver and the owners are told. It is in the audit log."
+    },
+    "retry": {
+      "heading": "Ask Stripe for the refund again",
+      "text": "The refund failed after Stripe took it (a closed card, say), so the money is back with Parkfairy. A new attempt may fail the same way. It is sent within a few minutes.",
+      "note": "Why try again? (for the audit log only)",
+      "submit": "Ask again…",
+      "question": "Ask Stripe to refund {amount} again now?",
+      "confirm": "Yes, ask again",
+      "busy": "Asking…",
+      "doneTitle": "Refund requested",
+      "doneText": "It is queued and goes within minutes. If it fails again, this page shows it."
+    },
+    "settle": {
+      "heading": "Mark the refund settled",
+      "text": "Use this once the driver has been paid another way. The failed refund stays on record, and nothing more is sent.",
+      "note": "How was the driver paid? (for the audit log only)",
+      "submit": "Mark as settled…",
+      "question": "Mark this refund of {amount} as settled? Nothing more will be sent to the driver.",
+      "confirm": "Yes, it is settled",
+      "busy": "Saving…",
+      "doneTitle": "Refund settled",
+      "doneText": "It stays on record as failed and settled by hand. It is in the audit log."
+    },
+    "dispute": {
+      "heading": "Decide who bears this loss",
+      "text": "The bank sided with the driver ({amount}). Until you decide, the owners’ payout for this booking is held. The owners are told either way. After you choose, a note and one more question follow.",
+      "legend": "Who bears the loss?",
+      "parkfairy_bears": "Parkfairy bears the loss",
+      "parkfairy_bearsHint": "The owners’ payout for this booking is released as normal.",
+      "owners_bear": "The owners bear the loss",
+      "owners_bearHint": "Their payout for this booking is cancelled for good.",
+      "parkfairy_bearsHeading": "Parkfairy bears the loss",
+      "parkfairy_bearsText": "The owners’ payout is released as normal, and they are told.",
+      "owners_bearHeading": "The owners bear the loss",
+      "owners_bearText": "Their payout for this booking is cancelled for good, and they are told.",
+      "note": "Why? (for the audit log only)",
+      "submit": "Decide…",
+      "parkfairy_bearsQuestion": "Release the owners’ payout and bear this loss?",
+      "owners_bearQuestion": "Cancel the owners’ payout for this booking for good? The owners are told.",
+      "confirm": "Yes, decide",
+      "busy": "Deciding…",
+      "doneTitle": "Decision recorded",
+      "parkfairy_bearsDone": "The owners’ payout is released and they are told. It is in the audit log.",
+      "owners_bearDone": "The owners’ payout is cancelled and they are told. It is in the audit log.",
+      "textPaid": "The bank sided with the driver ({amount}). Nothing is held: the owners were paid already, or nothing of this booking was kept for them. Only “Parkfairy bears the loss” can be recorded, and the owners are not told."
     }
   }
 }
