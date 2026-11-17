@@ -23,6 +23,13 @@
     "api:generate": "turbo run build --filter=@parkfairy/api... && pnpm --filter @parkfairy/api-client openapi:generate",
     "test:smoke": "turbo run test:smoke"
   },
+  "pnpm": {
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-fc5q-39xc-vjpf"
+      ]
+    }
+  },
   "devDependencies": {
     "@playwright/mcp": "0.0.83",
     "prettier": "3.9.10",

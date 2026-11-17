@@ -1269,6 +1269,12 @@ true })` (`lib/zod-jitless.ts`) must be the first import of every client compone
 - **Known advisory (2026-10-28):** `pnpm audit` reports a _moderate_ esbuild dev-server issue
   (GHSA-67mh-4wv8-2f99) via drizzle-kit's deprecated `@esbuild-kit` loader. Dev-time only, and
   we never run esbuild's dev server, so it's not exploitable here. CI fails on high/critical only.
+- **picomatch ReDoS ignored in audit (2026-11-17):** GHSA-fc5q-39xc-vjpf (high, `<=4.0.7`) has
+  **no patched release** (4.0.7 is the latest), so CI's `pnpm audit --prod --audit-level high`
+  failed with nothing to upgrade. It is listed in `pnpm.auditConfig.ignoreGhsas` in the root
+  package.json. Not exploitable here: picomatch only arrives through dev tooling (vitest via
+  better-auth, eslint-config-next's fast-glob) and never sees attacker-supplied globs. **Remove
+  the ignore once a patched picomatch ships** (`npm view picomatch version` past 4.0.7).
 - **TypeScript is pinned to 6.0.x:** typescript-eslint and @nestjs/swagger don't support
   TS 7 yet. **ESLint is pinned to 9.x:** eslint-config-next pulls eslint-plugin-import,
   which doesn't support ESLint 10.
