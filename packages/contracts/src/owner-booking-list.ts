@@ -8,6 +8,7 @@ import {
   parseBookingsCursor,
 } from './bookings.js';
 import { DEFAULT_TIME_ZONE } from './locales.js';
+import { OwnerOverstaySchema } from './overstays.js';
 import {
   addMonths,
   CALENDAR_MONTHS_AWAY,
@@ -146,6 +147,10 @@ export const OwnerBookingListItemSchema = z
     /** Only for `cancelled`: whose side called it off, and when. */
     cancelledBy: BookingCancellerSchema.nullable(),
     cancelledAt: z.iso.datetime().nullable(),
+    /** The report of a car left past this stay, if there is one (5.2c4). */
+    overstay: OwnerOverstaySchema.nullable(),
+    /** The stay is over, within the reporting window, and not reported yet. */
+    canReportOverstay: z.boolean(),
   })
   .register(contractsRegistry, { id: 'OwnerBookingListItem' });
 export type OwnerBookingListItem = z.infer<typeof OwnerBookingListItemSchema>;

@@ -39,6 +39,11 @@ import {
   AdminDisputeDecisionInputSchema,
   type AdminListingReview,
   AdminListingReviewSchema,
+  type AdminOverstay,
+  type AdminOverstays,
+  AdminOverstaySchema,
+  AdminOverstaysQuerySchema,
+  AdminOverstaysSchema,
   type AdminPayments,
   AdminPaymentsSchema,
   type AdminQueue,
@@ -67,6 +72,7 @@ import { AccountThrottlerGuard } from '../rate-limit/account-throttler.guard.js'
 import { AdminAuditService } from './admin-audit.service.js';
 import { AdminBookingsService } from './admin-bookings.service.js';
 import { AdminListingsService } from './admin-listings.service.js';
+import { AdminOverstaysService } from './admin-overstays.service.js';
 import { AdminPaymentsService } from './admin-payments.service.js';
 import { AdminUsersService } from './admin-users.service.js';
 
@@ -116,6 +122,7 @@ export class AdminController {
     private readonly accounts: AdminUsersService,
     private readonly bookingsAdmin: AdminBookingsService,
     private readonly payments: AdminPaymentsService,
+    private readonly overstays: AdminOverstaysService,
   ) {}
 
   @Get('listings')
@@ -438,6 +445,49 @@ export class AdminController {
       parseOrThrow(AdminDisputeDecisionInputSchema, body),
     );
     return this.bookingsAdmin.show(bookingId);
+  }
+
+  /** What owners say about cars left past their stays: open reports, oldest first (5.2c4, #76). */
+  @Get('overstays')
+  @Throttle(LOOKUP_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'after', required: false, type: String })
+  @ApiOkResponse({ schema: schemaRef(AdminOverstaysSchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  getAdminOverstays(@Query() rawQuery: unknown): Promise<AdminOverstays> {
+    return this.overstays.list(parseOrThrow(AdminOverstaysQuerySchema, rawQuery));
+  }
+
+  /** One report: who made it, what they wrote and the stay it is about. The driver is not on it. */
+  @Get('overstays/:id')
+  @Throttle(LOOKUP_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOkResponse({ schema: schemaRef(AdminOverstaySchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  getAdminOverstay(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<AdminOverstay> {
+    return this.overstays.open(user.id, id);
+  }
+
+  /** Closes a report with a note for the log (#76): once, and never for a listing the admin runs. */
+  @Post('overstays/:id/resolve')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  @Throttle(DECIDE_LIMIT)
+  @UseGuards(AccountThrottlerGuard)
+  @ApiBody({ schema: schemaRef(AdminReasonInputSchema) })
+  @ApiOkResponse({ schema: schemaRef(AdminOverstaySchema) })
+  @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  @ApiConflictResponse({ schema: schemaRef(ErrorResponseSchema) })
+  resolveAdminOverstay(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<AdminOverstay> {
+    return this.overstays.resolve(user.id, id, parseOrThrow(AdminReasonInputSchema, body));
   }
 
   @Get('audit')

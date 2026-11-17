@@ -26,6 +26,8 @@ const booking = (patch: Partial<OwnerBookingListItem> = {}): OwnerBookingListIte
   state: 'upcoming',
   cancelledBy: null,
   cancelledAt: null,
+  overstay: null,
+  canReportOverstay: false,
   ...patch,
 });
 const cancelled = (patch: Partial<OwnerBookingListItem> = {}) =>
@@ -329,5 +331,74 @@ describe('BookingListView', () => {
       /τελευταίες 90 ημέρες/,
     );
     await expectNoAxeViolations(container);
+  });
+});
+
+describe('BookingListView: overstays (5.2c4)', () => {
+  const over = (patch: Partial<OwnerBookingListItem> = {}) =>
+    booking({ state: 'ended', canReportOverstay: true, ...patch });
+  const past = (bookings: OwnerBookingListItem[]) => list({ status: 'past', bookings });
+
+  it('offers the report on an ended stay that can be reported, naming the booking', async () => {
+    const { container } = renderWithProviders(view(past([over()])));
+    expect(
+      screen.getByRole('button', { name: 'Report an overstay (booking K7M4-Q2ZD)' }),
+    ).toBeInTheDocument();
+    await expectNoAxeViolations(container);
+  });
+
+  it('says what the past list is for, and how long a report may wait', () => {
+    renderWithProviders(view(past([over()])));
+    expect(
+      screen.getByText(/Use “Report an overstay” on that booking, within 14 days/),
+    ).toBeVisible();
+  });
+
+  it('says nothing about overstays on the other lists', () => {
+    renderWithProviders(view(list()));
+    expect(screen.queryByText(/Report an overstay/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /overstay/i })).not.toBeInTheDocument();
+  });
+
+  it('offers nothing on a stay that is not over, or one called off', () => {
+    renderWithProviders(
+      view(
+        list({
+          status: 'past',
+          bookings: [
+            booking({ state: 'underWay', canReportOverstay: false }),
+            cancelled({ id: OTHER, reference: 'A6GT-K7C0' }),
+          ],
+        }),
+      ),
+    );
+    expect(screen.queryByRole('button', { name: /Report an overstay/ })).not.toBeInTheDocument();
+  });
+
+  it('offers nothing on a stay past the window, and nothing to do on one already reported', () => {
+    renderWithProviders(
+      view(
+        past([
+          over({ canReportOverstay: false }),
+          over({
+            id: OTHER,
+            reference: 'A6GT-K7C0',
+            canReportOverstay: false,
+            overstay: { reportedAt: '2026-11-16T10:30:00.000Z', status: 'open' },
+          }),
+        ]),
+      ),
+    );
+    expect(screen.queryByRole('button', { name: /Report an overstay/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'An overstay was reported on November 16, 2026. Our team will look into it.',
+      ),
+    ).toBeVisible();
+  });
+
+  it('says the window in Greek, with its plural', () => {
+    renderWithProviders(view(past([over()])), { locale: 'el' });
+    expect(screen.getByText(/μέσα σε 14 ημέρες από τη λήξη της στάθμευσης/)).toBeVisible();
   });
 });

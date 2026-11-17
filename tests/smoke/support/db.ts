@@ -318,3 +318,54 @@ export async function moneyOf(bookingId: string): Promise<{
     decision: row?.decision ?? null,
   };
 }
+
+/**
+ * Stays that ended `hoursAgo` hours ago on a listing, as the listing's owner's own bookings (the API
+ * refuses that, so they go in by hand), and the owner's place on the listing moved back a month: an
+ * owner reads only the stays that ended after they joined it (#35), and a smoke listing is minutes
+ * old. Returns each booking's id and reference, oldest first.
+ */
+export async function addEndedBookings(
+  listingId: string,
+  count: number,
+  hoursAgo = 3,
+): Promise<{ id: string; reference: string }[]> {
+  await run(
+    `update listing_owners set created_at = now() - interval '30 days' where location_id = $1`,
+    [listingId],
+  );
+  return run<{ id: string; reference: string }>(
+    `insert into bookings (reference, user_id, location_id, space_id, space_label, listing_name,
+       listing_address, listing_locale, starts_at, ends_at, gap_minutes, blocked_until, status,
+       hold_expires_at, total_minor, currency, cancellation_policy, vehicle_plate, confirmed_at,
+       commission_bps)
+     select r.reference, p.user_id, l.id, s.id, s.label, l.name, l.address, l.content_locale,
+       now() - ($3::int + 3 * ($4::int - r.n::int) + 1) * interval '1 hour',
+       now() - ($3::int + 3 * ($4::int - r.n::int)) * interval '1 hour',
+       0,
+       now() - ($3::int + 3 * ($4::int - r.n::int)) * interval '1 hour',
+       'confirmed', now() - interval '2 days', 400, 'EUR', 'oneDay', 'IKB1234', now() - interval '2 days',
+       (select commission_bps from platform_settings)
+     from unnest($2::text[]) with ordinality as r(reference, n)
+     join parking_locations l on l.id = $1
+     join owner_profiles p on p.id = l.owner_id
+     join lateral (
+       select id, label from parking_spaces where location_id = l.id order by label limit 1
+     ) s on true
+     returning id, reference`,
+    [listingId, Array.from({ length: count }, reference), hoursAgo, count],
+  );
+}
+
+/** A booking's overstay report as the database has it: none yet, null. */
+export async function overstayOf(bookingId: string): Promise<{
+  status: string;
+  note: string;
+  resolution: string | null;
+} | null> {
+  const [row] = await run<{ status: string; note: string; resolution: string | null }>(
+    `select status, note, resolution from overstay_reports where booking_id = $1`,
+    [bookingId],
+  );
+  return row ?? null;
+}

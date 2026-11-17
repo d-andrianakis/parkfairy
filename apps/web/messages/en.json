@@ -918,7 +918,10 @@
       "OWNER_DETAILS_MISSING": "An owner with a share, or the primary owner, hasn’t filled in “About you” and “Tax details” yet. Each owner fills these in from their own account.",
       "TOO_MANY_MANAGERS": "This listing already has the most managers and invitations to manage allowed.",
       "ALREADY_MANAGER": "That address is already one of this listing’s managers.",
-      "MANAGER_NOT_FOUND": "That person isn’t one of this listing’s managers any more."
+      "MANAGER_NOT_FOUND": "That person isn’t one of this listing’s managers any more.",
+      "BOOKING_NOT_ENDED": "This stay hasn’t ended yet, so it can’t be reported as an overstay.",
+      "OVERSTAY_TOO_LATE": "This stay ended too long ago to be reported as an overstay.",
+      "OVERSTAY_REPORTED": "This booking has been reported already. Reload the page to see the report."
     },
     "bookings": {
       "metaTitle": "Bookings for “{name}”",
@@ -1066,7 +1069,22 @@
       "daysLegend": "Days stays start on",
       "windowProblem": "There is a problem with the days",
       "windowOrder": "The last day is before the first day. Choose a last day on or after the first.",
-      "windowSpan": "The days are more than a year apart. Choose days at most a year apart."
+      "windowSpan": "The days are more than a year apart. Choose days at most a year apart.",
+      "overstay": {
+        "hint": "Was a car left in a space after its stay ended? Use “Report an overstay” on that booking, within {days, plural, one {# day} other {# days}} of the stay’s end.",
+        "report": "Report an overstay <hidden>(booking {reference})</hidden>",
+        "formLabel": "Report an overstay for booking {reference}",
+        "lead": "Was a car still in the space after this booking ended? Tell us and our team will look into it. The driver isn’t told, and nothing is charged or refunded because of this report.",
+        "noteLabel": "What happened?",
+        "noteHint": "Which car, how long it stayed on, and anything you did. Our team reads this; the driver doesn’t. Up to {max, number} characters.",
+        "noteRequired": "Describe what happened.",
+        "submit": "Send the report",
+        "sending": "Sending…",
+        "cancel": "Not now",
+        "sent": "Report sent. Our team will look into it.",
+        "reported": "An overstay was reported on {date}. Our team will look into it.",
+        "closed": "An overstay was reported on {date}. Our team has looked into it and closed the report."
+      }
     },
     "payouts": {
       "metaTitle": "Payouts",

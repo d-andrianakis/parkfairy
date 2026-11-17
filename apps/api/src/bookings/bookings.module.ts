@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { BookingsController } from './bookings.controller.js';
 import { BookingsService } from './bookings.service.js';
+import { OverstaysService } from './overstays.service.js';
 import { OwnerBookingListController } from './owner-booking-list.controller.js';
 import { OwnerBookingListService } from './owner-booking-list.service.js';
 import { OwnerBookingsController } from './owner-bookings.controller.js';
@@ -18,7 +19,13 @@ import { OwnerEarningsService } from './owner-earnings.service.js';
     OwnerCalendarController,
     OwnerBookingListController,
   ],
-  providers: [BookingsService, OwnerEarningsService, OwnerCalendarService, OwnerBookingListService],
+  providers: [
+    BookingsService,
+    OwnerEarningsService,
+    OwnerCalendarService,
+    OwnerBookingListService,
+    OverstaysService,
+  ],
   // Stripe's webhook settles payments through it.
   exports: [BookingsService],
 })

@@ -275,6 +275,29 @@ describe('the audit log', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('names the closing of an overstay report, linked to its booking, in both languages', async () => {
+    const BOOKING = '5d2f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f';
+    vi.mocked(loadAudit).mockResolvedValue({
+      entries: [
+        entry({
+          action: 'overstay.resolved',
+          targetType: 'booking',
+          targetId: BOOKING,
+          details: { reference: 'K7M4-Q2ZD', note: 'Ticket 7001.' },
+        }),
+      ],
+      next: null,
+    });
+    await show();
+    const row = within(screen.getByRole('table', { name: 'Audit log' })).getAllByRole('row')[1]!;
+    expect(row).toHaveTextContent('Overstay report closed');
+    expect(row).toHaveTextContent('Ticket 7001.');
+    expect(within(row).getByRole('link', { name: 'Open the booking' })).toHaveAttribute(
+      'href',
+      `/en/bookings/${BOOKING}`,
+    );
+  });
+
   it('names the same four in Greek', async () => {
     vi.mocked(loadAudit).mockResolvedValue({
       entries: [

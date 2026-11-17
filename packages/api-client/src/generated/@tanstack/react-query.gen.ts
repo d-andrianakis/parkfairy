@@ -30,6 +30,8 @@ import {
   findPlaces,
   getAdminBooking,
   getAdminListing,
+  getAdminOverstay,
+  getAdminOverstays,
   getAdminPayments,
   getAdminQueue,
   getAdminUser,
@@ -71,7 +73,9 @@ import {
   removeListingManager,
   removeListingOwner,
   reorderListingPhotos,
+  reportOverstay,
   requestAdminListingChanges,
+  resolveAdminOverstay,
   retrievePlace,
   retryAdminBookingRefund,
   saveListingHours,
@@ -157,6 +161,12 @@ import type {
   GetAdminListingData,
   GetAdminListingError,
   GetAdminListingResponse,
+  GetAdminOverstayData,
+  GetAdminOverstayError,
+  GetAdminOverstayResponse,
+  GetAdminOverstaysData,
+  GetAdminOverstaysError,
+  GetAdminOverstaysResponse,
   GetAdminPaymentsData,
   GetAdminPaymentsError,
   GetAdminPaymentsResponse,
@@ -275,9 +285,15 @@ import type {
   ReorderListingPhotosData,
   ReorderListingPhotosError,
   ReorderListingPhotosResponse,
+  ReportOverstayData,
+  ReportOverstayError,
+  ReportOverstayResponse,
   RequestAdminListingChangesData,
   RequestAdminListingChangesError,
   RequestAdminListingChangesResponse,
+  ResolveAdminOverstayData,
+  ResolveAdminOverstayError,
+  ResolveAdminOverstayResponse,
   RetrievePlaceData,
   RetrievePlaceError,
   RetrievePlaceResponse,
@@ -2034,6 +2050,117 @@ export const decideAdminDisputeMutation = (
   return mutationOptions;
 };
 
+export const getAdminOverstaysQueryKey = (options?: Options<GetAdminOverstaysData>) =>
+  createQueryKey('getAdminOverstays', options);
+
+export const getAdminOverstaysOptions = (options?: Options<GetAdminOverstaysData>) =>
+  queryOptions<
+    GetAdminOverstaysResponse,
+    GetAdminOverstaysError,
+    GetAdminOverstaysResponse,
+    ReturnType<typeof getAdminOverstaysQueryKey>
+  >({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await getAdminOverstays({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      });
+      return data;
+    },
+    queryKey: getAdminOverstaysQueryKey(options),
+  });
+
+export const getAdminOverstaysInfiniteQueryKey = (
+  options?: Options<GetAdminOverstaysData>,
+): QueryKey<Options<GetAdminOverstaysData>> => createQueryKey('getAdminOverstays', options, true);
+
+export const getAdminOverstaysInfiniteOptions = (options?: Options<GetAdminOverstaysData>) => {
+  const opts = infiniteQueryOptions<
+    GetAdminOverstaysResponse,
+    GetAdminOverstaysError,
+    InfiniteData<GetAdminOverstaysResponse>,
+    QueryKey<Options<GetAdminOverstaysData>>,
+    | string
+    | Pick<QueryKey<Options<GetAdminOverstaysData>>[0], 'body' | 'headers' | 'path' | 'query'>
+  >(
+    // @ts-ignore
+    {
+      queryFn: async ({ pageParam, queryKey, signal }) => {
+        // @ts-ignore
+        const page: Pick<
+          QueryKey<Options<GetAdminOverstaysData>>[0],
+          'body' | 'headers' | 'path' | 'query'
+        > =
+          typeof pageParam === 'object'
+            ? pageParam
+            : {
+                query: {
+                  after: pageParam,
+                },
+              };
+        const params = createInfiniteParams(queryKey, page);
+        const { data } = await getAdminOverstays({
+          ...options,
+          ...params,
+          signal,
+          throwOnError: true,
+        });
+        return data;
+      },
+      queryKey: getAdminOverstaysInfiniteQueryKey(options),
+    },
+  );
+  return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const getAdminOverstayQueryKey = (options: Options<GetAdminOverstayData>) =>
+  createQueryKey('getAdminOverstay', options);
+
+export const getAdminOverstayOptions = (options: Options<GetAdminOverstayData>) =>
+  queryOptions<
+    GetAdminOverstayResponse,
+    GetAdminOverstayError,
+    GetAdminOverstayResponse,
+    ReturnType<typeof getAdminOverstayQueryKey>
+  >({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await getAdminOverstay({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      });
+      return data;
+    },
+    queryKey: getAdminOverstayQueryKey(options),
+  });
+
+export const resolveAdminOverstayMutation = (
+  options?: Partial<Options<ResolveAdminOverstayData>>,
+): UseMutationOptions<
+  ResolveAdminOverstayResponse,
+  ResolveAdminOverstayError,
+  Options<ResolveAdminOverstayData>
+> => {
+  const mutationOptions: UseMutationOptions<
+    ResolveAdminOverstayResponse,
+    ResolveAdminOverstayError,
+    Options<ResolveAdminOverstayData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await resolveAdminOverstay({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};
+
 export const getAuditLogQueryKey = (options?: Options<GetAuditLogData>) =>
   createQueryKey('getAuditLog', options);
 
@@ -2403,6 +2530,26 @@ export const cancelListingBookingMutation = (
   > = {
     mutationFn: async (fnOptions) => {
       const { data } = await cancelListingBooking({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};
+
+export const reportOverstayMutation = (
+  options?: Partial<Options<ReportOverstayData>>,
+): UseMutationOptions<ReportOverstayResponse, ReportOverstayError, Options<ReportOverstayData>> => {
+  const mutationOptions: UseMutationOptions<
+    ReportOverstayResponse,
+    ReportOverstayError,
+    Options<ReportOverstayData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await reportOverstay({
         ...options,
         ...fnOptions,
         throwOnError: true,

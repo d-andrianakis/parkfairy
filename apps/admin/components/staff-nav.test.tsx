@@ -19,10 +19,14 @@ describe('the staff navigation', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Listings', 'Accounts', 'Bookings', 'Payments', 'Audit log']);
+    ).toEqual(['Listings', 'Accounts', 'Bookings', 'Payments', 'Overstays', 'Audit log']);
     expect(within(nav).getByRole('link', { name: 'Accounts' })).toHaveAttribute(
       'href',
       '/en/users',
+    );
+    expect(within(nav).getByRole('link', { name: 'Overstays' })).toHaveAttribute(
+      'href',
+      '/en/overstays',
     );
     expect(within(nav).queryByRole('link', { current: 'page' })).toBeNull();
   });
@@ -36,6 +40,14 @@ describe('the staff navigation', () => {
     setPathname('/users/7f1f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f');
     render(<StaffNav />);
     expect(screen.getByRole('link', { name: 'Accounts', current: 'page' })).toBeInTheDocument();
+  });
+
+  it('marks the overstays on a report’s own page, and says them in Greek', () => {
+    setPathname('/overstays/7f1f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f');
+    render(<StaffNav />, { locale: 'el' });
+    expect(
+      screen.getByRole('link', { name: 'Υπερβάσεις χρόνου', current: 'page' }),
+    ).toBeInTheDocument();
   });
 
   it('is the same in Greek, and does not mistake a longer path for another screen', () => {

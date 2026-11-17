@@ -323,6 +323,13 @@
       "when": 1794934259546,
       "tag": "0045_fancy_vampiro",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1794937611238,
+      "tag": "0046_damp_wendigo",
+      "breakpoints": true
     }
   ]
 }

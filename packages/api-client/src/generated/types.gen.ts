@@ -833,7 +833,8 @@ export type AuditAction =
   | 'booking.cancelled'
   | 'booking.refund_retried'
   | 'booking.refund_settled'
-  | 'dispute.decided';
+  | 'dispute.decided'
+  | 'overstay.resolved';
 
 export type AdminQueueQuery = {
   status: 'in_review' | 'changes_requested' | 'published' | 'suspended';
@@ -1138,6 +1139,69 @@ export type OwnerEarnings = {
   next: string | null;
 };
 
+export type OverstayStatus = 'open' | 'resolved';
+
+export type OverstayReportInput = {
+  note: string;
+};
+
+export type OwnerOverstay = {
+  reportedAt: string;
+  status: OverstayStatus;
+};
+
+export type AdminOverstaysQuery = {
+  status: OverstayStatus;
+  after?: string;
+};
+
+export type AdminOverstayItem = {
+  id: string;
+  status: OverstayStatus;
+  bookingId: string;
+  reference: string;
+  listingName: string | null;
+  contentLocale: Locale;
+  endedAt: string;
+  reportedAt: string;
+};
+
+export type AdminOverstays = {
+  reports: Array<AdminOverstayItem>;
+  next: string | null;
+};
+
+export type AdminOverstay = {
+  id: string;
+  status: OverstayStatus;
+  reportedAt: string;
+  reporter: {
+    name: string;
+  };
+  note: string;
+  booking: {
+    id: string;
+    reference: string;
+    listing: {
+      id: string;
+      name: string | null;
+      contentLocale: Locale;
+    };
+    spaceLabel: string;
+    startsAt: string;
+    endsAt: string;
+  };
+  resolution: {
+    at: string;
+    by: {
+      name: string;
+    };
+    note: string;
+  } | null;
+  canResolve: boolean;
+  own: boolean;
+};
+
 export type OwnerCalendarQuery = {
   month?: string;
   listing?: string;
@@ -1203,6 +1267,8 @@ export type OwnerBookingListItem = {
   state: OwnerBookingState;
   cancelledBy: BookingCanceller | null;
   cancelledAt: string | null;
+  overstay: OwnerOverstay | null;
+  canReportOverstay: boolean;
 };
 
 export type OwnerBookingList = {
@@ -2787,6 +2853,81 @@ export type DecideAdminDisputeResponses = {
 export type DecideAdminDisputeResponse =
   DecideAdminDisputeResponses[keyof DecideAdminDisputeResponses];
 
+export type GetAdminOverstaysData = {
+  body?: never;
+  path?: never;
+  query?: {
+    after?: string;
+    status?: string;
+  };
+  url: '/v1/admin/overstays';
+};
+
+export type GetAdminOverstaysErrors = {
+  400: ErrorResponse;
+  401: ErrorResponse;
+  403: ErrorResponse;
+};
+
+export type GetAdminOverstaysError = GetAdminOverstaysErrors[keyof GetAdminOverstaysErrors];
+
+export type GetAdminOverstaysResponses = {
+  200: AdminOverstays;
+};
+
+export type GetAdminOverstaysResponse =
+  GetAdminOverstaysResponses[keyof GetAdminOverstaysResponses];
+
+export type GetAdminOverstayData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/admin/overstays/{id}';
+};
+
+export type GetAdminOverstayErrors = {
+  401: ErrorResponse;
+  403: ErrorResponse;
+  404: ErrorResponse;
+};
+
+export type GetAdminOverstayError = GetAdminOverstayErrors[keyof GetAdminOverstayErrors];
+
+export type GetAdminOverstayResponses = {
+  200: AdminOverstay;
+};
+
+export type GetAdminOverstayResponse = GetAdminOverstayResponses[keyof GetAdminOverstayResponses];
+
+export type ResolveAdminOverstayData = {
+  body: AdminReasonInput;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/admin/overstays/{id}/resolve';
+};
+
+export type ResolveAdminOverstayErrors = {
+  400: ErrorResponse;
+  401: ErrorResponse;
+  403: ErrorResponse;
+  404: ErrorResponse;
+  409: ErrorResponse;
+};
+
+export type ResolveAdminOverstayError =
+  ResolveAdminOverstayErrors[keyof ResolveAdminOverstayErrors];
+
+export type ResolveAdminOverstayResponses = {
+  200: AdminOverstay;
+};
+
+export type ResolveAdminOverstayResponse =
+  ResolveAdminOverstayResponses[keyof ResolveAdminOverstayResponses];
+
 export type GetAuditLogData = {
   body?: never;
   path?: never;
@@ -3050,6 +3191,31 @@ export type CancelListingBookingResponses = {
 
 export type CancelListingBookingResponse =
   CancelListingBookingResponses[keyof CancelListingBookingResponses];
+
+export type ReportOverstayData = {
+  body: OverstayReportInput;
+  path: {
+    id: string;
+    bookingId: string;
+  };
+  query?: never;
+  url: '/v1/owner/listings/{id}/bookings/{bookingId}/overstay';
+};
+
+export type ReportOverstayErrors = {
+  400: ErrorResponse;
+  401: ErrorResponse;
+  404: ErrorResponse;
+  409: ErrorResponse;
+};
+
+export type ReportOverstayError = ReportOverstayErrors[keyof ReportOverstayErrors];
+
+export type ReportOverstayResponses = {
+  201: OwnerOverstay;
+};
+
+export type ReportOverstayResponse = ReportOverstayResponses[keyof ReportOverstayResponses];
 
 export type GetEarningsData = {
   body?: never;

@@ -60,6 +60,8 @@ export const AUDIT_ACTIONS = [
   'booking.refund_settled',
   /** Who bears a lost dispute, decided (#83). */
   'dispute.decided',
+  /** An owner's report of a car left past its booking, looked into and closed (#11, #76). */
+  'overstay.resolved',
 ] as const;
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS).register(contractsRegistry, {
   id: 'AuditAction',
@@ -200,7 +202,7 @@ export type AdminListingReview = z.infer<typeof AdminListingReviewSchema>;
  * invisible one, and no line or paragraph separators, which would read differently from what is
  * written), in one Unicode form, not empty, at most `max`.
  */
-const staffNote = (max: number) =>
+export const staffNote = (max: number) =>
   z
     .string(message('invalid'))
     .trim()
@@ -528,5 +530,8 @@ export const ADMIN_ERROR_CODES = [
   'NOT_LOST',
   /** Decided already: once, and for good (#83). */
   'ALREADY_DECIDED',
+  'OVERSTAY_NOT_FOUND',
+  /** Closed already: once, and for good (#76). */
+  'ALREADY_RESOLVED',
 ] as const;
 export type AdminErrorCode = (typeof ADMIN_ERROR_CODES)[number];

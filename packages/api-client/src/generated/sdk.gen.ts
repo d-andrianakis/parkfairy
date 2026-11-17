@@ -63,6 +63,12 @@ import type {
   GetAdminListingData,
   GetAdminListingErrors,
   GetAdminListingResponses,
+  GetAdminOverstayData,
+  GetAdminOverstayErrors,
+  GetAdminOverstayResponses,
+  GetAdminOverstaysData,
+  GetAdminOverstaysErrors,
+  GetAdminOverstaysResponses,
   GetAdminPaymentsData,
   GetAdminPaymentsErrors,
   GetAdminPaymentsResponses,
@@ -181,9 +187,15 @@ import type {
   ReorderListingPhotosData,
   ReorderListingPhotosErrors,
   ReorderListingPhotosResponses,
+  ReportOverstayData,
+  ReportOverstayErrors,
+  ReportOverstayResponses,
   RequestAdminListingChangesData,
   RequestAdminListingChangesErrors,
   RequestAdminListingChangesResponses,
+  ResolveAdminOverstayData,
+  ResolveAdminOverstayErrors,
+  ResolveAdminOverstayResponses,
   RetrievePlaceData,
   RetrievePlaceErrors,
   RetrievePlaceResponses,
@@ -1504,6 +1516,63 @@ export const decideAdminDispute = <ThrowOnError extends boolean = false>(
     },
   });
 
+export const getAdminOverstays = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAdminOverstaysData, ThrowOnError>,
+): RequestResult<GetAdminOverstaysResponses, GetAdminOverstaysErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    GetAdminOverstaysResponses,
+    GetAdminOverstaysErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/admin/overstays',
+    ...options,
+  });
+
+export const getAdminOverstay = <ThrowOnError extends boolean = false>(
+  options: Options<GetAdminOverstayData, ThrowOnError>,
+): RequestResult<GetAdminOverstayResponses, GetAdminOverstayErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetAdminOverstayResponses, GetAdminOverstayErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/admin/overstays/{id}',
+    ...options,
+  });
+
+export const resolveAdminOverstay = <ThrowOnError extends boolean = false>(
+  options: Options<ResolveAdminOverstayData, ThrowOnError>,
+): RequestResult<ResolveAdminOverstayResponses, ResolveAdminOverstayErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ResolveAdminOverstayResponses,
+    ResolveAdminOverstayErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/admin/overstays/{id}/resolve',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
 export const getAuditLog = <ThrowOnError extends boolean = false>(
   options?: Options<GetAuditLogData, ThrowOnError>,
 ): RequestResult<GetAuditLogResponses, GetAuditLogErrors, ThrowOnError> =>
@@ -1691,6 +1760,25 @@ export const cancelListingBooking = <ThrowOnError extends boolean = false>(
     ],
     url: '/v1/owner/listings/{id}/bookings/{bookingId}/cancel',
     ...options,
+  });
+
+export const reportOverstay = <ThrowOnError extends boolean = false>(
+  options: Options<ReportOverstayData, ThrowOnError>,
+): RequestResult<ReportOverstayResponses, ReportOverstayErrors, ThrowOnError> =>
+  (options.client ?? client).post<ReportOverstayResponses, ReportOverstayErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/owner/listings/{id}/bookings/{bookingId}/overstay',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 export const getEarnings = <ThrowOnError extends boolean = false>(

@@ -268,12 +268,14 @@ describe('owner list of bookings (5.1)', () => {
     // Never anyone's share or payout: the keys are the contract's.
     expect(Object.keys(seen.bookings[0] ?? {}).sort()).toEqual(
       [
+        'canReportOverstay',
         'cancelledAt',
         'cancelledBy',
         'driverName',
         'end',
         'id',
         'listing',
+        'overstay',
         'reference',
         'spaceLabel',
         'start',

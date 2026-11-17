@@ -188,6 +188,8 @@ describe('OwnerBookingListSchema', () => {
     state: 'upcoming',
     cancelledBy: null,
     cancelledAt: null,
+    overstay: null,
+    canReportOverstay: false,
   };
   const list = {
     status: 'upcoming',
@@ -202,6 +204,30 @@ describe('OwnerBookingListSchema', () => {
 
   it('accepts a page of bookings', () => {
     expect(OwnerBookingListSchema.safeParse(list).success).toBe(true);
+  });
+
+  it('carries a report of a car left past the stay, and whether one can still be made (5.2c4)', () => {
+    const reported = {
+      ...booking,
+      state: 'ended',
+      overstay: { reportedAt: '2026-11-21T09:00:00.000Z', status: 'open' },
+    };
+    expect(OwnerBookingListItemSchema.safeParse(reported).success).toBe(true);
+    expect(
+      OwnerBookingListItemSchema.safeParse({ ...reported, canReportOverstay: true }).success,
+    ).toBe(true);
+    expect(
+      OwnerBookingListItemSchema.safeParse({ ...reported, overstay: { status: 'open' } }).success,
+    ).toBe(false);
+    // Staff's own note never rides along.
+    expect(
+      JSON.stringify(
+        OwnerBookingListItemSchema.parse({
+          ...reported,
+          overstay: { ...reported.overstay, resolution: 'Ticket 7001' },
+        }),
+      ),
+    ).not.toContain('7001');
   });
 
   it('knows who called a booking off, and no one’s earnings', () => {

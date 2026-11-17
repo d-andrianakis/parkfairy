@@ -1640,8 +1640,8 @@ payments, overstay reports, removing two-factor).
   unit test, an exhaustive allowlist test against Better Auth's endpoint list
 - [x] **5.2b Contracts & docs**: no contract or schema change; README, GETTING_STARTED, `.env.example`,
       CI, memory.md
-- [ ] **5.2c** moderation, users, bookings, payments, overstay reports, removing two-factor: built in
-      order (#74–#85); 5.2c1, 5.2c2 and 5.2c3 below are done, overstay reports are open
+- [x] **5.2c** moderation, users, bookings, payments, overstay reports, removing two-factor: built in
+      order (#74–#85); 5.2c1 to 5.2c4 below are done
 
 #### 5.2c1 Accounts and removing two-factor (2026-11-15, #13, #77)
 
@@ -1726,6 +1726,30 @@ payments, overstay reports, removing two-factor).
       4 skipped) all green. Smoke reads the audit log through its kind filter: the log is shared by every
       spec and shows 25 lines a page. One run of `booking.smoke.ts` found a missing `<title>` on a web page
       (axe `document-title`) and passed on rerun: watch for it
+
+#### 5.2c4 Overstay reports (2026-11-17, #11, #76)
+
+- [x] **Implemented**: `POST /owner/listings/:id/bookings/:bookingId/overstay` (whoever runs the listing, a stay
+      that is over and within 14 days, once per booking), `GET /admin/overstays` (open or closed, oldest first),
+      `GET /admin/overstays/:id`, `POST /admin/overstays/:id/resolve` (a note; never for a listing the admin runs
+      or a report they made); migration 0046 (`overstay_reports`, `overstay.resolved` in the audit log's check);
+      the owners' bookings list says if a report exists and offers one on a stay that is over; `/overstays` and
+      `/overstays/[id]` in the staff app, both languages. Nothing is charged, refunded or emailed
+- [x] **Unit and integration tests**: contracts, `overstays.integration.test.ts` (who may, which stays, the
+      window's edges, races, note rules, the queue and its paging, closing, own listing, the table's
+      constraints), the owner report component and list, the staff pages and panel
+- [x] **Smoke test** `overstays.smoke.ts`: an owner reports (empty note, "not now", sent, reloaded, Greek at
+      320 px), staff find it, read it, close it, the log, the owner's page says closed and never staff's note
+- [x] **Reviews** (2026-11-17): security (no high; staff can't close their own report), performance (no
+      high), accessibility (nothing serious: "Not now" while sending, required note, alert beside the buttons),
+      i18n (one term, «αρχείο ενεργειών»; neutral "was reported"; caption by `select`), test (stale strings,
+      the loaders, the audit label, the window's edge, the co-owner case, the shared security and sign-in
+      specs). The gate: `format:check`, `lint`, `typecheck`, `build`, `db:migrate`, `db:generate` (no changes),
+      `api:generate` (stable), `pnpm test` (all green) and `test:smoke` (279 passed, 4 skipped)
+- [ ] **Open**: the Greek of this slice is unreviewed (a review form was sent to the product owner); manual
+      NVDA/VoiceOver on the report form and the "Report sent" line; closed list newest first; a retention
+      decision for the notes (Phase 6); `NOT VALID` for the audit check on a large `audit_log`
+
 - [ ] **Left open on purpose** (in memory.md, none loses money): owners' "on its way" sums count a part
       marked `sending` whose dispute is then lost; the ledger check has no rule for `settled` refunds;
       deciding one of two disputes tells the owners as if the payout moved; native Greek review of the
@@ -1736,7 +1760,7 @@ payments, overstay reports, removing two-factor).
 - [~] Owner calendar and earnings done (5.1); a bookings list across listings is not
 - [~] Admin approvals (listings, proof of the right to rent) and the audit log: done (5.2a, 5.2b).
   Moderation, users, bookings, payments: 5.2c
-- [ ] Overstay reports: the owner reports, support handles it (#11)
+- [x] Overstay reports: the owner reports, support handles it (#11): done (5.2c4)
 - [x] Support removes two-factor after an identity check: audited action, email to the address,
       written procedure (#13): done (5.2c1; the procedure is in GETTING_STARTED.md)
 

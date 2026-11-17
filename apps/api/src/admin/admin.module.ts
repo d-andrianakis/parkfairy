@@ -6,6 +6,7 @@ import { AdminController } from './admin.controller.js';
 import { AdminAuditService } from './admin-audit.service.js';
 import { AdminBookingsService } from './admin-bookings.service.js';
 import { AdminListingsService } from './admin-listings.service.js';
+import { AdminOverstaysService } from './admin-overstays.service.js';
 import { AdminPaymentsService } from './admin-payments.service.js';
 import { AdminUsersService } from './admin-users.service.js';
 
@@ -21,6 +22,7 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminUsersService,
     AdminBookingsService,
     AdminPaymentsService,
+    AdminOverstaysService,
   ],
 })
 export class AdminModule {}

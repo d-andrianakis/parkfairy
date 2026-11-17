@@ -3,6 +3,8 @@ import 'server-only';
 import {
   type AdminBooking,
   type AdminListingReview,
+  type AdminOverstay,
+  type AdminOverstays,
   type AdminPayments,
   type AdminQueue,
   type AdminUser,
@@ -11,12 +13,14 @@ import {
   createConfig,
   getAdminBooking,
   getAdminListing,
+  getAdminOverstay,
+  getAdminOverstays,
   getAdminPayments,
   getAdminQueue,
   getAdminUser,
   getAuditLog,
 } from '@parkfairy/api-client';
-import type { AdminAuditQuery, AdminQueueQuery } from '@parkfairy/contracts';
+import type { AdminAuditQuery, AdminOverstaysQuery, AdminQueueQuery } from '@parkfairy/contracts';
 import { headers } from 'next/headers';
 import { cache } from 'react';
 
@@ -104,6 +108,32 @@ export const loadBooking = cache(async (id: string): Promise<AdminBooking | Miss
 export const loadPayments = cache(async (): Promise<AdminPayments | Missing> => {
   try {
     const { data, response } = await getAdminPayments(await request());
+    return data ?? missing(response?.status);
+  } catch {
+    return 'unavailable';
+  }
+});
+
+export const loadOverstays = cache(
+  async (
+    status: AdminOverstaysQuery['status'],
+    after: string | undefined,
+  ): Promise<AdminOverstays | Missing> => {
+    try {
+      const { data, response } = await getAdminOverstays({
+        ...(await request()),
+        query: { status, after },
+      });
+      return data ?? missing(response?.status);
+    } catch {
+      return 'unavailable';
+    }
+  },
+);
+
+export const loadOverstay = cache(async (id: string): Promise<AdminOverstay | Missing> => {
+  try {
+    const { data, response } = await getAdminOverstay({ ...(await request()), path: { id } });
     return data ?? missing(response?.status);
   } catch {
     return 'unavailable';

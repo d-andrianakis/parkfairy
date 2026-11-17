@@ -15,7 +15,8 @@
     "payments": "Payments",
     "audit": "Audit log",
     "signOut": "Sign out",
-    "signingOut": "Signing out…"
+    "signingOut": "Signing out…",
+    "overstays": "Overstays"
   },
   "LocaleSwitcher": {
     "label": "Language"
@@ -232,6 +233,9 @@
         },
         "dispute": {
           "decided": "Lost dispute decided"
+        },
+        "overstay": {
+          "resolved": "Overstay report closed"
         }
       },
       "unknownAction": "Other action",
@@ -433,6 +437,54 @@
         "caption": "Refunds that failed",
         "empty": "None failed."
       }
+    },
+    "overstays": {
+      "metaTitle": "Overstays",
+      "title": "Overstays",
+      "lead": "Cars that owners say stayed past their booking, oldest report first. A report is looked into and closed with a note: nothing is charged or refunded from here, and the driver isn’t told.",
+      "filter": "Which reports",
+      "statuses": {
+        "open": "Open",
+        "resolved": "Closed"
+      },
+      "empty": {
+        "open": "No open reports.",
+        "resolved": "No closed reports."
+      },
+      "caption": "{status, select, open {Open overstay reports, oldest first} other {Closed overstay reports, oldest first}}",
+      "booking": "Booking",
+      "listing": "Listing",
+      "ended": "Stay ended",
+      "reported": "Reported",
+      "unnamed": "Unnamed listing",
+      "pages": "Pages",
+      "first": "First page",
+      "next": "Next page"
+    },
+    "overstay": {
+      "metaTitle": "Overstay report",
+      "back": "Back to the overstays",
+      "facts": "The report",
+      "status": "Status",
+      "statuses": {
+        "open": "Open",
+        "resolved": "Closed"
+      },
+      "reportedBy": "Reported by",
+      "reportedAt": "Reported",
+      "said": "What they wrote",
+      "stay": "The stay",
+      "listing": "Listing",
+      "space": "Space",
+      "when": "When",
+      "booking": "Booking",
+      "openBooking": "Open booking {reference}",
+      "openBookingHint": "The driver’s name and number plate are on the booking’s page, and opening it is logged.",
+      "closed": "How it was closed",
+      "closedBy": "Closed by",
+      "closedAt": "Closed",
+      "closedNote": "Note",
+      "actions": "What you can do"
     }
   },
   "AdminReview": {
@@ -505,7 +557,9 @@
     "TOO_MANY_REQUESTS": "Too many decisions in a short time. Wait a moment and try again.",
     "UNKNOWN": "Something went wrong. Please try again.",
     "DISPUTED": "This booking is disputed at the bank, so it can’t be cancelled or its refund asked for again: the driver could be paid twice. Settle the dispute first.",
-    "NOT_HELD": "No payout is held for this booking (it was paid out, or nothing was kept), so the owners can’t be made to bear the loss. Only “Parkfairy bears the loss” can be recorded."
+    "NOT_HELD": "No payout is held for this booking (it was paid out, or nothing was kept), so the owners can’t be made to bear the loss. Only “Parkfairy bears the loss” can be recorded.",
+    "OVERSTAY_NOT_FOUND": "That report no longer exists.",
+    "ALREADY_RESOLVED": "Someone closed this report already. The page now shows where it stands."
   },
   "AdminUser": {
     "own": "This is your own account, so someone else on the staff has to change its security.",
@@ -664,6 +718,23 @@
       "parkfairy_bearsDone": "The owners’ payout is released and they are told. It is in the audit log.",
       "owners_bearDone": "The owners’ payout is cancelled and they are told. It is in the audit log.",
       "textPaid": "The bank sided with the driver ({amount}). Nothing is held: the owners were paid already, or nothing of this booking was kept for them. Only “Parkfairy bears the loss” can be recorded, and the owners are not told."
+    }
+  },
+  "AdminOverstay": {
+    "hint": "A ticket reference and a few words, up to {max, number} characters.",
+    "notYet": "Not yet",
+    "nothing": "Nothing to do here: this report is closed.",
+    "own": "You run this listing, or made this report yourself, so someone else on the staff has to close it.",
+    "resolve": {
+      "heading": "Close this report",
+      "text": "Say what was done about it. Nothing else follows: no money moves and nobody is told. Your note stays in the audit log.",
+      "note": "What was done? (for the audit log only)",
+      "submit": "Close this report…",
+      "question": "Close this report now? This can’t be undone.",
+      "confirm": "Yes, close it",
+      "busy": "Closing…",
+      "doneTitle": "Report closed",
+      "doneText": "It is in the audit log, and the owner’s list shows that it was looked into."
     }
   }
 }

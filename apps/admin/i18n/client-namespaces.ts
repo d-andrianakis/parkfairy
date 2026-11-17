@@ -20,6 +20,8 @@ export const CLIENT_NAMESPACES = {
   bookingLookup: ['AdminBookingLookup', 'AdminErrors', 'Validation', 'Forms'],
   /** A booking's page: calling it off, its refund, a lost dispute. */
   booking: ['AdminBooking', 'AdminErrors', 'Validation', 'Forms'],
+  /** An overstay report's page: closing it with a note. */
+  overstay: ['AdminOverstay', 'AdminErrors', 'Validation', 'Forms'],
   /** A live or suspended listing: taking it down, bringing it back. */
   moderation: ['AdminModeration', 'AdminErrors', 'Validation', 'Forms'],
 } as const satisfies Record<string, readonly Namespace[]>;

@@ -22,6 +22,8 @@ describe('what a refusal from the admin routes is called', () => {
     'DISPUTE_NOT_FOUND',
     'NOT_LOST',
     'ALREADY_DECIDED',
+    'OVERSTAY_NOT_FOUND',
+    'ALREADY_RESOLVED',
     'MFA_REQUIRED',
     'INVALID_ORIGIN',
   ])('knows %s', (code) => {

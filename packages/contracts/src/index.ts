@@ -6,6 +6,7 @@ export * from './common.js';
 export * from './earnings.js';
 export * from './i18n.js';
 export * from './listing-owners.js';
+export * from './overstays.js';
 export * from './owner.js';
 export * from './owner-booking-list.js';
 export * from './owner-calendar.js';

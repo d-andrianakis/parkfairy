@@ -110,6 +110,7 @@ test('the staff app has a policy of its own and only the doors staff need', asyn
   // The API answers through this origin too, and still wants a session.
   expect((await request.get(admin('/api/v1/admin/listings'))).status()).toBe(401);
   expect((await request.get(admin('/api/v1/admin/audit'))).status()).toBe(401);
+  expect((await request.get(admin('/api/v1/admin/overstays'))).status()).toBe(401);
 });
 
 test('signed out, every staff screen goes to sign-in and comes back', async ({ page }) => {
@@ -119,6 +120,8 @@ test('signed out, every staff screen goes to sign-in and comes back', async ({ p
     ['en', `/listings/${randomUUID()}`],
     ['en', '/users'],
     ['el', `/users/${randomUUID()}`],
+    ['en', '/overstays'],
+    ['el', `/overstays/${randomUUID()}`],
   ] as const) {
     await page.goto(admin(`/${locale}${path}`));
     await expect(page).toHaveURL(admin(`/${locale}/sign-in?next=${encodeURIComponent(path)}`));

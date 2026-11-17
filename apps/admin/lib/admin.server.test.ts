@@ -7,6 +7,8 @@ const sdk = vi.hoisted(() => ({
   getAdminUser: vi.fn(),
   getAdminBooking: vi.fn(),
   getAdminPayments: vi.fn(),
+  getAdminOverstays: vi.fn(),
+  getAdminOverstay: vi.fn(),
   getAuditLog: vi.fn(),
 }));
 vi.mock('@parkfairy/api-client', () => ({
@@ -18,8 +20,16 @@ let incoming = new Headers();
 vi.mock('next/headers', () => ({ headers: () => Promise.resolve(incoming) }));
 vi.mock('server-only', () => ({}));
 
-const { loadAudit, loadBooking, loadPayments, loadQueue, loadReview, loadUser } =
-  await import('./admin.server');
+const {
+  loadAudit,
+  loadBooking,
+  loadOverstay,
+  loadOverstays,
+  loadPayments,
+  loadQueue,
+  loadReview,
+  loadUser,
+} = await import('./admin.server');
 const answer = (status: number, data?: unknown) => ({
   data,
   response: new Response(null, { status }),
@@ -55,6 +65,10 @@ describe('what staff pages learn from the API', () => {
     sdk.getAdminPayments.mockResolvedValue(answer(status));
     expect(await loadPayments()).toBe(expected);
     expect(await loadAudit(undefined, `a${status}`)).toBe(expected);
+    sdk.getAdminOverstays.mockResolvedValue(answer(status));
+    expect(await loadOverstays('open', `o${status}`)).toBe(expected);
+    sdk.getAdminOverstay.mockResolvedValue(answer(status));
+    expect(await loadOverstay(`overstay${status}`)).toBe(expected);
   });
 
   it('reads a call that threw as unavailable, and one with no answer too', async () => {
@@ -122,6 +136,31 @@ describe('what staff pages learn from the API', () => {
     });
     sdk.getAdminBooking.mockRejectedValue(new Error('timeout'));
     expect(await loadBooking('thrown')).toBe('unavailable');
+  });
+
+  it('asks for the overstay queue with the status and the place, and for a report by its own id, as the signed-in staff member', async () => {
+    sdk.getAdminOverstays.mockResolvedValue(answer(200, { reports: [], next: null }));
+    expect(await loadOverstays('resolved', 'after-this')).toEqual({ reports: [], next: null });
+    expect(lastOptions(sdk.getAdminOverstays).query).toEqual({
+      status: 'resolved',
+      after: 'after-this',
+    });
+    expect(lastOptions(sdk.getAdminOverstays).headers).toEqual({
+      cookie: 'parkfairy.session_token=abc',
+      'x-forwarded-for': '203.0.113.9',
+    });
+    sdk.getAdminOverstay.mockResolvedValue(answer(200, { id: 'x' }));
+    expect(await loadOverstay('7f1f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f')).toEqual({ id: 'x' });
+    expect(lastOptions(sdk.getAdminOverstay).path).toEqual({
+      id: '7f1f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f',
+    });
+    expect(lastOptions(sdk.getAdminOverstay).headers).toMatchObject({
+      cookie: 'parkfairy.session_token=abc',
+    });
+    sdk.getAdminOverstays.mockRejectedValue(new Error('timeout'));
+    expect(await loadOverstays('open', 'thrown')).toBe('unavailable');
+    sdk.getAdminOverstay.mockRejectedValue(new Error('timeout'));
+    expect(await loadOverstay('thrown')).toBe('unavailable');
   });
 
   it('asks for a listing by its own id', async () => {

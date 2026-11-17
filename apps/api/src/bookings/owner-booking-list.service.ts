@@ -7,6 +7,8 @@ import {
   type Locale,
   MAX_BOOKING_DAYS,
   NAME_MAX_LENGTH,
+  OVERSTAY_REPORT_DAYS,
+  type OverstayStatus,
   type OwnerBookingList,
   type OwnerBookingListQuery,
   OwnerBookingListSchema,
@@ -41,6 +43,8 @@ interface Row extends Record<string, unknown> {
   status: 'confirmed' | 'cancelled';
   cancelled_by: BookingCanceller | null;
   cancelled_at: string | null;
+  overstay_at: string | null;
+  overstay_status: OverstayStatus | null;
 }
 
 /**
@@ -118,7 +122,8 @@ export class OwnerBookingListService {
           top.space_label, top.starts_at::text as starts_at, top.ends_at::text as ends_at,
           left(u.name, ${NAME_MAX_LENGTH}) as driver_name, top.vehicle_plate,
           top.total_minor, top.currency, top.status, top.cancelled_by,
-          top.cancelled_at::text as cancelled_at
+          top.cancelled_at::text as cancelled_at,
+          o.reported_at::text as overstay_at, o.status as overstay_status
         from (
           select b.id, b.reference, l.id as listing_id, l.name, l.content_locale, l.time_zone,
             b.space_label, b.starts_at, b.ends_at, b.user_id, b.vehicle_plate, b.total_minor,
@@ -156,6 +161,7 @@ export class OwnerBookingListService {
           limit ${limit}
         ) top
         join users u on u.id = top.user_id
+        left join overstay_reports o on o.booking_id = top.id
         order by top.starts_at ${order}, top.id ${order}
       `);
     };
@@ -220,6 +226,15 @@ export class OwnerBookingListService {
         state: state(row),
         cancelledBy: row.status === 'cancelled' ? row.cancelled_by : null,
         cancelledAt: row.cancelled_at ? new Date(row.cancelled_at).toISOString() : null,
+        overstay:
+          row.overstay_at && row.overstay_status
+            ? { reportedAt: new Date(row.overstay_at).toISOString(), status: row.overstay_status }
+            : null,
+        // Over, not yet reported, and still within the days staff can look into it (5.2c4).
+        canReportOverstay:
+          state(row) === 'ended' &&
+          row.overstay_at === null &&
+          now.getTime() - new Date(row.ends_at).getTime() <= OVERSTAY_REPORT_DAYS * DAY_MS,
       })),
       previous: (backwards ? more : beyond.rows.length > 0) ? cursor(rows[0]) : null,
       next: (backwards ? beyond.rows.length > 0 : more) ? cursor(rows.at(-1)) : null,

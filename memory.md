@@ -1913,3 +1913,33 @@ After the five reviews of 5.2c3 (2026-11-16), what changed and why:
   - `open()` of an account reads, then writes its audit line, and returns the page only if the line was
     written (a failed insert is an error, never an unlogged page); it is two statements, not one
     transaction, so a read can be logged a moment after it happened.
+
+Our readings for overstay reports, 5.2c4 (2026-11-17), not asked; change any that are wrong (#11, #76 are the decisions):
+
+- **Who and when**: whoever runs the listing (owner, co-owner, manager) reports, once the stay is over and
+  within `OVERSTAY_REPORT_DAYS` (14) of its end, for a confirmed booking that ended after they joined the
+  listing (#35, as the list reads it). One report to a booking (`unique(booking_id)`); a second is
+  `409 OVERSTAY_REPORTED`, a stay not over `BOOKING_NOT_ENDED`, too old `OVERSTAY_TOO_LATE`. A booking of
+  another listing, a cancelled one and a hold are the same 404 as one that doesn't exist.
+- **Recorded and triaged only (#76)**: no email, no money, no hold on a payout, and the driver is never told
+  (an accusation that staff haven't looked into). Staff close a report with a note of 100 characters
+  (`overstay.resolved`, on the booking in the audit log); owners then read "looked into and closed", never
+  staff's note. The owner's own note is for staff only (300 characters, same character rules as staff notes).
+- **Staff close other people's reports only**: not one about a listing they run (`OWN_LISTING`), nor one
+  they made themselves, even if they no longer run the listing (security review).
+- **The report page has no driver on it**: the driver's name and plate are on the booking's page, which
+  staff reach by a link and whose opening is logged (#85). The queue is oldest first, by status, 25 a page.
+- **2026-11-17 · "You reported…" is wrong for a co-owner or manager reading a report someone else made**,
+  so the owners' list says "An overstay was reported on …"; only the line right after sending says "Report sent".
+- **2026-11-17 · The report component stays mounted after sending** (`OverstayReport`): the refreshed list no
+  longer offers the button the focus was on, so the line that says it was sent, and holds the focus, must
+  belong to the same instance. Rendering the static states on the server would drop that line.
+- **Phase 6 (retention, #18)**: `overstay_reports.note` and `.resolution` are free text that may name a
+  driver or a plate; every foreign key restricts, so rows and the accounts behind them stay for good. The
+  adviser sets how long, and what erasing a reporter or a former staff member does to them.
+- **Left on purpose**: the closed list is oldest first like the open one (a year's closed reports are many
+  pages; newest-first by `resolved_at` needs its own index and cursor); `audit_log`'s action check is dropped
+  and re-added without `NOT VALID`, as 0038 to 0041 did (a scan under lock, small today); the staff note on
+  an overstay is shown in the staff language's `lang` (Greek runs marked on English pages only).
+- **Translations**: the Greek of this slice was written without a native speaker and sent to the product
+  owner as a review form (2026-11-17); answers are in that page's `reviews` collection.

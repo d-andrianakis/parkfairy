@@ -50,7 +50,7 @@ const ENDING_LENGTH = 3;
  * The admin owns or manages the listing, or is the profile it names as its owner: staff never
  * decide their own. The last is a belt over the owners' rows, which every listing has.
  */
-const isOwn = (adminId: string) => sql<boolean>`(
+export const isOwn = (adminId: string) => sql<boolean>`(
   ${runsListing(adminId)}
   or ${listing.ownerId} in (select id from owner_profiles where user_id = ${adminId})
 )`;

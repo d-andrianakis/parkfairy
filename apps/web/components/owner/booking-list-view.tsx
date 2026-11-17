@@ -1,5 +1,7 @@
 import type { OwnerBookingList, OwnerBookingListItem } from '@parkfairy/api-client';
 import {
+  OVERSTAY_NOTE_MAX,
+  OVERSTAY_REPORT_DAYS,
   OWNER_BOOKING_STATUSES,
   OWNER_BOOKINGS_DEFAULT_DAYS,
   ownerBookingsReach,
@@ -18,6 +20,8 @@ import { PersonName, PlaceWords } from '@/components/parking/place-words';
 import { StayRange } from '@/components/parking/stay-range';
 import { Link } from '@/i18n/navigation';
 import { BOOKING_LIST_HREF, ownerBookingsHref } from '@/lib/owner-href';
+
+import { OverstayReport } from './overstay-report';
 
 /** What is wrong with the days asked for: the last before the first, or over a year apart. */
 export type WindowProblem = 'order' | 'span';
@@ -203,6 +207,11 @@ export function BookingListView({
         {problem ? null : (
           <>
             {window ? <p className="text-sm text-muted-foreground">{window}</p> : null}
+            {list.status === 'past' && list.bookings.length > 0 ? (
+              <p className="max-w-prose text-sm text-muted-foreground">
+                {t('overstay.hint', { days: OVERSTAY_REPORT_DAYS })}
+              </p>
+            ) : null}
             {list.bookings.length === 0 ? (
               <p>{t(`empty.${list.status}`)}</p>
             ) : (
@@ -282,6 +291,16 @@ export function BookingListView({
                                 })}
                               </Link>
                             </p>
+                          ) : null}
+                          {booking.state === 'ended' ? (
+                            <OverstayReport
+                              listingId={booking.listing.id}
+                              bookingId={booking.id}
+                              reference={booking.reference}
+                              canReport={booking.canReportOverstay}
+                              overstay={booking.overstay}
+                              noteMax={OVERSTAY_NOTE_MAX}
+                            />
                           ) : null}
                         </CardContent>
                       </Card>

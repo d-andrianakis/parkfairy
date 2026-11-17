@@ -11,6 +11,7 @@ const ITEMS = [
   { href: '/users', key: 'users' },
   { href: '/bookings', key: 'bookings' },
   { href: '/payments', key: 'payments' },
+  { href: '/overstays', key: 'overstays' },
   { href: '/audit', key: 'audit' },
 ] as const;
 

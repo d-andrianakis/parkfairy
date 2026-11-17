@@ -4,6 +4,7 @@ import {
   type AdminBooking,
   type AdminBookingLookupResult,
   type AdminListingReview,
+  type AdminOverstay,
   type AdminUser,
   type AdminUserLookupResult,
   approveAdminListing,
@@ -15,6 +16,7 @@ import {
   reinstateAdminUser,
   removeAdminUserTwoFactor,
   requestAdminListingChanges,
+  resolveAdminOverstay,
   retryAdminBookingRefund,
   settleAdminBookingRefund,
   suspendAdminListing,
@@ -65,6 +67,9 @@ export const decideDispute = (
 ): Promise<Outcome<AdminBooking>> =>
   attempt(() => decideAdminDispute({ path: { id }, body: { decision, note } }));
 
+export const resolveOverstay = (id: string, note: string): Promise<Outcome<AdminOverstay>> =>
+  attempt(() => resolveAdminOverstay({ path: { id }, body: { note } }));
+
 export const lookUpUser = (email: string): Promise<Outcome<AdminUserLookupResult>> =>
   attempt(() => lookUpAdminUser({ body: { email } }));
 
@@ -91,6 +96,8 @@ const KNOWN_CODES = [
   'DISPUTE_NOT_FOUND',
   'NOT_LOST',
   'ALREADY_DECIDED',
+  'OVERSTAY_NOT_FOUND',
+  'ALREADY_RESOLVED',
   'MFA_REQUIRED',
   'INVALID_ORIGIN',
 ] as const;

@@ -177,6 +177,7 @@ test.describe('signed in', () => {
       [`/api/v1/bookings/${id}/confirm`, { vehiclePlate: 'IKB1234' }],
       [`/api/v1/bookings/${id}/cancel`, {}],
       [`/api/v1/owner/listings/${id}/bookings/${id}/cancel`, {}],
+      [`/api/v1/owner/listings/${id}/bookings/${id}/overstay`, { note: 'A grey Fiat.' }],
       // Paying, and setting up payouts (Phase 4).
       [`/api/v1/bookings/${id}/payment`, { vehiclePlate: 'IKB1234' }],
       [`/api/v1/bookings/${id}/payment/settle`, {}],
