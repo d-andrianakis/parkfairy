@@ -2,10 +2,12 @@ import type { AdminUser } from '@parkfairy/api-client';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { loadUser } from '@/lib/admin.server';
 import { requireSession } from '@/lib/session';
-import { notFoundMock } from '@/test/server-mocks';
 import { renderWithProviders } from '@/test/render';
+import { notFoundMock } from '@/test/server-mocks';
+
 import UserPage from './[id]/page';
 import UsersPage from './page';
 

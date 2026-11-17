@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { attempt } from './api-call';
 
 const response = (status: number) => new Response(null, { status });

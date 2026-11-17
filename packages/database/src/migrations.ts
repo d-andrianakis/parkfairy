@@ -1,5 +1,7 @@
 import { fileURLToPath } from 'node:url';
+
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+
 import { createDatabase } from './client.js';
 
 /** Absolute path to the versioned SQL migrations shipped with this package. */

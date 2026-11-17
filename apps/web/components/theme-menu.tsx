@@ -7,10 +7,11 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@parkfairy/ui/components/dropdown-menu';
-import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
+import { type LucideIcon, Monitor, Moon, Sun } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, type ReactElement } from 'react';
-import { isTheme, THEMES, type Theme } from '@/lib/theme';
+import { type ReactElement, useEffect, useRef } from 'react';
+
+import { isTheme, type Theme, THEMES } from '@/lib/theme';
 
 const ICONS: Record<Theme, LucideIcon> = { light: Sun, dark: Moon, system: Monitor };
 

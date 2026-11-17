@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
   addMonths,
   CALENDAR_BOOKINGS_MAX,

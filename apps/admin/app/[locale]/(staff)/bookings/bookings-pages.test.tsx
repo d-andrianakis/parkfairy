@@ -2,10 +2,12 @@ import type { AdminBooking, AdminPayments } from '@parkfairy/api-client';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { loadBooking, loadPayments } from '@/lib/admin.server';
 import { requireSession } from '@/lib/session';
-import { notFoundMock } from '@/test/server-mocks';
 import { renderWithProviders } from '@/test/render';
+import { notFoundMock } from '@/test/server-mocks';
+
 import PaymentsPage from '../payments/page';
 import BookingPage from './[id]/page';
 import BookingsPage from './page';

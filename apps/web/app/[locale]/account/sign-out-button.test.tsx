@@ -3,10 +3,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { authClient } from '@/lib/auth-client';
 import { routerMock } from '@/test/navigation-mock';
 import { catalogs, rendererFor } from '@/test/render';
+
 import { SignOutButton } from './sign-out-button';
 
 // Only the catalog namespaces this subtree ships to the browser.

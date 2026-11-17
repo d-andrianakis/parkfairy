@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+
 import { expect, type Page } from '@playwright/test';
+
 import { WEB_URL } from './env';
 
 const PHOTO = readFileSync(

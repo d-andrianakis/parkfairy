@@ -8,7 +8,9 @@ import { Alert, AlertDescription, AlertTitle } from '@parkfairy/ui/components/al
 import { CircleAlert, Clock } from 'lucide-react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
+
 import { ClosuresLink } from '@/components/owner/closures-link';
 import { HoursForm } from '@/components/owner/hours-form';
 import { LocationForm } from '@/components/owner/location-form';
@@ -19,7 +21,6 @@ import { ReviewSummary } from '@/components/owner/review-summary';
 import { SpacesForm } from '@/components/owner/spaces-form';
 import { StepShell } from '@/components/owner/step-shell';
 import { SubmitListing } from '@/components/owner/submit-listing';
-import { hasLocale } from 'next-intl';
 import { routing } from '@/i18n/routing';
 import { isListingStep } from '@/lib/owner';
 import { loadOtherListings, loadOwnerListing } from '@/lib/owner.server';

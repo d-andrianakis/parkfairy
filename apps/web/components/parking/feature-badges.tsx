@@ -1,6 +1,6 @@
 import type { ParkingFeature } from '@parkfairy/contracts';
 import { Badge } from '@parkfairy/ui/components/badge';
-import { Accessibility, Umbrella, Zap, type LucideIcon } from 'lucide-react';
+import { Accessibility, type LucideIcon, Umbrella, Zap } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 const ICONS: Record<ParkingFeature, LucideIcon> = {

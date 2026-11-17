@@ -1,6 +1,8 @@
 import 'server-only';
+
 import { cookies } from 'next/headers';
-import { parseTheme, THEME_COOKIE, type Theme } from './theme';
+
+import { parseTheme, type Theme, THEME_COOKIE } from './theme';
 
 /** The theme saved for this browser (see `applyTheme`), validated. */
 export async function getTheme(): Promise<Theme> {

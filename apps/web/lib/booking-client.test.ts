@@ -1,5 +1,6 @@
 import { BOOKING_ERROR_CODES } from '@parkfairy/contracts';
 import { describe, expect, it } from 'vitest';
+
 import el from '../messages/el.json';
 import en from '../messages/en.json';
 import { BOOKING_CODES, CHOOSE_AGAIN } from './booking-client';

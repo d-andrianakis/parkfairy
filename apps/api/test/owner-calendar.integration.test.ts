@@ -1,16 +1,18 @@
 import { randomUUID } from 'node:crypto';
+
 import {
   addMonths,
   CALENDAR_BOOKINGS_MAX,
   CALENDAR_MONTHS_AWAY,
   currentMonth,
-  OwnerCalendarSchema,
   type OwnerCalendar,
+  OwnerCalendarSchema,
 } from '@parkfairy/contracts';
-import { schema, type Database } from '@parkfairy/database';
+import { type Database, schema } from '@parkfairy/database';
 import { eq, inArray, like } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { newBookingReference } from '../src/bookings/booking-reference.js';
 import { DB } from '../src/database/database.module.js';
 import { createTestApp, signUpUser, type TestApp, type TestUser } from './test-app.js';

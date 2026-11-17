@@ -1527,9 +1527,41 @@ Our readings for 5.1, the owner's calendar and earnings (2026-11-15), not asked;
   held by a restricted account (#52) or a dispute (#58). No estimate is shown for a stay that
   isn't over: the part is worked out 24 hours after it (#4), so a figure before then could be
   wrong. Months go by the platform's time zone; gross, commission and VAT wait for #18.
-- **The cross-listing bookings list with status and date filters is not built.** The calendar
-  covers every listing by month and the per-listing page still lists upcoming bookings and
-  cancels them; say if a list across listings is still wanted.
+- **The cross-listing bookings list (2026-11-16)**: `GET /owner/bookings`, `/owner/bookings`, for
+  owners, co-owners and managers alike. Our readings, not asked; change any that are wrong:
+  - **Three groups**: `upcoming` (confirmed and not over, soonest first, under way included),
+    `past` (confirmed and over, latest first) and `cancelled` (latest first, a stay still to come
+    included). A hold, an expired one or a released one is never a booking here.
+  - **Days are the day a stay starts in its listing's own zone**, 24 months either side of this
+    month at most (`ownerBookingsReach`: the calendar's reach), a window of a year at most. `past` and
+    `cancelled` always read a window so a garage's whole history is never scanned: the last 90 days
+    unless days are asked for, a year after a lone first day, a year up to a lone last day.
+  - **The reach is a privacy limit, not a performance one**: drivers' names and plates stay readable
+    only as far back as the calendar goes until Phase 6 sets retention. Widen it only with that.
+  - **A new member reads no history** (as the calendar, #35): not a stay that ended before they
+    joined, and not a booking called off before then whatever day its stay would have been
+    (`least(ends_at, cancelled_at)`; a security review found the stay's planned end let a new
+    manager read a driver who cancelled earlier).
+  - **`cancelled_by = 'owner'` is also staff**: the list says "the listing's team or our support".
+  - **Paging is keyset on (start, id) in reading order**, `after`/`before` as the per-listing page,
+    with a probe for the side we came from. Ties on one instant, across listings, are broken by id
+    (tested).
+  - **Refused days are told on the page**, before the form, linking to the field, with the title
+    "Error: …": the order of the days and a span over a year are different messages. A GET form
+    reloads the whole page, so the title is what a screen reader hears.
+  - **Each listing gives its own first page** (a lateral on `bookings_location_starts_id_idx`), then
+    the few rows are merged and joined to drivers: a join before the limit read every booking in the
+    window (3–5 s at 100 listings, past the statement timeout). The day bounds are exact instants per
+    listing, not `to_char` of every row. Cancelled bookings have a partial index (0045). The list
+    runs at most two queries at once (the pool is ten) and is throttled per account (60 a minute).
+  - **Not done**: `upcoming` for a hundred listings is 0.25 s (the planner picks a bitmap scan; an
+    ordered-scan rewrite measured 50 ms and needs checking for equivalence), a DST test at API level,
+    a stay range in the booking's own zone (`StayRange` uses the app's, correct while listings are
+    Athens only), and the filter lists 100 listings at most (any other is still reachable by its id).
+  - **Gross, commission and VAT in earnings are still not built** and wait for #18: whether the
+    10% is shown with or without VAT and who invoices it is the adviser's. Per owner the pieces are
+    all in the ledger (`transfer_minor`, `commission_minor`, `share_bps`), but a co-owner's own
+    commission would be a pro-rata of the booking's, with rounding.
 - **2026-11-15 · `pnpm dlx shadcn add` can add an unrelated npm package.** For `table` it added a
   dependency called `cn` and imported from it. Check `git diff package.json pnpm-lock.yaml` after
   every `shadcn add`, revert them, and import `cn` from `@parkfairy/ui/lib/utils`. The registry's

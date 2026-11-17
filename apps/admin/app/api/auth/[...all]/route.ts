@@ -1,4 +1,5 @@
 import { toNextJsHandler } from 'better-auth/next-js';
+
 import { getAuth } from '@/lib/auth';
 import { bodyIsAllowed, isAllowedAuthRequest } from '@/lib/auth-routes';
 

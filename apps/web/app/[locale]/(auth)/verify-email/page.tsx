@@ -1,10 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@parkfairy/ui/components/card';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { redirect } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
-import { showsSentPanel, usableToken, type SentPanelSearch } from '@/lib/email-link-params';
+import { type SentPanelSearch, showsSentPanel, usableToken } from '@/lib/email-link-params';
 import { getSession } from '@/lib/session';
+
 import { EmailLinkForm } from '../email-link-form';
 import { ConfirmEmail } from './confirm-email';
 

@@ -2,18 +2,19 @@
 
 // First: zod must be configured before any schema (in @parkfairy/contracts) is built.
 import '@/lib/zod-jitless';
+
 import {
   deleteListingPhoto,
   reorderListingPhotos,
   updateListingPhoto,
 } from '@parkfairy/api-client';
 import {
+  type OwnerListing,
+  type OwnerPhoto,
   PHOTO_CONTENT_TYPES,
   PHOTO_LIMITS,
   PHOTO_WIDTHS,
   photoUrl,
-  type OwnerListing,
-  type OwnerPhoto,
 } from '@parkfairy/contracts';
 import { Badge } from '@parkfairy/ui/components/badge';
 import { Button } from '@parkfairy/ui/components/button';
@@ -21,14 +22,16 @@ import { FieldGroup } from '@parkfairy/ui/components/field';
 import { Progress } from '@parkfairy/ui/components/progress';
 import { ArrowLeft, ArrowRight, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { type ChangeEvent, useEffect, useState } from 'react';
+
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
 import { useAnnouncer } from '@/components/use-announcer';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
-import { attempt, uploadFile, useOwnerError, type Outcome } from '@/lib/owner-client';
+import { attempt, type Outcome, uploadFile, useOwnerError } from '@/lib/owner-client';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
+
 import { useOptionalLabel } from './fields';
 import { useFocusAfterRender } from './navigation';
 import { SaveStatus, useAutosave } from './save-status';

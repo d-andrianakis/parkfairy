@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import { defineConfig } from 'drizzle-kit';
 
 // drizzle-kit runs from this package's directory; the shared .env lives at the repo root.

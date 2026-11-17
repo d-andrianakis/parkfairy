@@ -1,4 +1,4 @@
-import { PHOTO_WIDTHS, photoUrl, type ListingPhoto } from '@parkfairy/contracts';
+import { type ListingPhoto, PHOTO_WIDTHS, photoUrl } from '@parkfairy/contracts';
 
 interface ListingPhotoImageProps {
   photo: ListingPhoto;

@@ -1,11 +1,13 @@
 import { createHmac } from 'node:crypto';
+
 import { Controller, Get } from '@nestjs/common';
 import type { Auth } from '@parkfairy/auth';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { Roles } from '../src/auth/auth.decorators.js';
 import { AUTH } from '../src/auth/auth.tokens.js';
-import { createTestApp, signUpUser, updateUser, type TestApp } from './test-app.js';
+import { createTestApp, signUpUser, type TestApp, updateUser } from './test-app.js';
 
 const PASSWORD = 'correct horse battery staple'; // signUpUser's
 

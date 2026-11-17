@@ -4,10 +4,12 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { removeTwoFactor } from '@/lib/admin-client';
 import { routerMock } from '@/test/navigation-mock';
 import { rendererFor } from '@/test/render';
+
 import { RemoveTwoFactorPanel } from './remove-two-factor-panel';
 
 vi.mock('@/lib/admin-client', async (importOriginal) => ({

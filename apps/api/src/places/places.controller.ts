@@ -12,22 +12,23 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import {
   ErrorResponseSchema,
+  type Place,
+  type PlaceList,
   PlaceListSchema,
   PlaceRetrieveQuerySchema,
   PlaceSchema,
   PlaceSearchQuerySchema,
+  type PlaceSuggestions,
   PlaceSuggestionsSchema,
   PlaceSuggestQuerySchema,
   SUPPORTED_LOCALES,
-  type Place,
-  type PlaceList,
-  type PlaceSuggestions,
 } from '@parkfairy/contracts';
+
 import { Public } from '../auth/auth.decorators.js';
 import { parseOrThrow } from '../common/validation.js';
 import { schemaRef } from '../openapi/zod-openapi.js';
-import { PlacesVisitorGuard } from './places-visitor.guard.js';
 import { PlacesService } from './places.service.js';
+import { PlacesVisitorGuard } from './places-visitor.guard.js';
 
 const MINUTE_MS = 60_000;
 /** Typing asks every few letters: a long address is a dozen calls, a few addresses a minute. */

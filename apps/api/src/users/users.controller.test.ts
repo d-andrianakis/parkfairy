@@ -1,5 +1,6 @@
 import type { AuthUser } from '@parkfairy/auth';
 import { describe, expect, it } from 'vitest';
+
 import { UsersController } from './users.controller.js';
 
 const user = {

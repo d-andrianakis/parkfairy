@@ -1,5 +1,6 @@
 import { Global, Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { createDatabase, type DatabaseConnection } from '@parkfairy/database';
+
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 

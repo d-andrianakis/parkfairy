@@ -1,7 +1,8 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { Database } from '@parkfairy/database';
-import { describe, expect, it } from 'vitest';
 import type { PaymentsGateway } from '@parkfairy/payments';
+import { describe, expect, it } from 'vitest';
+
 import { BookingsService } from './bookings.service.js';
 
 /** A database that fails the test if anything reaches it. */

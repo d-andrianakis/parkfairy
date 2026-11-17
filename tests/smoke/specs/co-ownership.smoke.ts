@@ -1,6 +1,7 @@
-import { expect, test, type Page } from '@playwright/test';
-import { emailLink, waitForEmail } from '../support/email';
+import { expect, type Page, test } from '@playwright/test';
+
 import { activatePayoutsOf, HAS_DATABASE } from '../support/db';
+import { emailLink, waitForEmail } from '../support/email';
 import { EMAIL_OUTBOX } from '../support/env';
 import {
   confirmEmail,

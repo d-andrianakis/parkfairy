@@ -1,0 +1,1 @@
+CREATE INDEX "bookings_location_cancelled_idx" ON "bookings" USING btree ("location_id","starts_at","id") WHERE "bookings"."status" = 'cancelled';

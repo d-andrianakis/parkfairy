@@ -7,9 +7,10 @@ import {
 } from '@nestjs/common';
 import { ApiOkResponse, ApiServiceUnavailableResponse, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import { HealthResponseSchema, type HealthResponse } from '@parkfairy/contracts';
+import { type HealthResponse, HealthResponseSchema } from '@parkfairy/contracts';
 import type { Database } from '@parkfairy/database';
 import { sql } from 'drizzle-orm';
+
 import { Public } from '../auth/auth.decorators.js';
 import { DB } from '../database/database.module.js';
 import { schemaRef } from '../openapi/zod-openapi.js';

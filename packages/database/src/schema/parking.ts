@@ -8,29 +8,29 @@
  */
 import {
   AREA_IDS,
+  type AreaId,
   BOOKING_GAPS,
   BOOKING_STEP_MINUTES,
   CANCELLATION_POLICIES,
+  type CancellationPolicy,
   CURRENCIES,
   DEFAULT_TIME_ZONE,
   DISCOUNT_LIMITS,
   HOURS_EXCEPTION_LABEL_MAX,
   LISTING_LIMITS,
   LISTING_STATUSES,
+  type ListingStatus,
+  type Locale,
   MAX_BOOKING_DAYS,
   OWNER_LIMITS,
   PHOTO_LIMITS,
   PRICE_LABEL_MAX,
   PROOF_CONTENT_TYPES,
   PROOF_KINDS,
+  type ProofKind,
   SLUG_PATTERN,
   SUPPORTED_LOCALES,
   SUPPORTED_TIME_ZONES,
-  type AreaId,
-  type CancellationPolicy,
-  type ListingStatus,
-  type Locale,
-  type ProofKind,
 } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import {
@@ -49,6 +49,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+
 import { ownerProfiles } from './owners.js';
 
 export { LISTING_STATUSES, type ListingStatus };

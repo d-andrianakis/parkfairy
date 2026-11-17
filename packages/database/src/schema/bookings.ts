@@ -11,21 +11,21 @@ import {
   BOOKING_CANCELLERS,
   BOOKING_GAPS,
   BOOKING_STATUSES,
-  CANCELLATION_POLICIES,
-  CURRENCIES,
-  HOLD_MAX_EXTENSIONS,
-  PAYMENT_STATUSES,
-  REFUND_STATUSES,
-  SUPPORTED_LOCALES,
-  TRANSFER_STATUSES,
-  VEHICLE_PLATE_LIMITS,
   type BookingCanceller,
   type BookingStatus,
+  CANCELLATION_POLICIES,
   type CancellationPolicy,
+  CURRENCIES,
+  HOLD_MAX_EXTENSIONS,
   type Locale,
+  PAYMENT_STATUSES,
   type PaymentStatus,
+  REFUND_STATUSES,
   type RefundStatus,
+  SUPPORTED_LOCALES,
+  TRANSFER_STATUSES,
   type TransferStatus,
+  VEHICLE_PLATE_LIMITS,
 } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import {
@@ -40,6 +40,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+
 import { users } from './auth.js';
 import { parkingLocations, parkingSpaces } from './parking.js';
 
@@ -151,6 +152,11 @@ export const bookings = pgTable(
     // An owner's bookings page and the check that closing hours strand nobody. The id last: the
     // page goes by `(starts_at, id)` places, which this answers in order and exactly (0020).
     index('bookings_location_starts_id_idx').on(t.locationId, t.startsAt, t.id),
+    // The owner's list of called-off bookings (5.1): each listing's latest, in order. A few percent of
+    // the table, so a listing with few of them doesn't walk a whole window of the others.
+    index('bookings_location_cancelled_idx')
+      .on(t.locationId, t.startsAt, t.id)
+      .where(sql`${t.status} = 'cancelled'`),
     // Removing a space sets its bookings' space to null; without it, a scan per space.
     index('bookings_space_idx').on(t.spaceId),
     // Deleting an account that called bookings off sets this null: without it, a scan per account.

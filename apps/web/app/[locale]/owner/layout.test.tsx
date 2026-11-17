@@ -1,9 +1,11 @@
 import { screen } from '@testing-library/react';
 import { useMessages } from 'next-intl';
 import { describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { getLayoutSession } from '@/lib/session';
 import { renderWithProviders } from '@/test/render';
+
 import OwnerLayout from './layout';
 
 vi.mock('@/lib/session', () => ({ getLayoutSession: vi.fn() }));

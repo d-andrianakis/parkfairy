@@ -2,6 +2,7 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { render, screen } from '@testing-library/react';
 import { encode } from 'uqr';
 import { describe, expect, it } from 'vitest';
+
 import { QrCode } from './qr-code';
 
 const URI = 'otpauth://totp/Parkfairy:demo%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=Parkfairy';

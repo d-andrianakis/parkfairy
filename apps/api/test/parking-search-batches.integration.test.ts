@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+
 import {
   addDays,
   DEFAULT_TIME_ZONE,
@@ -6,10 +7,11 @@ import {
   zonedParts,
   zonedTimeToUtc,
 } from '@parkfairy/contracts';
-import { schema, type Database } from '@parkfairy/database';
+import { type Database, schema } from '@parkfairy/database';
 import { like } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { DB } from '../src/database/database.module.js';
 import { SEARCH_BATCH } from '../src/parking/parking.service.js';
 import { createTestApp, type TestApp } from './test-app.js';

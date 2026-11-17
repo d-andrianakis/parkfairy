@@ -1,9 +1,9 @@
 import {
   isPlaceId,
-  PLACE_SUGGESTIONS_MAX,
-  placeLabel,
   type Locale,
   type Place,
+  PLACE_SUGGESTIONS_MAX,
+  placeLabel,
   type PlaceSuggestion,
 } from '@parkfairy/contracts';
 import { z } from 'zod';

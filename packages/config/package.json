@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
   "exports": {
     "./tsconfig/*.json": "./tsconfig/*.json",
     "./eslint/base": "./eslint/base.js",
@@ -14,6 +17,7 @@
     "eslint-config-next": "16.4.3",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-i18next": "6.1.5",
+    "eslint-plugin-simple-import-sort": "14.0.0",
     "globals": "17.13.0",
     "typescript-eslint": "8.72.1"
   },

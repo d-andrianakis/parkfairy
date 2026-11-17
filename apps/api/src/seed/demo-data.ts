@@ -1,4 +1,5 @@
 import type { AreaId, CancellationPolicy, ListingHoursExceptionsInput } from '@parkfairy/contracts';
+
 import type { PriceRules } from '../parking/pricing.js';
 
 /**

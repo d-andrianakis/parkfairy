@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { message, NAME_MAX_LENGTH, PASSWORD_POLICY } from './validation.js';
 
 export const SignUpInputSchema = z.object({

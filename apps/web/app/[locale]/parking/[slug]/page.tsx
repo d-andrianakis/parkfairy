@@ -14,15 +14,16 @@ import { CircleAlert, CircleCheck, MapPin } from 'lucide-react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
+
 import { ClientMessages } from '@/components/client-messages';
 import { FocusHeading } from '@/components/focus-heading';
 import { BookSpacePicker } from '@/components/parking/book-space-picker';
-import { PlaceWords } from '@/components/parking/place-words';
-import { SearchLink } from '@/components/parking/search-link';
 import { FeatureBadges } from '@/components/parking/feature-badges';
 import { HoursExceptions } from '@/components/parking/hours-exceptions';
 import { ListingPhotoImage } from '@/components/parking/listing-photo';
 import { OpeningHours } from '@/components/parking/opening-hours';
+import { PlaceWords } from '@/components/parking/place-words';
+import { SearchLink } from '@/components/parking/search-link';
 import { SpaceList } from '@/components/parking/space-list';
 import { StayRange } from '@/components/parking/stay-range';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
@@ -30,7 +31,7 @@ import { timeOptions } from '@/i18n/formats';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { loadListing } from '@/lib/api.server';
-import { parseListingWindow, windowQuery, type SearchParams } from '@/lib/search';
+import { parseListingWindow, type SearchParams, windowQuery } from '@/lib/search';
 import { getLayoutSession } from '@/lib/session';
 import { validationArgs } from '@/lib/validation-args';
 

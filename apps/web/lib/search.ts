@@ -4,14 +4,15 @@ import {
   DEFAULT_TIME_ZONE,
   isValidationMessage,
   ParkingListingQuerySchema,
-  PLACE_QUERY_LIMITS,
+  type ParkingSearchQuery,
   ParkingSearchQuerySchema,
+  PLACE_QUERY_LIMITS,
+  type ValidationMessage,
   zonedParts,
   zonedTimeToUtc,
-  type ParkingSearchQuery,
-  type ValidationMessage,
 } from '@parkfairy/contracts';
 import { isLocale } from '@parkfairy/contracts/locales';
+
 import { DEFAULT_DURATION_MS, WINDOW_PARAM_KEYS } from './search-params';
 
 /**

@@ -7,7 +7,8 @@ import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-
 import type { Stripe } from '@stripe/stripe-js';
 import { loadStripe } from '@stripe/stripe-js/pure';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useState, type FormEvent } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
+
 import { FocusHeading } from '@/components/focus-heading';
 import { FormError } from '@/components/form-error';
 import { getPathname, useRouter } from '@/i18n/navigation';

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+
 import { applyTheme, parseTheme, themeClassName } from './theme';
 
 function themeCookie() {

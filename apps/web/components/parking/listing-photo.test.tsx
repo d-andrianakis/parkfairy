@@ -1,6 +1,7 @@
 import type { ListingPhoto } from '@parkfairy/contracts';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+
 import { ListingPhotoImage } from './listing-photo';
 
 const photo: ListingPhoto = {

@@ -1,15 +1,16 @@
 import 'server-only';
+
 import {
   createClient,
   createConfig,
   findPlaces,
   getFeaturedParking,
   getParkingListing,
-  searchParking,
   type ParkingListingDetail,
   type ParkingListingSummary,
   type ParkingSearchResponse,
   type Place,
+  searchParking,
 } from '@parkfairy/api-client';
 import { isListingSlug, type ParkingSearchQuery } from '@parkfairy/contracts';
 import { unstable_cache } from 'next/cache';

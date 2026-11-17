@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@parkfairy/ui/components/alert';
 import { ArrowLeft, CircleAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
+
 import { Link } from '@/i18n/navigation';
 
 /** A page for one of the account's steps, or the "try again" state if the API didn't answer. */

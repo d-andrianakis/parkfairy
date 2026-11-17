@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { inboxOfAddress } from './listing-owners.service.js';
 
 describe('inboxOfAddress', () => {

@@ -1,6 +1,8 @@
 ﻿import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { expect, test, type Page } from '@playwright/test';
+
+import { expect, type Page, test } from '@playwright/test';
+
 import { HAS_DATABASE, sendListingBack } from '../support/db';
 import { emailLink, emailsTo } from '../support/email';
 import { DEMO_DATA, EMAIL_OUTBOX, SIGNED_IN_STATE } from '../support/env';

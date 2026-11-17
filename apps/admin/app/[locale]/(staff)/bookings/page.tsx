@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { ClientMessages } from '@/components/client-messages';
 import { StandingNotice } from '@/components/standing-notice';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
-import { accountPageUrl } from '@/lib/site';
 import { requireSession } from '@/lib/session';
+import { accountPageUrl } from '@/lib/site';
+
 import { BookingLookupForm } from './lookup-form';
 
 export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {

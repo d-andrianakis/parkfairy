@@ -1,6 +1,7 @@
-import { ForbiddenException, type ExecutionContext } from '@nestjs/common';
+import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { describe, expect, it, vi } from 'vitest';
+
 import { PLACES_PER_VISITOR_HOUR, PlacesVisitorGuard } from './places-visitor.guard.js';
 
 const HOUR_MS = 60 * 60_000;

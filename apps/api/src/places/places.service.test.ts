@@ -1,5 +1,6 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+
 import type { FetchFn } from './mapbox-search.js';
 import { PlacesService } from './places.service.js';
 

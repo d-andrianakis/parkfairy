@@ -1,7 +1,9 @@
 import { createServer } from 'node:http';
+
 import { createDatabase } from '@parkfairy/database';
-import { Queue, Worker, type ConnectionOptions } from 'bullmq';
+import { type ConnectionOptions, Queue, Worker } from 'bullmq';
 import { pino } from 'pino';
+
 import { chooseEmailTransport } from './email-transport.js';
 import { loadEnv } from './env.js';
 import { paymentsGatewayFor } from './payments-gateway.js';

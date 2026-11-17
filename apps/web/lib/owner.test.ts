@@ -1,5 +1,6 @@
 import type { OwnerListingProgress, OwnerOnboarding } from '@parkfairy/contracts';
 import { describe, expect, it } from 'vitest';
+
 import { isListingStep, listingStepHref, nextOwnerAction, setupProgress } from './owner';
 
 const listing = (overrides: Partial<OwnerListingProgress> = {}): OwnerListingProgress => ({

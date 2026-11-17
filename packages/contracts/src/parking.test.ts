@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AREAS, AREA_IDS } from './areas.js';
+
+import { AREA_IDS, AREAS } from './areas.js';
 import {
   currentSlotStart,
   MoneySchema,

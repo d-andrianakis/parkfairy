@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
+
 import { HoursExceptionsForm } from '@/components/owner/hours-exceptions-form';
 import { PlaceWords } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';

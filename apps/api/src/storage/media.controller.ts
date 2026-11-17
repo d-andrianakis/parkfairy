@@ -14,9 +14,10 @@ import {
   ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
-import { ErrorResponseSchema, PHOTO_WIDTHS } from '@parkfairy/contracts';
 import { Throttle } from '@nestjs/throttler';
+import { ErrorResponseSchema, PHOTO_WIDTHS } from '@parkfairy/contracts';
 import type { Response } from 'express';
+
 import { Public } from '../auth/auth.decorators.js';
 import { schemaRef } from '../openapi/zod-openapi.js';
 import { OBJECT_STORE, type ObjectStore } from './object-store.js';

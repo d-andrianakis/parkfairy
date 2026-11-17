@@ -1,16 +1,17 @@
 import {
+  type CanActivate,
+  type ExecutionContext,
   ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
-  type CanActivate,
-  type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Auth } from '@parkfairy/auth';
 import type { UserRole } from '@parkfairy/database';
 import { fromNodeHeaders } from 'better-auth/node';
-import { IS_PUBLIC_KEY, ROLES_KEY, type AuthenticatedRequest } from './auth.decorators.js';
+
+import { type AuthenticatedRequest, IS_PUBLIC_KEY, ROLES_KEY } from './auth.decorators.js';
 import { AUTH } from './auth.tokens.js';
 
 /**

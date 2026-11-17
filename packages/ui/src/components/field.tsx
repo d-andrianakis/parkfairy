@@ -1,11 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '@parkfairy/ui/lib/utils';
-
 import { Label } from '@parkfairy/ui/components/label';
 import { Separator } from '@parkfairy/ui/components/separator';
+import { cn } from '@parkfairy/ui/lib/utils';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { useMemo } from 'react';
 
 function FieldSet({ className, ...props }: React.ComponentProps<'fieldset'>) {
   return (
@@ -222,13 +221,13 @@ function FieldError({
 
 export {
   Field,
-  FieldLabel,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
+  FieldLabel,
   FieldLegend,
   FieldSeparator,
   FieldSet,
-  FieldContent,
   FieldTitle,
 };

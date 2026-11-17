@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
+
 import { createFieldCrypto, fieldKey } from './field-crypto.js';
 
 const crypto = createFieldCrypto(randomBytes(32));

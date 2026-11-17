@@ -3,11 +3,12 @@ import { Button } from '@parkfairy/ui/components/button';
 import { CircleAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { AccountChecklist } from '@/components/owner/account-checklist';
-import { ManagedListings } from '@/components/owner/managed-listings';
 import { ContinueCard } from '@/components/owner/continue-card';
 import { NewListingButton } from '@/components/owner/listing-actions';
 import { ListingMilestones } from '@/components/owner/listing-milestones';
+import { ManagedListings } from '@/components/owner/managed-listings';
 import { OwnerLanding, SignedOutActions } from '@/components/owner/owner-landing';
 import { PayoutsCard } from '@/components/owner/payouts-card';
 import { Link } from '@/i18n/navigation';
@@ -88,6 +89,12 @@ export default async function OwnerPage({ params }: LocaleParams) {
             className="text-primary underline underline-offset-4 hover:decoration-2"
           >
             {t('calendar.link')}
+          </Link>
+          <Link
+            href="/owner/bookings"
+            className="text-primary underline underline-offset-4 hover:decoration-2"
+          >
+            {t('bookingList.link')}
           </Link>
           <Link
             href="/owner/earnings"

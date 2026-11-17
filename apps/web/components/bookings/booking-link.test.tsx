@@ -1,7 +1,9 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { stripePublishableKey } from '@/lib/payments.server';
 import { renderWithProviders } from '@/test/render';
+
 import { BookingLink } from './booking-link';
 
 vi.mock('@/lib/payments.server', () => ({ stripePublishableKey: vi.fn() }));

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+
 import { emailLink, emailsTo, waitForEmail } from '../support/email';
 import { EMAIL_OUTBOX, TEST_PASSWORD, WEB_URL } from '../support/env';
 import {

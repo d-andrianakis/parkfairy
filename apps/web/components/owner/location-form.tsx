@@ -2,33 +2,36 @@
 
 // First: zod must be configured before any schema (in @parkfairy/contracts) is built.
 import '@/lib/zod-jitless';
-import { saveListingLocation, type ListingLocationPatch } from '@parkfairy/api-client';
+
+import { type ListingLocationPatch, saveListingLocation } from '@parkfairy/api-client';
 import {
-  AREAS,
   AREA_IDS,
+  type AreaId,
+  AREAS,
   ListingLocationInputSchema,
   ListingLocationPatchSchema,
-  SUPPORTED_LOCALES,
-  type AreaId,
   type Locale,
   type OwnerListing,
+  SUPPORTED_LOCALES,
 } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
 import { FieldGroup, FieldLegend, FieldSet } from '@parkfairy/ui/components/field';
 import { LocateFixed, Map as MapIcon, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react';
+import { type ComponentType, type FormEvent, useEffect, useMemo, useState } from 'react';
+
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
 import { PlaceWords } from '@/components/parking/place-words';
 import { useAnnouncer } from '@/components/use-announcer';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { LOCALE_ENDONYMS } from '@/i18n/locales';
-import { findAddress, type AddressMatch } from '@/lib/mapbox-geocode';
+import { type AddressMatch, findAddress } from '@/lib/mapbox-geocode';
 import { listingStepHref } from '@/lib/owner';
 import { attempt, useOwnerError } from '@/lib/owner-client';
 import { useValidationMessage } from '@/lib/use-validation-message';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
+
 import { SelectField, SelectOption, TextareaField, useOptionalLabel } from './fields';
 import type { LocationMapProps } from './location-map';
 import { useFocusAfterRender, useStepNavigation } from './navigation';

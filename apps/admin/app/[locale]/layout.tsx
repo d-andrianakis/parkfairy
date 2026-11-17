@@ -1,9 +1,12 @@
+import '../globals.css';
+
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
+
 import { ClientMessages } from '@/components/client-messages';
 import { RouteFocus } from '@/components/route-focus';
 import { SiteHeader } from '@/components/site-header';
@@ -11,7 +14,6 @@ import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { routing } from '@/i18n/routing';
 import { getLayoutSession, standingOf } from '@/lib/session';
-import '../globals.css';
 
 export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
   const t = await getTranslations({

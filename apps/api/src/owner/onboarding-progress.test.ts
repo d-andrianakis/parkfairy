@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+
 import {
   doneAccountSteps,
   doneListingSteps,
+  type ListingFacts,
   missingForSubmit,
   nextListingStep,
-  type ListingFacts,
   type ProfileFacts,
 } from './onboarding-progress.js';
 

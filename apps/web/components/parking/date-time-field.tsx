@@ -6,13 +6,15 @@ import { Input } from '@parkfairy/ui/components/input';
 import { NativeSelect, NativeSelectOption } from '@parkfairy/ui/components/native-select';
 import { cn } from '@parkfairy/ui/lib/utils';
 import { CalendarClock, LoaderCircle } from 'lucide-react';
-import { useFormatter, useLocale, useTranslations, type DateTimeFormatOptions } from 'next-intl';
-import { useCallback, useEffect, useId, useRef, useState, type ComponentType } from 'react';
+import { type DateTimeFormatOptions, useFormatter, useLocale, useTranslations } from 'next-intl';
+import { type ComponentType, useCallback, useEffect, useId, useRef, useState } from 'react';
+
 import { spokenStayOptions, stayOptions, timeOptions } from '@/i18n/formats';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
+
 import { PlainField } from '../plain-field';
 import type { DateTimePickerProps, DateTimeValue } from './date-time-picker';
-import { useStay, type StayPart } from './stay-fields';
+import { type StayPart, useStay } from './stay-fields';
 
 let pickerChunk: Promise<typeof import('./date-time-picker')> | undefined;
 function loadPicker() {

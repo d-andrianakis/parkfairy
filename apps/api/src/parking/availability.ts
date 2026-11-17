@@ -1,5 +1,5 @@
 import { schema } from '@parkfairy/database';
-import { sql, type Column, type SQL } from 'drizzle-orm';
+import { type Column, type SQL, sql } from 'drizzle-orm';
 
 const booking = schema.bookings;
 

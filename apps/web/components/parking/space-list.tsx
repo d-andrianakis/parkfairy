@@ -1,5 +1,6 @@
 import type { ParkingListingDetail } from '@parkfairy/contracts';
 import { useFormatter, useTranslations } from 'next-intl';
+
 import { FeatureBadges } from './feature-badges';
 import { PlaceWords } from './place-words';
 

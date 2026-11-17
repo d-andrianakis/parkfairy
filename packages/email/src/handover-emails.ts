@@ -1,4 +1,5 @@
 import { LISTING_HANDOVER_DAYS } from '@parkfairy/contracts';
+
 import { renderEmail } from './layout.js';
 import type { OwnerEmailLocale } from './owner-emails.js';
 import type { OutgoingEmail } from './transport.js';

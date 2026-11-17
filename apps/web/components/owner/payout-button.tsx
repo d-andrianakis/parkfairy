@@ -4,6 +4,7 @@ import { openPayoutDashboard, startPayoutOnboarding } from '@parkfairy/api-clien
 import { Button } from '@parkfairy/ui/components/button';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
+
 import { FormError } from '@/components/form-error';
 import { loadPage } from '@/lib/load-page';
 import { attempt, useOwnerError } from '@/lib/owner-client';

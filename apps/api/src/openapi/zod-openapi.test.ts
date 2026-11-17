@@ -1,6 +1,7 @@
 import { MeResponseSchema } from '@parkfairy/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+
 import { addContractSchemas, schemaRef } from './zod-openapi.js';
 
 describe('schemaRef', () => {

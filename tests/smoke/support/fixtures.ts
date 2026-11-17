@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+
 import AxeBuilder from '@axe-core/playwright';
-import { expect, type Browser, type Page } from '@playwright/test';
+import { type Browser, expect, type Page } from '@playwright/test';
+
 import { emailLink, waitForEmail } from './email';
 import { TEST_PASSWORD, visitorAddress } from './env';
 import { totp } from './totp';

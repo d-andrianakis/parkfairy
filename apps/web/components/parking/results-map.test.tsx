@@ -1,6 +1,7 @@
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import ResultsMap, { type ResultsMapProps } from './results-map';
 
 const fake = vi.hoisted(() => {

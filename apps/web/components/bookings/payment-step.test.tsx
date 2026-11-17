@@ -2,14 +2,16 @@ import { settleMyPayment } from '@parkfairy/api-client';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useEffect, type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { isPaying } from '@/lib/payment-progress';
 import { STRIPE_DARK, STRIPE_LIGHT } from '@/lib/stripe-appearance';
-import { answer, refusal } from '@/test/owner-fixtures';
 import { routerMock } from '@/test/navigation-mock';
+import { answer, refusal } from '@/test/owner-fixtures';
 import { rendererFor } from '@/test/render';
+
 import PaymentStep from './payment-step';
 
 vi.mock('@parkfairy/api-client', () => ({

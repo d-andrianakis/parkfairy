@@ -1,7 +1,9 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react';
+
 import { DEFAULT_DURATION_MS } from '@/lib/search-params';
+
 import type { DateTimeValue } from './date-time-picker';
 
 export type StayPart = 'start' | 'end';

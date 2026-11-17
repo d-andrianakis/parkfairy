@@ -5,9 +5,11 @@ import userEvent from '@testing-library/user-event';
 import { NextIntlClientProvider } from 'next-intl';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { getPathname } from '@/i18n/navigation';
 import type { SearchValues } from '@/lib/search';
 import { catalogs, renderWithProviders } from '@/test/render';
+
 import { SearchForm } from './search-form';
 
 const byId = (id: string) => document.getElementById(id) as HTMLElement;

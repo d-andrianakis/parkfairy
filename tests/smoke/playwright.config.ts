@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+
 import { VISITOR_HEADERS, WEB_URL } from './support/env';
 
 const isCI = Boolean(process.env.CI);

@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@parkfairy/ui/components/card';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
-import { showsSentPanel, type SentPanelSearch } from '@/lib/email-link-params';
+import { type SentPanelSearch, showsSentPanel } from '@/lib/email-link-params';
+
 import { EmailLinkForm } from '../email-link-form';
 
 export async function generateMetadata({

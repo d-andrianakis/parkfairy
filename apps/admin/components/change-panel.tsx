@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import type { ZodType } from 'zod';
+
 import { FocusHeading } from '@/components/focus-heading';
 import { NoteConfirm, type NoteConfirmLabels } from '@/components/note-confirm';
 import { StaleNotice } from '@/components/stale-notice';

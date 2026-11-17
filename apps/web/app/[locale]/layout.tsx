@@ -1,9 +1,12 @@
+import '../globals.css';
+
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
+
 import { ClientMessages } from '@/components/client-messages';
 import { RouteFocus } from '@/components/route-focus';
 import { SessionRefresh } from '@/components/session-refresh';
@@ -15,7 +18,6 @@ import { getLayoutSession } from '@/lib/session';
 import { sessionRefreshDue } from '@/lib/session-refresh';
 import { themeClassName } from '@/lib/theme';
 import { getTheme } from '@/lib/theme.server';
-import '../globals.css';
 
 export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
   const t = await getTranslations({

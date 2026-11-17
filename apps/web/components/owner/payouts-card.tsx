@@ -1,3 +1,4 @@
+import type { OwnerPayouts } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
 import {
   Card,
@@ -7,8 +8,8 @@ import {
   CardTitle,
 } from '@parkfairy/ui/components/card';
 import { Landmark } from 'lucide-react';
-import type { OwnerPayouts } from '@parkfairy/contracts';
 import { getTranslations } from 'next-intl/server';
+
 import { Link } from '@/i18n/navigation';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 

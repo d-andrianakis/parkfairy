@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { expect, request as http, test, type Page } from '@playwright/test';
+
+import { expect, type Page, request as http, test } from '@playwright/test';
+
 import {
   activatePayouts,
   disputeOf,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { adminErrorKey } from './admin-client';
 
 describe('what a refusal from the admin routes is called', () => {

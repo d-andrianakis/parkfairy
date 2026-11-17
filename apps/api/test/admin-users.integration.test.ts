@@ -1,18 +1,20 @@
 import { randomUUID } from 'node:crypto';
+
+import type { Auth } from '@parkfairy/auth';
 import {
   ADMIN_IDENTITY_NOTE_MAX,
   AdminUserLookupResultSchema,
   AdminUserSchema,
   AuditLogSchema,
 } from '@parkfairy/contracts';
-import type { Auth } from '@parkfairy/auth';
-import { claimDueEmails, releaseEmails, schema, type Database } from '@parkfairy/database';
+import { claimDueEmails, type Database, releaseEmails, schema } from '@parkfairy/database';
 import { eq, inArray, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { AUTH } from '../src/auth/auth.tokens.js';
 import { DB } from '../src/database/database.module.js';
-import { createTestApp, signUpUser, updateUser, type TestApp, type TestUser } from './test-app.js';
+import { createTestApp, signUpUser, type TestApp, type TestUser, updateUser } from './test-app.js';
 
 // Support's way into an account (5.2c, #13): find a person by their address, remove their second
 // factor after an identity check.

@@ -2,6 +2,7 @@ import { Alert, AlertDescription, AlertTitle } from '@parkfairy/ui/components/al
 import { ArrowLeft, CircleAlert, CircleCheck } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { FocusHeading } from '@/components/focus-heading';
 import { PayoutButton } from '@/components/owner/payout-button';
 import { Link } from '@/i18n/navigation';

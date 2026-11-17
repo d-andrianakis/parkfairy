@@ -7,7 +7,7 @@
  * Business data (owner profiles, bookings, ...) lives in separate tables that
  * reference `users.id`.
  */
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from '@parkfairy/contracts';
+import { DEFAULT_LOCALE, type Locale, SUPPORTED_LOCALES } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import {
   boolean,

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
+
 import { bookingsCursor } from './bookings.js';
 import {
   EARNING_HOLDS,
   EARNING_STATES,
+  EarningLineSchema,
   EARNINGS_IN_PROGRESS_MAX,
   EARNINGS_MONTHS,
   EARNINGS_PAGE_SIZE,
-  EarningLineSchema,
   OwnerEarningsQuerySchema,
   OwnerEarningsSchema,
 } from './earnings.js';

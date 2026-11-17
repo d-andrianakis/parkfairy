@@ -1,8 +1,10 @@
 import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { redirect } from '@/i18n/navigation';
 import { getSession } from '@/lib/session';
 import { renderWithProviders } from '@/test/render';
+
 import SignInPage from './sign-in/page';
 import SignUpPage from './sign-up/page';
 

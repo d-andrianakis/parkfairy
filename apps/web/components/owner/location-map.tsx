@@ -2,9 +2,11 @@
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/lib/mapbox-focus.css';
+
 import type { Map as MapboxMap, Marker } from 'mapbox-gl';
 import { useEffect, useRef } from 'react';
-import { markAttributionEnglish, MAPBOX_STYLE as STYLE, workerUrlFor } from '@/lib/mapbox';
+
+import { MAPBOX_STYLE as STYLE, markAttributionEnglish, workerUrlFor } from '@/lib/mapbox';
 
 /** Attica, until there is a pin. */
 const DEFAULT_CENTER: [number, number] = [23.7275, 37.9838];

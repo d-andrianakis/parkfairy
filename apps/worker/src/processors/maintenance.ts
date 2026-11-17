@@ -8,7 +8,8 @@ import {
   purgeStripeEvents,
 } from '@parkfairy/database';
 import { sql } from 'drizzle-orm';
-import { QUEUES, type QueueProcessor } from '../queues.js';
+
+import { type QueueProcessor, QUEUES } from '../queues.js';
 
 /**
  * How long an address may stay unconfirmed. Anyone can sign up with a stranger's address, so

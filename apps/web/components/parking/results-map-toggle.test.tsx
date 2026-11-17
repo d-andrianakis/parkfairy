@@ -2,8 +2,10 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { rendererFor } from '@/test/render';
+
 import { ResultsMapToggle } from './results-map-toggle';
 
 /** The library behind the map, faked: what the map was given, and its load and error. */

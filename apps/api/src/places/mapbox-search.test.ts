@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import {
+  type FetchFn,
   findPlaces,
   MapboxError,
   retrievePlace,
   suggestPlaces,
-  type FetchFn,
 } from './mapbox-search.js';
 
 const SESSION = '0b6f2a7e-6c1d-4f5e-9a3b-2c8d7e1f4a90';

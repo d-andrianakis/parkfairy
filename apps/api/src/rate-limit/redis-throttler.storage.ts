@@ -1,5 +1,5 @@
 import type { ThrottlerStorage } from '@nestjs/throttler';
-import { redisScript, runScript, type RedisEval } from '@parkfairy/auth';
+import { type RedisEval, redisScript, runScript } from '@parkfairy/auth';
 
 type ThrottlerStorageRecord = Awaited<ReturnType<ThrottlerStorage['increment']>>;
 

@@ -4,9 +4,11 @@ import { Progress } from '@parkfairy/ui/components/progress';
 import { ArrowLeft, CircleAlert } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
+
 import { PlaceWords } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
+
 import { StepLink } from './navigation';
 import { STEP_LINK, StepRow } from './step-state';
 

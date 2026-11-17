@@ -1,6 +1,8 @@
 import { screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { renderWithProviders } from '@/test/render';
+
 import { SearchLink } from './search-link';
 
 const press = (link: HTMLElement) => {

@@ -2,23 +2,25 @@
 
 // First: zod must be configured before any schema (in @parkfairy/contracts) is built.
 import '@/lib/zod-jitless';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   PASSWORD_POLICY,
-  ResetPasswordInputSchema,
   type ResetPasswordInput,
+  ResetPasswordInputSchema,
 } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
 import { FieldGroup } from '@parkfairy/ui/components/field';
 import { useTranslations } from 'next-intl';
-import { useState, type FormEvent } from 'react';
+import { type FormEvent, useState } from 'react';
 import { useForm } from 'react-hook-form';
+
 import { FormError } from '@/components/form-error';
 import { PasswordField, usePasswordReveal } from '@/components/password-field';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { Link, useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
-import { authErrorKey, authErrorValues, type AuthErrorKey } from '@/lib/auth-errors';
+import { type AuthErrorKey, authErrorKey, authErrorValues } from '@/lib/auth-errors';
 import { useValidationMessage } from '@/lib/use-validation-message';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 

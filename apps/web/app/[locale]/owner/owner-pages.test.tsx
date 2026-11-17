@@ -3,6 +3,7 @@ import { screen, within } from '@testing-library/react';
 import { notFound } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
   loadOtherListings,
   loadOwnerClosures,
@@ -12,9 +13,10 @@ import {
 import { requireSession } from '@/lib/session';
 import { LISTING_ID, listingFixture, profileFixture, progressFixture } from '@/test/owner-fixtures';
 import { renderWithProviders } from '@/test/render';
+
+import OwnerLayout from './layout';
 import ListingStepPage from './listings/[id]/[step]/page';
 import ClosuresPage, { generateMetadata as closuresMetadata } from './listings/[id]/closures/page';
-import OwnerLayout from './layout';
 import OwnerTaxPage from './tax/page';
 
 vi.mock('@/lib/owner.server', () => ({

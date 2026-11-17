@@ -1,13 +1,17 @@
 import { randomUUID } from 'node:crypto';
+
 import {
   addDays,
+  type Booking,
   BOOKING_REFERENCE_PATTERN,
   BookingListSchema,
-  BookingSchema,
   BOOKINGS_PAGE_SIZE,
+  BookingSchema,
+  type CancellationPolicy,
   DEFAULT_TIME_ZONE,
-  LISTING_SPACES_LIMIT,
   isoWeekday,
+  LISTING_SPACES_LIMIT,
+  type ListingStatus,
   OwnerHoursCopySchema,
   OwnerHoursExceptionsCopySchema,
   OwnerListingBookingsSchema,
@@ -15,25 +19,23 @@ import {
   ParkingSearchResponseSchema,
   zonedParts,
   zonedTimeToUtc,
-  type Booking,
-  type CancellationPolicy,
-  type ListingStatus,
 } from '@parkfairy/contracts';
-import { expireLapsedHolds, schema, type Database } from '@parkfairy/database';
+import { type Database, expireLapsedHolds, schema } from '@parkfairy/database';
 import { and, asc, eq, inArray, like, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
 import type * as bookingReference from '../src/bookings/booking-reference.js';
 import { newBookingReference } from '../src/bookings/booking-reference.js';
 import { OWNER_EMAILS_PER_DRIVER_DAY } from '../src/bookings/bookings.service.js';
 import { strandedBookings } from '../src/bookings/stranded.js';
+import { DB } from '../src/database/database.module.js';
 import {
   hoursExceptionsOf,
   listingRulesIn,
   openingHoursOf,
   priceRulesOf,
 } from '../src/parking/listing-data.js';
-import { DB } from '../src/database/database.module.js';
 import { createTestApp, signUpUser, type TestApp, type TestUser } from './test-app.js';
 
 /** References the next holds take before random ones: a collision, on demand. */

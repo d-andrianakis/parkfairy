@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { greekRuns } from './greek-runs.js';
 
 describe('greekRuns', () => {

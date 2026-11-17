@@ -1,7 +1,9 @@
 import 'reflect-metadata';
+
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
+
 import { AppModule } from './app.module.js';
 import { configureApp } from './app.setup.js';
 import { ENV } from './config/config.module.js';

@@ -18,12 +18,12 @@ vi.mock('@parkfairy/database', async (importOriginal) => ({
 import {
   ANSWER_FLOOR_MS,
   AUTH_COOKIE_PREFIX,
+  type AuthEmail,
   createAuth,
   INVALID_LOCALE,
   INVALID_NAME,
   memoryRateLimitStorage,
   parseOrigins,
-  type AuthEmail,
 } from './index.js';
 
 // The pool is lazy: nothing here opens a connection.

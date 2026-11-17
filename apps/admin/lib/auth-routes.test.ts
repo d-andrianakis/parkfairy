@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { bodyIsAllowed, isAllowedAuthRequest } from './auth-routes';
 
 describe('which Better Auth endpoints the staff origin serves', () => {

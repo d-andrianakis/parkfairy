@@ -3,6 +3,7 @@ import { Button } from '@parkfairy/ui/components/button';
 import { CircleAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { AccountStepShell } from '@/components/owner/account-step-shell';
 import { TaxForm } from '@/components/owner/tax-form';
 import { Link } from '@/i18n/navigation';

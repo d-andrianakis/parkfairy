@@ -1,12 +1,13 @@
 import {
-  Injectable,
   type CallHandler,
   type ExecutionContext,
+  Injectable,
   type NestInterceptor,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Response } from 'express';
 import type { Observable } from 'rxjs';
+
 import { IS_PUBLIC_KEY } from '../auth/auth.decorators.js';
 
 /**

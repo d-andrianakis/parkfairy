@@ -1,8 +1,10 @@
 import { Button } from '@parkfairy/ui/components/button';
 import { CircleParking } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+
 import { Link } from '@/i18n/navigation';
 import type { Theme } from '@/lib/theme';
+
 import { LocaleSwitcher } from './locale-switcher';
 import { ThemeToggle } from './theme-toggle';
 

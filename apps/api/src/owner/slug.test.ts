@@ -1,5 +1,6 @@
 import { isListingSlug, LISTING_LIMITS } from '@parkfairy/contracts';
 import { describe, expect, it } from 'vitest';
+
 import { slugFromName } from './slug.js';
 
 describe('slugFromName', () => {

@@ -3,8 +3,10 @@
 import { Button } from '@parkfairy/ui/components/button';
 import { Moon, Sun } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useRef, useState, type ComponentType } from 'react';
+import { type ComponentType, useRef, useState } from 'react';
+
 import { applyTheme, type Theme } from '@/lib/theme';
+
 import type { MenuStart, ThemeMenuProps } from './theme-menu';
 
 let menuChunk: Promise<typeof import('./theme-menu')> | undefined;

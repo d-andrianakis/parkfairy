@@ -5,7 +5,9 @@ import { NextIntlClientProvider } from 'next-intl';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+
 import { renderWithProviders } from '@/test/render';
+
 import { PasswordField, usePasswordReveal } from './password-field';
 
 function Field({ error }: { error?: string }) {

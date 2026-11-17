@@ -1,5 +1,6 @@
 import type { OpeningPeriod } from '@parkfairy/contracts';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
+
 import { endOfDayOptions, timeOptions } from '@/i18n/formats';
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];

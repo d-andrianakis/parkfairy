@@ -1,5 +1,6 @@
 import { outboxTransport, resendTransport } from '@parkfairy/email';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { chooseEmailTransport } from './email-transport.js';
 
 vi.mock('@parkfairy/email', () => ({

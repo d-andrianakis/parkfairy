@@ -8,11 +8,13 @@ import {
 } from '@parkfairy/ui/components/card';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { localeFromParams, type LocaleParams } from '@/i18n/params';
-import { requireSession } from '@/lib/session';
+
 import { ClientMessages } from '@/components/client-messages';
 import { PersonName } from '@/components/parking/place-words';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
+import { localeFromParams, type LocaleParams } from '@/i18n/params';
+import { requireSession } from '@/lib/session';
+
 import { ApiIdentity } from './api-identity';
 import { Providers } from './providers';
 import { SignOutButton } from './sign-out-button';

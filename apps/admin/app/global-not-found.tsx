@@ -1,7 +1,8 @@
+import './globals.css';
+
 import { buttonVariants } from '@parkfairy/ui/components/button';
 import type { Metadata } from 'next';
 import { getLocale, getTranslations } from 'next-intl/server';
-import './globals.css';
 
 /**
  * 404 for URLs that match no route. The root layout lives under [locale], so Next.js renders this

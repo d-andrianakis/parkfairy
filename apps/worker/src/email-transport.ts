@@ -1,5 +1,7 @@
 import { resolve } from 'node:path';
-import { outboxTransport, resendTransport, type EmailTransport } from '@parkfairy/email';
+
+import { type EmailTransport, outboxTransport, resendTransport } from '@parkfairy/email';
+
 import type { Env } from './env.js';
 
 type EmailEnv = Pick<

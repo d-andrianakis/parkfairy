@@ -1,6 +1,7 @@
 // @vitest-environment node
-import { memoryRateLimitStorage, redisRateLimitStorage, type AuthEmail } from '@parkfairy/auth';
+import { type AuthEmail, memoryRateLimitStorage, redisRateLimitStorage } from '@parkfairy/auth';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import type { EmailTransport } from './transport';
 
 vi.mock('server-only', () => ({}));

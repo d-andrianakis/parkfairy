@@ -3,11 +3,13 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { keepFocusThroughUrlChange } from '@/components/route-focus';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
-import { answer } from '@/test/owner-fixtures';
 import { routerMock } from '@/test/navigation-mock';
+import { answer } from '@/test/owner-fixtures';
 import { rendererFor } from '@/test/render';
+
 import { LOOKS_MS, PaymentPending } from './payment-pending';
 
 vi.mock('@parkfairy/api-client', () => ({

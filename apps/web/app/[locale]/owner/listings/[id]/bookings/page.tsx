@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
+
 import { FocusHeading } from '@/components/focus-heading';
 import { CancelListingBooking } from '@/components/owner/cancel-listing-booking';
 import { PersonName, PlaceWords } from '@/components/parking/place-words';

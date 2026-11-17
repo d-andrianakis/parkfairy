@@ -1,7 +1,8 @@
+import type { Job } from 'bullmq';
 import { describe, expect, it, vi } from 'vitest';
+
 import { maintenanceProcessor } from './processors/maintenance.js';
 import { ownerEmailsProcessor } from './processors/owner-emails.js';
-import type { Job } from 'bullmq';
 import { jobHandler, prepareQueue, type ProcessorContext } from './queues.js';
 
 const fakeQueue = () => ({

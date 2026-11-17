@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+
 import { parseOrigins } from '@parkfairy/auth';
 import { z } from 'zod';
 

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { getFormatter, getTranslations } from 'next-intl/server';
+
 import { ClientMessages } from '@/components/client-messages';
 import { DisputeReason } from '@/components/dispute-reason';
 import { MarkedText, PersonName } from '@/components/marked-text';
@@ -13,8 +14,9 @@ import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { loadBooking } from '@/lib/admin.server';
 import { withClock } from '@/lib/clock';
-import { accountPageUrl } from '@/lib/site';
 import { requireSession } from '@/lib/session';
+import { accountPageUrl } from '@/lib/site';
+
 import { BookingActions } from './booking-actions';
 
 type Props = LocaleParams & { params: Promise<{ locale: string; id: string }> };

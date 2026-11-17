@@ -2,14 +2,15 @@
 
 // First: zod must be configured before any schema (in @parkfairy/contracts) is built.
 import '@/lib/zod-jitless';
+
 import { deleteListingProof, saveListingProofDetails } from '@parkfairy/api-client';
 import {
-  PROOF_CONTENT_TYPES,
-  PROOF_KINDS,
-  PROOF_LIMITS,
   ListingProofPatchSchema,
   type OwnerListing,
   type OwnerProof,
+  PROOF_CONTENT_TYPES,
+  PROOF_KINDS,
+  PROOF_LIMITS,
   type ProofKind,
 } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
@@ -17,15 +18,17 @@ import { FieldGroup } from '@parkfairy/ui/components/field';
 import { Progress } from '@parkfairy/ui/components/progress';
 import { Download, FileText, Trash2 } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { type ChangeEvent, useEffect, useState } from 'react';
+
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
 import { useAnnouncer } from '@/components/use-announcer';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
-import { attempt, uploadFile, useOwnerError, type Outcome } from '@/lib/owner-client';
+import { attempt, type Outcome, uploadFile, useOwnerError } from '@/lib/owner-client';
 import { useValidationMessage } from '@/lib/use-validation-message';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
+
 import { SelectField, SelectOption, useOptionalLabel } from './fields';
 import { useFocusAfterRender } from './navigation';
 import { SaveStatus, useAutosave } from './save-status';

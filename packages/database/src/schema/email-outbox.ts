@@ -8,6 +8,7 @@
  */
 import { sql } from 'drizzle-orm';
 import { check, index, jsonb, pgTable, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+
 import { users } from './auth.js';
 import { listingInvites } from './listing-owners.js';
 

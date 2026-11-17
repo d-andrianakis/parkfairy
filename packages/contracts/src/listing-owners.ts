@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { LocaleSchema } from './i18n.js';
 import { PayoutStatusSchema } from './payments.js';
 import { contractsRegistry } from './registry.js';

@@ -2,18 +2,20 @@
 
 // First: zod must be configured before any schema (in @parkfairy/contracts) is built.
 import '@/lib/zod-jitless';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@parkfairy/ui/components/button';
 import { FieldDescription, FieldGroup, FieldLabel } from '@parkfairy/ui/components/field';
 import { Textarea } from '@parkfairy/ui/components/textarea';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { ZodType } from 'zod';
+
 import { FormError } from '@/components/form-error';
 import { PlainField, PlainFieldError } from '@/components/plain-field';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
-import type { Outcome } from '@/lib/api-call';
 import { useAdminError } from '@/lib/admin-client';
+import type { Outcome } from '@/lib/api-call';
 import { useValidationMessage } from '@/lib/use-validation-message';
 
 export interface NoteConfirmLabels {

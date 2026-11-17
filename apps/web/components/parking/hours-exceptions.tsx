@@ -1,5 +1,6 @@
 import type { HoursException } from '@parkfairy/contracts';
 import { useLocale, useTranslations } from 'next-intl';
+
 import { PeriodText, useWallTime } from './opening-hours';
 
 /** A calendar day (`YYYY-MM-DD`) at noon UTC, so formatting it in UTC never moves the day. */

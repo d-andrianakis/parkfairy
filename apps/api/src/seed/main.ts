@@ -2,6 +2,7 @@
  * Seeds a local database: `node dist/seed/main.js` (run via `pnpm db:seed`).
  */
 import { createDatabase } from '@parkfairy/database';
+
 import { DEFAULT_OBJECT_STORE_DIR } from '../config/env.js';
 import { fileObjectStore } from '../storage/object-store.js';
 import { DEMO_ACCOUNT, DEMO_LISTINGS } from './demo-data.js';

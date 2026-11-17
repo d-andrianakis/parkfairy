@@ -2,7 +2,9 @@ import type { CalendarBooking, OwnerCalendar } from '@parkfairy/api-client';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+
 import { renderWithProviders } from '@/test/render';
+
 import { CalendarView } from './calendar-view';
 
 const ID = '7f1f3a52-6a39-4a39-9c0b-0a1b2c3d4e5f';

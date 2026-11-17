@@ -2,13 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   bookingsCursor,
   EARNINGS_PAGE_SIZE,
-  OwnerEarningsSchema,
-  parseBookingsCursor,
   type OwnerEarnings,
   type OwnerEarningsQuery,
+  OwnerEarningsSchema,
+  parseBookingsCursor,
 } from '@parkfairy/contracts';
-import { ownerEarnings, schema, type Database, type EarningRow } from '@parkfairy/database';
+import { type Database, type EarningRow, ownerEarnings, schema } from '@parkfairy/database';
 import { eq } from 'drizzle-orm';
+
 import { DB } from '../database/database.module.js';
 
 const profile = schema.ownerProfiles;

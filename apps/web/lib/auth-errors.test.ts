@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { AUTH_ERROR_KEYS, authErrorKey, authErrorValues } from './auth-errors';
 
 describe('authErrorKey', () => {

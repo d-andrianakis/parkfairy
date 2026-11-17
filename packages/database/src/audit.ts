@@ -1,6 +1,7 @@
 import type { AuditAction } from '@parkfairy/contracts';
+
 import type { Database } from './client.js';
-import { auditLog, type AuditDetails } from './schema/audit.js';
+import { type AuditDetails, auditLog } from './schema/audit.js';
 
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 

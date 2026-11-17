@@ -1,6 +1,7 @@
-import { BadRequestException, Logger, type ArgumentsHost } from '@nestjs/common';
+import { type ArgumentsHost, BadRequestException, Logger } from '@nestjs/common';
 import type { HttpAdapterHost } from '@nestjs/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { SafeExceptionFilter } from './safe-exception.filter.js';
 
 const reply = vi.fn();

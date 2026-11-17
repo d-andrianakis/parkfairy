@@ -3,10 +3,12 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { answer, refusal } from '@/test/owner-fixtures';
 import { rendererFor } from '@/test/render';
-import { AddressField, SUGGEST_DELAY_MS, type AddressFieldProps } from './address-field';
+
+import { AddressField, type AddressFieldProps, SUGGEST_DELAY_MS } from './address-field';
 
 vi.mock('@parkfairy/api-client', () => ({
   client: { setConfig: vi.fn() },

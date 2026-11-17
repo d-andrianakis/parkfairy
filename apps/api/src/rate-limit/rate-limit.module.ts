@@ -1,6 +1,7 @@
 import { Global, Inject, Logger, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { Redis } from 'ioredis';
+
 import { ConfigModule, ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { RedisThrottlerStorage } from './redis-throttler.storage.js';

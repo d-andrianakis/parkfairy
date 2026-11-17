@@ -1,5 +1,6 @@
-import { schema, type Database } from '@parkfairy/database';
+import { type Database, schema } from '@parkfairy/database';
 import { and, asc, gte, inArray, lte, sql } from 'drizzle-orm';
+
 import type { DatedHours, OpeningPeriod } from './opening-hours.js';
 import type { PriceRules } from './pricing.js';
 

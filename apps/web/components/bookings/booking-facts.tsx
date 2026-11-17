@@ -1,6 +1,7 @@
 import type { Booking } from '@parkfairy/contracts';
 import { useFormatter, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
+
 import { PlaceWords } from '@/components/parking/place-words';
 import { StayRange } from '@/components/parking/stay-range';
 

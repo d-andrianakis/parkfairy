@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+
 import type { NextConfig } from 'next';
 
 // Development shares the repo-root .env with the API and worker. Variables already set

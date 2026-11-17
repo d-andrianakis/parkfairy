@@ -1,10 +1,13 @@
 import 'server-only';
+
 import type { AuthEmail } from '@parkfairy/auth';
 import { ACCOUNT_LINK_LIFETIME } from '@parkfairy/contracts';
 import { renderEmail } from '@parkfairy/email';
 import { createTranslator } from 'next-intl';
+
 import el from '@/messages/el.json';
 import en from '@/messages/en.json';
+
 import type { OutgoingEmail } from './transport';
 
 const CATALOGS = { el, en };

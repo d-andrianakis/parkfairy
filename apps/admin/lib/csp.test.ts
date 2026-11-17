@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { buildContentSecurityPolicy, createNonce } from './csp';
 
 const build = (options: Partial<Parameters<typeof buildContentSecurityPolicy>[0]> = {}) =>

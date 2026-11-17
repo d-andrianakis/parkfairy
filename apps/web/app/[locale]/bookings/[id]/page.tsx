@@ -1,12 +1,13 @@
+import { HOLD_MINUTES } from '@parkfairy/contracts/validation';
 import { Alert, AlertDescription } from '@parkfairy/ui/components/alert';
 import { Badge } from '@parkfairy/ui/components/badge';
 import { Button } from '@parkfairy/ui/components/button';
 import { Card, CardContent } from '@parkfairy/ui/components/card';
 import { ArrowLeft, CircleAlert, CircleCheck } from 'lucide-react';
-import { HOLD_MINUTES } from '@parkfairy/contracts/validation';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
+
 import { BookingFacts } from '@/components/bookings/booking-facts';
 import { CancelBooking } from '@/components/bookings/cancel-booking';
 import { ConfirmBooking } from '@/components/bookings/confirm-booking';

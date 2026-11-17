@@ -1,7 +1,7 @@
-import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@parkfairy/ui/lib/utils';
+import { cva, type VariantProps } from 'class-variance-authority';
 import { Slot } from 'radix-ui';
+import * as React from 'react';
 
 // Parkfairy: outline-hidden on focus so forced-colors mode still shows focus; solid invalid
 // ring and the default focus ring on destructive buttons (shadcn tints both to 20%/40%: <3:1).

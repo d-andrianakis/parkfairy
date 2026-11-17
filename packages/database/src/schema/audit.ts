@@ -6,6 +6,7 @@
 import { AUDIT_ACTIONS, AUDIT_TARGETS } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import { check, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+
 import { users } from './auth.js';
 
 /** `'a', 'b'` list for CHECK constraints built from trusted constants (never user input). */

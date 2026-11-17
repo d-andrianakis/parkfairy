@@ -3,8 +3,10 @@ import { createElement } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { keepFocusThroughUrlChange } from '@/components/route-focus';
 import { routerMock, setPathname } from '@/test/navigation-mock';
+
 import { useSentPanel } from './sent-panel';
 
 vi.mock('@/components/route-focus', () => ({ keepFocusThroughUrlChange: vi.fn() }));

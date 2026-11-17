@@ -1,5 +1,6 @@
 import type { ListingInviteRole } from '@parkfairy/contracts';
 import { and, asc, eq, lte, sql } from 'drizzle-orm';
+
 import type { Database } from './client.js';
 import { users } from './schema/auth.js';
 import { emailOutbox, type OutboxEmailKind, type OutboxPayload } from './schema/email-outbox.js';

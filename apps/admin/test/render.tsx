@@ -2,7 +2,9 @@ import { DEFAULT_TIME_ZONE, type Locale } from '@parkfairy/contracts';
 import { render, type RenderOptions } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import type { ReactElement, ReactNode } from 'react';
-import { pickMessages, type Namespace } from '@/components/client-messages';
+
+import { type Namespace, pickMessages } from '@/components/client-messages';
+
 import el from '../messages/el.json';
 import en from '../messages/en.json';
 

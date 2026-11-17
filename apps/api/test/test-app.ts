@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
+
 import type { INestApplication, Type } from '@nestjs/common';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import type { Auth } from '@parkfairy/auth';
-import { schema, type Database } from '@parkfairy/database';
+import { type Database, schema } from '@parkfairy/database';
 import { eq } from 'drizzle-orm';
 import type request from 'supertest';
+
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { AUTH } from '../src/auth/auth.tokens.js';

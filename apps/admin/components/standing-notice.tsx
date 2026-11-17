@@ -1,5 +1,6 @@
 import { Alert, AlertDescription, AlertTitle } from '@parkfairy/ui/components/alert';
 import { useTranslations } from 'next-intl';
+
 import type { Standing } from '@/lib/session';
 
 /**

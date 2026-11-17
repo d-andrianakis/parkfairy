@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto';
+
 import { Client } from 'pg';
 
 /** The database of a local or CI run; a deployed target's is out of the suite's reach. */
@@ -194,6 +195,50 @@ export async function addEarnings(
          case when $3::text = 'sent' then now() - interval '3 days' end
        from parking_locations l where l.id = $4`,
       [booking.id, part.minor, part.status, listingId],
+    );
+  }
+}
+
+/**
+ * A listing's history, for the owner's list of bookings (5.1): `past` confirmed stays that ended
+ * between a day and `past` days ago, one a day, and `cancelled` stays called off (by the driver,
+ * one of them still to come). The listing's owners are made to have joined 60 days ago: they see
+ * no stay that ended before they joined, and a listing made a moment ago has none older.
+ */
+export async function addBookingHistory(
+  listingId: string,
+  { past = 0, cancelled = 0 }: { past?: number; cancelled?: number },
+): Promise<void> {
+  await run(
+    `update listing_owners set created_at = now() - interval '60 days' where location_id = $1`,
+    [listingId],
+  );
+  const stays = [
+    ...Array.from({ length: past }, (_, index) => ({ days: -(index + 1), status: 'confirmed' })),
+    ...Array.from({ length: cancelled }, (_, index) => ({
+      // The first still to come, the rest over.
+      days: index === 0 ? 3 : -(index + 1),
+      status: 'cancelled',
+    })),
+  ];
+  for (const stay of stays) {
+    await run(
+      `insert into bookings (reference, user_id, location_id, space_label, listing_name,
+         listing_address, listing_locale, starts_at, ends_at, gap_minutes, blocked_until, status,
+         hold_expires_at, total_minor, currency, cancellation_policy, vehicle_plate, confirmed_at,
+         commission_bps, cancelled_at, cancelled_by, refund_minor)
+       select $2, p.user_id, l.id, 'A1', l.name, l.address, l.content_locale,
+         date_trunc('hour', now()) + $3 * interval '1 day',
+         date_trunc('hour', now()) + $3 * interval '1 day' + interval '2 hours', 0,
+         date_trunc('hour', now()) + $3 * interval '1 day' + interval '2 hours',
+         $4::text, now(), 400, 'EUR', 'oneDay', 'IKB1234', now(),
+         (select commission_bps from platform_settings),
+         case when $4::text = 'cancelled' then now() end,
+         case when $4::text = 'cancelled' then 'driver' end,
+         case when $4::text = 'cancelled' then 400 end
+       from parking_locations l join owner_profiles p on p.id = l.owner_id
+       where l.id = $1`,
+      [listingId, reference(), stay.days, stay.status],
     );
   }
 }

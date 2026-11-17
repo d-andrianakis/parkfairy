@@ -4,12 +4,13 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
+
 import { ListingOwnersPanel } from '@/components/owner/listing-owners';
 import { PlaceWords } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';
-import { ownersHref } from '@/lib/owner-href';
 import { loadListingOwners } from '@/lib/owner.server';
+import { ownersHref } from '@/lib/owner-href';
 import { requireSession } from '@/lib/session';
 
 interface OwnersPageProps {

@@ -6,7 +6,8 @@ import { Button } from '@parkfairy/ui/components/button';
 import { Label } from '@parkfairy/ui/components/label';
 import { RadioGroup, RadioGroupItem } from '@parkfairy/ui/components/radio-group';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+
 import { FormError } from '@/components/form-error';
 import { getPathname, useRouter } from '@/i18n/navigation';
 import { attempt, useBookingError } from '@/lib/booking-client';

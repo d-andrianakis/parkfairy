@@ -1,6 +1,7 @@
 import { is } from 'drizzle-orm';
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
+
 import * as schema from './index.js';
 
 // Guards the data conventions in memory.md for every table, including future ones.

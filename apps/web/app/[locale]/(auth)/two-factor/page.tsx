@@ -7,7 +7,9 @@ import {
 } from '@parkfairy/ui/components/card';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
+
 import { TwoFactorForm } from './two-factor-form';
 
 export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {

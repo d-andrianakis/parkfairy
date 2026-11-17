@@ -1,52 +1,54 @@
 import { randomUUID } from 'node:crypto';
+
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   HOURS_EXCEPTIONS_MAX,
-  OWNER_LISTINGS_MAX,
-  OwnerHoursCopySchema,
-  OwnerListingClosuresSchema,
-  OwnerOtherListingsSchema,
-  OwnerHoursExceptionsCopySchema,
-  OwnerHoursExceptionsSchema,
-  OwnerListingProgressSchema,
-  OwnerListingSchema,
-  OwnerOnboardingSchema,
-  PHOTO_LIMITS,
-  PROOF_LIMITS,
-  wallMinutes,
-  zonedParts,
   type ListingHoursCopyInput,
   type ListingHoursExceptionsCopyInput,
   type ListingHoursExceptionsInput,
   type ListingHoursInput,
   type ListingLocationPatch,
+  type ListingOwnerRole,
   type ListingPhotoOrder,
   type ListingPhotoUpdate,
   type ListingPricesInput,
   type ListingProofPatch,
   type ListingSpacesInput,
   type ListingStatus,
+  OWNER_LISTINGS_MAX,
   type OwnerHoursCopy,
-  type OwnerListingClosures,
-  type OwnerOtherListings,
+  OwnerHoursCopySchema,
   type OwnerHoursException,
   type OwnerHoursExceptions,
   type OwnerHoursExceptionsCopy,
+  OwnerHoursExceptionsCopySchema,
+  OwnerHoursExceptionsSchema,
   type OwnerListing,
+  type OwnerListingClosures,
+  OwnerListingClosuresSchema,
   type OwnerListingProgress,
+  OwnerListingProgressSchema,
+  OwnerListingSchema,
   type OwnerOnboarding,
+  OwnerOnboardingSchema,
+  type OwnerOtherListings,
+  OwnerOtherListingsSchema,
   type OwnerPhoto,
   type OwnerPrices,
-  type ListingOwnerRole,
   type OwnerProof,
   type ParkingFeature,
+  PHOTO_LIMITS,
+  PROOF_LIMITS,
   type ProofKind,
+  wallMinutes,
+  zonedParts,
 } from '@parkfairy/contracts';
-import { runsListing, schema, type Database } from '@parkfairy/database';
+import { type Database, runsListing, schema } from '@parkfairy/database';
 import { and, asc, count, desc, eq, gt, gte, inArray, lt, ne, not, or, sql } from 'drizzle-orm';
-import { strandedBookings, type HoursChange } from '../bookings/stranded.js';
+
+import { type HoursChange, strandedBookings } from '../bookings/stranded.js';
 import { DB } from '../database/database.module.js';
-import { hoursOf, wallTime, type DatedHours } from '../parking/opening-hours.js';
+import { type DatedHours, hoursOf, wallTime } from '../parking/opening-hours.js';
 import { OBJECT_STORE, type ObjectStore } from '../storage/object-store.js';
 import {
   cleanScan,
@@ -55,6 +57,7 @@ import {
   storePhoto,
 } from '../storage/photo-pipeline.js';
 import { UploadGate } from '../storage/upload-gate.js';
+import { everyoneReported } from './listing-owners.service.js';
 import {
   doneAccountSteps,
   doneListingSteps,
@@ -63,7 +66,6 @@ import {
   nextListingStep,
 } from './onboarding-progress.js';
 import { badUpload, conflict, listingNotFound, primaryOnly } from './owner.errors.js';
-import { everyoneReported } from './listing-owners.service.js';
 import { OwnerProfileService, profileFacts } from './owner-profile.service.js';
 import { slugFromName } from './slug.js';
 

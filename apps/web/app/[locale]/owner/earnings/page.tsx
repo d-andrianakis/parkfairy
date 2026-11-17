@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@parkfairy/ui/components/alert';
 import { ArrowLeft, CircleAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { EarningsView } from '@/components/owner/earnings-view';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';

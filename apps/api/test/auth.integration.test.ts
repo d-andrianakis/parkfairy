@@ -3,9 +3,10 @@ import type { Auth } from '@parkfairy/auth';
 import { MeResponseSchema } from '@parkfairy/contracts';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { Roles } from '../src/auth/auth.decorators.js';
 import { AUTH } from '../src/auth/auth.tokens.js';
-import { createTestApp, signUpUser, updateUser, type TestApp } from './test-app.js';
+import { createTestApp, signUpUser, type TestApp, updateUser } from './test-app.js';
 
 const TRUSTED_ORIGIN = 'http://localhost:3000';
 

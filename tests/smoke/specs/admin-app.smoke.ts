@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Browser, type Page } from '@playwright/test';
+
+import { type Browser, expect, type Page, test } from '@playwright/test';
+
 import { FIRST_VISIT, measureFirstVisit } from '../support/budgets';
 import { HAS_DATABASE, makeStaff, unpublishListing } from '../support/db';
 import { ADMIN_URL, EMAIL_OUTBOX, TEST_PASSWORD, visitorAddress, WEB_URL } from '../support/env';

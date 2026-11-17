@@ -1,5 +1,7 @@
 import '@parkfairy/ui/testing/setup';
+
 import { beforeEach, vi } from 'vitest';
+
 import { routerMock } from './navigation-mock';
 
 // Components use the locale-aware navigation from next-intl, which needs the Next.js app

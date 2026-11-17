@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { createAuth } from '@parkfairy/auth';
 import type { Database } from '@parkfairy/database';
+
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { DB } from '../database/database.module.js';

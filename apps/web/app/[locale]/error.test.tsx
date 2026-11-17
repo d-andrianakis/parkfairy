@@ -2,8 +2,10 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { rendererFor } from '@/test/render';
+
 import LocaleError from './error';
 
 // Only the catalog namespaces this subtree ships to the browser.

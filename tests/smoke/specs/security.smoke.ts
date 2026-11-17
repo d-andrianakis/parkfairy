@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+
 import { API_URL, SIGNED_IN_STATE, WEB_URL } from '../support/env';
 import { trackCspViolations } from '../support/fixtures';
 

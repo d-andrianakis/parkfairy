@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+
 import { EMAIL_OUTBOX, TEST_PASSWORD } from '../support/env';
 import { expectAccessible, ownVisitor, registerAndSignIn, uniqueEmail } from '../support/fixtures';
 import { totp } from '../support/totp';

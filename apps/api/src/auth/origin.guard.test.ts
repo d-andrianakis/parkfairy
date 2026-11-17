@@ -1,5 +1,6 @@
-import { ForbiddenException, type ExecutionContext } from '@nestjs/common';
+import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
+
 import type { Env } from '../config/env.js';
 import { OriginGuard } from './origin.guard.js';
 

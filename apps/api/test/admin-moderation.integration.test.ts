@@ -1,19 +1,21 @@
 import { randomUUID } from 'node:crypto';
+
+import type { Auth } from '@parkfairy/auth';
 import {
   ADMIN_REASON_NOTE_MAX,
   AdminListingReviewSchema,
   AdminUserSchema,
   OWNER_LIMITS,
 } from '@parkfairy/contracts';
-import type { Auth } from '@parkfairy/auth';
-import { enqueueListingStatusEmails, schema, type Database } from '@parkfairy/database';
+import { type Database, enqueueListingStatusEmails, schema } from '@parkfairy/database';
 import { and, eq, inArray, like, sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { AUTH } from '../src/auth/auth.tokens.js';
 import { newBookingReference } from '../src/bookings/booking-reference.js';
 import { DB } from '../src/database/database.module.js';
-import { createTestApp, signUpUser, updateUser, type TestApp, type TestUser } from './test-app.js';
+import { createTestApp, signUpUser, type TestApp, type TestUser, updateUser } from './test-app.js';
 
 // Moderation (5.2c2, #78–#81): staff take a live listing down or suspend an account, and bring either
 // back. Kalamata's neighbour, far from the demo areas.

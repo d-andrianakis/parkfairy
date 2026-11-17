@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { ANSWER_FLOOR_MS, createAuth, type AuthEmail } from '@parkfairy/auth';
-import { deleteUnconfirmedAccounts, schema, type Database } from '@parkfairy/database';
+
+import { ANSWER_FLOOR_MS, type AuthEmail, createAuth } from '@parkfairy/auth';
+import { type Database, deleteUnconfirmedAccounts, schema } from '@parkfairy/database';
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { DB } from '../src/database/database.module.js';
-import { createTestApp, updateUser, type TestApp } from './test-app.js';
+import { createTestApp, type TestApp, updateUser } from './test-app.js';
 
 const ORIGIN = 'http://localhost:3000';
 const PASSWORD = 'correct horse battery staple';

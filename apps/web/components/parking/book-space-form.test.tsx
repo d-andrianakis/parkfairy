@@ -4,11 +4,13 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { loadPage } from '@/lib/load-page';
-import { answer, refusal } from '@/test/owner-fixtures';
 import { routerMock } from '@/test/navigation-mock';
+import { answer, refusal } from '@/test/owner-fixtures';
 import { rendererFor, renderWithProviders } from '@/test/render';
+
 import { BookSpaceForm, type SpaceOption } from './book-space-form';
 
 vi.mock('@parkfairy/api-client', () => ({

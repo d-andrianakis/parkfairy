@@ -1,11 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { schema, type Database } from '@parkfairy/database';
+import { type Database, schema } from '@parkfairy/database';
+import { PaymentProviderError, type PaymentsEvent } from '@parkfairy/payments';
 import { eq } from 'drizzle-orm';
+
 import { BookingsService } from '../bookings/bookings.service.js';
 import { DB } from '../database/database.module.js';
 import { DisputesService } from './disputes.service.js';
 import { PayoutsService } from './payouts.service.js';
-import { PaymentProviderError, type PaymentsEvent } from '@parkfairy/payments';
 
 const events = schema.stripeEvents;
 

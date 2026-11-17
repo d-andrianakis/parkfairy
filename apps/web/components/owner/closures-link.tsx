@@ -1,4 +1,5 @@
 import { useTranslations } from 'next-intl';
+
 import { Link } from '@/i18n/navigation';
 import { closuresHref } from '@/lib/owner-href';
 

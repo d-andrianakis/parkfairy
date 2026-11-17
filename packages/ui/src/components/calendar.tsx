@@ -1,11 +1,10 @@
 'use client';
 
-import * as React from 'react';
+import { Button, buttonVariants } from '@parkfairy/ui/components/button';
 import { cn } from '@parkfairy/ui/lib/utils';
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { DayPicker, getDefaultClassNames, type DayButton } from 'react-day-picker';
-
-import { Button, buttonVariants } from '@parkfairy/ui/components/button';
+import * as React from 'react';
+import { type DayButton, DayPicker, getDefaultClassNames } from 'react-day-picker';
 
 // Parkfairy: out here, where the registry has them inline. New functions on every render remount
 // the whole calendar whenever a parent updates, which re-announces its month and drops its focus.

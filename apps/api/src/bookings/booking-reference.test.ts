@@ -1,5 +1,6 @@
 import { BOOKING_REFERENCE_PATTERN } from '@parkfairy/contracts';
 import { describe, expect, it } from 'vitest';
+
 import { newBookingReference } from './booking-reference.js';
 
 describe('newBookingReference', () => {

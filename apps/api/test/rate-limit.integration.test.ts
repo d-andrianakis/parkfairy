@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
+
 import { authRateLimitKey, redisRateLimitStorage } from '@parkfairy/auth';
 import { Redis } from 'ioredis';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
 import { createRateLimitRedis } from '../src/rate-limit/rate-limit.module.js';
 import { RedisThrottlerStorage } from '../src/rate-limit/redis-throttler.storage.js';
 import { createTestApp, type TestApp } from './test-app.js';

@@ -1475,11 +1475,11 @@ part after commission (#50, #51), never another co-owner's. Gross, commission an
 
 Built 2026-11-15: earnings (`GET /owner/earnings`, `/owner/earnings`) and the calendar
 (`GET /owner/calendar`, `/owner/calendar`), linked from the dashboard. Readings in memory.md.
-Not built: the cross-listing bookings list with status and date filters, a grid view, and gross,
+Built 2026-11-16: the bookings list across listings (below). Not built: a grid view, and gross,
 commission and VAT (#18).
 
-- [~] **Implemented** behind the API's authorization rules (no client-trusted roles/IDs): earnings
-  and calendar done; the cross-listing bookings list is not
+- [x] **Implemented** behind the API's authorization rules (no client-trusted roles/IDs): earnings,
+      calendar and the bookings list across listings
 - [x] **Unit tests** next to the code (`*.test.ts[x]`) for logic, guards, components
 - [x] **Smoke test** `tests/smoke/specs/owner-earnings.smoke.ts` and `owner-calendar.smoke.ts`
       (both languages, 320px, no table scrolling sideways, the filter without scripts)
@@ -1496,6 +1496,54 @@ commission and VAT (#18).
   uses «χώρος» and «στάθμευση» as the rest of the catalog. Open: a native speaker on the new
   Greek (`Owner.earnings`, `Owner.calendar`)
 - [x] **Contracts & docs**: OpenAPI/client regenerated, memory.md updated
+
+#### 5.1b Bookings across listings (2026-11-16)
+
+`GET /owner/bookings` and `/owner/bookings`, linked from the dashboard: upcoming, past and cancelled
+bookings of every listing the account owns, co-owns or manages, by listing and by the days stays
+start on (readings in memory.md).
+
+- [x] **Implemented**: contract `owner-booking-list.ts`, `OwnerBookingListService` (keyset paging on
+      (start, id), a window of days for past and cancelled, a new member reads no history), the
+      page, the view, the dashboard link, both catalogs
+- [x] **Unit tests**: contracts (37), the view (21), the page (13), the loader, the dashboard link,
+      the catalog guard against «παραμονή». **Integration** (`owner-booking-list.integration.test.ts`,
+      20): authorization, owners, co-owners and managers, the joined rule for stays and for
+      cancellations, three pages and back, ties on one instant across listings, a window with a
+      listing, the probe, the 30-day bound, the Athens day against UTC's
+- [x] **Smoke** `owner-bookings-list.smoke.ts` (3): the three groups, a listing, days, refused days
+      (title, link to the field, description), a bad query starting over, Greek at 320 px, CSP; the
+      pages in `accessibility.smoke.ts` (both languages) and `performance.smoke.ts`
+- [x] **Security** review: no critical, high or medium. Fixed: a booking called off before a member
+      joined was readable to them through its later stay (low), history limited to the calendar's
+      24 months until retention is set, `sql.raw` taken out of the cursor comparisons
+- [x] **Accessibility** review: fixed the silent refused-days error (alert before the form, linked to
+      the field, in the title), one message per mistake and only the last day marked for the order,
+      the group in the page title and a heading, the days in a fieldset, `lang` on an unnamed
+      listing's option (the calendar too), wrapping of long owner text, the cancellation date in
+      `<time>`, the days reset when the group changes. Open: a manual NVDA and VoiceOver pass
+- [x] **i18n** review: «στάθμευση» for a stay, «Επερχόμενες» as the driver's list says, one rich
+      message for the link's hidden words, «Ποιος ακύρωσε», the limit in the message from the
+      constant. Open: a native speaker on `Owner.bookingList`
+- [x] **Test** review: paging beyond two pages and ties, the manager's joined rule, under way against
+      past, the probe, the loader, DST days in the contract. Open: a DST test through the API, the
+      stay's range in the booking's own zone, a manager's list in `listing-managers.smoke.ts`
+- [x] **Performance** review (3M bookings, 105 listings, measured by the reviewer): the first shape
+      joined every in-window booking before its limit, 0.8 s for 90 days and 3–5 s (past the 3 s
+      statement timeout) for 366 days. Fixed: each listing gives its own page from its index in a
+      lateral, then only those rows are sorted and joined to drivers (measured 17–36 ms, same first
+      pages), exact per-listing day bounds instead of `to_char`, a partial index for called-off
+      bookings (migration 0045), at most two queries at once, 60 pages a minute per account. Open,
+      low: the `upcoming` group is 0.25 s at 100 listings (the planner underestimates 871 rows; an
+      ordered-scan rewrite measured 50 ms), a filter list of 100 listings at most, and the real
+      first-visit JS (estimated 167 KiB, the same as the calendar) in the next full smoke run
+- [x] **The gate** (2026-11-17): typecheck, build, `db:migrate` twice, `db:generate` and `api:generate`
+      without changes, unit and integration tests (939 API, 1156 web) and `test:smoke` (278 passed,
+      4 skipped) green. One web test (`date-time-field`, not touched here) failed once under the
+      load of the whole run and passed alone and on a rerun: watch for it. Lint and format were
+      checked on the files of this change only: the repo was being moved to import sorting
+      meanwhile (`simple-import-sort`), so `pnpm format:check` fails on files of that work
+- [ ] **Open**: gross, commission and VAT in earnings still wait for #18 (memory.md)
 
 ### 5.3 Managers (2026-11-15, decisions #69–#71)
 
@@ -1527,7 +1575,7 @@ primary owner adds and removes them by the emailed invite; an account is enough.
 - [~] **Test** review: authorization, replay, cross-listing, closures, visibility, calendar scope,
   the queue's role and the handover case are covered. Open: a cancel racing a removal and two
   accepts at once (both held by the listing lock), `claimDueEmails` under a real worker
-- [ ] **Contracts & docs**: client regenerated, memory.md updated
+- [x] **Contracts & docs**: client regenerated (stable, 2026-11-16), memory.md updated (decisions #69–#71 and our readings)
 
 ### 5.2 Admin approvals and the audit log (2026-11-15, decisions #66–#68)
 

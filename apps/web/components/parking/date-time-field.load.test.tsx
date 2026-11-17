@@ -1,8 +1,10 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { rendererFor } from '@/test/render';
+
 import { DateTimeField } from './date-time-field';
 import { StayFields } from './stay-fields';
 

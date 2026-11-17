@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { PlacesController } from './places.controller.js';
+
 import type { FetchFn } from './mapbox-search.js';
+import { PlacesController } from './places.controller.js';
 import { PLACES_FETCH, PlacesService } from './places.service.js';
 
 const send: FetchFn = (url, init) => fetch(url, init);

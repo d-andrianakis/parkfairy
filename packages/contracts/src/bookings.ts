@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { LocaleSchema } from './i18n.js';
 import {
   CancellationPolicySchema,
@@ -7,8 +8,8 @@ import {
   MoneySchema,
 } from './parking.js';
 import { CheckoutKindSchema, PaymentStatusSchema } from './payments.js';
-import { contractsRegistry } from './registry.js';
 import { isVehiclePlate } from './plates.js';
+import { contractsRegistry } from './registry.js';
 import { message, NAME_MAX_LENGTH } from './validation.js';
 
 export * from './plates.js';

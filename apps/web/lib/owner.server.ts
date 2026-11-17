@@ -1,4 +1,5 @@
 import 'server-only';
+
 import {
   createClient,
   createConfig,
@@ -10,9 +11,9 @@ import {
   getOwnerOnboarding,
   getOwnerPayouts,
   getOwnerProfile,
-  type OwnerListing,
   type ListingOwners,
   type ManagedListings,
+  type OwnerListing,
   type OwnerListingClosures,
   type OwnerOnboarding,
   type OwnerOtherListings,

@@ -2,7 +2,9 @@ import type { HoursException } from '@parkfairy/contracts';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+
 import { renderWithProviders } from '@/test/render';
+
 import { HoursExceptions } from './hours-exceptions';
 
 const text = (element: Element | null | undefined) =>

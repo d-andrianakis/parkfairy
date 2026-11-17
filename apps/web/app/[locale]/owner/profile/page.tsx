@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { AccountStepShell } from '@/components/owner/account-step-shell';
 import { ProfileForm } from '@/components/owner/profile-form';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';

@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { EARNINGS_PAGE_SIZE, OwnerEarningsSchema, type OwnerEarnings } from '@parkfairy/contracts';
-import { schema, type Database } from '@parkfairy/database';
+
+import { EARNINGS_PAGE_SIZE, type OwnerEarnings, OwnerEarningsSchema } from '@parkfairy/contracts';
+import { type Database, schema } from '@parkfairy/database';
 import { and, eq, inArray, like } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DB } from '../src/database/database.module.js';
+
 import { newBookingReference } from '../src/bookings/booking-reference.js';
+import { DB } from '../src/database/database.module.js';
 import { createTestApp, signUpUser, type TestApp, type TestUser } from './test-app.js';
 
 // What an owner has earned (5.1). Chania: far from the demo areas and every other suite's point.

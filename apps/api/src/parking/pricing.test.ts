@@ -1,6 +1,7 @@
 import { DEFAULT_TIME_ZONE } from '@parkfairy/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import { NO_PRICE_RULES, quoteStayMinor, type PriceRules, type Stay } from './pricing.js';
+
+import { NO_PRICE_RULES, type PriceRules, quoteStayMinor, type Stay } from './pricing.js';
 
 const hourly = (hourlyRateMinor: number, dailyMaxMinor: number | null = null) => ({
   hourlyRateMinor,

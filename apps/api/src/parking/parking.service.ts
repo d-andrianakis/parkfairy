@@ -1,36 +1,37 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   addDays,
+  type AreaId,
   findArea,
   LISTING_SPACES_LIMIT,
-  ParkingListingDetailSchema,
-  ParkingListingSummarySchema,
-  ParkingSearchResultSchema,
-  PARKING_FEATURES,
-  SEARCH_RADIUS_METERS,
-  SUPPORTED_TIME_ZONES,
-  zonedParts,
-  type AreaId,
   type ListingPhoto,
   type ListingPriceRules,
   type Money,
+  PARKING_FEATURES,
   type ParkingFeature,
   type ParkingListingDetail,
+  ParkingListingDetailSchema,
   type ParkingListingSummary,
+  ParkingListingSummarySchema,
   type ParkingSearchQuery,
   type ParkingSearchResult,
+  ParkingSearchResultSchema,
+  SEARCH_RADIUS_METERS,
+  SUPPORTED_TIME_ZONES,
+  zonedParts,
 } from '@parkfairy/contracts';
-import { payableListing, schema, type Database, type GeoPoint } from '@parkfairy/database';
+import { type Database, type GeoPoint, payableListing, schema } from '@parkfairy/database';
+import type { PaymentsGateway } from '@parkfairy/payments';
 import { and, asc, eq, exists, inArray, not, or, sql } from 'drizzle-orm';
+
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { DB } from '../database/database.module.js';
 import { PAYMENTS } from '../payments/payments.tokens.js';
-import type { PaymentsGateway } from '@parkfairy/payments';
 import { takenSpaceIds } from './availability.js';
 import { hoursExceptionsOf, openingHoursOf, priceRulesOf, utcDay } from './listing-data.js';
 import { hoursOf, isOpenThroughout, wallTime, weekNeeded } from './opening-hours.js';
-import { NO_PRICE_RULES, quoteStayMinor, type PriceRules } from './pricing.js';
+import { NO_PRICE_RULES, type PriceRules, quoteStayMinor } from './pricing.js';
 
 const listing = schema.parkingLocations;
 const space = schema.parkingSpaces;

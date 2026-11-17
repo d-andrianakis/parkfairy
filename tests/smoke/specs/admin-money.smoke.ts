@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Browser, type Page } from '@playwright/test';
+
+import { type Browser, expect, type Page, test } from '@playwright/test';
+
 import { FIRST_VISIT, measureFirstVisit } from '../support/budgets';
 import {
   addBookings,

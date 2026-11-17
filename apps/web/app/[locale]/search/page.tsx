@@ -1,3 +1,4 @@
+import { findArea, type Locale, type ParkingSearchResult } from '@parkfairy/contracts';
 import { Alert, AlertDescription, AlertTitle } from '@parkfairy/ui/components/alert';
 import { Card, CardContent } from '@parkfairy/ui/components/card';
 import {
@@ -7,12 +8,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@parkfairy/ui/components/empty';
-import { findArea, type Locale, type ParkingSearchResult } from '@parkfairy/contracts';
 import { CircleAlert, SearchX } from 'lucide-react';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
+
 import { ClientMessages } from '@/components/client-messages';
 import { ListingCard } from '@/components/parking/listing-card';
 import { PlaceWords } from '@/components/parking/place-words';
@@ -26,11 +27,11 @@ import { localeFromParams } from '@/i18n/params';
 import { loadSearchResults, lookupPlace } from '@/lib/api.server';
 import { mapboxToken } from '@/lib/maps.server';
 import {
+  type ParsedSearch,
   parseSearch,
+  type SearchParams,
   today,
   windowQuery,
-  type ParsedSearch,
-  type SearchParams,
 } from '@/lib/search';
 import { validationArgs } from '@/lib/validation-args';
 

@@ -3,6 +3,7 @@
 import { Button } from '@parkfairy/ui/components/button';
 import { cn } from '@parkfairy/ui/lib/utils';
 import { useLocale, useTranslations } from 'next-intl';
+
 import { LOCALE_ENDONYMS } from '@/i18n/locales';
 import { Link, usePathname, useSearchParams } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';

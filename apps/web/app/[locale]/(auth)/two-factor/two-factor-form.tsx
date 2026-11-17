@@ -2,24 +2,26 @@
 
 // First: zod must be configured before any schema (in @parkfairy/contracts) is built.
 import '@/lib/zod-jitless';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  BackupCodeInputSchema,
-  TotpInputSchema,
   type BackupCodeInput,
+  BackupCodeInputSchema,
   type TotpInput,
+  TotpInputSchema,
 } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
 import { FieldGroup } from '@parkfairy/ui/components/field';
 import { useTranslations } from 'next-intl';
-import { useState, type FormEvent } from 'react';
+import { type FormEvent, useState } from 'react';
 import { useForm } from 'react-hook-form';
+
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
-import { authErrorKey, authErrorValues, type AuthErrorKey } from '@/lib/auth-errors';
+import { type AuthErrorKey, authErrorKey, authErrorValues } from '@/lib/auth-errors';
 import { useValidationMessage } from '@/lib/use-validation-message';
 
 type Mode = 'totp' | 'backup';

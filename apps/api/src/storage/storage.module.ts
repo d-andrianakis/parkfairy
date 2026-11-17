@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+
 import { ConfigModule, ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { MediaController } from './media.controller.js';

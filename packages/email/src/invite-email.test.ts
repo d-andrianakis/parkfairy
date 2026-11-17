@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { LISTING_INVITE_DAYS } from '@parkfairy/contracts';
+import { describe, expect, it } from 'vitest';
+
 import {
   INVITE_EMAIL_COPY,
   INVITE_EMAIL_DAYS,

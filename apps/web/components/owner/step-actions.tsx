@@ -2,6 +2,7 @@
 
 import { Button } from '@parkfairy/ui/components/button';
 import { useTranslations } from 'next-intl';
+
 import { Link } from '@/i18n/navigation';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 

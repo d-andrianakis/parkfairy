@@ -1,17 +1,19 @@
 import {
   addDays,
   DEFAULT_TIME_ZONE,
-  zonedParts,
   type ParkingSearchResponse,
   type ParkingSearchResult,
+  zonedParts,
 } from '@parkfairy/contracts';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { redirect } from '@/i18n/navigation';
 import { loadSearchResults, lookupPlace } from '@/lib/api.server';
 import { mapboxToken } from '@/lib/maps.server';
 import { renderWithProviders } from '@/test/render';
+
 import SearchPage, { generateMetadata } from './page';
 
 vi.mock('@/lib/api.server', () => ({ loadSearchResults: vi.fn(), lookupPlace: vi.fn() }));

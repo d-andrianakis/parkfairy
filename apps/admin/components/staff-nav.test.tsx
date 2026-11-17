@@ -1,9 +1,11 @@
 import { screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
+
+import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { setPathname } from '@/test/navigation-mock';
 import { rendererFor } from '@/test/render';
+
 import { StaffNav } from './staff-nav';
-import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 
 const render = rendererFor(CLIENT_NAMESPACES.root);
 

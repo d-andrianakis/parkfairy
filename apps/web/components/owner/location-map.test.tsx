@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import LocationMap, { type LocationMapProps } from './location-map';
 
 type Handler = (event: { lngLat: { lat: number; lng: number } }) => void;

@@ -2,9 +2,11 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { applyTheme } from '@/lib/theme';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
+import { applyTheme } from '@/lib/theme';
 import { rendererFor } from '@/test/render';
+
 import { ThemeToggle } from './theme-toggle';
 
 // Only the catalog namespaces this subtree ships to the browser.

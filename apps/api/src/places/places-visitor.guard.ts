@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { ForbiddenException, Injectable, type ExecutionContext } from '@nestjs/common';
+
+import { type ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { ThrottlerGuard, type ThrottlerRequest } from '@nestjs/throttler';
 
 const HOUR_MS = 60 * 60_000;

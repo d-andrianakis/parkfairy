@@ -2,10 +2,12 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { authClient } from '@/lib/auth-client';
 import { routerMock } from '@/test/navigation-mock';
 import { rendererFor } from '@/test/render';
+
 import { ResetPasswordForm } from './reset-password-form';
 
 // Only the catalog namespaces this subtree ships to the browser.

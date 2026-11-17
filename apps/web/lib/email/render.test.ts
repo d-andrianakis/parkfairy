@@ -1,6 +1,7 @@
 // @vitest-environment node
 import type { AuthEmail } from '@parkfairy/auth';
 import { describe, expect, it, vi } from 'vitest';
+
 import el from '@/messages/el.json';
 import en from '@/messages/en.json';
 

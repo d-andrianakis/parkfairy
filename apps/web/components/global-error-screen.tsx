@@ -3,6 +3,7 @@
 import type { Locale } from '@parkfairy/contracts/locales';
 import { Button } from '@parkfairy/ui/components/button';
 import { useEffect, useRef } from 'react';
+
 import { ERROR_FALLBACK } from '@/messages/error-fallback';
 
 /**

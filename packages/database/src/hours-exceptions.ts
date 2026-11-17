@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+
 import type { Database } from './client.js';
 import { parkingHoursExceptions, parkingLocations } from './schema/parking.js';
 

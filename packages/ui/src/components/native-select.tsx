@@ -1,6 +1,6 @@
-import * as React from 'react';
 import { cn } from '@parkfairy/ui/lib/utils';
 import { ChevronDownIcon } from 'lucide-react';
+import * as React from 'react';
 
 function NativeSelect({
   className,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { ACCOUNT_EMAIL_COPY, ACCOUNT_EMAIL_KINDS, renderAccountEmail } from './account-emails.js';
 
 const email = (locale: 'el' | 'en') =>

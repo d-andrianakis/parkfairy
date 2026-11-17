@@ -6,11 +6,11 @@
 import {
   LISTING_INVITE_ROLES,
   LISTING_OWNER_ROLES,
-  SUPPORTED_LOCALES,
-  TRANSFER_STATUSES,
   type ListingInviteRole,
   type ListingOwnerRole,
   type Locale,
+  SUPPORTED_LOCALES,
+  TRANSFER_STATUSES,
   type TransferStatus,
 } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
@@ -24,8 +24,9 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { bookings } from './bookings.js';
+
 import { users } from './auth.js';
+import { bookings } from './bookings.js';
 import { ownerProfiles } from './owners.js';
 import { parkingLocations } from './parking.js';
 

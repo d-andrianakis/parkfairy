@@ -2,7 +2,8 @@
 
 import type { PlaceSuggestion } from '@parkfairy/api-client';
 import { Popover, PopoverAnchor, PopoverContent } from '@parkfairy/ui/components/popover';
-import { useEffect, type RefObject } from 'react';
+import { type RefObject, useEffect } from 'react';
+
 import { optionId } from './place-option-id';
 import { PlaceWords } from './place-words';
 

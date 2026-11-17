@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadBooking, loadBookings, loadOwnerBookings } from './bookings.server';
+
+import {
+  loadBooking,
+  loadBookings,
+  loadOwnerBookingList,
+  loadOwnerBookings,
+} from './bookings.server';
 
 vi.mock('server-only', () => ({}));
 const request = vi.hoisted(() => ({ headers: new Headers() }));
@@ -13,6 +19,7 @@ const api = vi.hoisted(() => ({
   getMyBooking: vi.fn(),
   getMyBookings: vi.fn(),
   getListingBookings: vi.fn(),
+  listOwnerBookings: vi.fn(),
 }));
 vi.mock('@parkfairy/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@parkfairy/api-client')>()),
@@ -81,5 +88,40 @@ describe('loadBookings', () => {
     api.getMyBookings.mockRejectedValue(new Error('down'));
     await expect(loadBookings('upcoming', 1)).resolves.toBeNull();
     expect(api.getMyBookings).toHaveBeenCalledWith(expect.objectContaining({ headers: {} }));
+  });
+});
+
+describe('loadOwnerBookingList', () => {
+  const PLACE = '1762934400000_0b1e7a52-3f4c-4d2a-9e8b-5c6d7e8f9a0b';
+
+  it('asks as the visitor and leaves out every part that is empty', async () => {
+    api.listOwnerBookings.mockResolvedValue({ data: FOUND, response: new Response() });
+    await expect(loadOwnerBookingList()).resolves.toBe(FOUND);
+    expect(api.listOwnerBookings).toHaveBeenCalledWith(
+      expect.objectContaining({ query: {}, headers: VISITOR }),
+    );
+  });
+
+  it('sends the group, the listing, the days and one place when they are given', async () => {
+    api.listOwnerBookings.mockResolvedValue({ data: FOUND, response: new Response() });
+    await loadOwnerBookingList('past', 'l', '2026-10-01', '2026-10-31', PLACE, '');
+    expect(api.listOwnerBookings).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        query: { status: 'past', listing: 'l', from: '2026-10-01', to: '2026-10-31', after: PLACE },
+      }),
+    );
+    await loadOwnerBookingList('cancelled', '', '', '', '', PLACE);
+    expect(api.listOwnerBookings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ query: { status: 'cancelled', before: PLACE } }),
+    );
+  });
+
+  it('answers null when the API refuses, does not answer, or is too slow', async () => {
+    api.listOwnerBookings.mockResolvedValue(answered(400));
+    await expect(loadOwnerBookingList('past')).resolves.toBeNull();
+    api.listOwnerBookings.mockResolvedValue(answered(401));
+    await expect(loadOwnerBookingList()).resolves.toBeNull();
+    api.listOwnerBookings.mockRejectedValue(new Error('timeout'));
+    await expect(loadOwnerBookingList()).resolves.toBeNull();
   });
 });

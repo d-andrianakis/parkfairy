@@ -6,6 +6,7 @@ import { Label } from '@parkfairy/ui/components/label';
 import { NativeSelect, NativeSelectOption } from '@parkfairy/ui/components/native-select';
 import { CircleAlert } from 'lucide-react';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
+
 import { PersonName, PlaceWords } from '@/components/parking/place-words';
 import { StayRange } from '@/components/parking/stay-range';
 import { Link } from '@/i18n/navigation';
@@ -59,7 +60,12 @@ export function CalendarView({ calendar }: { calendar: OwnerCalendar }) {
           >
             <NativeSelectOption value="">{t('filterAll')}</NativeSelectOption>
             {calendar.listings.map((listing) => (
-              <NativeSelectOption key={listing.id} value={listing.id} lang={listing.contentLocale}>
+              <NativeSelectOption
+                key={listing.id}
+                value={listing.id}
+                // Its owner's words are in the listing's language; "unnamed" is ours.
+                lang={listing.name ? listing.contentLocale : undefined}
+              >
                 {listing.name ?? untitled}
               </NativeSelectOption>
             ))}
@@ -121,7 +127,10 @@ export function CalendarView({ calendar }: { calendar: OwnerCalendar }) {
                     : ([
                         [
                           t('listing'),
-                          <span key="listing" lang={booking.listing.contentLocale}>
+                          <span
+                            key="listing"
+                            lang={booking.listing.name ? booking.listing.contentLocale : undefined}
+                          >
                             {booking.listing.name ? (
                               <PlaceWords
                                 text={booking.listing.name}

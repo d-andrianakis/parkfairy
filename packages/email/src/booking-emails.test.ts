@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+
 import {
   BOOKING_EMAIL_COPY,
   BOOKING_EMAIL_KINDS,
-  renderBookingEmail,
   type BookingEmailFacts,
+  renderBookingEmail,
 } from './booking-emails.js';
 import { OWNER_EMAIL_LOCALES } from './owner-emails.js';
 

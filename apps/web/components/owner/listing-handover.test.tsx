@@ -1,17 +1,19 @@
 import {
   acceptListingHandover,
   getListingOwners,
+  type ListingOwners,
   offerListingHandover,
   withdrawListingHandover,
-  type ListingOwners,
 } from '@parkfairy/api-client';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { answer, LISTING_ID, refusal } from '@/test/owner-fixtures';
 import { rendererFor } from '@/test/render';
+
 import { ListingOwnersPanel } from './listing-owners';
 
 vi.mock('@parkfairy/api-client', () => ({

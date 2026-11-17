@@ -1,5 +1,6 @@
 import { createTranslator } from 'next-intl';
 import { describe, expect, it } from 'vitest';
+
 import el from '../messages/el.json';
 import en from '../messages/en.json';
 import { validationArgs } from './validation-args';

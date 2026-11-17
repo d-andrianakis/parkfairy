@@ -1,6 +1,8 @@
 import { mkdir, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
 import { expect } from '@playwright/test';
+
 import { EMAIL_OUTBOX } from './env';
 
 export interface SentEmail {

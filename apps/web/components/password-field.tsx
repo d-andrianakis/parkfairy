@@ -4,7 +4,8 @@ import { Button } from '@parkfairy/ui/components/button';
 import { cn } from '@parkfairy/ui/lib/utils';
 import { Eye, EyeOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState, useSyncExternalStore, type ComponentProps } from 'react';
+import { type ComponentProps, useState, useSyncExternalStore } from 'react';
+
 import { FormField } from './form-field';
 
 const neverChanges = () => () => {};

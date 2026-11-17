@@ -1,11 +1,12 @@
 import { createDatabase } from '@parkfairy/database';
 import { afterAll, describe, expect, it, vi } from 'vitest';
+
 import { createAuth } from './index.js';
 import {
   authRateLimitKey,
   memoryRateLimitStorage,
-  redisRateLimitStorage,
   type RedisEval,
+  redisRateLimitStorage,
 } from './rate-limit-storage.js';
 
 const rule = { window: 10, max: 3 };

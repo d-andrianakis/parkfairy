@@ -1,5 +1,6 @@
 import { DISPUTES_SETTLED, type DisputeStatus } from '@parkfairy/contracts';
 import { eq, sql } from 'drizzle-orm';
+
 import type { Database } from './client.js';
 import { paymentDisputes } from './schema/payments.js';
 

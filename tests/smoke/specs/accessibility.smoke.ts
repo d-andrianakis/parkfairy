@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
 import { DEMO_DATA, EMAIL_OUTBOX, SIGNED_IN_STATE, WEB_URL } from '../support/env';
 import { expectAccessible, ownDriver } from '../support/fixtures';
 
@@ -152,6 +153,9 @@ test.describe('signed in', () => {
       '/owner/payouts',
       '/owner/earnings',
       '/owner/calendar',
+      '/owner/bookings',
+      '/owner/bookings?status=past',
+      '/owner/bookings?status=cancelled',
       '/bookings',
       '/bookings?when=past',
     ]) {

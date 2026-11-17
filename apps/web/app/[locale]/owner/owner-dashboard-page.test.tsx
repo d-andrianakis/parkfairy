@@ -2,9 +2,11 @@ import type { OwnerOnboarding } from '@parkfairy/api-client';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { loadManagedListings, loadOwnerOnboarding, loadOwnerPayouts } from '@/lib/owner.server';
 import { getSession } from '@/lib/session';
 import { renderWithProviders } from '@/test/render';
+
 import OwnerPage from './page';
 
 vi.mock('@/lib/owner.server', () => ({
@@ -75,6 +77,26 @@ describe('the owner’s page, for someone who manages a listing (#69)', () => {
       '/en/owner/profile',
     );
     await expectNoAxeViolations(container);
+  });
+
+  it('links an owner to the calendar, all their bookings and their earnings', async () => {
+    await show({ started: true, listings: [] });
+    expect(screen.getByRole('link', { name: 'See your calendar' })).toHaveAttribute(
+      'href',
+      '/en/owner/calendar',
+    );
+    expect(screen.getByRole('link', { name: 'See all bookings' })).toHaveAttribute(
+      'href',
+      '/en/owner/bookings',
+    );
+  });
+
+  it('names the link in Greek too', async () => {
+    await show({ started: true, listings: [] }, 'el');
+    expect(screen.getByRole('link', { name: 'Δείτε όλες τις κρατήσεις' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/owner\/bookings$/),
+    );
   });
 
   it('shows nothing extra to someone who manages nothing', async () => {

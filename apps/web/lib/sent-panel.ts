@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+
 import { keepFocusThroughUrlChange } from '@/components/route-focus';
 import { usePathname, useRouter, useSearchParams } from '@/i18n/navigation';
+
 import { SENT_PARAM } from './email-link-params';
 import { forgetSentTo, recallSentTo, rememberSentTo } from './remembered-email';
 

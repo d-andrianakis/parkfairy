@@ -1,5 +1,6 @@
 import { useLocale } from 'next-intl';
 import type { ComponentProps } from 'react';
+
 import { getPathname, Link } from '@/i18n/navigation';
 import { mapboxToken } from '@/lib/maps.server';
 

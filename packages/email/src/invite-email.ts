@@ -1,4 +1,5 @@
 import { LISTING_INVITE_DAYS, type ListingInviteRole } from '@parkfairy/contracts';
+
 import { renderEmail } from './layout.js';
 import type { OwnerEmailLocale } from './owner-emails.js';
 import type { OutgoingEmail } from './transport.js';

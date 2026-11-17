@@ -13,6 +13,7 @@ import {
 } from '@parkfairy/ui/components/table';
 import { CircleAlert } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
+
 import { PlaceWords } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { EARNINGS_HREF } from '@/lib/owner-href';

@@ -1,14 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   ADMIN_PAGE_SIZE,
+  type AdminAuditQuery,
   adminCursor,
+  type AuditLog,
   AuditLogSchema,
   parseBookingsCursor,
-  type AdminAuditQuery,
-  type AuditLog,
 } from '@parkfairy/contracts';
-import { schema, type Database } from '@parkfairy/database';
+import { type Database, schema } from '@parkfairy/database';
 import { and, eq, sql } from 'drizzle-orm';
+
 import { DB } from '../database/database.module.js';
 
 const log = schema.auditLog;

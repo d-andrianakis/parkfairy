@@ -1,7 +1,9 @@
 import type * as database from '@parkfairy/database';
 import {
   claimDueEmails,
+  type ClaimedEmail,
   countOverdueEmails,
+  type Database,
   enqueueListingStatusEmails,
   enqueueOnboardingReminders,
   markEmailFailed,
@@ -9,13 +11,12 @@ import {
   mintInviteToken,
   purgeSentEmails,
   releaseEmails,
-  type ClaimedEmail,
-  type Database,
 } from '@parkfairy/database';
-import { resendTransport, SendStopped, type EmailTransport } from '@parkfairy/email';
+import { type EmailTransport, resendTransport, SendStopped } from '@parkfairy/email';
 import type { Job } from 'bullmq';
 import { pino } from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { QUEUES } from '../queues.js';
 import {
   ownerEmailsProcessor,

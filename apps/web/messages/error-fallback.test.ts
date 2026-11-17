@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import el from './el.json';
 import en from './en.json';
 import { ERROR_FALLBACK } from './error-fallback';

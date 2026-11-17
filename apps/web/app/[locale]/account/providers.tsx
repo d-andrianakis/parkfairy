@@ -2,7 +2,7 @@
 
 import { client } from '@parkfairy/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 
 // Same-origin: Next.js proxies /api/v1/* to the API, so the session cookie travels with requests.
 client.setConfig({ baseUrl: '/api' });

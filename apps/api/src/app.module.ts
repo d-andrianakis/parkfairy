@@ -1,24 +1,26 @@
 import { randomUUID } from 'node:crypto';
+
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+
 import { AdminModule } from './admin/admin.module.js';
 import { AuthGuard } from './auth/auth.guard.js';
+import { AuthModule } from './auth/auth.module.js';
+import { OriginGuard } from './auth/origin.guard.js';
+import { BookingsModule } from './bookings/bookings.module.js';
 import { redactUrl } from './common/log-redaction.js';
 import { NoStoreInterceptor } from './common/no-store.interceptor.js';
 import { SafeExceptionFilter } from './common/safe-exception.filter.js';
-import { AuthModule } from './auth/auth.module.js';
-import { BookingsModule } from './bookings/bookings.module.js';
-import { OriginGuard } from './auth/origin.guard.js';
 import { ConfigModule, ENV } from './config/config.module.js';
 import type { Env } from './config/env.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { OwnerModule } from './owner/owner.module.js';
+import { ParkingModule } from './parking/parking.module.js';
 import { PaymentsGatewayModule, PaymentsModule } from './payments/payments.module.js';
 import { PlacesModule } from './places/places.module.js';
-import { ParkingModule } from './parking/parking.module.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { UsersModule } from './users/users.module.js';

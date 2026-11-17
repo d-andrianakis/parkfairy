@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { safeRedirectPath } from './safe-redirect';
 
 describe('safeRedirectPath', () => {

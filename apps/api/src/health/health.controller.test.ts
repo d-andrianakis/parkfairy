@@ -1,6 +1,7 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { Database } from '@parkfairy/database';
 import { describe, expect, it, vi } from 'vitest';
+
 import { HealthController } from './health.controller.js';
 
 function controllerWith(execute: () => Promise<unknown>) {

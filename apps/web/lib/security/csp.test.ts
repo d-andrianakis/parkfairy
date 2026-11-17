@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { allowsMaps, allowsPayments, buildContentSecurityPolicy, createNonce } from './csp';
 
 function directives(policy: string): Map<string, string[]> {

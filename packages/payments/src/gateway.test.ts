@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
+
 import Stripe from 'stripe';
 import { describe, expect, it, vi } from 'vitest';
+
 import {
   accountStatusOf,
   InvalidSignatureError,

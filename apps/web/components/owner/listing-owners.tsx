@@ -2,27 +2,28 @@
 
 // First: zod must be configured before any schema (in @parkfairy/contracts) is built.
 import '@/lib/zod-jitless';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   acceptListingHandover,
   getListingOwners,
   inviteListingOwner,
   leaveListing,
+  type ListingOwners,
   offerListingHandover,
   removeListingManager,
   removeListingOwner,
   setListingShares,
   withdrawListingHandover,
   withdrawListingInvite,
-  type ListingOwners,
 } from '@parkfairy/api-client';
 import {
   LISTING_INVITE_DAYS,
   LISTING_MANAGERS_MAX,
   LISTING_OWNERS_MAX,
   ListingInviteInputSchema,
-  ListingSharesInputSchema,
   type ListingSharesInput,
+  ListingSharesInputSchema,
 } from '@parkfairy/contracts';
 import { Alert, AlertDescription } from '@parkfairy/ui/components/alert';
 import { Badge } from '@parkfairy/ui/components/badge';
@@ -31,9 +32,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@parkfairy/ui/componen
 import { FieldGroup } from '@parkfairy/ui/components/field';
 import { CircleAlert } from 'lucide-react';
 import { hasLocale, useFormatter, useLocale, useTranslations } from 'next-intl';
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
+
 import { FocusHeading } from '@/components/focus-heading';
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
@@ -46,6 +48,7 @@ import { routing } from '@/i18n/routing';
 import { attempt, useOwnerError } from '@/lib/owner-client';
 import { useValidationMessage } from '@/lib/use-validation-message';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
+
 import { ChoiceField } from './fields';
 import { useFocusAfterRender } from './navigation';
 

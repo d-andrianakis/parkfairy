@@ -1,15 +1,15 @@
-import Stripe from 'stripe';
-import { vi } from 'vitest';
 import {
-  PaymentProviderError,
-  stripeGateway,
   type AccountStatus,
   type DisputeEvidence,
   type DisputeState,
-  type PaymentState,
+  PaymentProviderError,
   type PaymentsGateway,
+  type PaymentState,
   type RefundState,
+  stripeGateway,
 } from '@parkfairy/payments';
+import Stripe from 'stripe';
+import { vi } from 'vitest';
 
 /** The fake endpoint's signing secret: events are signed with it as Stripe would. */
 export const WEBHOOK_SECRET = 'whsec_parkfairyTestSecret';

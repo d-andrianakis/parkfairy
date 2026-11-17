@@ -2,6 +2,7 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+
 import { GlobalErrorScreen } from './global-error-screen';
 
 describe('GlobalErrorScreen', () => {

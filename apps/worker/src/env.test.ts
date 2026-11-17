@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { loadEnv } from './env.js';
 
 const base = {

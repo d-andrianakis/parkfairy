@@ -1,7 +1,9 @@
-import { SUPPORTED_LOCALES, VALIDATION_MESSAGES, type Locale } from '@parkfairy/contracts';
+import { type Locale, SUPPORTED_LOCALES, VALIDATION_MESSAGES } from '@parkfairy/contracts';
 import { createTranslator } from 'next-intl';
 import { describe, expect, it } from 'vitest';
+
 import { AUTH_ERROR_KEYS } from '@/lib/auth-errors';
+
 import el from './el.json';
 import en from './en.json';
 
@@ -121,6 +123,11 @@ describe('message catalogs', () => {
     expect(flatten(el)['Validation.startTooFar']).toContain('ημερομηνία άφιξης');
     expect(flatten(el)['Email.existingAccount.body']).toMatch(/^Έγινε προσπάθεια/);
     expect(flatten(el)['AuthErrors.INVALID_EMAIL_OR_PASSWORD']).toContain('που λάβατε');
+  });
+
+  it('says στάθμευση for a stay, never παραμονή, which reads as a hotel stay (memory.md)', () => {
+    const stray = Object.entries(flatten(el)).filter(([, text]) => /παραμον/i.test(text));
+    expect(stray.map(([key]) => key)).toEqual([]);
   });
 
   it('translates every validation key used by the contracts', () => {

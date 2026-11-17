@@ -10,10 +10,11 @@ import {
 import type { AuthUser } from '@parkfairy/auth';
 import {
   ErrorResponseSchema,
+  type OwnerCalendar,
   OwnerCalendarQuerySchema,
   OwnerCalendarSchema,
-  type OwnerCalendar,
 } from '@parkfairy/contracts';
+
 import { CurrentUser } from '../auth/auth.decorators.js';
 import { parseOrThrow } from '../common/validation.js';
 import { SESSION_COOKIE_SECURITY } from '../openapi/document.js';

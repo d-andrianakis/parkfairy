@@ -8,10 +8,12 @@ import {
 } from '@parkfairy/ui/components/card';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { usableToken } from '@/lib/email-link-params';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
+
 import { ResetPasswordForm } from './reset-password-form';
 
 interface ResetPasswordProps extends LocaleParams {

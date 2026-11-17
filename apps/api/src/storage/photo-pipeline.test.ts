@@ -1,13 +1,14 @@
 import { PHOTO_LIMITS, PHOTO_WIDTHS } from '@parkfairy/contracts';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
+
 import type { ObjectStore } from './object-store.js';
 import {
   cleanScan,
   MAX_INPUT_PIXELS,
-  PhotoRejected,
   photoObjectKey,
   photoObjectKeys,
+  PhotoRejected,
   storePhoto,
 } from './photo-pipeline.js';
 

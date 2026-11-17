@@ -3,8 +3,10 @@ import { DEFAULT_TIME_ZONE } from '@parkfairy/contracts';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { rendererFor } from '@/test/render';
+
 import { ApiIdentity } from './api-identity';
 
 // Only the catalog namespaces this subtree ships to the browser.

@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
+
 import type { Auth } from '@parkfairy/auth';
-import { schema, type Database } from '@parkfairy/database';
+import { type Database, schema } from '@parkfairy/database';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { AUTH } from '../src/auth/auth.tokens.js';
 import { DB } from '../src/database/database.module.js';
 import { DEMO_ACCOUNT, type DemoListing } from '../src/seed/demo-data.js';

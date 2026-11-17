@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+
 import { ClientMessages } from '@/components/client-messages';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 

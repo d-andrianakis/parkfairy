@@ -1,13 +1,14 @@
 import { ListingHoursInputSchema, type OpeningPeriod } from '@parkfairy/contracts';
 import { describe, expect, it } from 'vitest';
+
 import {
   ALL_WEEK,
   closedPartProblem,
+  type DayHours,
   daysToPeriods,
   periodsToDays,
   WEEKDAYS,
   WORKING_WEEK,
-  type DayHours,
 } from './owner-hours';
 
 const closed: DayHours = { open: false, opens: '08:00', closes: '20:00' };

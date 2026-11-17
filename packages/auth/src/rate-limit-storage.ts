@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+
 import type { BetterAuthOptions } from 'better-auth';
 
 export type RateLimitStorage = NonNullable<

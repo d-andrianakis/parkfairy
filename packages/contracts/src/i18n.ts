@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { SUPPORTED_LOCALES } from './locales.js';
 import { contractsRegistry } from './registry.js';
 

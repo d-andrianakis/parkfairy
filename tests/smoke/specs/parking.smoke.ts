@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Page } from '@playwright/test';
+
+import { expect, type Page, test } from '@playwright/test';
+
 import { DEMO_DATA } from '../support/env';
 import { expectAccessible, trackCspViolations } from '../support/fixtures';
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { BOOKING_EMAIL_COPY } from './booking-emails.js';
 import { renderEmail, sentenceWith } from './layout.js';
 import { OWNER_EMAIL_COPY, OWNER_EMAIL_LOCALES } from './owner-emails.js';

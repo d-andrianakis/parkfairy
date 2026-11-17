@@ -1,6 +1,8 @@
 import { ShieldCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+
 import { Link } from '@/i18n/navigation';
+
 import { LocaleSwitcher } from './locale-switcher';
 import { SignOutButton } from './sign-out-button';
 import { StaffNav } from './staff-nav';

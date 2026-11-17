@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
+import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { AUTH_COOKIE_PREFIX } from '@parkfairy/auth';
+
 import { addContractSchemas } from './zod-openapi.js';
 
 export const SESSION_COOKIE_SECURITY = 'session';

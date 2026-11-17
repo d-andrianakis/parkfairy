@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { keepClosuresDraft, takeClosuresDraft, type ClosureDraftRow } from './closures-draft';
+
+import { type ClosureDraftRow, keepClosuresDraft, takeClosuresDraft } from './closures-draft';
 
 const LISTING = 'f0f0f0f0-0000-4000-8000-000000000001';
 const ROW: ClosureDraftRow = {

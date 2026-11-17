@@ -5,7 +5,8 @@ import { Popover, PopoverAnchor, PopoverContent } from '@parkfairy/ui/components
 import { ScrollArea, ScrollBar } from '@parkfairy/ui/components/scroll-area';
 import { ToggleGroup, ToggleGroupItem } from '@parkfairy/ui/components/toggle-group';
 import { useFormatter, useLocale, useTimeZone, useTranslations } from 'next-intl';
-import { memo, useEffect, useId, useRef, type RefObject } from 'react';
+import { memo, type RefObject, useEffect, useId, useRef } from 'react';
+
 import { hourOptions } from '@/i18n/formats';
 
 /** Athens wall-clock values, as the search form submits them: `YYYY-MM-DD` and `HH:MM`. */

@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@parkfairy/ui/components/alert';
 import { useQuery } from '@tanstack/react-query';
 import { CircleAlert } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
+
 import { LOCALE_ENDONYMS } from '@/i18n/locales';
 
 /** Shows the identity the API derives from the session cookie, proving the cross-service session. */

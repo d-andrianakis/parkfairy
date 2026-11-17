@@ -1,6 +1,7 @@
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
 import {
   type DeleteObjectsCommand,
   GetObjectCommand,
@@ -8,7 +9,8 @@ import {
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { fileObjectStore, s3ObjectStore, type ObjectStore } from './object-store.js';
+
+import { fileObjectStore, type ObjectStore, s3ObjectStore } from './object-store.js';
 
 describe('fileObjectStore', () => {
   let directory: string;

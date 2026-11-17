@@ -8,6 +8,7 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { routerMock } from '@/test/navigation-mock';
 import {
@@ -18,6 +19,7 @@ import {
   refusal,
 } from '@/test/owner-fixtures';
 import { rendererFor } from '@/test/render';
+
 import { HoursForm } from './hours-form';
 import { LocationForm } from './location-form';
 import { PricesForm } from './prices-form';

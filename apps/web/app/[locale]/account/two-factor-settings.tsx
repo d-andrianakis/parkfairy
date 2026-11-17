@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { lazy, Suspense, useEffect, useRef, useState, useTransition } from 'react';
+
 import { useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
 

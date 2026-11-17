@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+
 import {
   addDays,
+  type AreaId,
   DEFAULT_TIME_ZONE,
   findArea,
   LISTING_SPACES_LIMIT,
@@ -8,12 +10,12 @@ import {
   ParkingSearchResponseSchema,
   zonedParts,
   zonedTimeToUtc,
-  type AreaId,
 } from '@parkfairy/contracts';
-import { schema, type Database } from '@parkfairy/database';
+import { type Database, schema } from '@parkfairy/database';
 import { and, eq, like } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+
 import { DB } from '../src/database/database.module.js';
 import {
   ParkingService,

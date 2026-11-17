@@ -10,7 +10,8 @@ import type { CheckoutKind } from '@parkfairy/contracts';
 import { isVehiclePlate, VEHICLE_PLATE_LIMITS } from '@parkfairy/contracts/plates';
 import { Button } from '@parkfairy/ui/components/button';
 import { useTranslations } from 'next-intl';
-import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
+import { type FormEvent, lazy, Suspense, useEffect, useRef, useState } from 'react';
+
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
 import { placeTag } from '@/components/parking/place-words';

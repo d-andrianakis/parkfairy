@@ -2,8 +2,10 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { rendererFor } from '@/test/render';
+
 import { NearMeButton } from './near-me-button';
 
 // Only the catalog namespaces this subtree ships to the browser.

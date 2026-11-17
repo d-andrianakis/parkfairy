@@ -10,16 +10,17 @@ import {
 import {
   AREA_IDS,
   ErrorResponseSchema,
+  type FeaturedParkingResponse,
   FeaturedParkingResponseSchema,
   isListingSlug,
+  type ParkingListingDetail,
   ParkingListingDetailSchema,
   ParkingListingQuerySchema,
   ParkingSearchQuerySchema,
-  ParkingSearchResponseSchema,
-  type FeaturedParkingResponse,
-  type ParkingListingDetail,
   type ParkingSearchResponse,
+  ParkingSearchResponseSchema,
 } from '@parkfairy/contracts';
+
 import { Public } from '../auth/auth.decorators.js';
 import { parseOrThrow } from '../common/validation.js';
 import { schemaRef } from '../openapi/zod-openapi.js';

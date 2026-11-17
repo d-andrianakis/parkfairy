@@ -1,6 +1,7 @@
 import type { ManagedListings as Managed } from '@parkfairy/api-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@parkfairy/ui/components/card';
 import { useTranslations } from 'next-intl';
+
 import { PlaceWords } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { CALENDAR_HREF, closuresHref, ownerBookingsHref } from '@/lib/owner-href';

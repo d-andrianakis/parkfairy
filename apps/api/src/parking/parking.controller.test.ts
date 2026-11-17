@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException, RequestMethod } from '@nestjs/c
 import { METHOD_METADATA } from '@nestjs/common/constants';
 import type { ParkingListingDetail, ParkingSearchResult } from '@parkfairy/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { IS_PUBLIC_KEY } from '../auth/auth.decorators.js';
 import { ParkingController } from './parking.controller.js';
 import type { ParkingService } from './parking.service.js';

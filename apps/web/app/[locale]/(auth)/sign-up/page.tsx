@@ -7,11 +7,13 @@ import {
 } from '@parkfairy/ui/components/card';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+
 import { Link, redirect } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
-import { showsSentPanel, type SentPanelSearch } from '@/lib/email-link-params';
+import { type SentPanelSearch, showsSentPanel } from '@/lib/email-link-params';
 import { safeRedirectPath } from '@/lib/safe-redirect';
 import { getSession } from '@/lib/session';
+
 import { SignUpForm } from './sign-up-form';
 
 export async function generateMetadata({

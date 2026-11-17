@@ -1,8 +1,17 @@
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import { defineConfig, globalIgnores } from 'eslint/config';
+import simpleImportSortPlugin from 'eslint-plugin-simple-import-sort';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+
+export const simpleImportSort = {
+  plugins: { 'simple-import-sort': simpleImportSortPlugin },
+  rules: {
+    'simple-import-sort/imports': 'error',
+    'simple-import-sort/exports': 'error',
+  },
+};
 
 /**
  * Type-aware lint config for Node packages and services.
@@ -13,6 +22,7 @@ export function baseConfig(tsconfigRootDir) {
     globalIgnores(['dist/**', 'coverage/**', '**/*.gen.ts']),
     js.configs.recommended,
     tseslint.configs.recommendedTypeChecked,
+    simpleImportSort,
     {
       languageOptions: {
         globals: globals.node,

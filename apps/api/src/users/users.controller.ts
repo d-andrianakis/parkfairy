@@ -1,7 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiCookieAuth, ApiOkResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import type { AuthUser } from '@parkfairy/auth';
-import { ErrorResponseSchema, MeResponseSchema, type MeResponse } from '@parkfairy/contracts';
+import { ErrorResponseSchema, type MeResponse, MeResponseSchema } from '@parkfairy/contracts';
+
 import { CurrentUser } from '../auth/auth.decorators.js';
 import { SESSION_COOKIE_SECURITY } from '../openapi/document.js';
 import { schemaRef } from '../openapi/zod-openapi.js';

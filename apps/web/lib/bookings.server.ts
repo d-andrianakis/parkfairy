@@ -1,5 +1,8 @@
 import 'server-only';
+
 import {
+  type Booking,
+  type BookingList,
   createClient,
   createConfig,
   getCalendar,
@@ -7,8 +10,8 @@ import {
   getListingBookings,
   getMyBooking,
   getMyBookings,
-  type Booking,
-  type BookingList,
+  listOwnerBookings,
+  type OwnerBookingList,
   type OwnerCalendar,
   type OwnerEarnings,
   type OwnerListingBookings,
@@ -111,6 +114,39 @@ export const loadOwnerCalendar = cache(
       const { data } = await getCalendar({
         ...(await asVisitor()),
         query: { ...(month ? { month } : {}), ...(listing ? { listing } : {}) },
+      });
+      return data ?? null;
+    } catch {
+      return null;
+    }
+  },
+);
+
+/**
+ * The bookings of every listing the signed-in account runs (5.1), a page at a time; null when the
+ * API could not answer or refused the query. Strings, not an object, so the page and its metadata
+ * share one request (`cache` keys); the empty string leaves a part of the query out.
+ */
+export const loadOwnerBookingList = cache(
+  async (
+    status: 'upcoming' | 'past' | 'cancelled' | '' = '',
+    listing = '',
+    from = '',
+    to = '',
+    after = '',
+    before = '',
+  ): Promise<OwnerBookingList | null> => {
+    try {
+      const { data } = await listOwnerBookings({
+        ...(await asVisitor()),
+        query: {
+          ...(status ? { status } : {}),
+          ...(listing ? { listing } : {}),
+          ...(from ? { from } : {}),
+          ...(to ? { to } : {}),
+          ...(after ? { after } : {}),
+          ...(before ? { before } : {}),
+        },
       });
       return data ?? null;
     } catch {

@@ -1,8 +1,10 @@
 import { ACCOUNT_STEPS, type AccountStep } from '@parkfairy/contracts';
 import { Card, CardContent, CardHeader, CardTitle } from '@parkfairy/ui/components/card';
 import { useTranslations } from 'next-intl';
+
 import { Link } from '@/i18n/navigation';
 import { ACCOUNT_STEP_HREF } from '@/lib/owner';
+
 import { STEP_LINK, StepRow } from './step-state';
 
 /** Once per owner, however many listings follow. */

@@ -2,8 +2,10 @@ import { Button } from '@parkfairy/ui/components/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@parkfairy/ui/components/card';
 import { Progress } from '@parkfairy/ui/components/progress';
 import { useTranslations } from 'next-intl';
+
 import type { NextAction, SetupProgress } from '@/lib/owner';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
+
 import { NewListingButton } from './listing-actions';
 import { StepLink } from './navigation';
 

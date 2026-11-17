@@ -2,926 +2,1824 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AcceptListingHandoverData, AcceptListingHandoverErrors, AcceptListingHandoverResponses, AcceptListingInviteData, AcceptListingInviteErrors, AcceptListingInviteResponses, ApproveAdminListingData, ApproveAdminListingErrors, ApproveAdminListingResponses, CancelAdminBookingData, CancelAdminBookingErrors, CancelAdminBookingResponses, CancelListingBookingData, CancelListingBookingErrors, CancelListingBookingResponses, CancelMyBookingData, CancelMyBookingErrors, CancelMyBookingResponses, ConfirmMyBookingData, ConfirmMyBookingErrors, ConfirmMyBookingResponses, CopyListingHoursData, CopyListingHoursErrors, CopyListingHoursExceptionsData, CopyListingHoursExceptionsErrors, CopyListingHoursExceptionsResponses, CopyListingHoursResponses, CreateOwnerListingData, CreateOwnerListingErrors, CreateOwnerListingResponses, DecideAdminDisputeData, DecideAdminDisputeErrors, DecideAdminDisputeResponses, DeleteListingPhotoData, DeleteListingPhotoErrors, DeleteListingPhotoResponses, DeleteListingProofData, DeleteListingProofErrors, DeleteListingProofResponses, DeleteOwnerListingData, DeleteOwnerListingErrors, DeleteOwnerListingResponses, DownloadAdminProofData, DownloadAdminProofErrors, DownloadAdminProofResponses, DownloadListingProofData, DownloadListingProofErrors, DownloadListingProofResponses, ExtendMyHoldData, ExtendMyHoldErrors, ExtendMyHoldResponses, FindPlacesData, FindPlacesErrors, FindPlacesResponses, GetAdminBookingData, GetAdminBookingErrors, GetAdminBookingResponses, GetAdminListingData, GetAdminListingErrors, GetAdminListingResponses, GetAdminPaymentsData, GetAdminPaymentsErrors, GetAdminPaymentsResponses, GetAdminQueueData, GetAdminQueueErrors, GetAdminQueueResponses, GetAdminUserData, GetAdminUserErrors, GetAdminUserResponses, GetAuditLogData, GetAuditLogErrors, GetAuditLogResponses, GetCalendarData, GetCalendarErrors, GetCalendarResponses, GetEarningsData, GetEarningsErrors, GetEarningsResponses, GetFeaturedParkingData, GetFeaturedParkingResponses, GetListingBookingsData, GetListingBookingsErrors, GetListingBookingsResponses, GetListingHoursExceptionsData, GetListingHoursExceptionsErrors, GetListingHoursExceptionsResponses, GetListingOwnersData, GetListingOwnersErrors, GetListingOwnersResponses, GetListingPhotoData, GetListingPhotoErrors, GetListingPhotoResponses, GetLivenessData, GetLivenessResponses, GetManagedListingsData, GetManagedListingsErrors, GetManagedListingsResponses, GetMeData, GetMeErrors, GetMeResponses, GetMyBookingData, GetMyBookingErrors, GetMyBookingResponses, GetMyBookingsData, GetMyBookingsErrors, GetMyBookingsResponses, GetOtherOwnerListingsData, GetOtherOwnerListingsErrors, GetOtherOwnerListingsResponses, GetOwnerListingData, GetOwnerListingErrors, GetOwnerListingResponses, GetOwnerOnboardingData, GetOwnerOnboardingErrors, GetOwnerOnboardingResponses, GetOwnerPayoutsData, GetOwnerPayoutsErrors, GetOwnerPayoutsResponses, GetOwnerProfileData, GetOwnerProfileErrors, GetOwnerProfileResponses, GetParkingListingData, GetParkingListingErrors, GetParkingListingResponses, GetPlaceSuggestionsData, GetPlaceSuggestionsErrors, GetPlaceSuggestionsResponses, GetReadinessData, GetReadinessErrors, GetReadinessResponses, HoldParkingSpaceData, HoldParkingSpaceErrors, HoldParkingSpaceResponses, InviteListingOwnerData, InviteListingOwnerErrors, InviteListingOwnerResponses, LeaveListingData, LeaveListingErrors, LeaveListingResponses, LookUpAdminBookingData, LookUpAdminBookingErrors, LookUpAdminBookingResponses, LookUpAdminUserData, LookUpAdminUserErrors, LookUpAdminUserResponses, OfferListingHandoverData, OfferListingHandoverErrors, OfferListingHandoverResponses, OpenPayoutDashboardData, OpenPayoutDashboardErrors, OpenPayoutDashboardResponses, PayForMyBookingData, PayForMyBookingErrors, PayForMyBookingResponses, PreviewListingInviteData, PreviewListingInviteErrors, PreviewListingInviteResponses, ReinstateAdminListingData, ReinstateAdminListingErrors, ReinstateAdminListingResponses, ReinstateAdminUserData, ReinstateAdminUserErrors, ReinstateAdminUserResponses, RemoveAdminUserTwoFactorData, RemoveAdminUserTwoFactorErrors, RemoveAdminUserTwoFactorResponses, RemoveListingManagerData, RemoveListingManagerErrors, RemoveListingManagerResponses, RemoveListingOwnerData, RemoveListingOwnerErrors, RemoveListingOwnerResponses, ReorderListingPhotosData, ReorderListingPhotosErrors, ReorderListingPhotosResponses, RequestAdminListingChangesData, RequestAdminListingChangesErrors, RequestAdminListingChangesResponses, RetrievePlaceData, RetrievePlaceErrors, RetrievePlaceResponses, RetryAdminBookingRefundData, RetryAdminBookingRefundErrors, RetryAdminBookingRefundResponses, SaveListingHoursData, SaveListingHoursErrors, SaveListingHoursExceptionsData, SaveListingHoursExceptionsErrors, SaveListingHoursExceptionsResponses, SaveListingHoursResponses, SaveListingLocationData, SaveListingLocationErrors, SaveListingLocationResponses, SaveListingPricesData, SaveListingPricesErrors, SaveListingPricesResponses, SaveListingProofDetailsData, SaveListingProofDetailsErrors, SaveListingProofDetailsResponses, SaveListingSpacesData, SaveListingSpacesErrors, SaveListingSpacesResponses, SaveOwnerTaxDetailsData, SaveOwnerTaxDetailsErrors, SaveOwnerTaxDetailsResponses, SearchParkingData, SearchParkingErrors, SearchParkingResponses, SetListingSharesData, SetListingSharesErrors, SetListingSharesResponses, SettleAdminBookingRefundData, SettleAdminBookingRefundErrors, SettleAdminBookingRefundResponses, SettleMyPaymentData, SettleMyPaymentErrors, SettleMyPaymentResponses, StartPayoutOnboardingData, StartPayoutOnboardingErrors, StartPayoutOnboardingResponses, SubmitOwnerListingData, SubmitOwnerListingErrors, SubmitOwnerListingResponses, SuspendAdminListingData, SuspendAdminListingErrors, SuspendAdminListingResponses, SuspendAdminUserData, SuspendAdminUserErrors, SuspendAdminUserResponses, UpdateListingPhotoData, UpdateListingPhotoErrors, UpdateListingPhotoResponses, UpdateOwnerProfileData, UpdateOwnerProfileErrors, UpdateOwnerProfileResponses, UploadListingPhotoData, UploadListingPhotoErrors, UploadListingPhotoResponses, UploadListingProofData, UploadListingProofErrors, UploadListingProofResponses, WithdrawListingHandoverData, WithdrawListingHandoverErrors, WithdrawListingHandoverResponses, WithdrawListingInviteData, WithdrawListingInviteErrors, WithdrawListingInviteResponses } from './types.gen';
+import type {
+  AcceptListingHandoverData,
+  AcceptListingHandoverErrors,
+  AcceptListingHandoverResponses,
+  AcceptListingInviteData,
+  AcceptListingInviteErrors,
+  AcceptListingInviteResponses,
+  ApproveAdminListingData,
+  ApproveAdminListingErrors,
+  ApproveAdminListingResponses,
+  CancelAdminBookingData,
+  CancelAdminBookingErrors,
+  CancelAdminBookingResponses,
+  CancelListingBookingData,
+  CancelListingBookingErrors,
+  CancelListingBookingResponses,
+  CancelMyBookingData,
+  CancelMyBookingErrors,
+  CancelMyBookingResponses,
+  ConfirmMyBookingData,
+  ConfirmMyBookingErrors,
+  ConfirmMyBookingResponses,
+  CopyListingHoursData,
+  CopyListingHoursErrors,
+  CopyListingHoursExceptionsData,
+  CopyListingHoursExceptionsErrors,
+  CopyListingHoursExceptionsResponses,
+  CopyListingHoursResponses,
+  CreateOwnerListingData,
+  CreateOwnerListingErrors,
+  CreateOwnerListingResponses,
+  DecideAdminDisputeData,
+  DecideAdminDisputeErrors,
+  DecideAdminDisputeResponses,
+  DeleteListingPhotoData,
+  DeleteListingPhotoErrors,
+  DeleteListingPhotoResponses,
+  DeleteListingProofData,
+  DeleteListingProofErrors,
+  DeleteListingProofResponses,
+  DeleteOwnerListingData,
+  DeleteOwnerListingErrors,
+  DeleteOwnerListingResponses,
+  DownloadAdminProofData,
+  DownloadAdminProofErrors,
+  DownloadAdminProofResponses,
+  DownloadListingProofData,
+  DownloadListingProofErrors,
+  DownloadListingProofResponses,
+  ExtendMyHoldData,
+  ExtendMyHoldErrors,
+  ExtendMyHoldResponses,
+  FindPlacesData,
+  FindPlacesErrors,
+  FindPlacesResponses,
+  GetAdminBookingData,
+  GetAdminBookingErrors,
+  GetAdminBookingResponses,
+  GetAdminListingData,
+  GetAdminListingErrors,
+  GetAdminListingResponses,
+  GetAdminPaymentsData,
+  GetAdminPaymentsErrors,
+  GetAdminPaymentsResponses,
+  GetAdminQueueData,
+  GetAdminQueueErrors,
+  GetAdminQueueResponses,
+  GetAdminUserData,
+  GetAdminUserErrors,
+  GetAdminUserResponses,
+  GetAuditLogData,
+  GetAuditLogErrors,
+  GetAuditLogResponses,
+  GetCalendarData,
+  GetCalendarErrors,
+  GetCalendarResponses,
+  GetEarningsData,
+  GetEarningsErrors,
+  GetEarningsResponses,
+  GetFeaturedParkingData,
+  GetFeaturedParkingResponses,
+  GetListingBookingsData,
+  GetListingBookingsErrors,
+  GetListingBookingsResponses,
+  GetListingHoursExceptionsData,
+  GetListingHoursExceptionsErrors,
+  GetListingHoursExceptionsResponses,
+  GetListingOwnersData,
+  GetListingOwnersErrors,
+  GetListingOwnersResponses,
+  GetListingPhotoData,
+  GetListingPhotoErrors,
+  GetListingPhotoResponses,
+  GetLivenessData,
+  GetLivenessResponses,
+  GetManagedListingsData,
+  GetManagedListingsErrors,
+  GetManagedListingsResponses,
+  GetMeData,
+  GetMeErrors,
+  GetMeResponses,
+  GetMyBookingData,
+  GetMyBookingErrors,
+  GetMyBookingResponses,
+  GetMyBookingsData,
+  GetMyBookingsErrors,
+  GetMyBookingsResponses,
+  GetOtherOwnerListingsData,
+  GetOtherOwnerListingsErrors,
+  GetOtherOwnerListingsResponses,
+  GetOwnerListingData,
+  GetOwnerListingErrors,
+  GetOwnerListingResponses,
+  GetOwnerOnboardingData,
+  GetOwnerOnboardingErrors,
+  GetOwnerOnboardingResponses,
+  GetOwnerPayoutsData,
+  GetOwnerPayoutsErrors,
+  GetOwnerPayoutsResponses,
+  GetOwnerProfileData,
+  GetOwnerProfileErrors,
+  GetOwnerProfileResponses,
+  GetParkingListingData,
+  GetParkingListingErrors,
+  GetParkingListingResponses,
+  GetPlaceSuggestionsData,
+  GetPlaceSuggestionsErrors,
+  GetPlaceSuggestionsResponses,
+  GetReadinessData,
+  GetReadinessErrors,
+  GetReadinessResponses,
+  HoldParkingSpaceData,
+  HoldParkingSpaceErrors,
+  HoldParkingSpaceResponses,
+  InviteListingOwnerData,
+  InviteListingOwnerErrors,
+  InviteListingOwnerResponses,
+  LeaveListingData,
+  LeaveListingErrors,
+  LeaveListingResponses,
+  ListOwnerBookingsData,
+  ListOwnerBookingsErrors,
+  ListOwnerBookingsResponses,
+  LookUpAdminBookingData,
+  LookUpAdminBookingErrors,
+  LookUpAdminBookingResponses,
+  LookUpAdminUserData,
+  LookUpAdminUserErrors,
+  LookUpAdminUserResponses,
+  OfferListingHandoverData,
+  OfferListingHandoverErrors,
+  OfferListingHandoverResponses,
+  OpenPayoutDashboardData,
+  OpenPayoutDashboardErrors,
+  OpenPayoutDashboardResponses,
+  PayForMyBookingData,
+  PayForMyBookingErrors,
+  PayForMyBookingResponses,
+  PreviewListingInviteData,
+  PreviewListingInviteErrors,
+  PreviewListingInviteResponses,
+  ReinstateAdminListingData,
+  ReinstateAdminListingErrors,
+  ReinstateAdminListingResponses,
+  ReinstateAdminUserData,
+  ReinstateAdminUserErrors,
+  ReinstateAdminUserResponses,
+  RemoveAdminUserTwoFactorData,
+  RemoveAdminUserTwoFactorErrors,
+  RemoveAdminUserTwoFactorResponses,
+  RemoveListingManagerData,
+  RemoveListingManagerErrors,
+  RemoveListingManagerResponses,
+  RemoveListingOwnerData,
+  RemoveListingOwnerErrors,
+  RemoveListingOwnerResponses,
+  ReorderListingPhotosData,
+  ReorderListingPhotosErrors,
+  ReorderListingPhotosResponses,
+  RequestAdminListingChangesData,
+  RequestAdminListingChangesErrors,
+  RequestAdminListingChangesResponses,
+  RetrievePlaceData,
+  RetrievePlaceErrors,
+  RetrievePlaceResponses,
+  RetryAdminBookingRefundData,
+  RetryAdminBookingRefundErrors,
+  RetryAdminBookingRefundResponses,
+  SaveListingHoursData,
+  SaveListingHoursErrors,
+  SaveListingHoursExceptionsData,
+  SaveListingHoursExceptionsErrors,
+  SaveListingHoursExceptionsResponses,
+  SaveListingHoursResponses,
+  SaveListingLocationData,
+  SaveListingLocationErrors,
+  SaveListingLocationResponses,
+  SaveListingPricesData,
+  SaveListingPricesErrors,
+  SaveListingPricesResponses,
+  SaveListingProofDetailsData,
+  SaveListingProofDetailsErrors,
+  SaveListingProofDetailsResponses,
+  SaveListingSpacesData,
+  SaveListingSpacesErrors,
+  SaveListingSpacesResponses,
+  SaveOwnerTaxDetailsData,
+  SaveOwnerTaxDetailsErrors,
+  SaveOwnerTaxDetailsResponses,
+  SearchParkingData,
+  SearchParkingErrors,
+  SearchParkingResponses,
+  SetListingSharesData,
+  SetListingSharesErrors,
+  SetListingSharesResponses,
+  SettleAdminBookingRefundData,
+  SettleAdminBookingRefundErrors,
+  SettleAdminBookingRefundResponses,
+  SettleMyPaymentData,
+  SettleMyPaymentErrors,
+  SettleMyPaymentResponses,
+  StartPayoutOnboardingData,
+  StartPayoutOnboardingErrors,
+  StartPayoutOnboardingResponses,
+  SubmitOwnerListingData,
+  SubmitOwnerListingErrors,
+  SubmitOwnerListingResponses,
+  SuspendAdminListingData,
+  SuspendAdminListingErrors,
+  SuspendAdminListingResponses,
+  SuspendAdminUserData,
+  SuspendAdminUserErrors,
+  SuspendAdminUserResponses,
+  UpdateListingPhotoData,
+  UpdateListingPhotoErrors,
+  UpdateListingPhotoResponses,
+  UpdateOwnerProfileData,
+  UpdateOwnerProfileErrors,
+  UpdateOwnerProfileResponses,
+  UploadListingPhotoData,
+  UploadListingPhotoErrors,
+  UploadListingPhotoResponses,
+  UploadListingProofData,
+  UploadListingProofErrors,
+  UploadListingProofResponses,
+  WithdrawListingHandoverData,
+  WithdrawListingHandoverErrors,
+  WithdrawListingHandoverResponses,
+  WithdrawListingInviteData,
+  WithdrawListingInviteErrors,
+  WithdrawListingInviteResponses,
+} from './types.gen';
 
-export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
-    /**
-     * You can provide a client instance returned by `createClient()` instead of
-     * individual options. This might be also useful if you want to implement a
-     * custom client.
-     */
-    client?: Client;
-    /**
-     * You can pass arbitrary values through the `meta` object. This can be
-     * used to access values that aren't defined as part of the SDK function.
-     */
-    meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
+export type Options<
+  TData extends TDataShape = TDataShape,
+  ThrowOnError extends boolean = boolean,
+  TResponse = unknown,
+> = Options2<TData, ThrowOnError, TResponse> & {
+  /**
+   * You can provide a client instance returned by `createClient()` instead of
+   * individual options. This might be also useful if you want to implement a
+   * custom client.
+   */
+  client?: Client;
+  /**
+   * You can pass arbitrary values through the `meta` object. This can be
+   * used to access values that aren't defined as part of the SDK function.
+   */
+  meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
 
-export const getLiveness = <ThrowOnError extends boolean = false>(options?: Options<GetLivenessData, ThrowOnError>): RequestResult<GetLivenessResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetLivenessResponses, unknown, ThrowOnError>({ url: '/health', ...options });
+export const getLiveness = <ThrowOnError extends boolean = false>(
+  options?: Options<GetLivenessData, ThrowOnError>,
+): RequestResult<GetLivenessResponses, unknown, ThrowOnError> =>
+  (options?.client ?? client).get<GetLivenessResponses, unknown, ThrowOnError>({
+    url: '/health',
+    ...options,
+  });
 
-export const getReadiness = <ThrowOnError extends boolean = false>(options?: Options<GetReadinessData, ThrowOnError>): RequestResult<GetReadinessResponses, GetReadinessErrors, ThrowOnError> => (options?.client ?? client).get<GetReadinessResponses, GetReadinessErrors, ThrowOnError>({ url: '/health/ready', ...options });
+export const getReadiness = <ThrowOnError extends boolean = false>(
+  options?: Options<GetReadinessData, ThrowOnError>,
+): RequestResult<GetReadinessResponses, GetReadinessErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetReadinessResponses, GetReadinessErrors, ThrowOnError>({
+    url: '/health/ready',
+    ...options,
+  });
 
-export const getMe = <ThrowOnError extends boolean = false>(options?: Options<GetMeData, ThrowOnError>): RequestResult<GetMeResponses, GetMeErrors, ThrowOnError> => (options?.client ?? client).get<GetMeResponses, GetMeErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getMe = <ThrowOnError extends boolean = false>(
+  options?: Options<GetMeData, ThrowOnError>,
+): RequestResult<GetMeResponses, GetMeErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetMeResponses, GetMeErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/me',
-    ...options
-});
+    ...options,
+  });
 
-export const getListingPhoto = <ThrowOnError extends boolean = false>(options: Options<GetListingPhotoData, ThrowOnError>): RequestResult<GetListingPhotoResponses, GetListingPhotoErrors, ThrowOnError> => (options.client ?? client).get<GetListingPhotoResponses, GetListingPhotoErrors, ThrowOnError>({ url: '/v1/media/photos/{key}/{width}.webp', ...options });
+export const getListingPhoto = <ThrowOnError extends boolean = false>(
+  options: Options<GetListingPhotoData, ThrowOnError>,
+): RequestResult<GetListingPhotoResponses, GetListingPhotoErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetListingPhotoResponses, GetListingPhotoErrors, ThrowOnError>({
+    url: '/v1/media/photos/{key}/{width}.webp',
+    ...options,
+  });
 
-export const getFeaturedParking = <ThrowOnError extends boolean = false>(options?: Options<GetFeaturedParkingData, ThrowOnError>): RequestResult<GetFeaturedParkingResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetFeaturedParkingResponses, unknown, ThrowOnError>({ url: '/v1/parking/featured', ...options });
+export const getFeaturedParking = <ThrowOnError extends boolean = false>(
+  options?: Options<GetFeaturedParkingData, ThrowOnError>,
+): RequestResult<GetFeaturedParkingResponses, unknown, ThrowOnError> =>
+  (options?.client ?? client).get<GetFeaturedParkingResponses, unknown, ThrowOnError>({
+    url: '/v1/parking/featured',
+    ...options,
+  });
 
-export const searchParking = <ThrowOnError extends boolean = false>(options: Options<SearchParkingData, ThrowOnError>): RequestResult<SearchParkingResponses, SearchParkingErrors, ThrowOnError> => (options.client ?? client).get<SearchParkingResponses, SearchParkingErrors, ThrowOnError>({ url: '/v1/parking/search', ...options });
+export const searchParking = <ThrowOnError extends boolean = false>(
+  options: Options<SearchParkingData, ThrowOnError>,
+): RequestResult<SearchParkingResponses, SearchParkingErrors, ThrowOnError> =>
+  (options.client ?? client).get<SearchParkingResponses, SearchParkingErrors, ThrowOnError>({
+    url: '/v1/parking/search',
+    ...options,
+  });
 
-export const getParkingListing = <ThrowOnError extends boolean = false>(options: Options<GetParkingListingData, ThrowOnError>): RequestResult<GetParkingListingResponses, GetParkingListingErrors, ThrowOnError> => (options.client ?? client).get<GetParkingListingResponses, GetParkingListingErrors, ThrowOnError>({ url: '/v1/parking/{slug}', ...options });
+export const getParkingListing = <ThrowOnError extends boolean = false>(
+  options: Options<GetParkingListingData, ThrowOnError>,
+): RequestResult<GetParkingListingResponses, GetParkingListingErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetParkingListingResponses, GetParkingListingErrors, ThrowOnError>(
+    { url: '/v1/parking/{slug}', ...options },
+  );
 
-export const getOwnerOnboarding = <ThrowOnError extends boolean = false>(options?: Options<GetOwnerOnboardingData, ThrowOnError>): RequestResult<GetOwnerOnboardingResponses, GetOwnerOnboardingErrors, ThrowOnError> => (options?.client ?? client).get<GetOwnerOnboardingResponses, GetOwnerOnboardingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getOwnerOnboarding = <ThrowOnError extends boolean = false>(
+  options?: Options<GetOwnerOnboardingData, ThrowOnError>,
+): RequestResult<GetOwnerOnboardingResponses, GetOwnerOnboardingErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    GetOwnerOnboardingResponses,
+    GetOwnerOnboardingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/onboarding',
-    ...options
-});
+    ...options,
+  });
 
-export const getOwnerProfile = <ThrowOnError extends boolean = false>(options?: Options<GetOwnerProfileData, ThrowOnError>): RequestResult<GetOwnerProfileResponses, GetOwnerProfileErrors, ThrowOnError> => (options?.client ?? client).get<GetOwnerProfileResponses, GetOwnerProfileErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getOwnerProfile = <ThrowOnError extends boolean = false>(
+  options?: Options<GetOwnerProfileData, ThrowOnError>,
+): RequestResult<GetOwnerProfileResponses, GetOwnerProfileErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetOwnerProfileResponses, GetOwnerProfileErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/profile',
-    ...options
-});
+    ...options,
+  });
 
-export const updateOwnerProfile = <ThrowOnError extends boolean = false>(options: Options<UpdateOwnerProfileData, ThrowOnError>): RequestResult<UpdateOwnerProfileResponses, UpdateOwnerProfileErrors, ThrowOnError> => (options.client ?? client).patch<UpdateOwnerProfileResponses, UpdateOwnerProfileErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const updateOwnerProfile = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateOwnerProfileData, ThrowOnError>,
+): RequestResult<UpdateOwnerProfileResponses, UpdateOwnerProfileErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateOwnerProfileResponses,
+    UpdateOwnerProfileErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/profile',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const saveOwnerTaxDetails = <ThrowOnError extends boolean = false>(options: Options<SaveOwnerTaxDetailsData, ThrowOnError>): RequestResult<SaveOwnerTaxDetailsResponses, SaveOwnerTaxDetailsErrors, ThrowOnError> => (options.client ?? client).put<SaveOwnerTaxDetailsResponses, SaveOwnerTaxDetailsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const saveOwnerTaxDetails = <ThrowOnError extends boolean = false>(
+  options: Options<SaveOwnerTaxDetailsData, ThrowOnError>,
+): RequestResult<SaveOwnerTaxDetailsResponses, SaveOwnerTaxDetailsErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    SaveOwnerTaxDetailsResponses,
+    SaveOwnerTaxDetailsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/profile/tax',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const createOwnerListing = <ThrowOnError extends boolean = false>(options?: Options<CreateOwnerListingData, ThrowOnError>): RequestResult<CreateOwnerListingResponses, CreateOwnerListingErrors, ThrowOnError> => (options?.client ?? client).post<CreateOwnerListingResponses, CreateOwnerListingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const createOwnerListing = <ThrowOnError extends boolean = false>(
+  options?: Options<CreateOwnerListingData, ThrowOnError>,
+): RequestResult<CreateOwnerListingResponses, CreateOwnerListingErrors, ThrowOnError> =>
+  (options?.client ?? client).post<
+    CreateOwnerListingResponses,
+    CreateOwnerListingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings',
-    ...options
-});
+    ...options,
+  });
 
-export const deleteOwnerListing = <ThrowOnError extends boolean = false>(options: Options<DeleteOwnerListingData, ThrowOnError>): RequestResult<DeleteOwnerListingResponses, DeleteOwnerListingErrors, ThrowOnError> => (options.client ?? client).delete<DeleteOwnerListingResponses, DeleteOwnerListingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const deleteOwnerListing = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteOwnerListingData, ThrowOnError>,
+): RequestResult<DeleteOwnerListingResponses, DeleteOwnerListingErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteOwnerListingResponses,
+    DeleteOwnerListingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}',
-    ...options
-});
+    ...options,
+  });
 
-export const getOwnerListing = <ThrowOnError extends boolean = false>(options: Options<GetOwnerListingData, ThrowOnError>): RequestResult<GetOwnerListingResponses, GetOwnerListingErrors, ThrowOnError> => (options.client ?? client).get<GetOwnerListingResponses, GetOwnerListingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getOwnerListing = <ThrowOnError extends boolean = false>(
+  options: Options<GetOwnerListingData, ThrowOnError>,
+): RequestResult<GetOwnerListingResponses, GetOwnerListingErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetOwnerListingResponses, GetOwnerListingErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}',
-    ...options
-});
+    ...options,
+  });
 
-export const getListingHoursExceptions = <ThrowOnError extends boolean = false>(options: Options<GetListingHoursExceptionsData, ThrowOnError>): RequestResult<GetListingHoursExceptionsResponses, GetListingHoursExceptionsErrors, ThrowOnError> => (options.client ?? client).get<GetListingHoursExceptionsResponses, GetListingHoursExceptionsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getListingHoursExceptions = <ThrowOnError extends boolean = false>(
+  options: Options<GetListingHoursExceptionsData, ThrowOnError>,
+): RequestResult<
+  GetListingHoursExceptionsResponses,
+  GetListingHoursExceptionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetListingHoursExceptionsResponses,
+    GetListingHoursExceptionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/hours-exceptions',
-    ...options
-});
+    ...options,
+  });
 
-export const saveListingHoursExceptions = <ThrowOnError extends boolean = false>(options: Options<SaveListingHoursExceptionsData, ThrowOnError>): RequestResult<SaveListingHoursExceptionsResponses, SaveListingHoursExceptionsErrors, ThrowOnError> => (options.client ?? client).put<SaveListingHoursExceptionsResponses, SaveListingHoursExceptionsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const saveListingHoursExceptions = <ThrowOnError extends boolean = false>(
+  options: Options<SaveListingHoursExceptionsData, ThrowOnError>,
+): RequestResult<
+  SaveListingHoursExceptionsResponses,
+  SaveListingHoursExceptionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    SaveListingHoursExceptionsResponses,
+    SaveListingHoursExceptionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/hours-exceptions',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const getOtherOwnerListings = <ThrowOnError extends boolean = false>(options: Options<GetOtherOwnerListingsData, ThrowOnError>): RequestResult<GetOtherOwnerListingsResponses, GetOtherOwnerListingsErrors, ThrowOnError> => (options.client ?? client).get<GetOtherOwnerListingsResponses, GetOtherOwnerListingsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getOtherOwnerListings = <ThrowOnError extends boolean = false>(
+  options: Options<GetOtherOwnerListingsData, ThrowOnError>,
+): RequestResult<GetOtherOwnerListingsResponses, GetOtherOwnerListingsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetOtherOwnerListingsResponses,
+    GetOtherOwnerListingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/others',
-    ...options
-});
+    ...options,
+  });
 
-export const saveListingLocation = <ThrowOnError extends boolean = false>(options: Options<SaveListingLocationData, ThrowOnError>): RequestResult<SaveListingLocationResponses, SaveListingLocationErrors, ThrowOnError> => (options.client ?? client).patch<SaveListingLocationResponses, SaveListingLocationErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const saveListingLocation = <ThrowOnError extends boolean = false>(
+  options: Options<SaveListingLocationData, ThrowOnError>,
+): RequestResult<SaveListingLocationResponses, SaveListingLocationErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    SaveListingLocationResponses,
+    SaveListingLocationErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/location',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const saveListingSpaces = <ThrowOnError extends boolean = false>(options: Options<SaveListingSpacesData, ThrowOnError>): RequestResult<SaveListingSpacesResponses, SaveListingSpacesErrors, ThrowOnError> => (options.client ?? client).put<SaveListingSpacesResponses, SaveListingSpacesErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
-    url: '/v1/owner/listings/{id}/spaces',
-    ...options,
-    headers: {
+export const saveListingSpaces = <ThrowOnError extends boolean = false>(
+  options: Options<SaveListingSpacesData, ThrowOnError>,
+): RequestResult<SaveListingSpacesResponses, SaveListingSpacesErrors, ThrowOnError> =>
+  (options.client ?? client).put<SaveListingSpacesResponses, SaveListingSpacesErrors, ThrowOnError>(
+    {
+      security: [
+        {
+          in: 'cookie',
+          name: 'parkfairy.session_token',
+          type: 'apiKey',
+        },
+      ],
+      url: '/v1/owner/listings/{id}/spaces',
+      ...options,
+      headers: {
         'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+        ...options.headers,
+      },
+    },
+  );
 
-export const saveListingHours = <ThrowOnError extends boolean = false>(options: Options<SaveListingHoursData, ThrowOnError>): RequestResult<SaveListingHoursResponses, SaveListingHoursErrors, ThrowOnError> => (options.client ?? client).put<SaveListingHoursResponses, SaveListingHoursErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const saveListingHours = <ThrowOnError extends boolean = false>(
+  options: Options<SaveListingHoursData, ThrowOnError>,
+): RequestResult<SaveListingHoursResponses, SaveListingHoursErrors, ThrowOnError> =>
+  (options.client ?? client).put<SaveListingHoursResponses, SaveListingHoursErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/hours',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const copyListingHours = <ThrowOnError extends boolean = false>(options: Options<CopyListingHoursData, ThrowOnError>): RequestResult<CopyListingHoursResponses, CopyListingHoursErrors, ThrowOnError> => (options.client ?? client).post<CopyListingHoursResponses, CopyListingHoursErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const copyListingHours = <ThrowOnError extends boolean = false>(
+  options: Options<CopyListingHoursData, ThrowOnError>,
+): RequestResult<CopyListingHoursResponses, CopyListingHoursErrors, ThrowOnError> =>
+  (options.client ?? client).post<CopyListingHoursResponses, CopyListingHoursErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/hours/copy',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const copyListingHoursExceptions = <ThrowOnError extends boolean = false>(options: Options<CopyListingHoursExceptionsData, ThrowOnError>): RequestResult<CopyListingHoursExceptionsResponses, CopyListingHoursExceptionsErrors, ThrowOnError> => (options.client ?? client).post<CopyListingHoursExceptionsResponses, CopyListingHoursExceptionsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const copyListingHoursExceptions = <ThrowOnError extends boolean = false>(
+  options: Options<CopyListingHoursExceptionsData, ThrowOnError>,
+): RequestResult<
+  CopyListingHoursExceptionsResponses,
+  CopyListingHoursExceptionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CopyListingHoursExceptionsResponses,
+    CopyListingHoursExceptionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/hours-exceptions/copy',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const saveListingPrices = <ThrowOnError extends boolean = false>(options: Options<SaveListingPricesData, ThrowOnError>): RequestResult<SaveListingPricesResponses, SaveListingPricesErrors, ThrowOnError> => (options.client ?? client).put<SaveListingPricesResponses, SaveListingPricesErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
-    url: '/v1/owner/listings/{id}/prices',
-    ...options,
-    headers: {
+export const saveListingPrices = <ThrowOnError extends boolean = false>(
+  options: Options<SaveListingPricesData, ThrowOnError>,
+): RequestResult<SaveListingPricesResponses, SaveListingPricesErrors, ThrowOnError> =>
+  (options.client ?? client).put<SaveListingPricesResponses, SaveListingPricesErrors, ThrowOnError>(
+    {
+      security: [
+        {
+          in: 'cookie',
+          name: 'parkfairy.session_token',
+          type: 'apiKey',
+        },
+      ],
+      url: '/v1/owner/listings/{id}/prices',
+      ...options,
+      headers: {
         'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+        ...options.headers,
+      },
+    },
+  );
 
-export const uploadListingPhoto = <ThrowOnError extends boolean = false>(options: Options<UploadListingPhotoData, ThrowOnError>): RequestResult<UploadListingPhotoResponses, UploadListingPhotoErrors, ThrowOnError> => (options.client ?? client).post<UploadListingPhotoResponses, UploadListingPhotoErrors, ThrowOnError>({
+export const uploadListingPhoto = <ThrowOnError extends boolean = false>(
+  options: Options<UploadListingPhotoData, ThrowOnError>,
+): RequestResult<UploadListingPhotoResponses, UploadListingPhotoErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    UploadListingPhotoResponses,
+    UploadListingPhotoErrors,
+    ThrowOnError
+  >({
     bodySerializer: null,
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/photos',
     ...options,
     headers: {
-        'Content-Type': 'image/jpeg',
-        ...options.headers
-    }
-});
+      'Content-Type': 'image/jpeg',
+      ...options.headers,
+    },
+  });
 
-export const reorderListingPhotos = <ThrowOnError extends boolean = false>(options: Options<ReorderListingPhotosData, ThrowOnError>): RequestResult<ReorderListingPhotosResponses, ReorderListingPhotosErrors, ThrowOnError> => (options.client ?? client).put<ReorderListingPhotosResponses, ReorderListingPhotosErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const reorderListingPhotos = <ThrowOnError extends boolean = false>(
+  options: Options<ReorderListingPhotosData, ThrowOnError>,
+): RequestResult<ReorderListingPhotosResponses, ReorderListingPhotosErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    ReorderListingPhotosResponses,
+    ReorderListingPhotosErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/photos/order',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const deleteListingPhoto = <ThrowOnError extends boolean = false>(options: Options<DeleteListingPhotoData, ThrowOnError>): RequestResult<DeleteListingPhotoResponses, DeleteListingPhotoErrors, ThrowOnError> => (options.client ?? client).delete<DeleteListingPhotoResponses, DeleteListingPhotoErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const deleteListingPhoto = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteListingPhotoData, ThrowOnError>,
+): RequestResult<DeleteListingPhotoResponses, DeleteListingPhotoErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteListingPhotoResponses,
+    DeleteListingPhotoErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/photos/{photoId}',
-    ...options
-});
+    ...options,
+  });
 
-export const updateListingPhoto = <ThrowOnError extends boolean = false>(options: Options<UpdateListingPhotoData, ThrowOnError>): RequestResult<UpdateListingPhotoResponses, UpdateListingPhotoErrors, ThrowOnError> => (options.client ?? client).patch<UpdateListingPhotoResponses, UpdateListingPhotoErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const updateListingPhoto = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateListingPhotoData, ThrowOnError>,
+): RequestResult<UpdateListingPhotoResponses, UpdateListingPhotoErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateListingPhotoResponses,
+    UpdateListingPhotoErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/photos/{photoId}',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const uploadListingProof = <ThrowOnError extends boolean = false>(options: Options<UploadListingProofData, ThrowOnError>): RequestResult<UploadListingProofResponses, UploadListingProofErrors, ThrowOnError> => (options.client ?? client).post<UploadListingProofResponses, UploadListingProofErrors, ThrowOnError>({
+export const uploadListingProof = <ThrowOnError extends boolean = false>(
+  options: Options<UploadListingProofData, ThrowOnError>,
+): RequestResult<UploadListingProofResponses, UploadListingProofErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    UploadListingProofResponses,
+    UploadListingProofErrors,
+    ThrowOnError
+  >({
     bodySerializer: null,
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/proofs',
     ...options,
     headers: {
-        'Content-Type': 'application/pdf',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/pdf',
+      ...options.headers,
+    },
+  });
 
-export const deleteListingProof = <ThrowOnError extends boolean = false>(options: Options<DeleteListingProofData, ThrowOnError>): RequestResult<DeleteListingProofResponses, DeleteListingProofErrors, ThrowOnError> => (options.client ?? client).delete<DeleteListingProofResponses, DeleteListingProofErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const deleteListingProof = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteListingProofData, ThrowOnError>,
+): RequestResult<DeleteListingProofResponses, DeleteListingProofErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteListingProofResponses,
+    DeleteListingProofErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/proofs/{proofId}',
-    ...options
-});
+    ...options,
+  });
 
-export const downloadListingProof = <ThrowOnError extends boolean = false>(options: Options<DownloadListingProofData, ThrowOnError>): RequestResult<DownloadListingProofResponses, DownloadListingProofErrors, ThrowOnError> => (options.client ?? client).get<DownloadListingProofResponses, DownloadListingProofErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const downloadListingProof = <ThrowOnError extends boolean = false>(
+  options: Options<DownloadListingProofData, ThrowOnError>,
+): RequestResult<DownloadListingProofResponses, DownloadListingProofErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    DownloadListingProofResponses,
+    DownloadListingProofErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/proofs/{proofId}',
-    ...options
-});
+    ...options,
+  });
 
-export const saveListingProofDetails = <ThrowOnError extends boolean = false>(options: Options<SaveListingProofDetailsData, ThrowOnError>): RequestResult<SaveListingProofDetailsResponses, SaveListingProofDetailsErrors, ThrowOnError> => (options.client ?? client).patch<SaveListingProofDetailsResponses, SaveListingProofDetailsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const saveListingProofDetails = <ThrowOnError extends boolean = false>(
+  options: Options<SaveListingProofDetailsData, ThrowOnError>,
+): RequestResult<SaveListingProofDetailsResponses, SaveListingProofDetailsErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    SaveListingProofDetailsResponses,
+    SaveListingProofDetailsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/proof-details',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const submitOwnerListing = <ThrowOnError extends boolean = false>(options: Options<SubmitOwnerListingData, ThrowOnError>): RequestResult<SubmitOwnerListingResponses, SubmitOwnerListingErrors, ThrowOnError> => (options.client ?? client).post<SubmitOwnerListingResponses, SubmitOwnerListingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const submitOwnerListing = <ThrowOnError extends boolean = false>(
+  options: Options<SubmitOwnerListingData, ThrowOnError>,
+): RequestResult<SubmitOwnerListingResponses, SubmitOwnerListingErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    SubmitOwnerListingResponses,
+    SubmitOwnerListingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/submit',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const getListingOwners = <ThrowOnError extends boolean = false>(options: Options<GetListingOwnersData, ThrowOnError>): RequestResult<GetListingOwnersResponses, GetListingOwnersErrors, ThrowOnError> => (options.client ?? client).get<GetListingOwnersResponses, GetListingOwnersErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getListingOwners = <ThrowOnError extends boolean = false>(
+  options: Options<GetListingOwnersData, ThrowOnError>,
+): RequestResult<GetListingOwnersResponses, GetListingOwnersErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetListingOwnersResponses, GetListingOwnersErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/owners',
-    ...options
-});
+    ...options,
+  });
 
-export const inviteListingOwner = <ThrowOnError extends boolean = false>(options: Options<InviteListingOwnerData, ThrowOnError>): RequestResult<InviteListingOwnerResponses, InviteListingOwnerErrors, ThrowOnError> => (options.client ?? client).post<InviteListingOwnerResponses, InviteListingOwnerErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const inviteListingOwner = <ThrowOnError extends boolean = false>(
+  options: Options<InviteListingOwnerData, ThrowOnError>,
+): RequestResult<InviteListingOwnerResponses, InviteListingOwnerErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    InviteListingOwnerResponses,
+    InviteListingOwnerErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/invites',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const withdrawListingInvite = <ThrowOnError extends boolean = false>(options: Options<WithdrawListingInviteData, ThrowOnError>): RequestResult<WithdrawListingInviteResponses, WithdrawListingInviteErrors, ThrowOnError> => (options.client ?? client).delete<WithdrawListingInviteResponses, WithdrawListingInviteErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const withdrawListingInvite = <ThrowOnError extends boolean = false>(
+  options: Options<WithdrawListingInviteData, ThrowOnError>,
+): RequestResult<WithdrawListingInviteResponses, WithdrawListingInviteErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    WithdrawListingInviteResponses,
+    WithdrawListingInviteErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/invites/{inviteId}',
-    ...options
-});
+    ...options,
+  });
 
-export const setListingShares = <ThrowOnError extends boolean = false>(options: Options<SetListingSharesData, ThrowOnError>): RequestResult<SetListingSharesResponses, SetListingSharesErrors, ThrowOnError> => (options.client ?? client).put<SetListingSharesResponses, SetListingSharesErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const setListingShares = <ThrowOnError extends boolean = false>(
+  options: Options<SetListingSharesData, ThrowOnError>,
+): RequestResult<SetListingSharesResponses, SetListingSharesErrors, ThrowOnError> =>
+  (options.client ?? client).put<SetListingSharesResponses, SetListingSharesErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/shares',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const removeListingOwner = <ThrowOnError extends boolean = false>(options: Options<RemoveListingOwnerData, ThrowOnError>): RequestResult<RemoveListingOwnerResponses, RemoveListingOwnerErrors, ThrowOnError> => (options.client ?? client).delete<RemoveListingOwnerResponses, RemoveListingOwnerErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const removeListingOwner = <ThrowOnError extends boolean = false>(
+  options: Options<RemoveListingOwnerData, ThrowOnError>,
+): RequestResult<RemoveListingOwnerResponses, RemoveListingOwnerErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    RemoveListingOwnerResponses,
+    RemoveListingOwnerErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/owners/{ownerId}',
-    ...options
-});
+    ...options,
+  });
 
-export const removeListingManager = <ThrowOnError extends boolean = false>(options: Options<RemoveListingManagerData, ThrowOnError>): RequestResult<RemoveListingManagerResponses, RemoveListingManagerErrors, ThrowOnError> => (options.client ?? client).delete<RemoveListingManagerResponses, RemoveListingManagerErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const removeListingManager = <ThrowOnError extends boolean = false>(
+  options: Options<RemoveListingManagerData, ThrowOnError>,
+): RequestResult<RemoveListingManagerResponses, RemoveListingManagerErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    RemoveListingManagerResponses,
+    RemoveListingManagerErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/managers/{managerId}',
-    ...options
-});
+    ...options,
+  });
 
-export const getManagedListings = <ThrowOnError extends boolean = false>(options?: Options<GetManagedListingsData, ThrowOnError>): RequestResult<GetManagedListingsResponses, GetManagedListingsErrors, ThrowOnError> => (options?.client ?? client).get<GetManagedListingsResponses, GetManagedListingsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getManagedListings = <ThrowOnError extends boolean = false>(
+  options?: Options<GetManagedListingsData, ThrowOnError>,
+): RequestResult<GetManagedListingsResponses, GetManagedListingsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    GetManagedListingsResponses,
+    GetManagedListingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/managed',
-    ...options
-});
+    ...options,
+  });
 
-export const withdrawListingHandover = <ThrowOnError extends boolean = false>(options: Options<WithdrawListingHandoverData, ThrowOnError>): RequestResult<WithdrawListingHandoverResponses, WithdrawListingHandoverErrors, ThrowOnError> => (options.client ?? client).delete<WithdrawListingHandoverResponses, WithdrawListingHandoverErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const withdrawListingHandover = <ThrowOnError extends boolean = false>(
+  options: Options<WithdrawListingHandoverData, ThrowOnError>,
+): RequestResult<WithdrawListingHandoverResponses, WithdrawListingHandoverErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    WithdrawListingHandoverResponses,
+    WithdrawListingHandoverErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/handover',
-    ...options
-});
+    ...options,
+  });
 
-export const offerListingHandover = <ThrowOnError extends boolean = false>(options: Options<OfferListingHandoverData, ThrowOnError>): RequestResult<OfferListingHandoverResponses, OfferListingHandoverErrors, ThrowOnError> => (options.client ?? client).post<OfferListingHandoverResponses, OfferListingHandoverErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const offerListingHandover = <ThrowOnError extends boolean = false>(
+  options: Options<OfferListingHandoverData, ThrowOnError>,
+): RequestResult<OfferListingHandoverResponses, OfferListingHandoverErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    OfferListingHandoverResponses,
+    OfferListingHandoverErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/handover',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const acceptListingHandover = <ThrowOnError extends boolean = false>(options: Options<AcceptListingHandoverData, ThrowOnError>): RequestResult<AcceptListingHandoverResponses, AcceptListingHandoverErrors, ThrowOnError> => (options.client ?? client).post<AcceptListingHandoverResponses, AcceptListingHandoverErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const acceptListingHandover = <ThrowOnError extends boolean = false>(
+  options: Options<AcceptListingHandoverData, ThrowOnError>,
+): RequestResult<AcceptListingHandoverResponses, AcceptListingHandoverErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    AcceptListingHandoverResponses,
+    AcceptListingHandoverErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/handover/accept',
-    ...options
-});
+    ...options,
+  });
 
-export const leaveListing = <ThrowOnError extends boolean = false>(options: Options<LeaveListingData, ThrowOnError>): RequestResult<LeaveListingResponses, LeaveListingErrors, ThrowOnError> => (options.client ?? client).post<LeaveListingResponses, LeaveListingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const leaveListing = <ThrowOnError extends boolean = false>(
+  options: Options<LeaveListingData, ThrowOnError>,
+): RequestResult<LeaveListingResponses, LeaveListingErrors, ThrowOnError> =>
+  (options.client ?? client).post<LeaveListingResponses, LeaveListingErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/leave',
-    ...options
-});
+    ...options,
+  });
 
-export const previewListingInvite = <ThrowOnError extends boolean = false>(options: Options<PreviewListingInviteData, ThrowOnError>): RequestResult<PreviewListingInviteResponses, PreviewListingInviteErrors, ThrowOnError> => (options.client ?? client).post<PreviewListingInviteResponses, PreviewListingInviteErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const previewListingInvite = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewListingInviteData, ThrowOnError>,
+): RequestResult<PreviewListingInviteResponses, PreviewListingInviteErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    PreviewListingInviteResponses,
+    PreviewListingInviteErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/invites/preview',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const acceptListingInvite = <ThrowOnError extends boolean = false>(options: Options<AcceptListingInviteData, ThrowOnError>): RequestResult<AcceptListingInviteResponses, AcceptListingInviteErrors, ThrowOnError> => (options.client ?? client).post<AcceptListingInviteResponses, AcceptListingInviteErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const acceptListingInvite = <ThrowOnError extends boolean = false>(
+  options: Options<AcceptListingInviteData, ThrowOnError>,
+): RequestResult<AcceptListingInviteResponses, AcceptListingInviteErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    AcceptListingInviteResponses,
+    AcceptListingInviteErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/invites/accept',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const getAdminQueue = <ThrowOnError extends boolean = false>(options?: Options<GetAdminQueueData, ThrowOnError>): RequestResult<GetAdminQueueResponses, GetAdminQueueErrors, ThrowOnError> => (options?.client ?? client).get<GetAdminQueueResponses, GetAdminQueueErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getAdminQueue = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAdminQueueData, ThrowOnError>,
+): RequestResult<GetAdminQueueResponses, GetAdminQueueErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetAdminQueueResponses, GetAdminQueueErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/listings',
-    ...options
-});
+    ...options,
+  });
 
-export const getAdminListing = <ThrowOnError extends boolean = false>(options: Options<GetAdminListingData, ThrowOnError>): RequestResult<GetAdminListingResponses, GetAdminListingErrors, ThrowOnError> => (options.client ?? client).get<GetAdminListingResponses, GetAdminListingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getAdminListing = <ThrowOnError extends boolean = false>(
+  options: Options<GetAdminListingData, ThrowOnError>,
+): RequestResult<GetAdminListingResponses, GetAdminListingErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetAdminListingResponses, GetAdminListingErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/listings/{id}',
-    ...options
-});
+    ...options,
+  });
 
-export const downloadAdminProof = <ThrowOnError extends boolean = false>(options: Options<DownloadAdminProofData, ThrowOnError>): RequestResult<DownloadAdminProofResponses, DownloadAdminProofErrors, ThrowOnError> => (options.client ?? client).get<DownloadAdminProofResponses, DownloadAdminProofErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const downloadAdminProof = <ThrowOnError extends boolean = false>(
+  options: Options<DownloadAdminProofData, ThrowOnError>,
+): RequestResult<DownloadAdminProofResponses, DownloadAdminProofErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    DownloadAdminProofResponses,
+    DownloadAdminProofErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/listings/{id}/proofs/{proofId}',
-    ...options
-});
+    ...options,
+  });
 
-export const approveAdminListing = <ThrowOnError extends boolean = false>(options: Options<ApproveAdminListingData, ThrowOnError>): RequestResult<ApproveAdminListingResponses, ApproveAdminListingErrors, ThrowOnError> => (options.client ?? client).post<ApproveAdminListingResponses, ApproveAdminListingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const approveAdminListing = <ThrowOnError extends boolean = false>(
+  options: Options<ApproveAdminListingData, ThrowOnError>,
+): RequestResult<ApproveAdminListingResponses, ApproveAdminListingErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ApproveAdminListingResponses,
+    ApproveAdminListingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/listings/{id}/approve',
-    ...options
-});
+    ...options,
+  });
 
-export const requestAdminListingChanges = <ThrowOnError extends boolean = false>(options: Options<RequestAdminListingChangesData, ThrowOnError>): RequestResult<RequestAdminListingChangesResponses, RequestAdminListingChangesErrors, ThrowOnError> => (options.client ?? client).post<RequestAdminListingChangesResponses, RequestAdminListingChangesErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const requestAdminListingChanges = <ThrowOnError extends boolean = false>(
+  options: Options<RequestAdminListingChangesData, ThrowOnError>,
+): RequestResult<
+  RequestAdminListingChangesResponses,
+  RequestAdminListingChangesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RequestAdminListingChangesResponses,
+    RequestAdminListingChangesErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/listings/{id}/request-changes',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const lookUpAdminUser = <ThrowOnError extends boolean = false>(options: Options<LookUpAdminUserData, ThrowOnError>): RequestResult<LookUpAdminUserResponses, LookUpAdminUserErrors, ThrowOnError> => (options.client ?? client).post<LookUpAdminUserResponses, LookUpAdminUserErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const lookUpAdminUser = <ThrowOnError extends boolean = false>(
+  options: Options<LookUpAdminUserData, ThrowOnError>,
+): RequestResult<LookUpAdminUserResponses, LookUpAdminUserErrors, ThrowOnError> =>
+  (options.client ?? client).post<LookUpAdminUserResponses, LookUpAdminUserErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/users/lookup',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const getAdminUser = <ThrowOnError extends boolean = false>(options: Options<GetAdminUserData, ThrowOnError>): RequestResult<GetAdminUserResponses, GetAdminUserErrors, ThrowOnError> => (options.client ?? client).get<GetAdminUserResponses, GetAdminUserErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getAdminUser = <ThrowOnError extends boolean = false>(
+  options: Options<GetAdminUserData, ThrowOnError>,
+): RequestResult<GetAdminUserResponses, GetAdminUserErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetAdminUserResponses, GetAdminUserErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/users/{id}',
-    ...options
-});
+    ...options,
+  });
 
-export const removeAdminUserTwoFactor = <ThrowOnError extends boolean = false>(options: Options<RemoveAdminUserTwoFactorData, ThrowOnError>): RequestResult<RemoveAdminUserTwoFactorResponses, RemoveAdminUserTwoFactorErrors, ThrowOnError> => (options.client ?? client).post<RemoveAdminUserTwoFactorResponses, RemoveAdminUserTwoFactorErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const removeAdminUserTwoFactor = <ThrowOnError extends boolean = false>(
+  options: Options<RemoveAdminUserTwoFactorData, ThrowOnError>,
+): RequestResult<RemoveAdminUserTwoFactorResponses, RemoveAdminUserTwoFactorErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RemoveAdminUserTwoFactorResponses,
+    RemoveAdminUserTwoFactorErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/users/{id}/remove-two-factor',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const suspendAdminListing = <ThrowOnError extends boolean = false>(options: Options<SuspendAdminListingData, ThrowOnError>): RequestResult<SuspendAdminListingResponses, SuspendAdminListingErrors, ThrowOnError> => (options.client ?? client).post<SuspendAdminListingResponses, SuspendAdminListingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const suspendAdminListing = <ThrowOnError extends boolean = false>(
+  options: Options<SuspendAdminListingData, ThrowOnError>,
+): RequestResult<SuspendAdminListingResponses, SuspendAdminListingErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    SuspendAdminListingResponses,
+    SuspendAdminListingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/listings/{id}/suspend',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const reinstateAdminListing = <ThrowOnError extends boolean = false>(options: Options<ReinstateAdminListingData, ThrowOnError>): RequestResult<ReinstateAdminListingResponses, ReinstateAdminListingErrors, ThrowOnError> => (options.client ?? client).post<ReinstateAdminListingResponses, ReinstateAdminListingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const reinstateAdminListing = <ThrowOnError extends boolean = false>(
+  options: Options<ReinstateAdminListingData, ThrowOnError>,
+): RequestResult<ReinstateAdminListingResponses, ReinstateAdminListingErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ReinstateAdminListingResponses,
+    ReinstateAdminListingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/listings/{id}/reinstate',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const suspendAdminUser = <ThrowOnError extends boolean = false>(options: Options<SuspendAdminUserData, ThrowOnError>): RequestResult<SuspendAdminUserResponses, SuspendAdminUserErrors, ThrowOnError> => (options.client ?? client).post<SuspendAdminUserResponses, SuspendAdminUserErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const suspendAdminUser = <ThrowOnError extends boolean = false>(
+  options: Options<SuspendAdminUserData, ThrowOnError>,
+): RequestResult<SuspendAdminUserResponses, SuspendAdminUserErrors, ThrowOnError> =>
+  (options.client ?? client).post<SuspendAdminUserResponses, SuspendAdminUserErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/users/{id}/suspend',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const reinstateAdminUser = <ThrowOnError extends boolean = false>(options: Options<ReinstateAdminUserData, ThrowOnError>): RequestResult<ReinstateAdminUserResponses, ReinstateAdminUserErrors, ThrowOnError> => (options.client ?? client).post<ReinstateAdminUserResponses, ReinstateAdminUserErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const reinstateAdminUser = <ThrowOnError extends boolean = false>(
+  options: Options<ReinstateAdminUserData, ThrowOnError>,
+): RequestResult<ReinstateAdminUserResponses, ReinstateAdminUserErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ReinstateAdminUserResponses,
+    ReinstateAdminUserErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/users/{id}/reinstate',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const lookUpAdminBooking = <ThrowOnError extends boolean = false>(options: Options<LookUpAdminBookingData, ThrowOnError>): RequestResult<LookUpAdminBookingResponses, LookUpAdminBookingErrors, ThrowOnError> => (options.client ?? client).post<LookUpAdminBookingResponses, LookUpAdminBookingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const lookUpAdminBooking = <ThrowOnError extends boolean = false>(
+  options: Options<LookUpAdminBookingData, ThrowOnError>,
+): RequestResult<LookUpAdminBookingResponses, LookUpAdminBookingErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    LookUpAdminBookingResponses,
+    LookUpAdminBookingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/bookings/lookup',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const getAdminBooking = <ThrowOnError extends boolean = false>(options: Options<GetAdminBookingData, ThrowOnError>): RequestResult<GetAdminBookingResponses, GetAdminBookingErrors, ThrowOnError> => (options.client ?? client).get<GetAdminBookingResponses, GetAdminBookingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getAdminBooking = <ThrowOnError extends boolean = false>(
+  options: Options<GetAdminBookingData, ThrowOnError>,
+): RequestResult<GetAdminBookingResponses, GetAdminBookingErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetAdminBookingResponses, GetAdminBookingErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/bookings/{id}',
-    ...options
-});
+    ...options,
+  });
 
-export const cancelAdminBooking = <ThrowOnError extends boolean = false>(options: Options<CancelAdminBookingData, ThrowOnError>): RequestResult<CancelAdminBookingResponses, CancelAdminBookingErrors, ThrowOnError> => (options.client ?? client).post<CancelAdminBookingResponses, CancelAdminBookingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const cancelAdminBooking = <ThrowOnError extends boolean = false>(
+  options: Options<CancelAdminBookingData, ThrowOnError>,
+): RequestResult<CancelAdminBookingResponses, CancelAdminBookingErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CancelAdminBookingResponses,
+    CancelAdminBookingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/bookings/{id}/cancel',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const retryAdminBookingRefund = <ThrowOnError extends boolean = false>(options: Options<RetryAdminBookingRefundData, ThrowOnError>): RequestResult<RetryAdminBookingRefundResponses, RetryAdminBookingRefundErrors, ThrowOnError> => (options.client ?? client).post<RetryAdminBookingRefundResponses, RetryAdminBookingRefundErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const retryAdminBookingRefund = <ThrowOnError extends boolean = false>(
+  options: Options<RetryAdminBookingRefundData, ThrowOnError>,
+): RequestResult<RetryAdminBookingRefundResponses, RetryAdminBookingRefundErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RetryAdminBookingRefundResponses,
+    RetryAdminBookingRefundErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/bookings/{id}/refund/retry',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const settleAdminBookingRefund = <ThrowOnError extends boolean = false>(options: Options<SettleAdminBookingRefundData, ThrowOnError>): RequestResult<SettleAdminBookingRefundResponses, SettleAdminBookingRefundErrors, ThrowOnError> => (options.client ?? client).post<SettleAdminBookingRefundResponses, SettleAdminBookingRefundErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const settleAdminBookingRefund = <ThrowOnError extends boolean = false>(
+  options: Options<SettleAdminBookingRefundData, ThrowOnError>,
+): RequestResult<SettleAdminBookingRefundResponses, SettleAdminBookingRefundErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    SettleAdminBookingRefundResponses,
+    SettleAdminBookingRefundErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/bookings/{id}/refund/settle',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const getAdminPayments = <ThrowOnError extends boolean = false>(options?: Options<GetAdminPaymentsData, ThrowOnError>): RequestResult<GetAdminPaymentsResponses, GetAdminPaymentsErrors, ThrowOnError> => (options?.client ?? client).get<GetAdminPaymentsResponses, GetAdminPaymentsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getAdminPayments = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAdminPaymentsData, ThrowOnError>,
+): RequestResult<GetAdminPaymentsResponses, GetAdminPaymentsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetAdminPaymentsResponses, GetAdminPaymentsErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/payments',
-    ...options
-});
+    ...options,
+  });
 
-export const decideAdminDispute = <ThrowOnError extends boolean = false>(options: Options<DecideAdminDisputeData, ThrowOnError>): RequestResult<DecideAdminDisputeResponses, DecideAdminDisputeErrors, ThrowOnError> => (options.client ?? client).post<DecideAdminDisputeResponses, DecideAdminDisputeErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const decideAdminDispute = <ThrowOnError extends boolean = false>(
+  options: Options<DecideAdminDisputeData, ThrowOnError>,
+): RequestResult<DecideAdminDisputeResponses, DecideAdminDisputeErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    DecideAdminDisputeResponses,
+    DecideAdminDisputeErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/disputes/{id}/decide',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const getAuditLog = <ThrowOnError extends boolean = false>(options?: Options<GetAuditLogData, ThrowOnError>): RequestResult<GetAuditLogResponses, GetAuditLogErrors, ThrowOnError> => (options?.client ?? client).get<GetAuditLogResponses, GetAuditLogErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getAuditLog = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAuditLogData, ThrowOnError>,
+): RequestResult<GetAuditLogResponses, GetAuditLogErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetAuditLogResponses, GetAuditLogErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/admin/audit',
-    ...options
-});
+    ...options,
+  });
 
-export const getMyBookings = <ThrowOnError extends boolean = false>(options?: Options<GetMyBookingsData, ThrowOnError>): RequestResult<GetMyBookingsResponses, GetMyBookingsErrors, ThrowOnError> => (options?.client ?? client).get<GetMyBookingsResponses, GetMyBookingsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getMyBookings = <ThrowOnError extends boolean = false>(
+  options?: Options<GetMyBookingsData, ThrowOnError>,
+): RequestResult<GetMyBookingsResponses, GetMyBookingsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetMyBookingsResponses, GetMyBookingsErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/bookings',
-    ...options
-});
+    ...options,
+  });
 
-export const holdParkingSpace = <ThrowOnError extends boolean = false>(options: Options<HoldParkingSpaceData, ThrowOnError>): RequestResult<HoldParkingSpaceResponses, HoldParkingSpaceErrors, ThrowOnError> => (options.client ?? client).post<HoldParkingSpaceResponses, HoldParkingSpaceErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const holdParkingSpace = <ThrowOnError extends boolean = false>(
+  options: Options<HoldParkingSpaceData, ThrowOnError>,
+): RequestResult<HoldParkingSpaceResponses, HoldParkingSpaceErrors, ThrowOnError> =>
+  (options.client ?? client).post<HoldParkingSpaceResponses, HoldParkingSpaceErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/bookings',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const getMyBooking = <ThrowOnError extends boolean = false>(options: Options<GetMyBookingData, ThrowOnError>): RequestResult<GetMyBookingResponses, GetMyBookingErrors, ThrowOnError> => (options.client ?? client).get<GetMyBookingResponses, GetMyBookingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getMyBooking = <ThrowOnError extends boolean = false>(
+  options: Options<GetMyBookingData, ThrowOnError>,
+): RequestResult<GetMyBookingResponses, GetMyBookingErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetMyBookingResponses, GetMyBookingErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/bookings/{id}',
-    ...options
-});
+    ...options,
+  });
 
-export const confirmMyBooking = <ThrowOnError extends boolean = false>(options: Options<ConfirmMyBookingData, ThrowOnError>): RequestResult<ConfirmMyBookingResponses, ConfirmMyBookingErrors, ThrowOnError> => (options.client ?? client).post<ConfirmMyBookingResponses, ConfirmMyBookingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const confirmMyBooking = <ThrowOnError extends boolean = false>(
+  options: Options<ConfirmMyBookingData, ThrowOnError>,
+): RequestResult<ConfirmMyBookingResponses, ConfirmMyBookingErrors, ThrowOnError> =>
+  (options.client ?? client).post<ConfirmMyBookingResponses, ConfirmMyBookingErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/bookings/{id}/confirm',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const payForMyBooking = <ThrowOnError extends boolean = false>(options: Options<PayForMyBookingData, ThrowOnError>): RequestResult<PayForMyBookingResponses, PayForMyBookingErrors, ThrowOnError> => (options.client ?? client).post<PayForMyBookingResponses, PayForMyBookingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const payForMyBooking = <ThrowOnError extends boolean = false>(
+  options: Options<PayForMyBookingData, ThrowOnError>,
+): RequestResult<PayForMyBookingResponses, PayForMyBookingErrors, ThrowOnError> =>
+  (options.client ?? client).post<PayForMyBookingResponses, PayForMyBookingErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/bookings/{id}/payment',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const settleMyPayment = <ThrowOnError extends boolean = false>(options: Options<SettleMyPaymentData, ThrowOnError>): RequestResult<SettleMyPaymentResponses, SettleMyPaymentErrors, ThrowOnError> => (options.client ?? client).post<SettleMyPaymentResponses, SettleMyPaymentErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const settleMyPayment = <ThrowOnError extends boolean = false>(
+  options: Options<SettleMyPaymentData, ThrowOnError>,
+): RequestResult<SettleMyPaymentResponses, SettleMyPaymentErrors, ThrowOnError> =>
+  (options.client ?? client).post<SettleMyPaymentResponses, SettleMyPaymentErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/bookings/{id}/payment/settle',
-    ...options
-});
+    ...options,
+  });
 
-export const extendMyHold = <ThrowOnError extends boolean = false>(options: Options<ExtendMyHoldData, ThrowOnError>): RequestResult<ExtendMyHoldResponses, ExtendMyHoldErrors, ThrowOnError> => (options.client ?? client).post<ExtendMyHoldResponses, ExtendMyHoldErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const extendMyHold = <ThrowOnError extends boolean = false>(
+  options: Options<ExtendMyHoldData, ThrowOnError>,
+): RequestResult<ExtendMyHoldResponses, ExtendMyHoldErrors, ThrowOnError> =>
+  (options.client ?? client).post<ExtendMyHoldResponses, ExtendMyHoldErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/bookings/{id}/extend',
-    ...options
-});
+    ...options,
+  });
 
-export const cancelMyBooking = <ThrowOnError extends boolean = false>(options: Options<CancelMyBookingData, ThrowOnError>): RequestResult<CancelMyBookingResponses, CancelMyBookingErrors, ThrowOnError> => (options.client ?? client).post<CancelMyBookingResponses, CancelMyBookingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const cancelMyBooking = <ThrowOnError extends boolean = false>(
+  options: Options<CancelMyBookingData, ThrowOnError>,
+): RequestResult<CancelMyBookingResponses, CancelMyBookingErrors, ThrowOnError> =>
+  (options.client ?? client).post<CancelMyBookingResponses, CancelMyBookingErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/bookings/{id}/cancel',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const getListingBookings = <ThrowOnError extends boolean = false>(options: Options<GetListingBookingsData, ThrowOnError>): RequestResult<GetListingBookingsResponses, GetListingBookingsErrors, ThrowOnError> => (options.client ?? client).get<GetListingBookingsResponses, GetListingBookingsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getListingBookings = <ThrowOnError extends boolean = false>(
+  options: Options<GetListingBookingsData, ThrowOnError>,
+): RequestResult<GetListingBookingsResponses, GetListingBookingsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetListingBookingsResponses,
+    GetListingBookingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/bookings',
-    ...options
-});
+    ...options,
+  });
 
-export const cancelListingBooking = <ThrowOnError extends boolean = false>(options: Options<CancelListingBookingData, ThrowOnError>): RequestResult<CancelListingBookingResponses, CancelListingBookingErrors, ThrowOnError> => (options.client ?? client).post<CancelListingBookingResponses, CancelListingBookingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const cancelListingBooking = <ThrowOnError extends boolean = false>(
+  options: Options<CancelListingBookingData, ThrowOnError>,
+): RequestResult<CancelListingBookingResponses, CancelListingBookingErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CancelListingBookingResponses,
+    CancelListingBookingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/listings/{id}/bookings/{bookingId}/cancel',
-    ...options
-});
+    ...options,
+  });
 
-export const getEarnings = <ThrowOnError extends boolean = false>(options?: Options<GetEarningsData, ThrowOnError>): RequestResult<GetEarningsResponses, GetEarningsErrors, ThrowOnError> => (options?.client ?? client).get<GetEarningsResponses, GetEarningsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getEarnings = <ThrowOnError extends boolean = false>(
+  options?: Options<GetEarningsData, ThrowOnError>,
+): RequestResult<GetEarningsResponses, GetEarningsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetEarningsResponses, GetEarningsErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/earnings',
-    ...options
-});
+    ...options,
+  });
 
-export const getCalendar = <ThrowOnError extends boolean = false>(options?: Options<GetCalendarData, ThrowOnError>): RequestResult<GetCalendarResponses, GetCalendarErrors, ThrowOnError> => (options?.client ?? client).get<GetCalendarResponses, GetCalendarErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const getCalendar = <ThrowOnError extends boolean = false>(
+  options?: Options<GetCalendarData, ThrowOnError>,
+): RequestResult<GetCalendarResponses, GetCalendarErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetCalendarResponses, GetCalendarErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/calendar',
-    ...options
-});
+    ...options,
+  });
 
-export const getOwnerPayouts = <ThrowOnError extends boolean = false>(options?: Options<GetOwnerPayoutsData, ThrowOnError>): RequestResult<GetOwnerPayoutsResponses, GetOwnerPayoutsErrors, ThrowOnError> => (options?.client ?? client).get<GetOwnerPayoutsResponses, GetOwnerPayoutsErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const listOwnerBookings = <ThrowOnError extends boolean = false>(
+  options?: Options<ListOwnerBookingsData, ThrowOnError>,
+): RequestResult<ListOwnerBookingsResponses, ListOwnerBookingsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListOwnerBookingsResponses,
+    ListOwnerBookingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/owner/bookings',
+    ...options,
+  });
+
+export const getOwnerPayouts = <ThrowOnError extends boolean = false>(
+  options?: Options<GetOwnerPayoutsData, ThrowOnError>,
+): RequestResult<GetOwnerPayoutsResponses, GetOwnerPayoutsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetOwnerPayoutsResponses, GetOwnerPayoutsErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/payouts',
-    ...options
-});
+    ...options,
+  });
 
-export const startPayoutOnboarding = <ThrowOnError extends boolean = false>(options: Options<StartPayoutOnboardingData, ThrowOnError>): RequestResult<StartPayoutOnboardingResponses, StartPayoutOnboardingErrors, ThrowOnError> => (options.client ?? client).post<StartPayoutOnboardingResponses, StartPayoutOnboardingErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const startPayoutOnboarding = <ThrowOnError extends boolean = false>(
+  options: Options<StartPayoutOnboardingData, ThrowOnError>,
+): RequestResult<StartPayoutOnboardingResponses, StartPayoutOnboardingErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    StartPayoutOnboardingResponses,
+    StartPayoutOnboardingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/payouts/onboarding',
     ...options,
     headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-export const openPayoutDashboard = <ThrowOnError extends boolean = false>(options?: Options<OpenPayoutDashboardData, ThrowOnError>): RequestResult<OpenPayoutDashboardResponses, OpenPayoutDashboardErrors, ThrowOnError> => (options?.client ?? client).post<OpenPayoutDashboardResponses, OpenPayoutDashboardErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'parkfairy.session_token',
-            type: 'apiKey'
-        }],
+export const openPayoutDashboard = <ThrowOnError extends boolean = false>(
+  options?: Options<OpenPayoutDashboardData, ThrowOnError>,
+): RequestResult<OpenPayoutDashboardResponses, OpenPayoutDashboardErrors, ThrowOnError> =>
+  (options?.client ?? client).post<
+    OpenPayoutDashboardResponses,
+    OpenPayoutDashboardErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
     url: '/v1/owner/payouts/dashboard',
-    ...options
-});
+    ...options,
+  });
 
-export const getPlaceSuggestions = <ThrowOnError extends boolean = false>(options: Options<GetPlaceSuggestionsData, ThrowOnError>): RequestResult<GetPlaceSuggestionsResponses, GetPlaceSuggestionsErrors, ThrowOnError> => (options.client ?? client).get<GetPlaceSuggestionsResponses, GetPlaceSuggestionsErrors, ThrowOnError>({ url: '/v1/places/suggestions', ...options });
+export const getPlaceSuggestions = <ThrowOnError extends boolean = false>(
+  options: Options<GetPlaceSuggestionsData, ThrowOnError>,
+): RequestResult<GetPlaceSuggestionsResponses, GetPlaceSuggestionsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetPlaceSuggestionsResponses,
+    GetPlaceSuggestionsErrors,
+    ThrowOnError
+  >({ url: '/v1/places/suggestions', ...options });
 
-export const retrievePlace = <ThrowOnError extends boolean = false>(options: Options<RetrievePlaceData, ThrowOnError>): RequestResult<RetrievePlaceResponses, RetrievePlaceErrors, ThrowOnError> => (options.client ?? client).get<RetrievePlaceResponses, RetrievePlaceErrors, ThrowOnError>({ url: '/v1/places/retrieve', ...options });
+export const retrievePlace = <ThrowOnError extends boolean = false>(
+  options: Options<RetrievePlaceData, ThrowOnError>,
+): RequestResult<RetrievePlaceResponses, RetrievePlaceErrors, ThrowOnError> =>
+  (options.client ?? client).get<RetrievePlaceResponses, RetrievePlaceErrors, ThrowOnError>({
+    url: '/v1/places/retrieve',
+    ...options,
+  });
 
-export const findPlaces = <ThrowOnError extends boolean = false>(options: Options<FindPlacesData, ThrowOnError>): RequestResult<FindPlacesResponses, FindPlacesErrors, ThrowOnError> => (options.client ?? client).get<FindPlacesResponses, FindPlacesErrors, ThrowOnError>({ url: '/v1/places', ...options });
+export const findPlaces = <ThrowOnError extends boolean = false>(
+  options: Options<FindPlacesData, ThrowOnError>,
+): RequestResult<FindPlacesResponses, FindPlacesErrors, ThrowOnError> =>
+  (options.client ?? client).get<FindPlacesResponses, FindPlacesErrors, ThrowOnError>({
+    url: '/v1/places',
+    ...options,
+  });

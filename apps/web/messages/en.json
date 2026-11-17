@@ -1008,6 +1008,66 @@
       "bookingTitle": "Booking {reference}",
       "metaTitleMonth": "Calendar, {month}"
     },
+    "bookingList": {
+      "title": "All bookings",
+      "lead": "The bookings of every listing you run, with who is coming in which car. Choose upcoming, past or cancelled bookings, then narrow them down by listing or by days.",
+      "unavailable": "Your bookings can’t be shown right now. Please try again in a moment.",
+      "link": "See all bookings",
+      "statusLabel": "Which bookings",
+      "status": {
+        "upcoming": "Upcoming",
+        "past": "Past",
+        "cancelled": "Cancelled"
+      },
+      "filterLabel": "Filter bookings",
+      "listing": "Listing",
+      "filterAll": "All your listings",
+      "from": "First day",
+      "to": "Last day",
+      "apply": "Show",
+      "daysHint": "In each listing’s own time zone. Leave both empty for the usual window: for past and cancelled bookings, the last {days, plural, one {# day} other {# days}}. A window is a year at most.",
+      "windowBoth": "Showing bookings whose stay starts from {from} to {to}.",
+      "windowFrom": "Showing bookings whose stay starts on or after {from}.",
+      "windowTo": "Showing bookings whose stay starts on or before {to}.",
+      "empty": {
+        "upcoming": "No upcoming bookings.",
+        "past": "No past bookings in these days.",
+        "cancelled": "No cancelled bookings in these days."
+      },
+      "bookingTitle": "Booking {reference}",
+      "state": "Status",
+      "states": {
+        "upcoming": "Upcoming",
+        "underWay": "Under way",
+        "ended": "Ended",
+        "cancelled": "Cancelled"
+      },
+      "space": "Space",
+      "stay": "Arrival and departure",
+      "driver": "Driver",
+      "plate": "Number plate",
+      "total": "Total paid",
+      "cancelledBy": "Cancelled by",
+      "by": {
+        "driver": "The driver",
+        "owner": "The listing’s team or our support"
+      },
+      "cancelledAt": "Cancelled on",
+      "manage": "Open this listing’s bookings <hidden>(booking {reference})</hidden>",
+      "pagesLabel": "Pages",
+      "previous": "Previous page",
+      "next": "Next page",
+      "metaTitles": {
+        "upcoming": "Upcoming bookings",
+        "past": "Past bookings",
+        "cancelled": "Cancelled bookings"
+      },
+      "errorTitle": "Error: {title}",
+      "daysLegend": "Days stays start on",
+      "windowProblem": "There is a problem with the days",
+      "windowOrder": "The last day is before the first day. Choose a last day on or after the first.",
+      "windowSpan": "The days are more than a year apart. Choose days at most a year apart."
+    },
     "payouts": {
       "metaTitle": "Payouts",
       "title": "Getting paid",

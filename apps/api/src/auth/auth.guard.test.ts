@@ -1,14 +1,15 @@
 import {
   Controller,
+  type ExecutionContext,
   ForbiddenException,
   Get,
   UnauthorizedException,
-  type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Auth } from '@parkfairy/auth';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Public, Roles, type AuthenticatedRequest } from './auth.decorators.js';
+
+import { type AuthenticatedRequest, Public, Roles } from './auth.decorators.js';
 import { AuthGuard } from './auth.guard.js';
 
 @Controller()

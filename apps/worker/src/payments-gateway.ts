@@ -1,4 +1,5 @@
-import { stripeGateway, type PaymentsGateway } from '@parkfairy/payments';
+import { type PaymentsGateway, stripeGateway } from '@parkfairy/payments';
+
 import type { Env } from './env.js';
 
 /**

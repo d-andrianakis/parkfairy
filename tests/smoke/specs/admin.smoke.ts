@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+
 import { expect, test } from '@playwright/test';
+
 import { SIGNED_IN_STATE, WEB_URL } from '../support/env';
 
 // Feature: the admin API (5.2a: #66–#68), on a running system. Its screens come with the admin app

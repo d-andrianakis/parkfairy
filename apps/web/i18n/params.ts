@@ -1,5 +1,6 @@
 import type { Locale } from '@parkfairy/contracts';
 import { hasLocale } from 'next-intl';
+
 import { routing } from './routing';
 
 export interface LocaleParams {

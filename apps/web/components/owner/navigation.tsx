@@ -1,7 +1,8 @@
 'use client';
 
 import { useLocale } from 'next-intl';
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from 'react';
+
 import { Link, useRouter } from '@/i18n/navigation';
 import { loadPage } from '@/lib/load-page';
 

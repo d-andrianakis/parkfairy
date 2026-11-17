@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+
 import {
+  type DatedHours,
   isOpenThroughout,
+  type OpeningPeriod,
   wallTime,
   weekNeeded,
-  type DatedHours,
-  type OpeningPeriod,
 } from './opening-hours.js';
 
 const ATHENS = 'Europe/Athens';

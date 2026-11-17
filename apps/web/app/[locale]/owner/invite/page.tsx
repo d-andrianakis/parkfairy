@@ -2,6 +2,7 @@ import { Button } from '@parkfairy/ui/components/button';
 import type { Metadata } from 'next';
 import { hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
+
 import { InviteAcceptance, KeepInviteToken } from '@/components/owner/invite-acceptance';
 import { Link } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';

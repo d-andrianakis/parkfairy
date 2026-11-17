@@ -1,6 +1,8 @@
 import { screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { renderWithProviders } from '@/test/render';
+
 import { StayRange } from './stay-range';
 
 // 2 November 2026 is a Monday; Athens is UTC+2 in winter.

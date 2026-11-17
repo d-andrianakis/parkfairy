@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { render } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
+
 import { PersonName, PlaceName, placeTag, PlaceWords } from './place-words';
 
 const html = (node: ReactNode) => render(<p>{node}</p>).container.innerHTML;

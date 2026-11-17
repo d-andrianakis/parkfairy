@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { AREA_IDS, AreaIdSchema } from './areas.js';
 import { DEFAULT_TIME_ZONE, LocaleSchema } from './i18n.js';
 import { contractsRegistry } from './registry.js';

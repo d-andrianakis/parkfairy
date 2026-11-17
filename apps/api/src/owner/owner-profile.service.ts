@@ -1,18 +1,19 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import {
   normalizeTaxNumber,
-  OwnerProfileSchema,
   type OwnerProfile,
   type OwnerProfilePatch,
+  OwnerProfileSchema,
   type OwnerTaxInput,
 } from '@parkfairy/contracts';
-import { schema, type Database } from '@parkfairy/database';
+import { type Database, schema } from '@parkfairy/database';
 import { and, eq, gt, notInArray } from 'drizzle-orm';
+
 import { DB } from '../database/database.module.js';
-import { FIELD_CRYPTO } from './field-crypto.provider.js';
 import type { FieldCrypto } from './field-crypto.js';
-import { conflict } from './owner.errors.js';
+import { FIELD_CRYPTO } from './field-crypto.provider.js';
 import { doneAccountSteps, type ProfileFacts } from './onboarding-progress.js';
+import { conflict } from './owner.errors.js';
 
 const profiles = schema.ownerProfiles;
 export type OwnerProfileRow = typeof profiles.$inferSelect;

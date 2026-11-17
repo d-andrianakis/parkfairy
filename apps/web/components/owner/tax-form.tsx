@@ -2,25 +2,28 @@
 
 // First: zod must be configured before any schema (in @parkfairy/contracts) is built.
 import '@/lib/zod-jitless';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { saveOwnerTaxDetails } from '@parkfairy/api-client';
 import {
   DEFAULT_COUNTRY,
   EU_COUNTRIES,
-  OwnerTaxInputSchema,
   type OwnerProfile,
   type OwnerTaxInput,
+  OwnerTaxInputSchema,
 } from '@parkfairy/contracts';
 import { FieldGroup } from '@parkfairy/ui/components/field';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { useForm, type Resolver } from 'react-hook-form';
+import { type Resolver, useForm } from 'react-hook-form';
+
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { useRouter } from '@/i18n/navigation';
 import { attempt, useOwnerError } from '@/lib/owner-client';
 import { useValidationMessage } from '@/lib/use-validation-message';
+
 import { SelectField, SelectOption, useCountryOptions, useOptionalLabel } from './fields';
 import { StepActions } from './step-actions';
 

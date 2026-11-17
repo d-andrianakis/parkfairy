@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+
 import { loadEnv } from './env.js';
 
 export const ENV = Symbol('ENV');

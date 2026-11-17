@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { contractsRegistry } from './registry.js';
 
 /**

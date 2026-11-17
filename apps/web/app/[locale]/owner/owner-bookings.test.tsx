@@ -5,12 +5,14 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { redirect } from '@/i18n/navigation';
 import { loadOwnerBookings } from '@/lib/bookings.server';
 import { requireSession } from '@/lib/session';
 import { routerMock } from '@/test/navigation-mock';
 import { answer, LISTING_ID } from '@/test/owner-fixtures';
 import { renderWithProviders } from '@/test/render';
+
 import OwnerLayout from './layout';
 import OwnerBookingsPage, { generateMetadata } from './listings/[id]/bookings/page';
 

@@ -1,9 +1,9 @@
 'use client';
 
-import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@parkfairy/ui/lib/utils';
+import { cva, type VariantProps } from 'class-variance-authority';
 import { Toggle as TogglePrimitive } from 'radix-ui';
+import * as React from 'react';
 
 // Parkfairy: outline-hidden on focus and an outline when on, so forced-colors mode (which drops
 // box-shadow rings and fills) still shows focus and the chosen item.

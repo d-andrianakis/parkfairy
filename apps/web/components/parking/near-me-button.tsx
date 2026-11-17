@@ -3,7 +3,7 @@
 import { Button } from '@parkfairy/ui/components/button';
 import { LocateFixed } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useId, useState, type MouseEvent } from 'react';
+import { type MouseEvent, useId, useState } from 'react';
 
 type State = 'idle' | 'locating' | 'denied' | 'unavailable';
 

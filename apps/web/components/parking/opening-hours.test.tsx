@@ -2,7 +2,9 @@ import type { OpeningPeriod } from '@parkfairy/contracts';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+
 import { renderWithProviders } from '@/test/render';
+
 import { OpeningHours } from './opening-hours';
 
 const days = (opens: string, closes: string, list = [1, 2, 3, 4, 5]): OpeningPeriod[] =>

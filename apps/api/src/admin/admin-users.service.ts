@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+
 import {
   ConflictException,
   ForbiddenException,
@@ -7,16 +8,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  AdminUserLookupResultSchema,
-  AdminUserSchema,
   type AdminReasonInput,
   type AdminRemoveTwoFactorInput,
   type AdminUser,
   type AdminUserLookup,
   type AdminUserLookupResult,
+  AdminUserLookupResultSchema,
+  AdminUserSchema,
 } from '@parkfairy/contracts';
-import { recordAudit, schema, type Database } from '@parkfairy/database';
+import { type Database, recordAudit, schema } from '@parkfairy/database';
 import { and, eq, sql } from 'drizzle-orm';
+
 import { DB } from '../database/database.module.js';
 
 const users = schema.users;

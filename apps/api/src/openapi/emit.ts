@@ -4,7 +4,9 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+
 import { NestFactory } from '@nestjs/core';
+
 import { AppModule } from '../app.module.js';
 import { configureApp } from '../app.setup.js';
 import { buildOpenApiDocument } from './document.js';

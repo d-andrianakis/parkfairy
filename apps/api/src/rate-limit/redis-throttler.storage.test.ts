@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import { RedisThrottlerStorage } from './redis-throttler.storage.js';
 
 describe('RedisThrottlerStorage', () => {

@@ -2,10 +2,12 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { authClient } from '@/lib/auth-client';
 import { routerMock, setPathname } from '@/test/navigation-mock';
 import { rendererFor } from '@/test/render';
+
 import { SiteHeader } from './site-header';
 
 // The header itself is a server component, so it also reads the layout's own words.

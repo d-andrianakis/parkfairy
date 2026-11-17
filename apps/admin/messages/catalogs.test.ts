@@ -1,17 +1,19 @@
 import {
+  ADMIN_ERROR_CODES,
   AREAS,
   AUDIT_ACTIONS,
-  LISTING_STATUSES,
   LISTING_OWNER_ROLES,
+  LISTING_STATUSES,
+  type Locale,
   OWNER_KINDS,
   OWNER_VERIFICATION_STATES,
   PROOF_KINDS,
   SUPPORTED_LOCALES,
-  ADMIN_ERROR_CODES,
-  type Locale,
 } from '@parkfairy/contracts';
 import { describe, expect, it } from 'vitest';
+
 import { AUTH_ERROR_KEYS } from '@/lib/auth-errors';
+
 import el from './el.json';
 import en from './en.json';
 

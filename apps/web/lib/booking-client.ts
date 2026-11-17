@@ -1,5 +1,6 @@
 import { useTranslations } from 'next-intl';
-import { attempt, type ApiFailure } from './api-call';
+
+import { type ApiFailure, attempt } from './api-call';
 
 export { attempt };
 export type BookingFailure = ApiFailure;

@@ -1,7 +1,9 @@
 import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { rendererFor } from '@/test/render';
+
 import { SaveStatus, useAutosave } from './save-status';
 
 const renderInSubtree = rendererFor(CLIENT_NAMESPACES.owner);

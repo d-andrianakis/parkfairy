@@ -3,10 +3,12 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
-import { answer, LISTING_ID, refusal } from '@/test/owner-fixtures';
 import { routerMock } from '@/test/navigation-mock';
+import { answer, LISTING_ID, refusal } from '@/test/owner-fixtures';
 import { rendererFor } from '@/test/render';
+
 import { CancelListingBooking } from './cancel-listing-booking';
 
 vi.mock('@parkfairy/api-client', () => ({

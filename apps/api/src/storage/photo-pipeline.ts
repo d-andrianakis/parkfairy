@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
+
 import { PHOTO_LIMITS, PHOTO_WIDTHS } from '@parkfairy/contracts';
 import sharp from 'sharp';
+
 import type { ObjectStore } from './object-store.js';
 
 /**

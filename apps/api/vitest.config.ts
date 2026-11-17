@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
 import { defineConfig } from 'vitest/config';
 
 // Local runs read the shared root .env; CI provides the variables directly.

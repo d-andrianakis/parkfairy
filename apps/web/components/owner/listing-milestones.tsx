@@ -1,12 +1,12 @@
 import {
   LISTING_MILESTONES,
-  photoUrl,
-  PHOTO_WIDTHS,
   type OwnerListingProgress,
   type PayoutStatus,
+  PHOTO_WIDTHS,
+  photoUrl,
 } from '@parkfairy/contracts';
-import { Badge } from '@parkfairy/ui/components/badge';
 import { Alert, AlertDescription, AlertTitle } from '@parkfairy/ui/components/alert';
+import { Badge } from '@parkfairy/ui/components/badge';
 import { Button } from '@parkfairy/ui/components/button';
 import {
   Card,
@@ -17,11 +17,13 @@ import {
 } from '@parkfairy/ui/components/card';
 import { CalendarCheck, CalendarX, CircleAlert, ImageOff, Users } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { PlaceWords, placeTag } from '@/components/parking/place-words';
+
+import { placeTag, PlaceWords } from '@/components/parking/place-words';
 import { Link } from '@/i18n/navigation';
 import { listingStepHref } from '@/lib/owner';
 import { closuresHref, ownerBookingsHref, ownersHref } from '@/lib/owner-href';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
+
 import { DeleteDraftButton } from './listing-actions';
 import { StepLink } from './navigation';
 import { STEP_LINK, StepRow } from './step-state';

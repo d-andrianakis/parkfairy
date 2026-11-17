@@ -7,15 +7,16 @@ import type {
   PlaceSuggestQuery,
 } from '@parkfairy/contracts';
 import type { Redis } from 'ioredis';
+
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { RATE_LIMIT_REDIS } from '../rate-limit/rate-limit.module.js';
 import {
+  type FetchFn,
   findPlaces,
   MapboxError,
   retrievePlace,
   suggestPlaces,
-  type FetchFn,
 } from './mapbox-search.js';
 import { PlacesBudget } from './places-budget.js';
 

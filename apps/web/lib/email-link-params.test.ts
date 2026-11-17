@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { showsSentPanel, usableToken } from './email-link-params';
 
 describe('showsSentPanel', () => {

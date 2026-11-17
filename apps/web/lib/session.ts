@@ -1,8 +1,11 @@
 import 'server-only';
+
 import { headers } from 'next/headers';
 import { getLocale } from 'next-intl/server';
 import { cache } from 'react';
+
 import { redirect } from '@/i18n/navigation';
+
 import { getAuth } from './auth';
 
 /**

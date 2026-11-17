@@ -1,6 +1,7 @@
-import { expect, test, type Page } from '@playwright/test';
-import { API_URL, DEMO_DATA, EMAIL_OUTBOX, SIGNED_IN_STATE, WEB_URL } from '../support/env';
+import { expect, type Page, test } from '@playwright/test';
+
 import { FIRST_VISIT, measureFirstVisit } from '../support/budgets';
+import { API_URL, DEMO_DATA, EMAIL_OUTBOX, SIGNED_IN_STATE, WEB_URL } from '../support/env';
 import { ownDriver } from '../support/fixtures';
 
 // Feature: performance budgets — catch regressions in what the browser must download
@@ -164,6 +165,7 @@ test.describe('signed in', () => {
     '/en/owner/payouts',
     '/en/owner/earnings',
     '/en/owner/calendar',
+    '/en/owner/bookings',
   ]) {
     test(`${path} stays within the first-visit budget`, async ({ page }) => {
       await expectWithinBudget(page, path);

@@ -2,6 +2,7 @@
 
 import { useLocale } from 'next-intl';
 import { useEffect } from 'react';
+
 import { usePathname, useSearchParams } from '@/i18n/navigation';
 
 // Module scope, not refs: switching language remounts the [locale] layout, and that must still

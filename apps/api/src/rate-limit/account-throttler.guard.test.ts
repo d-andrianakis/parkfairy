@@ -1,5 +1,6 @@
 import { Reflector } from '@nestjs/core';
 import { describe, expect, it } from 'vitest';
+
 import { AccountThrottlerGuard } from './account-throttler.guard.js';
 
 class Exposed extends AccountThrottlerGuard {

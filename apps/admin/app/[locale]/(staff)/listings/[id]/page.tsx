@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { getFormatter, getTranslations } from 'next-intl/server';
+
 import { ClientMessages } from '@/components/client-messages';
 import { MarkedText } from '@/components/marked-text';
 import { MissingNotice } from '@/components/missing-notice';
@@ -15,8 +16,9 @@ import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { loadReview } from '@/lib/admin.server';
 import { withClock } from '@/lib/clock';
-import { accountPageUrl } from '@/lib/site';
 import { requireSession } from '@/lib/session';
+import { accountPageUrl } from '@/lib/site';
+
 import { DecisionPanel } from './decision-panel';
 import { ModerationPanel } from './moderation-panel';
 

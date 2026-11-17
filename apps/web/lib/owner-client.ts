@@ -1,5 +1,6 @@
 import { isValidationMessage } from '@parkfairy/contracts/validation';
 import { useTranslations } from 'next-intl';
+
 import type { ApiFailure, Outcome } from './api-call';
 import { useValidationMessage } from './use-validation-message';
 

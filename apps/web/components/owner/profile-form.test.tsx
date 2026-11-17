@@ -3,10 +3,12 @@ import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { routerMock } from '@/test/navigation-mock';
 import { answer, profileFixture, refusal } from '@/test/owner-fixtures';
 import { rendererFor } from '@/test/render';
+
 import { ProfileForm } from './profile-form';
 
 const renderInSubtree = rendererFor(CLIENT_NAMESPACES.owner);

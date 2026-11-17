@@ -2,7 +2,9 @@ import { LISTING_SPACES_LIMIT } from '@parkfairy/contracts';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+
 import { renderWithProviders } from '@/test/render';
+
 import { SpaceList } from './space-list';
 
 const spaces = (count: number) =>

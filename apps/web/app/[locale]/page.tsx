@@ -1,8 +1,9 @@
 import { AREAS, CITIES } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
 import { Card, CardContent } from '@parkfairy/ui/components/card';
-import { CalendarClock, Car, MapPinned, type LucideIcon } from 'lucide-react';
+import { CalendarClock, Car, type LucideIcon, MapPinned } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
+
 import { ListingCard } from '@/components/parking/listing-card';
 import { SearchForm } from '@/components/parking/search-form';
 import { SearchLink } from '@/components/parking/search-link';

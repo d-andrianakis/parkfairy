@@ -1,9 +1,9 @@
 import {
+  type ArgumentsHost,
   Catch,
   HttpException,
   InternalServerErrorException,
   Logger,
-  type ArgumentsHost,
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
 

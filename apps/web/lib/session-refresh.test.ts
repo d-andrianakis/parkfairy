@@ -1,5 +1,6 @@
 import { SESSION_TIMING } from '@parkfairy/auth';
 import { describe, expect, it } from 'vitest';
+
 import { sessionRefreshDue } from './session-refresh';
 
 const DAY = 24 * 60 * 60 * 1000;

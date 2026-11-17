@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { parseServerEnv } from './server-env';
 
 const base = {

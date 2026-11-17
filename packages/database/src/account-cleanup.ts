@@ -1,4 +1,5 @@
 import { and, eq, lt } from 'drizzle-orm';
+
 import type { Database } from './client.js';
 import { sessions, users, verifications } from './schema/auth.js';
 

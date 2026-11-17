@@ -1,28 +1,29 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  type InviteAccepted,
+  InviteAcceptedSchema,
+  type InvitePreview,
+  InvitePreviewSchema,
   INVITES_PER_ADDRESS_WEEK,
   INVITES_PER_DAY,
-  InviteAcceptedSchema,
-  InvitePreviewSchema,
+  LISTING_HANDOVER_DAYS,
   LISTING_MANAGERS_MAX,
   LISTING_OWNERS_MAX,
-  ManagedListingsSchema,
-  ListingOwnersSchema,
-  SHARE_BPS_PER_PERCENT,
-  type InviteAccepted,
-  type InvitePreview,
+  type ListingHandoverInput,
   type ListingInviteInput,
-  type ManagedListings,
   type ListingOwnerRole,
   type ListingOwners,
-  type ListingHandoverInput,
+  ListingOwnersSchema,
   type ListingSharesInput,
-  LISTING_HANDOVER_DAYS,
+  type ManagedListings,
+  ManagedListingsSchema,
   OWNER_LISTINGS_MAX,
+  SHARE_BPS_PER_PERCENT,
 } from '@parkfairy/contracts';
-import { hashInviteToken, schema, type Database } from '@parkfairy/database';
-import { and, asc, eq, gt, inArray, isNull, or, sql, type AnyColumn } from 'drizzle-orm';
+import { type Database, hashInviteToken, schema } from '@parkfairy/database';
+import { and, type AnyColumn, asc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+
 import { DB } from '../database/database.module.js';
 import type { Reader } from '../parking/listing-data.js';
 import { doneAccountSteps } from './onboarding-progress.js';

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import { PlacesBudget } from './places-budget.js';
 
 const HOUR_MS = 60 * 60_000;

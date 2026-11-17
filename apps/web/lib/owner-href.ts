@@ -20,3 +20,6 @@ export const EARNINGS_HREF = '/owner/earnings';
 
 /** The owner's calendar of bookings (5.1). */
 export const CALENDAR_HREF = '/owner/calendar';
+
+/** The bookings of every listing the account runs, in one list (5.1). */
+export const BOOKING_LIST_HREF = '/owner/bookings';

@@ -1,8 +1,8 @@
 import 'server-only';
 
 export {
-  outboxTransport,
-  resendTransport,
   type EmailTransport,
+  outboxTransport,
   type OutgoingEmail,
+  resendTransport,
 } from '@parkfairy/email';

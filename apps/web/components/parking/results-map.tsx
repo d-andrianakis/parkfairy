@@ -2,10 +2,12 @@
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/lib/mapbox-focus.css';
+
+import { greekRuns } from '@parkfairy/contracts/greek-runs';
 import type { LngLatBoundsLike, Map as MapboxMap } from 'mapbox-gl';
 import { useEffect, useRef } from 'react';
-import { greekRuns } from '@parkfairy/contracts/greek-runs';
-import { markAttributionEnglish, MAPBOX_STYLE, workerUrlFor } from '@/lib/mapbox';
+
+import { MAPBOX_STYLE, markAttributionEnglish, workerUrlFor } from '@/lib/mapbox';
 
 export interface ResultPin {
   number: number;

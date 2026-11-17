@@ -1,5 +1,7 @@
 import { rm } from 'node:fs/promises';
+
 import { expect, test as setup } from '@playwright/test';
+
 import { emailLink, waitForEmail } from '../support/email';
 import { EMAIL_OUTBOX, SIGNED_IN_STATE, SMOKE_USER, TEST_PASSWORD } from '../support/env';
 import { ownVisitor, uniqueEmail } from '../support/fixtures';

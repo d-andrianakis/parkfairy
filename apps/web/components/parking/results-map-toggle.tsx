@@ -3,7 +3,8 @@
 import { Button } from '@parkfairy/ui/components/button';
 import { Map as MapIcon, Maximize } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { lazy, Suspense, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { lazy, type ReactNode, Suspense, useEffect, useId, useMemo, useState } from 'react';
+
 import type { ResultPin } from './results-map';
 
 const loadMap = () => import('./results-map');

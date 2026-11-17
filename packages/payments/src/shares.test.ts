@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { sharesOf, splitShares } from './shares.js';
 
 describe('sharesOf', () => {

@@ -1,5 +1,6 @@
 import type { ParkingListingDetail } from '@parkfairy/api-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { loadFeaturedListings, loadListing, loadSearchResults, lookupPlace } from './api.server';
 
 vi.mock('server-only', () => ({}));

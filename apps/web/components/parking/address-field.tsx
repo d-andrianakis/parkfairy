@@ -3,18 +3,20 @@
 import type { PlaceSuggestion } from '@parkfairy/api-client';
 import { PLACE_QUERY_LIMITS } from '@parkfairy/contracts/validation';
 import { Input } from '@parkfairy/ui/components/input';
-import { useLocale, useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
+import { useLocale, useTranslations } from 'next-intl';
 import {
+  type ChangeEvent,
+  type FocusEvent,
+  type KeyboardEvent,
   useEffect,
   useId,
   useRef,
   useState,
-  type ChangeEvent,
-  type FocusEvent,
-  type KeyboardEvent,
 } from 'react';
+
 import { useAnnouncer } from '@/components/use-announcer';
+
 import { optionId } from './place-option-id';
 
 /** Long enough that a word typed at speed is one request, short enough to feel immediate. */
