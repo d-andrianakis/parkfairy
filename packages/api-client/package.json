@@ -18,7 +18,7 @@
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
     "@parkfairy/config": "workspace:*",
-    "@tanstack/react-query": "5.105.0",
+    "@tanstack/react-query": "5.107.1",
     "eslint": "9.39.5",
     "typescript": "6.0.3"
   },
