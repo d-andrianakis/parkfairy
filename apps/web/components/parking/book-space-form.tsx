@@ -1,15 +1,17 @@
 'use client';
 
 import { holdParkingSpace } from '@parkfairy/api-client';
+import { type SizesCm, vehicleFitsSpace } from '@parkfairy/contracts/plates';
 import { HOLD_MINUTES } from '@parkfairy/contracts/validation';
 import { Button } from '@parkfairy/ui/components/button';
 import { Label } from '@parkfairy/ui/components/label';
+import { NativeSelect, NativeSelectOption } from '@parkfairy/ui/components/native-select';
 import { RadioGroup, RadioGroupItem } from '@parkfairy/ui/components/radio-group';
 import { useLocale, useTranslations } from 'next-intl';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { FormError } from '@/components/form-error';
-import { getPathname, useRouter } from '@/i18n/navigation';
+import { getPathname, Link, useRouter } from '@/i18n/navigation';
 import { attempt, useBookingError } from '@/lib/booking-client';
 import { loadPage } from '@/lib/load-page';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
@@ -20,6 +22,14 @@ export interface SpaceOption {
   label: ReactNode;
   /** Its features and price for the stay, rendered by the server. */
   details: ReactNode;
+  /** The largest vehicle it takes; null is no stated limit, which fits anything (5A.1). */
+  limits?: SizesCm;
+}
+
+/** One of the driver's saved vehicles, as the picker needs it: its name in a list, and its size. */
+export interface VehicleOption extends SizesCm {
+  id: string;
+  label: string;
 }
 
 /**
@@ -38,11 +48,14 @@ export function BookSpaceForm({
   spaces,
   initial,
   labelledBy,
+  vehicles = [],
 }: {
   listing: string;
   start: string;
   end: string;
   spaces: SpaceOption[];
+  /** The driver's saved vehicles (5A.2): the first is chosen to begin with. None is no choice shown. */
+  vehicles?: VehicleOption[];
   /** The cheapest, picked to begin with, so one press books it. */
   initial: string;
   labelledBy: string;
@@ -53,10 +66,15 @@ export function BookSpaceForm({
   const bookingError = useBookingError();
   const firstRadio = useRef<HTMLButtonElement>(null);
   const [picked, setPicked] = useState(initial);
+  const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? '');
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<{ text: string; code?: string } | null>(null);
   const spaceId = spaces.some((space) => space.id === picked) ? picked : '';
   const noneLeft = spaces.length === 0;
+  const vehicle = vehicles.find((candidate) => candidate.id === vehicleId);
+  /** Too small for the vehicle chosen: said by the space, and refused here before it is asked of the API. */
+  const tooSmall = (space: SpaceOption) =>
+    vehicle !== undefined && space.limits !== undefined && !vehicleFitsSpace(vehicle, space.limits);
 
   // The last space went with the refresh: the Book button pressed is gone too.
   useEffect(() => {
@@ -71,10 +89,18 @@ export function BookSpaceForm({
       firstRadio.current?.focus();
       return;
     }
+    const chosen = spaces.find((space) => space.id === spaceId);
+    if (vehicle && chosen && tooSmall(chosen)) {
+      setFailure({ text: t('pickFits', { vehicle: vehicle.label }) });
+      firstRadio.current?.focus();
+      return;
+    }
     setSaving(true);
     setFailure(null);
     const outcome = await attempt(() =>
-      holdParkingSpace({ body: { listing, spaceId, start, end } }),
+      holdParkingSpace({
+        body: { listing, spaceId, start, end, ...(vehicle ? { vehicleId: vehicle.id } : {}) },
+      }),
     );
     if (outcome.ok && outcome.data) {
       if (outcome.data.checkout === 'payment') {
@@ -97,6 +123,43 @@ export function BookSpaceForm({
       <FormError message={failure ? (noneLeft && taken ? t('noneLeft') : failure.text) : null} />
       {noneLeft ? null : (
         <form onSubmit={(event) => void book(event)} className="grid gap-4">
+          {vehicles.length > 0 ? (
+            <div className="grid max-w-sm gap-1.5">
+              <Label htmlFor="book-vehicle">{t('vehicleLabel')}</Label>
+              <NativeSelect
+                id="book-vehicle"
+                value={vehicleId}
+                aria-describedby="book-vehicle-hint"
+                onChange={(event) => {
+                  setVehicleId(event.target.value);
+                  if (failure?.code === undefined) setFailure(null);
+                }}
+                className="w-full"
+              >
+                <NativeSelectOption value="">{t('vehicleNone')}</NativeSelectOption>
+                {vehicles.map((option) => (
+                  <NativeSelectOption key={option.id} value={option.id}>
+                    {option.label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              <p id="book-vehicle-hint" className="text-sm text-muted-foreground">
+                {t('vehicleHint')}{' '}
+                <Link
+                  href="/account/vehicles"
+                  className="text-primary underline underline-offset-4"
+                >
+                  {t('manageVehicles')}
+                </Link>
+              </p>
+            </div>
+          ) : null}
+          {/* What the vehicle chosen does to the list, said when it changes: the warnings are on the radios. */}
+          <p role="status" className="sr-only">
+            {vehicle && spaces.length > 0
+              ? t('tooSmallCount', { count: spaces.filter(tooSmall).length })
+              : ''}
+          </p>
           <RadioGroup
             value={spaceId}
             onValueChange={(value) => {
@@ -115,7 +178,7 @@ export function BookSpaceForm({
                   ref={index === 0 ? firstRadio : undefined}
                   id={`space-${space.id}`}
                   value={space.id}
-                  aria-describedby={`space-${space.id}-details`}
+                  aria-describedby={`space-${space.id}-details${tooSmall(space) ? ` space-${space.id}-fit` : ''}`}
                   className="mt-1"
                 />
                 <div className="grid min-w-0 gap-1">
@@ -125,6 +188,15 @@ export function BookSpaceForm({
                   <div id={`space-${space.id}-details`} className="grid gap-1 text-sm">
                     {space.details}
                   </div>
+                  {tooSmall(space) ? (
+                    // Words, not a colour: the space can still be looked at, and the refusal says why.
+                    <p
+                      id={`space-${space.id}-fit`}
+                      className="text-sm font-medium text-destructive"
+                    >
+                      {t('tooSmall')}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ))}

@@ -12,6 +12,7 @@ import { getTranslations } from 'next-intl/server';
 import { ClientMessages } from '@/components/client-messages';
 import { PersonName } from '@/components/parking/place-words';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
+import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
 import { requireSession } from '@/lib/session';
 
@@ -74,6 +75,34 @@ export default async function AccountPage({ params }: LocaleParams) {
           </Card>
         </Providers>
       </ClientMessages>
+      <Card>
+        <CardHeader>
+          <CardTitle className="leading-snug">
+            <h2>{t('parkingHeading')}</h2>
+          </CardTitle>
+          <CardDescription>{t('parkingIntro')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="grid gap-2">
+            <li>
+              <Link
+                href="/account/vehicles"
+                className="text-primary underline underline-offset-4 hover:decoration-2"
+              >
+                {t('vehiclesLink')}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/favourites"
+                className="text-primary underline underline-offset-4 hover:decoration-2"
+              >
+                {t('favouritesLink')}
+              </Link>
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -19,6 +19,8 @@ const booking = (overrides: Partial<Booking> = {}): Booking => ({
     timeZone: 'Europe/Athens',
   },
   spaceLabel: 'A1',
+  spaceId: 'a1a1a1a1-0000-4000-8000-000000000001',
+  vehicleId: null,
   start: '2099-01-01T08:00:00.000Z',
   end: '2099-01-01T10:00:00.000Z',
   total: { amountMinor: 400, currency: 'EUR' },

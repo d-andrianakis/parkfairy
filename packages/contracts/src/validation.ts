@@ -118,6 +118,14 @@ export const SIZE_MESSAGES = {
   width: 'sizeWidthInvalid',
 } as const satisfies Record<SpaceDimension, ValidationMessage>;
 
+/** What a driver's saved vehicles keep to (5A.2), here so the page that lists them loads no zod. */
+export const VEHICLE_LIMITS = {
+  /** A nickname for the car ("Work car"): free text, so it is isolated where it is shown. */
+  name: 40,
+  /** Enough for a household and a company car; more is a fleet, which is 5A.11's. */
+  perDriver: 10,
+} as const;
+
 /** How long a space is kept for a driver while they confirm (decision #3). */
 export const HOLD_MINUTES = 10;
 /**

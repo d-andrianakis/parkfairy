@@ -278,7 +278,11 @@
     "twoFactorStatus": "{enabled, select, true {Enabled} other {Not enabled}}",
     "memberSince": "Member since",
     "signOut": "Sign out",
-    "signingOut": "Signing out…"
+    "signingOut": "Signing out…",
+    "parkingHeading": "Your parking",
+    "parkingIntro": "Vehicles and places you’ve saved, so booking takes fewer steps.",
+    "vehiclesLink": "Saved vehicles",
+    "favouritesLink": "Favourite parking"
   },
   "TwoFactorSettings": {
     "heading": "Two-factor authentication",
@@ -1273,7 +1277,14 @@
     "booking": "Holding the space…",
     "holdHint": "We keep the space for you for {minutes, plural, one {# minute} other {# minutes}} while you book.",
     "noneLeft": "Someone else has just booked the last free space for those times. Choose other times.",
-    "pickOne": "Choose a space first."
+    "pickOne": "Choose a space first.",
+    "vehicleLabel": "Vehicle",
+    "vehicleNone": "No saved vehicle",
+    "vehicleHint": "Pick a vehicle and we’ll tell you which spaces are too small for it.",
+    "tooSmall": "Too small for this vehicle",
+    "pickFits": "That space is too small for {vehicle}. Choose another space or vehicle.",
+    "manageVehicles": "Manage saved vehicles",
+    "tooSmallCount": "{count, plural, =0 {Every space fits this vehicle.} one {# space is too small for this vehicle.} other {# spaces are too small for this vehicle.}}"
   },
   "BookingErrors": {
     "generic": "Something went wrong. Check your connection and try again.",
@@ -1288,7 +1299,9 @@
     "BOOKING_STARTED": "This stay has already begun, so it can’t be cancelled here.",
     "REFUND_CHANGED": "The refund has changed, because your arrival is nearer now. Check it and cancel again.",
     "HOLD_LIMIT_REACHED": "This space can’t be kept any longer. Book it now, or let it go.",
-    "PAYMENT_PROVIDER_ERROR": "Payments aren’t available right now. Try again in a moment."
+    "PAYMENT_PROVIDER_ERROR": "Payments aren’t available right now. Try again in a moment.",
+    "VEHICLE_NOT_FOUND": "That vehicle is no longer saved. Choose another, or type a plate.",
+    "VEHICLE_DOES_NOT_FIT": "That space is too small for this vehicle. Choose another space."
   },
   "Booking": {
     "metaTitle": "Your booking",
@@ -1383,7 +1396,12 @@
     "plateKept": "Kept with this payment.",
     "changePlate": "Change the number plate",
     "arrival": "How to get in",
-    "arrivalFrom": "Shown here from {when}"
+    "arrivalFrom": "Shown here from {when}",
+    "vehicleLabel": "Vehicle",
+    "vehicleOther": "Another vehicle",
+    "vehicleChosen": "The owner will see this plate: {plate}.",
+    "saveVehicle": "Save this vehicle for next time",
+    "changeVehicle": "Change the vehicle"
   },
   "Bookings": {
     "metaTitle": "Your bookings",
@@ -1399,6 +1417,78 @@
     "previous": "Previous page",
     "next": "Next page",
     "unavailable": "Your bookings can’t be shown right now. Please try again in a moment.",
-    "space": "Space: <space>{label}</space>"
+    "space": "Space: <space>{label}</space>",
+    "rebookWhen": "Same weekday and times:"
+  },
+  "Vehicles": {
+    "metaTitle": "Saved vehicles",
+    "heading": "Saved vehicles",
+    "back": "Back to your account",
+    "intro": "Save the vehicles you park so booking takes one press. Only you see this list; an owner sees a plate only on a booking you make.",
+    "listLabel": "Your saved vehicles",
+    "empty": "You haven’t saved a vehicle yet.",
+    "unavailable": "We can’t load your vehicles right now. Try again in a moment.",
+    "addHeading": "Add a vehicle",
+    "editHeading": "Change {vehicle}",
+    "plate": "Number plate",
+    "plateHint": "Letters and digits, like IKB-1234. We show it in Latin letters.",
+    "name": "Name (optional)",
+    "nameHint": "Only you see it, like “Work car”.",
+    "sizeLegend": "Size in centimetres (optional)",
+    "sizeHint": "If you say how big the vehicle is, we warn you about spaces that are too small. Leave a size empty if you aren’t sure.",
+    "height": "Height (cm)",
+    "length": "Length (cm)",
+    "width": "Width (cm)",
+    "save": "Save vehicle",
+    "saveChanges": "Save changes",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "editLabel": "Edit {vehicle}",
+    "delete": "Remove",
+    "deleteLabel": "Remove {vehicle}",
+    "deleteQuestion": "Remove {vehicle}? Bookings you made with it keep their plate.",
+    "deleteConfirm": "Yes, remove it",
+    "deleteKeep": "No, keep it",
+    "deleting": "Removing…",
+    "added": "Vehicle saved.",
+    "changed": "Changes saved.",
+    "removed": "Vehicle removed.",
+    "full": "You’ve saved the most vehicles you can ({max}). Remove one to add another.",
+    "sizeHigh": "{value} cm high",
+    "sizeLong": "{value} cm long",
+    "sizeWide": "{value} cm wide",
+    "noSizes": "No size given",
+    "errors": {
+      "generic": "Something went wrong. Check your connection and try again.",
+      "VEHICLE_EXISTS": "You’ve saved that plate already.",
+      "VEHICLE_LIMIT_REACHED": "You’ve saved the most vehicles you can. Remove one first.",
+      "VEHICLE_NOT_FOUND": "That vehicle is no longer saved."
+    }
+  },
+  "Favourites": {
+    "metaTitle": "Favourite parking",
+    "heading": "Favourite parking",
+    "back": "Back to your account",
+    "intro": "Places you’ve saved. One that isn’t available any more is hidden, and comes back when it is.",
+    "listLabel": "Your favourite parking",
+    "empty": "You haven’t saved any parking yet. Open a place and press “Favourite”.",
+    "findParking": "Find parking",
+    "unavailable": "We can’t load your favourites right now. Try again in a moment.",
+    "toggle": "Favourite",
+    "saved": "Saved to your favourites.",
+    "removedStatus": "Removed from your favourites.",
+    "remove": "Remove from favourites",
+    "removing": "Removing…",
+    "errors": {
+      "generic": "Something went wrong. Check your connection and try again.",
+      "FAVOURITES_LIMIT_REACHED": "You’ve saved the most places you can. Remove one first.",
+      "LISTING_NOT_FOUND": "This parking isn’t available any more."
+    }
+  },
+  "Rebook": {
+    "button": "Book again",
+    "holding": "Holding the space…",
+    "chooseOther": "Choose another space or time"
   }
 }

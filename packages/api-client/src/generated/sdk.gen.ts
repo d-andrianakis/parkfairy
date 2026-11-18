@@ -21,6 +21,9 @@ import type {
   CancelMyBookingData,
   CancelMyBookingErrors,
   CancelMyBookingResponses,
+  ChangeMyVehicleData,
+  ChangeMyVehicleErrors,
+  ChangeMyVehicleResponses,
   ConfirmMyBookingData,
   ConfirmMyBookingErrors,
   ConfirmMyBookingResponses,
@@ -54,9 +57,15 @@ import type {
   ExtendMyHoldData,
   ExtendMyHoldErrors,
   ExtendMyHoldResponses,
+  FavouriteListingData,
+  FavouriteListingErrors,
+  FavouriteListingResponses,
   FindPlacesData,
   FindPlacesErrors,
   FindPlacesResponses,
+  ForgetMyVehicleData,
+  ForgetMyVehicleErrors,
+  ForgetMyVehicleResponses,
   GetAdminBookingData,
   GetAdminBookingErrors,
   GetAdminBookingResponses,
@@ -115,6 +124,12 @@ import type {
   GetMyBookingsData,
   GetMyBookingsErrors,
   GetMyBookingsResponses,
+  GetMyFavouritesData,
+  GetMyFavouritesErrors,
+  GetMyFavouritesResponses,
+  GetMyVehiclesData,
+  GetMyVehiclesErrors,
+  GetMyVehiclesResponses,
   GetOtherOwnerListingsData,
   GetOtherOwnerListingsErrors,
   GetOtherOwnerListingsResponses,
@@ -145,6 +160,9 @@ import type {
   InviteListingOwnerData,
   InviteListingOwnerErrors,
   InviteListingOwnerResponses,
+  IsMyFavouriteData,
+  IsMyFavouriteErrors,
+  IsMyFavouriteResponses,
   LeaveListingData,
   LeaveListingErrors,
   LeaveListingResponses,
@@ -220,6 +238,9 @@ import type {
   SaveListingSpacesData,
   SaveListingSpacesErrors,
   SaveListingSpacesResponses,
+  SaveMyVehicleData,
+  SaveMyVehicleErrors,
+  SaveMyVehicleResponses,
   SaveOwnerTaxDetailsData,
   SaveOwnerTaxDetailsErrors,
   SaveOwnerTaxDetailsResponses,
@@ -247,6 +268,9 @@ import type {
   SuspendAdminUserData,
   SuspendAdminUserErrors,
   SuspendAdminUserResponses,
+  UnfavouriteListingData,
+  UnfavouriteListingErrors,
+  UnfavouriteListingResponses,
   UpdateListingPhotoData,
   UpdateListingPhotoErrors,
   UpdateListingPhotoResponses,
@@ -1909,5 +1933,137 @@ export const findPlaces = <ThrowOnError extends boolean = false>(
 ): RequestResult<FindPlacesResponses, FindPlacesErrors, ThrowOnError> =>
   (options.client ?? client).get<FindPlacesResponses, FindPlacesErrors, ThrowOnError>({
     url: '/v1/places',
+    ...options,
+  });
+
+export const getMyVehicles = <ThrowOnError extends boolean = false>(
+  options?: Options<GetMyVehiclesData, ThrowOnError>,
+): RequestResult<GetMyVehiclesResponses, GetMyVehiclesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetMyVehiclesResponses, GetMyVehiclesErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/vehicles',
+    ...options,
+  });
+
+export const saveMyVehicle = <ThrowOnError extends boolean = false>(
+  options: Options<SaveMyVehicleData, ThrowOnError>,
+): RequestResult<SaveMyVehicleResponses, SaveMyVehicleErrors, ThrowOnError> =>
+  (options.client ?? client).post<SaveMyVehicleResponses, SaveMyVehicleErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/vehicles',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+export const forgetMyVehicle = <ThrowOnError extends boolean = false>(
+  options: Options<ForgetMyVehicleData, ThrowOnError>,
+): RequestResult<ForgetMyVehicleResponses, ForgetMyVehicleErrors, ThrowOnError> =>
+  (options.client ?? client).delete<ForgetMyVehicleResponses, ForgetMyVehicleErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/vehicles/{id}',
+    ...options,
+  });
+
+export const changeMyVehicle = <ThrowOnError extends boolean = false>(
+  options: Options<ChangeMyVehicleData, ThrowOnError>,
+): RequestResult<ChangeMyVehicleResponses, ChangeMyVehicleErrors, ThrowOnError> =>
+  (options.client ?? client).put<ChangeMyVehicleResponses, ChangeMyVehicleErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/vehicles/{id}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+export const getMyFavourites = <ThrowOnError extends boolean = false>(
+  options?: Options<GetMyFavouritesData, ThrowOnError>,
+): RequestResult<GetMyFavouritesResponses, GetMyFavouritesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetMyFavouritesResponses, GetMyFavouritesErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/favourites',
+    ...options,
+  });
+
+export const unfavouriteListing = <ThrowOnError extends boolean = false>(
+  options: Options<UnfavouriteListingData, ThrowOnError>,
+): RequestResult<UnfavouriteListingResponses, UnfavouriteListingErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    UnfavouriteListingResponses,
+    UnfavouriteListingErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/favourites/{slug}',
+    ...options,
+  });
+
+export const isMyFavourite = <ThrowOnError extends boolean = false>(
+  options: Options<IsMyFavouriteData, ThrowOnError>,
+): RequestResult<IsMyFavouriteResponses, IsMyFavouriteErrors, ThrowOnError> =>
+  (options.client ?? client).get<IsMyFavouriteResponses, IsMyFavouriteErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/favourites/{slug}',
+    ...options,
+  });
+
+export const favouriteListing = <ThrowOnError extends boolean = false>(
+  options: Options<FavouriteListingData, ThrowOnError>,
+): RequestResult<FavouriteListingResponses, FavouriteListingErrors, ThrowOnError> =>
+  (options.client ?? client).put<FavouriteListingResponses, FavouriteListingErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/favourites/{slug}',
     ...options,
   });

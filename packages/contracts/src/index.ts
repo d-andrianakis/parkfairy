@@ -18,3 +18,4 @@ export * from './registry.js';
 export * from './time.js';
 export * from './users.js';
 export * from './validation.js';
+export * from './vehicles.js';

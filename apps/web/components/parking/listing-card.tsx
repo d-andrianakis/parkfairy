@@ -27,6 +27,8 @@ interface ListingCardProps {
   /** Query (e.g. the search window) carried to the listing page. */
   query?: Record<string, string>;
   headingLevel?: 'h2' | 'h3';
+  /** An id for the heading, for a control beside the card that is described by the name. */
+  headingId?: string;
   /** The first result on a page: its photo is likely the largest thing in view. */
   priority?: boolean;
   /**
@@ -41,6 +43,7 @@ export function ListingCard({
   listing,
   query,
   headingLevel: Heading = 'h3',
+  headingId,
   priority = false,
   number,
 }: ListingCardProps) {
@@ -84,7 +87,7 @@ export function ListingCard({
               {number}
             </span>
           ) : null}
-          <Heading lang={listing.contentLocale}>
+          <Heading id={headingId} lang={listing.contentLocale}>
             <Link
               href={{ pathname: `/parking/${listing.slug}`, query }}
               className="outline-none after:absolute after:inset-0 after:rounded-xl"

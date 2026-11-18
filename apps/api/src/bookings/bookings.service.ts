@@ -34,6 +34,7 @@ import {
   type OwnerListingBookings,
   OwnerListingBookingsSchema,
   parseBookingsCursor,
+  vehicleFitsSpace,
 } from '@parkfairy/contracts';
 import {
   copyPayees,
@@ -68,6 +69,7 @@ const listing = schema.parkingLocations;
 const space = schema.parkingSpaces;
 const profile = schema.ownerProfiles;
 const users = schema.users;
+const vehicles = schema.savedVehicles;
 const outbox = schema.emailOutbox;
 /** How many bookings one statement calls off when staff suspend a listing. */
 const CANCEL_CHUNK = 400;
@@ -123,7 +125,9 @@ const bookableColumns = {
 
 const published = sql`${listing.status} = 'published'`;
 
-function notFound(code: 'LISTING_NOT_FOUND' | 'SPACE_NOT_FOUND' | 'BOOKING_NOT_FOUND') {
+function notFound(
+  code: 'LISTING_NOT_FOUND' | 'SPACE_NOT_FOUND' | 'BOOKING_NOT_FOUND' | 'VEHICLE_NOT_FOUND',
+) {
   return new NotFoundException({ statusCode: 404, error: 'Not Found', message: 'Not Found', code });
 }
 
@@ -199,6 +203,7 @@ function viewOf(row: BookingRow, info: ListingInfo, now: Date, checkout: Checkou
     status: row.status,
     listing: booked(row, info),
     spaceLabel: row.spaceLabel,
+    spaceId: row.spaceId,
     start: row.startsAt.toISOString(),
     end: row.endsAt.toISOString(),
     total: money(row.totalMinor, row.currency),
@@ -206,6 +211,7 @@ function viewOf(row: BookingRow, info: ListingInfo, now: Date, checkout: Checkou
     holdExpiresAt: row.holdExpiresAt.toISOString(),
     holdExtensionsLeft: Math.max(0, HOLD_MAX_EXTENSIONS - row.holdExtensions),
     vehiclePlate: row.vehiclePlate,
+    vehicleId: row.vehicleId,
     confirmedAt: row.confirmedAt?.toISOString() ?? null,
     cancelledAt: row.cancelledAt?.toISOString() ?? null,
     cancelledBy: row.cancelledBy,
@@ -281,6 +287,48 @@ async function clearForHold(tx: Transaction, userId: string, spaceId: string) {
 }
 
 /**
+ * The saved vehicle a hold or a payment names, checked: it must be the driver's own (another's is the
+ * same 404 as one that was deleted) and fit the space (5A.2). A space with no stated limit takes any
+ * vehicle, and a vehicle with no stated size is never refused for it.
+ */
+async function savedVehicleFor(
+  tx: Transaction,
+  userId: string,
+  vehicleId: string,
+  spaceId: string,
+  /** The space's limits, where the caller has read them already (a hold has): saves a round trip. */
+  known?: { heightCm: number | null; lengthCm: number | null; widthCm: number | null },
+): Promise<{ id: string; plate: string }> {
+  if (!UUID.test(vehicleId)) throw notFound('VEHICLE_NOT_FOUND');
+  const [found] = await tx
+    .select({
+      id: vehicles.id,
+      plate: vehicles.plate,
+      heightCm: vehicles.heightCm,
+      lengthCm: vehicles.lengthCm,
+      widthCm: vehicles.widthCm,
+    })
+    .from(vehicles)
+    .where(and(eq(vehicles.id, vehicleId), eq(vehicles.userId, userId)))
+    // Held until this transaction ends: forgetting the vehicle meanwhile would otherwise break the
+    // booking's link to it as a foreign key error, not as "not found".
+    .for('share');
+  if (!found) throw notFound('VEHICLE_NOT_FOUND');
+  const [limits] = known
+    ? [known]
+    : await tx
+        .select({
+          heightCm: space.maxHeightCm,
+          lengthCm: space.maxLengthCm,
+          widthCm: space.maxWidthCm,
+        })
+        .from(space)
+        .where(eq(space.id, spaceId));
+  if (limits && !vehicleFitsSpace(found, limits)) throw conflict('VEHICLE_DOES_NOT_FIT');
+  return found;
+}
+
+/**
  * Bookings: a driver holds a space, confirms it, and may call it off; the listing's owner sees and
  * cancels the bookings of their listings. Every call starts from the session's user, and a booking
  * or listing that isn't theirs is the same 404 as one that doesn't exist.
@@ -348,7 +396,14 @@ export class BookingsService {
     const [row] = await tx
       .select({
         ...bookableColumns,
-        spot: { id: space.id, label: space.label, ownRate: space.hourlyRateMinor },
+        spot: {
+          id: space.id,
+          label: space.label,
+          ownRate: space.hourlyRateMinor,
+          heightCm: space.maxHeightCm,
+          lengthCm: space.maxLengthCm,
+          widthCm: space.maxWidthCm,
+        },
         // Co-ownership (#54): every owner with a share can be paid; this driver isn't one.
         payable: sql<boolean>`${payableListing}`,
         mine: sql<boolean>`${ownedByUser(userId)}`,
@@ -369,6 +424,10 @@ export class BookingsService {
     const { spot } = row;
     if (!spot) throw notFound('SPACE_NOT_FOUND');
     const { prices } = await this.assertOpen(tx, row, stay, { prices: true });
+    // The car it is for, if the driver said: refused here, not after they have typed and paid.
+    const car = input.vehicleId
+      ? await savedVehicleFor(tx, userId, input.vehicleId, spot.id, spot)
+      : null;
 
     await clearForHold(tx, userId, spot.id);
 
@@ -388,6 +447,7 @@ export class BookingsService {
         locationId: row.id,
         spaceId: spot.id,
         spaceLabel: spot.label,
+        vehicleId: car?.id ?? null,
         listingName: row.name,
         listingAddress: row.address,
         listingLocale: row.contentLocale,
@@ -482,6 +542,26 @@ export class BookingsService {
   }
 
   /**
+   * The car a confirmation or a payment is for: a saved vehicle (its plate, checked against the space,
+   * 5A.2) or the plate typed, which leaves the booking tied to no saved vehicle. The space is the
+   * hold's, which `lockHold` has just found still there.
+   */
+  private async carFor(
+    tx: Transaction,
+    userId: string,
+    input: BookingConfirmInput,
+    spaceId: string | null,
+  ): Promise<{ vehiclePlate: string; vehicleId: string | null }> {
+    if (input.vehicleId !== undefined) {
+      if (!spaceId) throw conflict('SPACE_TAKEN');
+      const saved = await savedVehicleFor(tx, userId, input.vehicleId, spaceId);
+      return { vehiclePlate: saved.plate, vehicleId: saved.id };
+    }
+    // The contract allows one or the other, so a typed plate is here.
+    return { vehiclePlate: normalizeVehiclePlate(input.vehiclePlate ?? ''), vehicleId: null };
+  }
+
+  /**
    * Turns the driver's hold into a booking without paying: the stand-in of a local run without
    * Stripe (#33, #47). Only while the hold runs (decision #37): after it, the driver chooses the
    * space again, and to have more time they keep the hold (`extend`). Asked again, a confirmed
@@ -490,15 +570,15 @@ export class BookingsService {
   async confirm(userId: string, id: string, input: BookingConfirmInput): Promise<Booking> {
     this.assertStandIn();
     if (!UUID.test(id)) throw notFound('BOOKING_NOT_FOUND');
-    const vehiclePlate = normalizeVehiclePlate(input.vehiclePlate);
     try {
       return await this.db.transaction(async (tx) => {
         const { row, current } = await this.lockHold(tx, userId, id);
         if (current.status === 'confirmed') return this.view(current, row);
         const now = new Date();
+        const car = await this.carFor(tx, userId, input, current.spaceId);
         const [confirmed] = await tx
           .update(booking)
-          .set({ status: 'confirmed', vehiclePlate, confirmedAt: now })
+          .set({ status: 'confirmed', ...car, confirmedAt: now })
           .where(eq(booking.id, id))
           .returning();
         if (!confirmed) throw notFound('BOOKING_NOT_FOUND');
@@ -554,11 +634,11 @@ export class BookingsService {
     const gateway = this.payments;
     if (!gateway) throw conflict('BOOKING_UNAVAILABLE');
     if (!UUID.test(id)) throw notFound('BOOKING_NOT_FOUND');
-    const vehiclePlate = normalizeVehiclePlate(input.vehiclePlate);
     const held = await this.db.transaction(async (tx) => {
       const { current } = await this.lockHold(tx, userId, id);
       // Booked already: nothing is left to pay.
       if (current.status === 'confirmed') throw conflict('BOOKING_NOT_ACTIVE');
+      const car = await this.carFor(tx, userId, input, current.spaceId);
       // Paying takes minutes (a card typed, a bank's check): a hold with less than half its time
       // left is kept for a full HOLD_MINUTES again, as one of its extensions (decision #37), so
       // the time limit doesn't fall in the middle of paying (WCAG 2.2.1).
@@ -568,7 +648,7 @@ export class BookingsService {
       const [kept] = await tx
         .update(booking)
         .set({
-          vehiclePlate,
+          ...car,
           ...(low
             ? {
                 holdExpiresAt: sql`now() + make_interval(mins => ${HOLD_MINUTES})`,

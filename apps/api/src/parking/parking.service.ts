@@ -334,6 +334,30 @@ export class ParkingService {
   }
 
   /**
+   * The live ones among these listings, as the home page shows them, in the order asked for (a
+   * driver's favourites, newest first). A listing that has since been unpublished, or has no active
+   * space left, is left out; so is an id that never was one.
+   */
+  async summariesOf(locationIds: string[]): Promise<ParkingListingSummary[]> {
+    if (locationIds.length === 0) return [];
+    const rows = (await this.db
+      .select(listingColumns)
+      .from(listing)
+      .where(
+        and(published, inArray(listing.id, locationIds), this.hasActiveSpace()),
+      )) as ListingRow[];
+    const [stats, covers] = await Promise.all([
+      this.spaceStats(rows.map((row) => row.id)),
+      this.coverPhotos(rows.map((row) => row.id)),
+    ]);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return locationIds.flatMap((id) => {
+      const row = byId.get(id);
+      return row ? [summary(row, stats.get(id) ?? NO_SPACES, covers.get(id) ?? null)] : [];
+    });
+  }
+
+  /**
    * Published listings within SEARCH_RADIUS_METERS of the area or position, nearest first,
    * that are open for the whole window and have a free space. Opening hours are checked per
    * batch of nearest candidates, so open listings beyond closed ones are still found.

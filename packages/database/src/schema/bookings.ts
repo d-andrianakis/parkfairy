@@ -45,6 +45,7 @@ import {
 
 import { users } from './auth.js';
 import { parkingLocations, parkingSpaces } from './parking.js';
+import { savedVehicles } from './vehicles.js';
 
 export { BOOKING_STATUSES, type BookingStatus };
 
@@ -104,6 +105,11 @@ export const bookings = pgTable(
     cancellationPolicy: text('cancellation_policy').$type<CancellationPolicy>().notNull(),
     /** Normalized (`IKB1234`), set when confirmed. Personal data: Phase 6 sets how long it stays. */
     vehiclePlate: text('vehicle_plate'),
+    /**
+     * The saved vehicle it was held or paid for (5A.2), so the booking page offers it first and a
+     * rebook asks for it again. Null once the driver deletes the vehicle: the plate above stays.
+     */
+    vehicleId: uuid('vehicle_id').references(() => savedVehicles.id, { onDelete: 'set null' }),
     confirmedAt: instant('confirmed_at'),
     cancelledAt: instant('cancelled_at'),
     cancelledBy: text('cancelled_by').$type<BookingCanceller>(),
@@ -171,6 +177,10 @@ export const bookings = pgTable(
       .where(sql`${t.status} = 'cancelled'`),
     // Removing a space sets its bookings' space to null; without it, a scan per space.
     index('bookings_space_idx').on(t.spaceId),
+    // Deleting a saved vehicle sets its bookings' vehicle to null; without it, a scan per delete.
+    index('bookings_vehicle_idx')
+      .on(t.vehicleId)
+      .where(sql`${t.vehicleId} is not null`),
     // A booking has one *live* continuation at most (a hold, or a booking that stands): one that
     // lapsed, was let go or was cancelled stays as history and must not block the next try. Also
     // what finding "what carries on from this?" reads. The statuses are the ones that take a space.

@@ -30,6 +30,12 @@ export const CLIENT_NAMESPACES = {
   resultsMap: ['ResultsMap'],
   /** The listing page's space picker: its button and refusals, no zod and no Validation. */
   bookSpace: ['BookSpace', 'BookingErrors'],
+  /** The saved vehicles page: adding, changing and removing a car (5A.2). */
+  vehicles: ['Vehicles', 'Validation', 'Forms'],
+  /** The listing page's favourite button, and the one on each favourite (5A.2). */
+  favourite: ['Favourites'],
+  /** "Book again" on a past booking: its button and the booking refusals (5A.2). */
+  rebook: ['Rebook', 'BookingErrors'],
   /** A booking's page: the plate, confirming, letting go and cancelling. */
   booking: ['Booking', 'BookingErrors', 'Validation', 'Forms'],
 } as const satisfies Record<string, readonly Namespace[]>;

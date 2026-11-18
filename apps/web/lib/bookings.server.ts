@@ -5,16 +5,21 @@ import {
   type BookingList,
   createClient,
   createConfig,
+  type FavouriteList,
   getCalendar,
   getEarnings,
   getListingBookings,
   getMyBooking,
   getMyBookings,
+  getMyFavourites,
+  getMyVehicles,
+  isMyFavourite,
   listOwnerBookings,
   type OwnerBookingList,
   type OwnerCalendar,
   type OwnerEarnings,
   type OwnerListingBookings,
+  type SavedVehicle,
 } from '@parkfairy/api-client';
 import { headers } from 'next/headers';
 import { cache } from 'react';
@@ -154,3 +159,33 @@ export const loadOwnerBookingList = cache(
     }
   },
 );
+
+/** The driver's saved vehicles (5A.2), or null when the API could not answer. */
+export const loadVehicles = cache(async (): Promise<SavedVehicle[] | null> => {
+  try {
+    const { data } = await getMyVehicles(await asVisitor());
+    return data?.vehicles ?? null;
+  } catch {
+    return null;
+  }
+});
+
+/** The driver's favourite listings that are still live, newest first; null when the API failed. */
+export const loadFavourites = cache(async (): Promise<FavouriteList['listings'] | null> => {
+  try {
+    const { data } = await getMyFavourites(await asVisitor());
+    return data?.listings ?? null;
+  } catch {
+    return null;
+  }
+});
+
+/** Whether the signed-in driver has favoured a listing; null when the API could not say. */
+export const loadFavouriteState = cache(async (slug: string): Promise<boolean | null> => {
+  try {
+    const { data } = await isMyFavourite({ ...(await asVisitor()), path: { slug } });
+    return data?.favourite ?? null;
+  } catch {
+    return null;
+  }
+});

@@ -15,6 +15,7 @@ import {
   OwnerBookingsQuerySchema,
   parseBookingsCursor,
   VEHICLE_PLATE_LIMITS,
+  vehicleFitsSpace,
 } from './bookings.js';
 import { isValidationMessage } from './validation.js';
 
@@ -62,6 +63,27 @@ describe('vehicle plates', () => {
   });
 });
 
+describe('whether a vehicle fits a space (5A.2)', () => {
+  const none = { heightCm: null, lengthCm: null, widthCm: null };
+
+  it('fits a space that states no limit, whatever the vehicle', () => {
+    expect(vehicleFitsSpace({ heightCm: 480, lengthCm: 1400, widthCm: 390 }, none)).toBe(true);
+  });
+
+  it('is never refused for a size it was not told', () => {
+    expect(vehicleFitsSpace(none, { heightCm: 190, lengthCm: 400, widthCm: 170 })).toBe(true);
+    expect(vehicleFitsSpace({ ...none, heightCm: 180 }, { ...none, lengthCm: 300 })).toBe(true);
+  });
+
+  it('fits at the limit and not a centimetre past it, in each direction', () => {
+    const space = { heightCm: 200, lengthCm: 450, widthCm: 180 };
+    expect(vehicleFitsSpace({ heightCm: 200, lengthCm: 450, widthCm: 180 }, space)).toBe(true);
+    expect(vehicleFitsSpace({ heightCm: 201, lengthCm: 450, widthCm: 180 }, space)).toBe(false);
+    expect(vehicleFitsSpace({ heightCm: 200, lengthCm: 451, widthCm: 180 }, space)).toBe(false);
+    expect(vehicleFitsSpace({ heightCm: 200, lengthCm: 450, widthCm: 181 }, space)).toBe(false);
+  });
+});
+
 describe('BookingConfirmInputSchema', () => {
   it('asks for a plate, then a readable one', () => {
     expect(issues(BookingConfirmInputSchema.safeParse({}))).toEqual(['vehiclePlate:plateRequired']);
@@ -84,6 +106,17 @@ describe('BookingConfirmInputSchema', () => {
       BookingConfirmInputSchema.safeParse({ vehiclePlate: 'IKB1234', status: 'confirmed' }).success,
     ).toBe(false);
   });
+
+  it('takes a saved vehicle in place of a plate, and never both (5A.2)', () => {
+    const vehicleId = '6f1c0a52-8c1e-4f0e-9b7a-2d3e4f5a6b7c';
+    expect(BookingConfirmInputSchema.parse({ vehicleId })).toEqual({ vehicleId });
+    expect(
+      issues(BookingConfirmInputSchema.safeParse({ vehicleId, vehiclePlate: 'IKB1234' })),
+    ).toEqual(['vehiclePlate:plateRequired']);
+    expect(issues(BookingConfirmInputSchema.safeParse({ vehicleId: 'x' }))).toEqual([
+      'vehicleId:invalid',
+    ]);
+  });
 });
 
 describe('BookingHoldInputSchema', () => {
@@ -96,6 +129,14 @@ describe('BookingHoldInputSchema', () => {
 
   it('accepts a listing, a space and a stay', () => {
     expect(BookingHoldInputSchema.parse(hold)).toEqual(hold);
+  });
+
+  it('may name one of the driver’s saved vehicles, which must be an id (5A.2)', () => {
+    const vehicleId = '0b4c1f3e-6d2a-4a55-8f0e-1c2d3e4f5a6b';
+    expect(BookingHoldInputSchema.parse({ ...hold, vehicleId })).toEqual({ ...hold, vehicleId });
+    expect(issues(BookingHoldInputSchema.safeParse({ ...hold, vehicleId: 'IKB1234' }))).toEqual([
+      'vehicleId:invalid',
+    ]);
   });
 
   it('checks the stay as a search does', () => {

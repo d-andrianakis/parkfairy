@@ -44,3 +44,25 @@ const PLATE = new RegExp(`^[A-Z0-9]{${VEHICLE_PLATE_LIMITS.min},${VEHICLE_PLATE_
 export function isVehiclePlate(raw: string): boolean {
   return raw.length <= VEHICLE_PLATE_LIMITS.input && PLATE.test(normalizeVehiclePlate(raw));
 }
+
+/** A vehicle's size, or a space's largest, in whole centimetres; null is unknown or unlimited. */
+export interface SizesCm {
+  heightCm: number | null;
+  lengthCm: number | null;
+  widthCm: number | null;
+}
+
+/**
+ * Whether a vehicle fits a space (5A.2). A space with no stated limit takes any vehicle (owners say
+ * what they know), and a vehicle whose size isn't known is never refused for it: the driver only
+ * says what they know too. The search filter reads the same way, in SQL.
+ */
+export function vehicleFitsSpace(vehicle: SizesCm, space: SizesCm): boolean {
+  const fits = (size: number | null, limit: number | null) =>
+    size === null || limit === null || size <= limit;
+  return (
+    fits(vehicle.heightCm, space.heightCm) &&
+    fits(vehicle.lengthCm, space.lengthCm) &&
+    fits(vehicle.widthCm, space.widthCm)
+  );
+}

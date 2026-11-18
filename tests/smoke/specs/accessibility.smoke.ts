@@ -166,6 +166,9 @@ test.describe('signed in', () => {
       '/owner/bookings?status=cancelled',
       '/bookings',
       '/bookings?when=past',
+      // What a driver keeps for next time (5A.2); with things in them, vehicles-and-favourites.smoke.ts.
+      '/account/vehicles',
+      '/favourites',
     ]) {
       test(`/${locale}${path} has no WCAG 2.2 AA violations, signed in`, async ({ page }) => {
         await page.goto(`/${locale}${path}`);

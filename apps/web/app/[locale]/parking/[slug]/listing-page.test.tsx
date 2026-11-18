@@ -9,16 +9,23 @@ import { screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { loadListing } from '@/lib/api.server';
+import { loadFavouriteState, loadVehicles } from '@/lib/bookings.server';
 import { getLayoutSession } from '@/lib/session';
 import { renderWithProviders } from '@/test/render';
 
 import ListingPage from './page';
 
 vi.mock('@/lib/api.server', () => ({ loadListing: vi.fn() }));
+vi.mock('@/lib/bookings.server', () => ({
+  loadVehicles: vi.fn(() => Promise.resolve([])),
+  loadFavouriteState: vi.fn(() => Promise.resolve(false)),
+}));
 vi.mock('@/lib/session', () => ({ getLayoutSession: vi.fn() }));
 vi.mock('@parkfairy/api-client', () => ({
   client: { setConfig: vi.fn() },
   holdParkingSpace: vi.fn(),
+  favouriteListing: vi.fn(),
+  unfavouriteListing: vi.fn(),
 }));
 vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
@@ -168,7 +175,8 @@ describe('the listing page’s booking', () => {
     await show(listing({ availability: { ...availability, open: false }, spaces: [] }), true);
     expect(screen.queryByRole('button', { name: 'Book this space' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Spaces' })).toBeVisible();
-    expect(getLayoutSession).not.toHaveBeenCalled();
+    // Nothing is asked of the API for the booking form, which isn't shown.
+    expect(loadVehicles).not.toHaveBeenCalled();
   });
 
   it('says none is free when it is full, and keeps the place where a refusal shows', async () => {
@@ -212,6 +220,59 @@ describe('the listing page’s booking', () => {
     const spaces = screen.getByRole('list', { name: 'Spaces' });
     expect(within(spaces).getAllByRole('listitem')).toHaveLength(2);
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  });
+});
+
+describe('a signed-in driver’s own things on the listing page (5A.2)', () => {
+  it('offers the favourite button, pressed when it is one, and nothing to a visitor', async () => {
+    vi.mocked(loadFavouriteState).mockResolvedValueOnce(true);
+    const signedIn = await show(listing(), true);
+    expect(await screen.findByRole('button', { name: 'Favourite', pressed: true })).toBeVisible();
+    expect(loadFavouriteState).toHaveBeenCalledWith('ermou-garage');
+    signedIn.unmount();
+    await show(listing(), false);
+    expect(screen.queryByRole('button', { name: 'Favourite' })).not.toBeInTheDocument();
+    expect(loadFavouriteState).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the button out when the API could not say, rather than guessing', async () => {
+    vi.mocked(loadFavouriteState).mockResolvedValueOnce(null);
+    await show(listing(), true);
+    expect(screen.queryByRole('button', { name: 'Favourite' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Choose your space' })).toBeVisible();
+  });
+
+  it('asks which vehicle, and says which spaces are too small for it', async () => {
+    vi.mocked(loadVehicles).mockResolvedValueOnce([
+      {
+        id: 'a0a0a0a0-0000-4000-8000-000000000001',
+        plate: 'IKB1234',
+        name: 'Work car',
+        heightCm: 210,
+        lengthCm: null,
+        widthCm: null,
+      },
+    ]);
+    const sized = listing({
+      spaces: [
+        { ...space('11111111-1111-4111-8111-111111111111', 'Α1', 400), maxHeightCm: 190 },
+        space('22222222-2222-4222-8222-222222222222', 'Α2', 800),
+      ],
+    });
+    await show(sized, true);
+    const picker = await screen.findByRole('combobox', { name: 'Vehicle' }, { timeout: 10_000 });
+    expect(picker).toHaveValue('a0a0a0a0-0000-4000-8000-000000000001');
+    expect(screen.getByRole('option', { name: 'Work car · IKB1234' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Α1' })).toHaveAccessibleDescription(
+      /Too small for this vehicle/,
+    );
+    expect(screen.getByRole('radio', { name: 'Α2' })).not.toHaveAccessibleDescription(/Too small/);
+  });
+
+  it('shows no vehicle choice to a driver who has saved none', async () => {
+    await show(listing(), true);
+    await screen.findByRole('radio', { name: 'Α1' }, { timeout: 10_000 });
+    expect(screen.queryByRole('combobox', { name: 'Vehicle' })).not.toBeInTheDocument();
   });
 });
 

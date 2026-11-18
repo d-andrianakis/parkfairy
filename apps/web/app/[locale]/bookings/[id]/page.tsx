@@ -13,6 +13,7 @@ import { CancelBooking } from '@/components/bookings/cancel-booking';
 import { ConfirmBooking } from '@/components/bookings/confirm-booking';
 import { HoldTimer } from '@/components/bookings/hold-timer';
 import { PaymentPending } from '@/components/bookings/payment-pending';
+import { RebookStay } from '@/components/bookings/rebook-stay';
 import { TidyPaymentReturn } from '@/components/bookings/tidy-payment-return';
 import { ClientMessages } from '@/components/client-messages';
 import { FocusHeading } from '@/components/focus-heading';
@@ -22,8 +23,9 @@ import { timeOptions } from '@/i18n/formats';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { listingStayHref } from '@/lib/booking-links';
-import { loadBooking } from '@/lib/bookings.server';
+import { loadBooking, loadVehicles } from '@/lib/bookings.server';
 import { stripePublishableKey } from '@/lib/payments.server';
+import { canRebook } from '@/lib/rebook';
 import { requireSession } from '@/lib/session';
 
 interface BookingPageProps {
@@ -95,6 +97,8 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
       ? ('processing' as const)
       : booking.status;
   const unpaid = done === 'unpaid' && booking.payment === 'pending' && booking.status === 'held';
+  // The driver's saved vehicles, for the form that asks which car (5A.2); the form works without them.
+  const vehicles = pending && !ended && !refunded && !processing ? await loadVehicles() : null;
   // Called off at Stripe an hour after the hold ended (4.2): said, so nobody wonders if it went.
   const canceledNote = booking.payment === 'canceled' ? <p>{t('paymentCanceled')}</p> : null;
 
@@ -206,6 +210,8 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
               space={booking.spaceLabel}
               spaceLocale={booking.listing.contentLocale}
               checkout={booking.checkout}
+              vehicles={vehicles ?? []}
+              initialVehicleId={booking.vehicleId}
               payment={
                 booking.checkout === 'payment'
                   ? { publishableKey: stripePublishableKey(), amount: money(booking.total) }
@@ -232,6 +238,10 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
             {Date.parse(booking.end) <= now ? t('ended') : t('started')}
           </p>
         )
+      ) : null}
+
+      {canRebook(booking, new Date(now)) ? (
+        <RebookStay booking={booking} now={new Date(now)} />
       ) : null}
 
       {booking.status === 'cancelled' && booking.refund ? (

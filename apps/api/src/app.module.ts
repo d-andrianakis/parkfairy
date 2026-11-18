@@ -16,6 +16,7 @@ import { SafeExceptionFilter } from './common/safe-exception.filter.js';
 import { ConfigModule, ENV } from './config/config.module.js';
 import type { Env } from './config/env.js';
 import { DatabaseModule } from './database/database.module.js';
+import { FavouritesModule } from './favourites/favourites.module.js';
 import { HealthModule } from './health/health.module.js';
 import { OwnerModule } from './owner/owner.module.js';
 import { ParkingModule } from './parking/parking.module.js';
@@ -24,6 +25,7 @@ import { PlacesModule } from './places/places.module.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { UsersModule } from './users/users.module.js';
+import { VehiclesModule } from './vehicles/vehicles.module.js';
 
 const REQUEST_ID_PATTERN = /^[\w-]{1,128}$/;
 
@@ -74,6 +76,8 @@ const REQUEST_ID_PATTERN = /^[\w-]{1,128}$/;
     BookingsModule,
     PaymentsModule,
     PlacesModule,
+    VehiclesModule,
+    FavouritesModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: SafeExceptionFilter },

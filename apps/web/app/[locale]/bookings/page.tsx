@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@parkfairy/ui/components/card';
@@ -14,12 +15,14 @@ import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
 
 import { BookingLink } from '@/components/bookings/booking-link';
+import { RebookStay } from '@/components/bookings/rebook-stay';
 import { PlaceWords } from '@/components/parking/place-words';
 import { SearchLink } from '@/components/parking/search-link';
 import { StayRange } from '@/components/parking/stay-range';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { loadBookings } from '@/lib/bookings.server';
+import { canRebook } from '@/lib/rebook';
 import { requireSession } from '@/lib/session';
 
 interface BookingsPageProps {
@@ -53,6 +56,8 @@ export default async function BookingsPage({ params, searchParams }: BookingsPag
   const asked = Number(typeof query.page === 'string' ? query.page : 1);
   const page = Number.isInteger(asked) ? Math.min(Math.max(asked, 1), BOOKINGS_MAX_PAGE) : 1;
   const list = await loadBookings(when, page);
+  // One reading of the clock for the whole page: which stays are over, and the next weekday.
+  const now = new Date();
   const t = await getTranslations({ locale, namespace: 'Bookings' });
   const tBooking = await getTranslations({ locale, namespace: 'Booking' });
   const format = await getFormatter({ locale });
@@ -104,7 +109,7 @@ export default async function BookingsPage({ params, searchParams }: BookingsPag
               <Card>
                 <CardHeader>
                   <CardTitle className="leading-snug">
-                    <h2>
+                    <h2 id={`booking-name-${booking.id}`}>
                       <BookingLink
                         id={booking.id}
                         paying={booking.status === 'held'}
@@ -151,6 +156,11 @@ export default async function BookingsPage({ params, searchParams }: BookingsPag
                     {t('reference', { reference: booking.reference })}
                   </span>
                 </CardContent>
+                {canRebook(booking, now) ? (
+                  <CardFooter className="block">
+                    <RebookStay booking={booking} now={now} nameId={`booking-name-${booking.id}`} />
+                  </CardFooter>
+                ) : null}
               </Card>
             </li>
           ))}

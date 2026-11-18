@@ -11,7 +11,7 @@ import { routerMock } from '@/test/navigation-mock';
 import { answer, refusal } from '@/test/owner-fixtures';
 import { rendererFor, renderWithProviders } from '@/test/render';
 
-import { BookSpaceForm, type SpaceOption } from './book-space-form';
+import { BookSpaceForm, type SpaceOption, type VehicleOption } from './book-space-form';
 
 vi.mock('@parkfairy/api-client', () => ({
   client: { setConfig: vi.fn() },
@@ -213,5 +213,145 @@ describe('BookSpaceForm', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Something went wrong');
     expect(alert).not.toHaveTextContent('Internal detail');
+  });
+});
+
+// A saved vehicle (5A.2): chosen here, held for, and warned about where a space is too small for it.
+describe('BookSpaceForm with saved vehicles', () => {
+  const WORK: VehicleOption = {
+    id: 'a0a0a0a0-0000-4000-8000-000000000001',
+    label: 'Work car · IKB1234',
+    heightCm: 210,
+    lengthCm: null,
+    widthCm: null,
+  };
+  const SMALL: VehicleOption = {
+    id: 'a0a0a0a0-0000-4000-8000-000000000002',
+    label: 'YZM5678',
+    heightCm: 150,
+    lengthCm: 400,
+    widthCm: null,
+  };
+  // A1 takes up to 190 cm high; A2 has no stated limit.
+  const SIZED = [
+    {
+      ...option(A1, 'Α1', '€4.00 for your stay'),
+      limits: { heightCm: 190, lengthCm: null, widthCm: null },
+    },
+    {
+      ...option(A2, 'Α2', '€8.00 for your stay'),
+      limits: { heightCm: null, lengthCm: null, widthCm: null },
+    },
+  ];
+  const showWith = (vehicles: VehicleOption[], locale: 'en' | 'el' = 'en') =>
+    renderInSubtree(
+      <>
+        <h2 id="spaces-heading">Choose your space</h2>
+        <BookSpaceForm
+          listing="ermou-garage"
+          {...stay}
+          spaces={SIZED}
+          initial={A1}
+          labelledBy="spaces-heading"
+          vehicles={vehicles}
+        />
+      </>,
+      { locale },
+    );
+  const picker = () => screen.getByRole('combobox', { name: 'Vehicle' });
+
+  it('shows no choice to a driver with no saved vehicle, and sends no vehicle', async () => {
+    hold.mockResolvedValue(answer({ id: 'b1' }) as never);
+    showWith([]);
+    expect(screen.queryByRole('combobox')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Book this space' }));
+    await waitFor(() => expect(hold).toHaveBeenCalledOnce());
+    expect(hold.mock.calls[0]?.[0]?.body).not.toHaveProperty('vehicleId');
+  });
+
+  it('offers the first vehicle and a way to none, with a link to manage them', async () => {
+    const { container } = showWith([WORK, SMALL]);
+    expect(picker()).toHaveValue(WORK.id);
+    expect(screen.getByRole('option', { name: 'No saved vehicle' })).toBeInTheDocument();
+    expect(picker()).toHaveAccessibleDescription(
+      /Pick a vehicle and we’ll tell you which spaces are too small for it/,
+    );
+    expect(screen.getByRole('link', { name: 'Manage saved vehicles' })).toHaveAttribute(
+      'href',
+      '/en/account/vehicles',
+    );
+    await expectNoAxeViolations(container);
+  });
+
+  it('says which spaces are too small for the vehicle, in words, and not for the others', async () => {
+    showWith([WORK, SMALL]);
+    expect(screen.getByRole('radio', { name: 'Α1' })).toHaveAccessibleDescription(
+      '€4.00 for your stay Too small for this vehicle',
+    );
+    expect(screen.getByRole('radio', { name: 'Α2' })).toHaveAccessibleDescription(
+      '€8.00 for your stay',
+    );
+    await userEvent.selectOptions(picker(), 'YZM5678');
+    expect(screen.getByRole('radio', { name: 'Α1' })).toHaveAccessibleDescription(
+      '€4.00 for your stay',
+    );
+    await userEvent.selectOptions(picker(), 'No saved vehicle');
+    expect(screen.queryByText('Too small for this vehicle')).toBeNull();
+  });
+
+  it('says how many spaces are too small when the vehicle changes, in a polite status', async () => {
+    showWith([WORK, SMALL]);
+    const status = () =>
+      screen
+        .getAllByRole('status')
+        .map((region) => region.textContent)
+        .join(' ');
+    expect(status()).toContain('1 space is too small for this vehicle.');
+    await userEvent.selectOptions(picker(), 'YZM5678');
+    expect(status()).toContain('Every space fits this vehicle.');
+    await userEvent.selectOptions(picker(), 'No saved vehicle');
+    expect(status()).not.toContain('space');
+  });
+
+  it('holds the space for the vehicle chosen', async () => {
+    hold.mockResolvedValue(answer({ id: 'b1' }) as never);
+    showWith([WORK]);
+    await userEvent.click(screen.getByRole('radio', { name: 'Α2' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Book this space' }));
+    await waitFor(() => expect(hold).toHaveBeenCalledOnce());
+    expect(hold).toHaveBeenCalledWith({
+      body: { listing: 'ermou-garage', spaceId: A2, ...stay, vehicleId: WORK.id },
+    });
+  });
+
+  it('refuses a space that is too small before asking, naming the vehicle, with the focus back', async () => {
+    showWith([WORK]);
+    await userEvent.click(screen.getByRole('button', { name: 'Book this space' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'That space is too small for Work car · IKB1234. Choose another space or vehicle.',
+    );
+    expect(screen.getByRole('radio', { name: 'Α1' })).toHaveFocus();
+    expect(hold).not.toHaveBeenCalled();
+    // Another vehicle clears it, and the same space can be held.
+    hold.mockResolvedValue(answer({ id: 'b1' }) as never);
+    await userEvent.selectOptions(picker(), 'No saved vehicle');
+    expect(screen.queryByRole('alert')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Book this space' }));
+    await waitFor(() => expect(hold).toHaveBeenCalledOnce());
+  });
+
+  it('says what the API says when it refuses the vehicle all the same', async () => {
+    hold.mockResolvedValue(refusal('VEHICLE_DOES_NOT_FIT') as never);
+    showWith([SMALL]);
+    await userEvent.click(screen.getByRole('button', { name: 'Book this space' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('too small for this vehicle');
+  });
+
+  it('speaks Greek', () => {
+    showWith([WORK], 'el');
+    expect(screen.getByRole('combobox', { name: 'Όχημα' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Α1' })).toHaveAccessibleDescription(
+      /Πολύ μικρή για αυτό το όχημα/,
+    );
   });
 });

@@ -204,10 +204,12 @@ export type BookingHoldInput = {
   spaceId: string;
   start: string;
   end: string;
+  vehicleId?: string;
 };
 
 export type BookingConfirmInput = {
-  vehiclePlate: string;
+  vehiclePlate?: string;
+  vehicleId?: string;
 };
 
 export type BookingCancelInput = {
@@ -228,6 +230,7 @@ export type Booking = {
   status: BookingStatus;
   listing: BookingListing;
   spaceLabel: string;
+  spaceId: string | null;
   start: string;
   end: string;
   total: Money;
@@ -235,6 +238,7 @@ export type Booking = {
   holdExpiresAt: string;
   holdExtensionsLeft: number;
   vehiclePlate: string | null;
+  vehicleId: string | null;
   confirmedAt: string | null;
   cancelledAt: string | null;
   cancelledBy: BookingCanceller | null;
@@ -1325,6 +1329,35 @@ export type Place = {
 
 export type PlaceList = {
   places: Array<Place>;
+};
+
+export type SavedVehicle = {
+  id: string;
+  plate: string;
+  name: string | null;
+  heightCm: number | null;
+  lengthCm: number | null;
+  widthCm: number | null;
+};
+
+export type SavedVehicleList = {
+  vehicles: Array<SavedVehicle>;
+};
+
+export type SavedVehicleInput = {
+  plate: string;
+  name?: string | null;
+  heightCm?: number | null;
+  lengthCm?: number | null;
+  widthCm?: number | null;
+};
+
+export type FavouriteState = {
+  favourite: boolean;
+};
+
+export type FavouriteList = {
+  listings: Array<ParkingListingSummary>;
 };
 
 export type GetLivenessData = {
@@ -3478,3 +3511,175 @@ export type FindPlacesResponses = {
 };
 
 export type FindPlacesResponse = FindPlacesResponses[keyof FindPlacesResponses];
+
+export type GetMyVehiclesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/vehicles';
+};
+
+export type GetMyVehiclesErrors = {
+  401: ErrorResponse;
+};
+
+export type GetMyVehiclesError = GetMyVehiclesErrors[keyof GetMyVehiclesErrors];
+
+export type GetMyVehiclesResponses = {
+  200: SavedVehicleList;
+};
+
+export type GetMyVehiclesResponse = GetMyVehiclesResponses[keyof GetMyVehiclesResponses];
+
+export type SaveMyVehicleData = {
+  body: SavedVehicleInput;
+  path?: never;
+  query?: never;
+  url: '/v1/vehicles';
+};
+
+export type SaveMyVehicleErrors = {
+  400: ErrorResponse;
+  401: ErrorResponse;
+  409: ErrorResponse;
+};
+
+export type SaveMyVehicleError = SaveMyVehicleErrors[keyof SaveMyVehicleErrors];
+
+export type SaveMyVehicleResponses = {
+  201: SavedVehicleList;
+};
+
+export type SaveMyVehicleResponse = SaveMyVehicleResponses[keyof SaveMyVehicleResponses];
+
+export type ForgetMyVehicleData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/vehicles/{id}';
+};
+
+export type ForgetMyVehicleErrors = {
+  401: ErrorResponse;
+  404: ErrorResponse;
+};
+
+export type ForgetMyVehicleError = ForgetMyVehicleErrors[keyof ForgetMyVehicleErrors];
+
+export type ForgetMyVehicleResponses = {
+  200: SavedVehicleList;
+};
+
+export type ForgetMyVehicleResponse = ForgetMyVehicleResponses[keyof ForgetMyVehicleResponses];
+
+export type ChangeMyVehicleData = {
+  body: SavedVehicleInput;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/vehicles/{id}';
+};
+
+export type ChangeMyVehicleErrors = {
+  400: ErrorResponse;
+  401: ErrorResponse;
+  404: ErrorResponse;
+  409: ErrorResponse;
+};
+
+export type ChangeMyVehicleError = ChangeMyVehicleErrors[keyof ChangeMyVehicleErrors];
+
+export type ChangeMyVehicleResponses = {
+  200: SavedVehicleList;
+};
+
+export type ChangeMyVehicleResponse = ChangeMyVehicleResponses[keyof ChangeMyVehicleResponses];
+
+export type GetMyFavouritesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/favourites';
+};
+
+export type GetMyFavouritesErrors = {
+  401: ErrorResponse;
+};
+
+export type GetMyFavouritesError = GetMyFavouritesErrors[keyof GetMyFavouritesErrors];
+
+export type GetMyFavouritesResponses = {
+  200: FavouriteList;
+};
+
+export type GetMyFavouritesResponse = GetMyFavouritesResponses[keyof GetMyFavouritesResponses];
+
+export type UnfavouriteListingData = {
+  body?: never;
+  path: {
+    slug: string;
+  };
+  query?: never;
+  url: '/v1/favourites/{slug}';
+};
+
+export type UnfavouriteListingErrors = {
+  401: ErrorResponse;
+};
+
+export type UnfavouriteListingError = UnfavouriteListingErrors[keyof UnfavouriteListingErrors];
+
+export type UnfavouriteListingResponses = {
+  200: FavouriteState;
+};
+
+export type UnfavouriteListingResponse =
+  UnfavouriteListingResponses[keyof UnfavouriteListingResponses];
+
+export type IsMyFavouriteData = {
+  body?: never;
+  path: {
+    slug: string;
+  };
+  query?: never;
+  url: '/v1/favourites/{slug}';
+};
+
+export type IsMyFavouriteErrors = {
+  401: ErrorResponse;
+  404: ErrorResponse;
+};
+
+export type IsMyFavouriteError = IsMyFavouriteErrors[keyof IsMyFavouriteErrors];
+
+export type IsMyFavouriteResponses = {
+  200: FavouriteState;
+};
+
+export type IsMyFavouriteResponse = IsMyFavouriteResponses[keyof IsMyFavouriteResponses];
+
+export type FavouriteListingData = {
+  body?: never;
+  path: {
+    slug: string;
+  };
+  query?: never;
+  url: '/v1/favourites/{slug}';
+};
+
+export type FavouriteListingErrors = {
+  401: ErrorResponse;
+  404: ErrorResponse;
+  409: ErrorResponse;
+};
+
+export type FavouriteListingError = FavouriteListingErrors[keyof FavouriteListingErrors];
+
+export type FavouriteListingResponses = {
+  200: FavouriteState;
+};
+
+export type FavouriteListingResponse = FavouriteListingResponses[keyof FavouriteListingResponses];

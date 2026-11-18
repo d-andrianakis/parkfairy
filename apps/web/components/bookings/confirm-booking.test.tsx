@@ -2,6 +2,7 @@ import {
   cancelMyBooking,
   confirmMyBooking,
   payForMyBooking,
+  saveMyVehicle,
   settleMyPayment,
 } from '@parkfairy/api-client';
 import { expectNoAxeViolations } from '@parkfairy/ui/testing/axe';
@@ -21,6 +22,7 @@ vi.mock('@parkfairy/api-client', () => ({
   confirmMyBooking: vi.fn(),
   cancelMyBooking: vi.fn(),
   payForMyBooking: vi.fn(),
+  saveMyVehicle: vi.fn(),
   settleMyPayment: vi.fn(),
 }));
 // Stripe's fields are their own test's: here, what they were given.
@@ -41,6 +43,7 @@ vi.mock('./payment-step', () => ({
 }));
 const payFor = vi.mocked(payForMyBooking);
 const settlePayment = vi.mocked(settleMyPayment);
+const saveVehicle = vi.mocked(saveMyVehicle);
 const confirm = vi.mocked(confirmMyBooking);
 const release = vi.mocked(cancelMyBooking);
 const renderInSubtree = rendererFor(CLIENT_NAMESPACES.booking);
@@ -309,5 +312,231 @@ describe('ConfirmBooking, paying (decision #49)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Continue to payment' }));
     expect(plate()).toHaveFocus();
     expect(payFor).not.toHaveBeenCalled();
+  });
+});
+
+// Saved vehicles (5A.2): a car to pick instead of typing, saved from here, and checked against the space.
+describe('ConfirmBooking with saved vehicles', () => {
+  const WORK = { id: 'a0a0a0a0-0000-4000-8000-000000000001', plate: 'IKB1234', name: 'Work car' };
+  const SPARE = { id: 'a0a0a0a0-0000-4000-8000-000000000002', plate: 'YZM5678', name: null };
+  const showWith = (
+    vehicles = [WORK, SPARE],
+    initialVehicleId: string | null = null,
+    extra: Partial<Parameters<typeof ConfirmBooking>[0]> = {},
+    locale: 'en' | 'el' = 'en',
+  ) =>
+    renderInSubtree(
+      <ConfirmBooking
+        id={ID}
+        chooseAgainHref={AGAIN}
+        space="Α1"
+        spaceLocale="el"
+        vehicles={vehicles}
+        initialVehicleId={initialVehicleId}
+        {...extra}
+      />,
+      { locale },
+    );
+  const picker = () => screen.getByRole('combobox', { name: 'Vehicle' });
+  const noPlateField = () =>
+    expect(screen.queryByRole('textbox', { name: 'Number plate' })).toBeNull();
+
+  it('offers the first vehicle, or the one the space was held for, and asks for no plate', async () => {
+    const { container, unmount } = showWith();
+    expect(picker()).toHaveValue(WORK.id);
+    expect(picker()).toHaveAccessibleDescription('The owner will see this plate: IKB1234.');
+    expect(screen.getByRole('option', { name: 'Work car · IKB1234' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'YZM5678' })).toBeInTheDocument();
+    noPlateField();
+    await expectNoAxeViolations(container);
+    unmount();
+    showWith([WORK, SPARE], SPARE.id);
+    expect(picker()).toHaveValue(SPARE.id);
+  });
+
+  it('confirms with the vehicle, not a plate, and comes back to the booking confirmed', async () => {
+    confirm.mockResolvedValue(answer({ id: ID, status: 'confirmed' }) as never);
+    showWith();
+    await userEvent.click(confirmButton());
+    await waitFor(() =>
+      expect(routerMock.replace).toHaveBeenCalledWith(`/bookings/${ID}?done=confirmed`),
+    );
+    expect(confirm).toHaveBeenCalledWith({ path: { id: ID }, body: { vehicleId: WORK.id } });
+    expect(saveVehicle).not.toHaveBeenCalled();
+  });
+
+  it('goes on to pay with the vehicle, and keeps it chosen until "Change"', async () => {
+    payFor.mockResolvedValue(answer({ status: 'pending', clientSecret: 'cs_1' }) as never);
+    showWith([WORK, SPARE], SPARE.id, {
+      checkout: 'payment',
+      payment: { publishableKey: 'pk_test_123', amount: '€4.00' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to payment' }));
+    await screen.findByRole('region', { name: 'Stripe payment' });
+    expect(payFor).toHaveBeenCalledWith({ path: { id: ID }, body: { vehicleId: SPARE.id } });
+    expect(picker()).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Change the vehicle' }));
+    expect(picker()).toBeEnabled();
+    expect(picker()).toHaveFocus();
+  });
+
+  it('types a plate for another vehicle, remembered as before', async () => {
+    confirm.mockResolvedValue(answer({ id: ID, status: 'confirmed' }) as never);
+    showWith();
+    await userEvent.selectOptions(picker(), 'Another vehicle');
+    await userEvent.type(plate(), 'ΥΖΜ 9999');
+    await userEvent.click(confirmButton());
+    await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    expect(confirm).toHaveBeenCalledWith({ path: { id: ID }, body: { vehiclePlate: 'ΥΖΜ 9999' } });
+    expect(saveVehicle).not.toHaveBeenCalled();
+  });
+
+  it('still checks a typed plate', async () => {
+    showWith();
+    await userEvent.selectOptions(picker(), 'Another vehicle');
+    await userEvent.click(confirmButton());
+    expect(plate()).toHaveFocus();
+    expect(plate()).toHaveAccessibleDescription(/Enter the number plate/);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('sends a typed plate that is a saved vehicle as that vehicle, so its size is checked', async () => {
+    confirm.mockResolvedValue(answer({ id: ID, status: 'confirmed' }) as never);
+    showWith();
+    await userEvent.selectOptions(picker(), 'Another vehicle');
+    // Typed as a Greek keyboard would: Υ, Ζ and Μ are the Latin Y, Z and M.
+    await userEvent.type(plate(), 'υζμ-5678');
+    await userEvent.click(confirmButton());
+    await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    expect(confirm).toHaveBeenCalledWith({ path: { id: ID }, body: { vehicleId: SPARE.id } });
+  });
+
+  it('sends a plate that is no saved vehicle as the plate', async () => {
+    confirm.mockResolvedValue(answer({ id: ID, status: 'confirmed' }) as never);
+    showWith();
+    await userEvent.selectOptions(picker(), 'Another vehicle');
+    await userEvent.type(plate(), 'ΙΖΜ-5678');
+    await userEvent.click(confirmButton());
+    await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    expect(confirm).toHaveBeenCalledWith({ path: { id: ID }, body: { vehiclePlate: 'ΙΖΜ-5678' } });
+  });
+
+  describe('saving the vehicle from here', () => {
+    it('offers it with a typed plate only, and saves before confirming with the new vehicle', async () => {
+      const saved = { id: 'a0a0a0a0-0000-4000-8000-000000000009', plate: 'IKB1234', name: null };
+      saveVehicle.mockResolvedValue(answer({ vehicles: [saved] }) as never);
+      confirm.mockResolvedValue(answer({ id: ID, status: 'confirmed' }) as never);
+      showWith([]);
+      await userEvent.type(plate(), 'ΙΚΒ-1234');
+      await userEvent.click(
+        screen.getByRole('checkbox', { name: 'Save this vehicle for next time' }),
+      );
+      await userEvent.click(confirmButton());
+      await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+      expect(saveVehicle).toHaveBeenCalledWith({ body: { plate: 'ΙΚΒ-1234' } });
+      expect(confirm).toHaveBeenCalledWith({ path: { id: ID }, body: { vehicleId: saved.id } });
+    });
+
+    it('does not save unless asked', async () => {
+      confirm.mockResolvedValue(answer({ id: ID, status: 'confirmed' }) as never);
+      showWith([]);
+      await userEvent.type(plate(), 'IKB1234');
+      await userEvent.click(confirmButton());
+      await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+      expect(saveVehicle).not.toHaveBeenCalled();
+      expect(confirm).toHaveBeenCalledWith({ path: { id: ID }, body: { vehiclePlate: 'IKB1234' } });
+    });
+
+    it('books with the plate when the save fails: a full list, or another tab got there first', async () => {
+      saveVehicle.mockResolvedValue(refusal('VEHICLE_LIMIT_REACHED') as never);
+      confirm.mockResolvedValue(answer({ id: ID, status: 'confirmed' }) as never);
+      showWith([]);
+      await userEvent.type(plate(), 'IKB1234');
+      await userEvent.click(
+        screen.getByRole('checkbox', { name: 'Save this vehicle for next time' }),
+      );
+      await userEvent.click(confirmButton());
+      await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+      expect(confirm).toHaveBeenCalledWith({ path: { id: ID }, body: { vehiclePlate: 'IKB1234' } });
+    });
+
+    it('is not offered once ten are saved', async () => {
+      const ten = Array.from({ length: 10 }, (_, index) => ({
+        id: `a0a0a0a0-0000-4000-8000-0000000002${String(index).padStart(2, '0')}`,
+        plate: `AB${1000 + index}`,
+        name: null,
+      }));
+      showWith(ten);
+      await userEvent.selectOptions(picker(), 'Another vehicle');
+      expect(plate()).toBeInTheDocument();
+      expect(screen.queryByRole('checkbox')).toBeNull();
+    });
+
+    it('is not offered with a vehicle chosen, which is saved already', () => {
+      showWith();
+      expect(screen.queryByRole('checkbox')).toBeNull();
+    });
+  });
+
+  it('calls the button that reopens a kept vehicle by its name, and says why it is held', async () => {
+    payFor.mockResolvedValue(answer({ status: 'pending', clientSecret: 'cs_1' }) as never);
+    showWith([WORK], null, {
+      checkout: 'payment',
+      payment: { publishableKey: 'pk_test_123', amount: '€4.00' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to payment' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Change the vehicle' }));
+    expect(picker()).toBeEnabled();
+  });
+
+  it('pays with a typed plate that is a saved vehicle as that vehicle', async () => {
+    payFor.mockResolvedValue(answer({ status: 'pending', clientSecret: 'cs_1' }) as never);
+    showWith([WORK, SPARE], null, {
+      checkout: 'payment',
+      payment: { publishableKey: 'pk_test_123', amount: '€4.00' },
+    });
+    await userEvent.selectOptions(picker(), 'Another vehicle');
+    await userEvent.type(plate(), 'υζμ 5678');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to payment' }));
+    await waitFor(() => expect(payFor).toHaveBeenCalledOnce());
+    expect(payFor).toHaveBeenCalledWith({ path: { id: ID }, body: { vehicleId: SPARE.id } });
+  });
+
+  it('says a refusal that is about the plate in an alert when a vehicle is chosen, not nowhere', async () => {
+    confirm.mockResolvedValue(refusal('VALIDATION_FAILED', 400, ['plateInvalid']) as never);
+    showWith();
+    await userEvent.click(confirmButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
+  });
+
+  it('asks for another vehicle or a plate when the saved one was forgotten meanwhile', async () => {
+    confirm.mockResolvedValue(refusal('VEHICLE_NOT_FOUND', 404) as never);
+    showWith();
+    await userEvent.click(confirmButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent('no longer saved');
+  });
+
+  it('falls back to the first vehicle when the one the space was held for is gone', () => {
+    showWith([WORK, SPARE], 'a0a0a0a0-0000-4000-8000-0000000000ff');
+    expect(picker()).toHaveValue(WORK.id);
+  });
+
+  it('says the space is too small for the vehicle, and offers another space', async () => {
+    confirm.mockResolvedValue(refusal('VEHICLE_DOES_NOT_FIT') as never);
+    showWith();
+    await userEvent.click(confirmButton());
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('That space is too small for this vehicle');
+    expect(within(alert).getByRole('link', { name: 'Choose another space' })).toHaveAttribute(
+      'href',
+      `/en${AGAIN}`,
+    );
+  });
+
+  it('speaks Greek', () => {
+    showWith([WORK], null, {}, 'el');
+    expect(screen.getByRole('combobox', { name: 'Όχημα' })).toHaveAccessibleDescription(
+      'Ο ιδιοκτήτης θα δει αυτόν τον αριθμό κυκλοφορίας: IKB1234.',
+    );
   });
 });

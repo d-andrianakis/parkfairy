@@ -16,6 +16,7 @@ import {
   cancelAdminBooking,
   cancelListingBooking,
   cancelMyBooking,
+  changeMyVehicle,
   confirmMyBooking,
   copyListingHours,
   copyListingHoursExceptions,
@@ -27,7 +28,9 @@ import {
   downloadAdminProof,
   downloadListingProof,
   extendMyHold,
+  favouriteListing,
   findPlaces,
+  forgetMyVehicle,
   getAdminBooking,
   getAdminListing,
   getAdminOverstay,
@@ -48,6 +51,8 @@ import {
   getMe,
   getMyBooking,
   getMyBookings,
+  getMyFavourites,
+  getMyVehicles,
   getOtherOwnerListings,
   getOwnerListing,
   getOwnerOnboarding,
@@ -58,6 +63,7 @@ import {
   getReadiness,
   holdParkingSpace,
   inviteListingOwner,
+  isMyFavourite,
   leaveListing,
   listOwnerBookings,
   lookUpAdminBooking,
@@ -84,6 +90,7 @@ import {
   saveListingPrices,
   saveListingProofDetails,
   saveListingSpaces,
+  saveMyVehicle,
   saveOwnerTaxDetails,
   searchParking,
   setListingShares,
@@ -93,6 +100,7 @@ import {
   submitOwnerListing,
   suspendAdminListing,
   suspendAdminUser,
+  unfavouriteListing,
   updateListingPhoto,
   updateOwnerProfile,
   uploadListingPhoto,
@@ -119,6 +127,9 @@ import type {
   CancelMyBookingData,
   CancelMyBookingError,
   CancelMyBookingResponse,
+  ChangeMyVehicleData,
+  ChangeMyVehicleError,
+  ChangeMyVehicleResponse,
   ConfirmMyBookingData,
   ConfirmMyBookingError,
   ConfirmMyBookingResponse,
@@ -152,9 +163,15 @@ import type {
   ExtendMyHoldData,
   ExtendMyHoldError,
   ExtendMyHoldResponse,
+  FavouriteListingData,
+  FavouriteListingError,
+  FavouriteListingResponse,
   FindPlacesData,
   FindPlacesError,
   FindPlacesResponse,
+  ForgetMyVehicleData,
+  ForgetMyVehicleError,
+  ForgetMyVehicleResponse,
   GetAdminBookingData,
   GetAdminBookingError,
   GetAdminBookingResponse,
@@ -213,6 +230,12 @@ import type {
   GetMyBookingsData,
   GetMyBookingsError,
   GetMyBookingsResponse,
+  GetMyFavouritesData,
+  GetMyFavouritesError,
+  GetMyFavouritesResponse,
+  GetMyVehiclesData,
+  GetMyVehiclesError,
+  GetMyVehiclesResponse,
   GetOtherOwnerListingsData,
   GetOtherOwnerListingsError,
   GetOtherOwnerListingsResponse,
@@ -243,6 +266,9 @@ import type {
   InviteListingOwnerData,
   InviteListingOwnerError,
   InviteListingOwnerResponse,
+  IsMyFavouriteData,
+  IsMyFavouriteError,
+  IsMyFavouriteResponse,
   LeaveListingData,
   LeaveListingError,
   LeaveListingResponse,
@@ -318,6 +344,9 @@ import type {
   SaveListingSpacesData,
   SaveListingSpacesError,
   SaveListingSpacesResponse,
+  SaveMyVehicleData,
+  SaveMyVehicleError,
+  SaveMyVehicleResponse,
   SaveOwnerTaxDetailsData,
   SaveOwnerTaxDetailsError,
   SaveOwnerTaxDetailsResponse,
@@ -345,6 +374,9 @@ import type {
   SuspendAdminUserData,
   SuspendAdminUserError,
   SuspendAdminUserResponse,
+  UnfavouriteListingData,
+  UnfavouriteListingError,
+  UnfavouriteListingResponse,
   UpdateListingPhotoData,
   UpdateListingPhotoError,
   UpdateListingPhotoResponse,
@@ -2846,3 +2878,185 @@ export const findPlacesOptions = (options: Options<FindPlacesData>) =>
     },
     queryKey: findPlacesQueryKey(options),
   });
+
+export const getMyVehiclesQueryKey = (options?: Options<GetMyVehiclesData>) =>
+  createQueryKey('getMyVehicles', options);
+
+export const getMyVehiclesOptions = (options?: Options<GetMyVehiclesData>) =>
+  queryOptions<
+    GetMyVehiclesResponse,
+    GetMyVehiclesError,
+    GetMyVehiclesResponse,
+    ReturnType<typeof getMyVehiclesQueryKey>
+  >({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await getMyVehicles({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      });
+      return data;
+    },
+    queryKey: getMyVehiclesQueryKey(options),
+  });
+
+export const saveMyVehicleMutation = (
+  options?: Partial<Options<SaveMyVehicleData>>,
+): UseMutationOptions<SaveMyVehicleResponse, SaveMyVehicleError, Options<SaveMyVehicleData>> => {
+  const mutationOptions: UseMutationOptions<
+    SaveMyVehicleResponse,
+    SaveMyVehicleError,
+    Options<SaveMyVehicleData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await saveMyVehicle({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};
+
+export const forgetMyVehicleMutation = (
+  options?: Partial<Options<ForgetMyVehicleData>>,
+): UseMutationOptions<
+  ForgetMyVehicleResponse,
+  ForgetMyVehicleError,
+  Options<ForgetMyVehicleData>
+> => {
+  const mutationOptions: UseMutationOptions<
+    ForgetMyVehicleResponse,
+    ForgetMyVehicleError,
+    Options<ForgetMyVehicleData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await forgetMyVehicle({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};
+
+export const changeMyVehicleMutation = (
+  options?: Partial<Options<ChangeMyVehicleData>>,
+): UseMutationOptions<
+  ChangeMyVehicleResponse,
+  ChangeMyVehicleError,
+  Options<ChangeMyVehicleData>
+> => {
+  const mutationOptions: UseMutationOptions<
+    ChangeMyVehicleResponse,
+    ChangeMyVehicleError,
+    Options<ChangeMyVehicleData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await changeMyVehicle({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};
+
+export const getMyFavouritesQueryKey = (options?: Options<GetMyFavouritesData>) =>
+  createQueryKey('getMyFavourites', options);
+
+export const getMyFavouritesOptions = (options?: Options<GetMyFavouritesData>) =>
+  queryOptions<
+    GetMyFavouritesResponse,
+    GetMyFavouritesError,
+    GetMyFavouritesResponse,
+    ReturnType<typeof getMyFavouritesQueryKey>
+  >({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await getMyFavourites({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      });
+      return data;
+    },
+    queryKey: getMyFavouritesQueryKey(options),
+  });
+
+export const unfavouriteListingMutation = (
+  options?: Partial<Options<UnfavouriteListingData>>,
+): UseMutationOptions<
+  UnfavouriteListingResponse,
+  UnfavouriteListingError,
+  Options<UnfavouriteListingData>
+> => {
+  const mutationOptions: UseMutationOptions<
+    UnfavouriteListingResponse,
+    UnfavouriteListingError,
+    Options<UnfavouriteListingData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await unfavouriteListing({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};
+
+export const isMyFavouriteQueryKey = (options: Options<IsMyFavouriteData>) =>
+  createQueryKey('isMyFavourite', options);
+
+export const isMyFavouriteOptions = (options: Options<IsMyFavouriteData>) =>
+  queryOptions<
+    IsMyFavouriteResponse,
+    IsMyFavouriteError,
+    IsMyFavouriteResponse,
+    ReturnType<typeof isMyFavouriteQueryKey>
+  >({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await isMyFavourite({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      });
+      return data;
+    },
+    queryKey: isMyFavouriteQueryKey(options),
+  });
+
+export const favouriteListingMutation = (
+  options?: Partial<Options<FavouriteListingData>>,
+): UseMutationOptions<
+  FavouriteListingResponse,
+  FavouriteListingError,
+  Options<FavouriteListingData>
+> => {
+  const mutationOptions: UseMutationOptions<
+    FavouriteListingResponse,
+    FavouriteListingError,
+    Options<FavouriteListingData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await favouriteListing({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};

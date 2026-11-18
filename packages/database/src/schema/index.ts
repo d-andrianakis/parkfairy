@@ -7,3 +7,4 @@ export * from './overstays.js';
 export * from './owners.js';
 export * from './parking.js';
 export * from './payments.js';
+export * from './vehicles.js';

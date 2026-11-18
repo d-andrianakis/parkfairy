@@ -4,22 +4,33 @@ import {
   cancelMyBooking,
   confirmMyBooking,
   payForMyBooking,
+  type SavedVehicle,
+  saveMyVehicle,
   settleMyPayment,
 } from '@parkfairy/api-client';
 import type { CheckoutKind } from '@parkfairy/contracts';
-import { isVehiclePlate, VEHICLE_PLATE_LIMITS } from '@parkfairy/contracts/plates';
+import {
+  isVehiclePlate,
+  normalizeVehiclePlate,
+  VEHICLE_PLATE_LIMITS,
+} from '@parkfairy/contracts/plates';
+import { VEHICLE_LIMITS } from '@parkfairy/contracts/validation';
 import { Button } from '@parkfairy/ui/components/button';
+import { Label } from '@parkfairy/ui/components/label';
+import { NativeSelect, NativeSelectOption } from '@parkfairy/ui/components/native-select';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, lazy, Suspense, useEffect, useRef, useState } from 'react';
 
 import { FormError } from '@/components/form-error';
 import { FormField } from '@/components/form-field';
+import { CheckboxField } from '@/components/owner/fields';
 import { placeTag } from '@/components/parking/place-words';
 import { useInvalidSubmitStatus } from '@/components/use-invalid-submit-status';
 import { Link, useRouter } from '@/i18n/navigation';
 import { attempt, CHOOSE_AGAIN, useBookingError } from '@/lib/booking-client';
 import { forgetPlate, recallPlate, rememberPlate } from '@/lib/remembered-plate';
 import { useValidationMessage } from '@/lib/use-validation-message';
+import { vehicleLabel } from '@/lib/vehicle-label';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 
 /** The contract's rules for the plate, without loading zod for one field. */
@@ -52,6 +63,8 @@ export function ConfirmBooking({
   spaceLocale,
   checkout = 'confirm',
   payment = null,
+  vehicles: savedVehicles = [],
+  initialVehicleId = null,
 }: {
   id: string;
   chooseAgainHref: string;
@@ -61,6 +74,10 @@ export function ConfirmBooking({
   checkout?: CheckoutKind;
   /** For paying: Stripe's publishable key (null: none here) and the total, written out. */
   payment?: { publishableKey: string | null; amount: string } | null;
+  /** The driver's saved vehicles (5A.2): one to pick instead of typing a plate. */
+  vehicles?: Pick<SavedVehicle, 'id' | 'plate' | 'name'>[];
+  /** The vehicle the space was held for, offered first (null: the first saved one). */
+  initialVehicleId?: string | null;
 }) {
   const t = useTranslations('Booking');
   const validation = useValidationMessage();
@@ -68,6 +85,14 @@ export function ConfirmBooking({
   const router = useRouter();
   const invalid = useInvalidSubmitStatus();
   const plateRef = useRef<HTMLInputElement>(null);
+  const vehicleRef = useRef<HTMLSelectElement>(null);
+  /** The saved vehicles, which a vehicle saved here joins. */
+  const [vehicles, setVehicles] = useState(savedVehicles);
+  /** The saved vehicle chosen, or empty for a plate typed here. */
+  const [choice, setChoice] = useState(
+    vehicles.find((vehicle) => vehicle.id === initialVehicleId)?.id ?? vehicles[0]?.id ?? '',
+  );
+  const [saveIt, setSaveIt] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [failure, setFailure] = useState<{ text: string; chooseAgain: boolean } | null>(null);
   const [busy, setBusy] = useState<'confirm' | 'release' | null>(null);
@@ -79,6 +104,8 @@ export function ConfirmBooking({
   const [asking, setAsking] = useState(false);
   /** Counts the times "No, keep it" was pressed: each one gives the focus back. */
   const [returning, setReturning] = useState(0);
+  /** Counts the presses of "Change": each puts the focus back on the car, once it can take it. */
+  const [changing, setChanging] = useState(0);
   const question = useRef<HTMLParagraphElement>(null);
   const releaseButton = useRef<HTMLButtonElement>(null);
 
@@ -87,21 +114,29 @@ export function ConfirmBooking({
     else if (returning > 0) releaseButton.current?.focus();
   }, [asking, returning]);
 
+  // After the render that opens the car again: a select kept with the payment is disabled until then.
+  useEffect(() => {
+    if (changing > 0) (choice ? vehicleRef : plateRef).current?.focus();
+    // Only a press of "Change" moves the focus, not a different car chosen after it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changing]);
+
   // After hydration, as storage isn't there for the server render: into the field itself, which
   // is the one place the plate lives (it is read when sent), unless something is typed already.
   useEffect(() => {
     const field = plateRef.current;
     const remembered = recallPlate();
     if (field && remembered && !field.value) field.value = remembered;
-  }, []);
+  }, [choice]);
 
   async function confirm(event: FormEvent) {
     event.preventDefault();
     // Kept with the payment: Enter in the field asks for nothing more.
     if (busy || clientSecret) return;
     setFailure(null);
-    const plate = plateRef.current?.value ?? '';
-    const problem = plateProblem(plate);
+    // A saved vehicle is the answer by itself; otherwise the plate typed is read and checked.
+    const plate = choice ? '' : (plateRef.current?.value ?? '');
+    const problem = choice ? null : plateProblem(plate);
     if (problem) {
       setError(validation(problem));
       invalid.report(1);
@@ -110,16 +145,15 @@ export function ConfirmBooking({
     }
     setError(undefined);
     invalid.clear();
-    rememberPlate(plate.trim());
+    if (!choice) rememberPlate(plate.trim());
     if (paying && !payment?.publishableKey) {
       setFailure({ text: t('paymentUnavailable'), chooseAgain: false });
       return;
     }
     setBusy('confirm');
+    const car = await carFor(plate.trim());
     if (paying) {
-      const asked = await attempt(() =>
-        payForMyBooking({ path: { id }, body: { vehiclePlate: plate.trim() } }),
-      );
+      const asked = await attempt(() => payForMyBooking({ path: { id }, body: car }));
       if (asked.ok && asked.data) {
         if (asked.data.status === 'pending') {
           setClientSecret(asked.data.clientSecret);
@@ -137,9 +171,7 @@ export function ConfirmBooking({
       if (!asked.ok) setFailureFrom(asked.failure);
       return;
     }
-    const outcome = await attempt(() =>
-      confirmMyBooking({ path: { id }, body: { vehiclePlate: plate.trim() } }),
-    );
+    const outcome = await attempt(() => confirmMyBooking({ path: { id }, body: car }));
     if (outcome.ok) {
       forgetPlate();
       router.replace(`/bookings/${id}?done=confirmed`);
@@ -149,9 +181,32 @@ export function ConfirmBooking({
     setFailureFrom(outcome.failure);
   }
 
+  /**
+   * What says which car it is: the vehicle chosen, a saved one the typed plate is the same as, one
+   * saved now because the driver asked, or the plate alone. A saved vehicle is what the API checks
+   * against the space (5A.2), so a typed plate that is one is sent as it. A save that fails (the
+   * list is full, or it was saved in another tab) only means the booking goes ahead with the plate.
+   */
+  async function carFor(plate: string): Promise<{ vehicleId: string } | { vehiclePlate: string }> {
+    if (choice) return { vehicleId: choice };
+    const normalized = normalizeVehiclePlate(plate);
+    const same = vehicles.find((vehicle) => vehicle.plate === normalized);
+    if (same) return { vehicleId: same.id };
+    if (saveIt && vehicles.length < VEHICLE_LIMITS.perDriver) {
+      const saved = await attempt(() => saveMyVehicle({ body: { plate } }));
+      if (saved.ok) {
+        setVehicles(saved.data.vehicles);
+        const found = saved.data.vehicles.find((vehicle) => vehicle.plate === normalized);
+        if (found) return { vehicleId: found.id };
+      }
+    }
+    return { vehiclePlate: plate };
+  }
+
   function setFailureFrom(failure: Parameters<typeof bookingError>[0]) {
     const { code, message } = failure;
-    if (code === 'VALIDATION_FAILED') {
+    // With a saved vehicle chosen there is no plate field to say it at.
+    if (code === 'VALIDATION_FAILED' && plateRef.current) {
       setError(validation(Array.isArray(message) ? message[0] : message));
       plateRef.current?.focus();
       return;
@@ -177,24 +232,72 @@ export function ConfirmBooking({
     <>
       <form noValidate onSubmit={(event) => void confirm(event)} className="grid gap-4">
         {invalid.region}
-        <FormField
-          ref={plateRef}
-          id="vehicle-plate"
-          label={t('plateLabel')}
-          hint={clientSecret ? t('plateKept') : t('plateHint')}
-          error={error}
-          // Kept as typed, so a hold that ends meanwhile costs no retyping (3.3.7).
-          onChange={(event) => rememberPlate(event.target.value)}
-          autoComplete="off"
-          autoCapitalize="characters"
-          spellCheck={false}
-          maxLength={VEHICLE_PLATE_LIMITS.input}
-          className={`max-w-xs font-mono ${clientSecret ? 'bg-muted' : ''}`}
-          // Kept with the payment once it is asked for; "Change" opens it again.
-          readOnly={clientSecret !== null}
-          // The payment's code, fetched while the plate is typed rather than after.
-          onFocus={paying ? () => void loadPaymentStep() : undefined}
-        />
+        {vehicles.length > 0 ? (
+          <div className="grid max-w-sm gap-1.5">
+            <Label htmlFor="booking-vehicle">{t('vehicleLabel')}</Label>
+            <NativeSelect
+              ref={vehicleRef}
+              id="booking-vehicle"
+              value={choice}
+              aria-describedby={choice ? 'booking-vehicle-chosen' : undefined}
+              // Kept with the payment once it is asked for; "Change" opens it again.
+              disabled={clientSecret !== null}
+              onChange={(event) => {
+                setChoice(event.target.value);
+                setFailure(null);
+                setError(undefined);
+              }}
+              onFocus={paying ? () => void loadPaymentStep() : undefined}
+              className="w-full"
+            >
+              {vehicles.map((vehicle) => (
+                <NativeSelectOption key={vehicle.id} value={vehicle.id}>
+                  {vehicleLabel(vehicle)}
+                </NativeSelectOption>
+              ))}
+              <NativeSelectOption value="">{t('vehicleOther')}</NativeSelectOption>
+            </NativeSelect>
+            {choice ? (
+              <p id="booking-vehicle-chosen" className="text-sm text-muted-foreground">
+                {t('vehicleChosen', {
+                  plate: vehicles.find((vehicle) => vehicle.id === choice)?.plate ?? '',
+                })}{' '}
+                {clientSecret ? t('plateKept') : null}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {choice ? null : (
+          <>
+            <FormField
+              ref={plateRef}
+              id="vehicle-plate"
+              label={t('plateLabel')}
+              hint={clientSecret ? t('plateKept') : t('plateHint')}
+              error={error}
+              // Kept as typed, so a hold that ends meanwhile costs no retyping (3.3.7).
+              onChange={(event) => rememberPlate(event.target.value)}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              maxLength={VEHICLE_PLATE_LIMITS.input}
+              className={`max-w-xs font-mono ${clientSecret ? 'bg-muted' : ''}`}
+              // Kept with the payment once it is asked for; "Change" opens it again.
+              readOnly={clientSecret !== null}
+              // The payment's code, fetched while the plate is typed rather than after.
+              onFocus={paying ? () => void loadPaymentStep() : undefined}
+            />
+            {vehicles.length < VEHICLE_LIMITS.perDriver ? (
+              <CheckboxField
+                id="booking-save-vehicle"
+                label={t('saveVehicle')}
+                checked={saveIt}
+                onChange={setSaveIt}
+                disabled={clientSecret !== null}
+              />
+            ) : null}
+          </>
+        )}
         {clientSecret ? (
           <div>
             <Button
@@ -207,10 +310,10 @@ export function ConfirmBooking({
                 if (underWay) return;
                 // Asked for again with the new plate: the same payment, kept with it.
                 setClientSecret(null);
-                plateRef.current?.focus();
+                setChanging((times) => times + 1);
               }}
             >
-              {t('changePlate')}
+              {t(choice ? 'changeVehicle' : 'changePlate')}
             </Button>
           </div>
         ) : null}

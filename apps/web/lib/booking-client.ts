@@ -21,6 +21,8 @@ export const BOOKING_CODES = [
   'BOOKING_STARTED',
   'REFUND_CHANGED',
   'HOLD_LIMIT_REACHED',
+  'VEHICLE_NOT_FOUND',
+  'VEHICLE_DOES_NOT_FIT',
   'PAYMENT_PROVIDER_ERROR',
 ] as const;
 type BookingCode = (typeof BOOKING_CODES)[number];
@@ -34,6 +36,8 @@ export const CHOOSE_AGAIN = new Set<string>([
   'SPACE_NOT_FOUND',
   'LISTING_CLOSED',
   'BOOKING_NOT_ACTIVE',
+  // The space is too small for the vehicle: another space, or another vehicle, is the way on.
+  'VEHICLE_DOES_NOT_FIT',
 ]);
 
 /** Translates a refusal; server text is never shown. */

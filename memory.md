@@ -2088,3 +2088,50 @@ After the five reviews of 5A.1 (2026-11-18), what changed and why:
 - **2026-11-18 · An error summary's links need a 24 px row each** (WCAG 2.5.8): with two or more problems they sit
   one above the other, and axe's `target-size` failed on the search page's summary only once a second error made
   a neighbour. The accessibility smoke list now has a two-error page.
+
+Our readings for 5A.2, saved vehicles, favourites and booking again (2026-11-18), not asked; change any that are wrong:
+
+- **Saved vehicles are the driver's alone**: a plate (kept normalized, as a booking keeps it), an optional nickname
+  (40 characters), optional height, length and width in whole centimetres (a space's own limits), at most ten
+  (`VEHICLE_LIMITS`), one entry to a plate. No "default" flag: the first saved is offered first, and on the
+  booking page the one the space was held for. An owner never sees any of it, only a booking's plate. Plates and
+  nicknames join Phase 6's retention list; the rows go with the account (cascade), unlike bookings.
+- **The fit rule is `vehicleFitsSpace`**, the same reading as the search filter in SQL: a space with no stated
+  limit takes anything, and a vehicle with no size said is never refused. It is checked at the hold
+  (`VEHICLE_DOES_NOT_FIT`, nothing held), and again when confirming or paying, since the vehicle can be edited in
+  between. It is advice, not a safety control: a plate typed that is not saved is never checked, and owners never
+  see sizes. A typed plate that normalizes to a saved one is sent as that vehicle, so its size counts.
+- **The hold does not set `vehicle_plate`**, only `vehicle_id`: `settlePayment` reads `vehicle_plate is not null`
+  as "the driver went to pay", so a plate on a hold would let a late payment book it. The plate is set by
+  `confirm` and `pay`, from the saved vehicle or as typed (which unties the booking from any vehicle). A booking
+  keeps its own copy of the plate, so forgetting a vehicle only nulls the link (`on delete set null`).
+- **`BookingConfirmInput` is a plate or a vehicle, never both**; a pair is a 400, not a choice for the server.
+- **The vehicle read in `savedVehicleFor` is `FOR SHARE`**: forgetting it in another tab meanwhile would otherwise
+  fail as a foreign key error (a 500) instead of `VEHICLE_NOT_FOUND`. The hold passes the space's limits it has read
+  already. Saves go one driver at a time by an advisory lock (`vehicles:<id>`, `favourites:<id>`), so the count
+  limits hold under concurrent presses; the database's unique constraints and CHECKs are behind them.
+- **Favourites are published listings only**: a listing that stops being live drops out of the list and the heart's
+  state is a 404, but the row stays and it comes back when the listing does. A hundred at most. A heart on the
+  listing page (shown to a signed-in driver whether or not a stay is chosen, so the listing page now reads the
+  session always), and the list at `/favourites`. Removing one comes back as `/favourites?removed=<slug>` with a
+  notice that takes the focus (the button has gone), keyed per slug so a second removal is said too.
+- **Book again** (`rebookStay`): the same wall-clock start and the same length, on the next day after today with
+  the same weekday in the listing's zone, so a Monday habit is next Monday. One press holds the same space for the
+  same vehicle (`RebookButton`), and a refusal is said beside the button with a link to the listing for those
+  times. Only for a confirmed stay that is over in a space the owner has not removed (`canRebook`); `Booking`
+  now carries `spaceId` and `vehicleId` for it.
+- **A zod `transform` cannot be in a contract**: the OpenAPI emit throws "Transforms cannot be represented". The
+  nickname's "empty is none" is in the service.
+- **`openapi:emit` can fail once with a Redis `EPIPE`** (an unhandled ioredis error event while it exits); run
+  `pnpm api:generate` again.
+- **Server components inside `<ClientMessages>` are rendered with the trimmed messages in jsdom** (see 5A.1), so
+  `RebookStay` puts its provider around the button alone. The cost: each rebookable card on the past bookings
+  list carries `Rebook` and `BookingErrors` (about 1.2 KB English, 2.2 KB Greek, repeated; 20 cards a page).
+  A single provider around the list is the cheaper shape for production; it needs those cards tested in the
+  browser only. Not done, for the unit test's sake.
+- **Migration 0049 adds a foreign key and an index to `bookings`** that lock it while they validate and build; fine
+  at today's size, `NOT VALID` then `VALIDATE` and a `CONCURRENTLY` index before a large production table (as 0047).
+- **Cancelled and released bookings keep `vehicle_id`** (only the plate is cleared): a link, not personal data, only
+  returned to the booking's own driver. Phase 6 should know.
+- **Greek shows a plate in Latin letters** (as the API normalizes it), which the form says. Whether to show the
+  Greek-letter form is a product question for the native speaker, and the owner side shows the same plate.

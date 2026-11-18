@@ -68,7 +68,7 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
   let addresses = 0;
   const visitors = new Map<string, string>();
 
-  const api = (user: TestUser | null, method: 'get' | 'post', path: string) => {
+  const api = (user: TestUser | null, method: 'get' | 'post' | 'delete', path: string) => {
     const call = request(app.getHttpServer())[method](`/v1${path}`);
     if (method !== 'get') call.set('Origin', ORIGIN);
     if (!user) return call;
@@ -857,6 +857,71 @@ describe('payments (Stripe in test mode, faked: decision #47)', () => {
       });
       expect((await settle(stranger, held.id).expect(404)).body).toMatchObject({
         code: 'BOOKING_NOT_FOUND',
+      });
+    });
+
+    describe('for a saved vehicle (5A.2)', () => {
+      const saveVehicle = async (user: TestUser, body: Record<string, unknown>) => {
+        await api(user, 'post', '/vehicles').send(body).expect(201);
+        const response = await api(user, 'get', '/vehicles').expect(200);
+        const list = response.body as { vehicles: { id: string; plate: string }[] };
+        return list.vehicles[0]?.id ?? '';
+      };
+      const setLimit = (maxHeightCm: number | null) =>
+        db
+          .update(schema.parkingSpaces)
+          .set({ maxHeightCm })
+          .where(eq(schema.parkingSpaces.id, paidListing.spaceId));
+
+      it('keeps its plate and ties the booking to it, and a typed plate unties it', async () => {
+        const driver = await person();
+        const vehicleId = await saveVehicle(driver, { plate: 'ΙΚΒ-1234', heightCm: 180 });
+        const held = BookingSchema.parse(
+          (await hold(driver, paidListing, freshDay()).expect(201)).body,
+        );
+        await api(driver, 'post', `/bookings/${held.id}/payment`).send({ vehicleId }).expect(200);
+        expect(await row(held.id)).toMatchObject({ vehiclePlate: 'IKB1234', vehicleId });
+        // Paying again with a plate typed instead keeps the same payment, and no vehicle.
+        await pay(driver, held.id, 'YXA-9876').expect(200);
+        expect(await row(held.id)).toMatchObject({ vehiclePlate: 'YXA9876', vehicleId: null });
+      });
+
+      it('refuses a vehicle that no longer fits the space, asks Stripe nothing and keeps the hold', async () => {
+        const driver = await person();
+        const vehicleId = await saveVehicle(driver, { plate: 'IKB1234', heightCm: 180 });
+        const held = BookingSchema.parse(
+          (await hold(driver, paidListing, freshDay()).expect(201)).body,
+        );
+        await setLimit(170);
+        try {
+          const refused = await api(driver, 'post', `/bookings/${held.id}/payment`)
+            .send({ vehicleId })
+            .expect(409);
+          expect(refused.body).toMatchObject({ code: 'VEHICLE_DOES_NOT_FIT' });
+        } finally {
+          await setLimit(null);
+        }
+        expect(stripe.gateway.createPayment).not.toHaveBeenCalled();
+        expect(await row(held.id)).toMatchObject({ status: 'held', vehiclePlate: null });
+      });
+
+      it('answers another driver’s vehicle, or one forgotten since the hold, as not found', async () => {
+        const [driver, other] = [await person(), await person()];
+        const theirs = await saveVehicle(other, { plate: 'ΥΖΜ-5678' });
+        const mine = await saveVehicle(driver, { plate: 'IKB1234' });
+        const held = BookingSchema.parse(
+          (await hold(driver, paidListing, freshDay()).expect(201)).body,
+        );
+        const stolen = await api(driver, 'post', `/bookings/${held.id}/payment`)
+          .send({ vehicleId: theirs })
+          .expect(404);
+        expect(stolen.body).toMatchObject({ code: 'VEHICLE_NOT_FOUND' });
+        await api(driver, 'delete', `/vehicles/${mine}`).expect(200);
+        await api(driver, 'post', `/bookings/${held.id}/payment`)
+          .send({ vehicleId: mine })
+          .expect(404);
+        expect(stripe.gateway.createPayment).not.toHaveBeenCalled();
+        expect(await row(held.id)).toMatchObject({ vehiclePlate: null, vehicleId: null });
       });
     });
 

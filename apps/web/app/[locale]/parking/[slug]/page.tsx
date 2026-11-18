@@ -18,6 +18,7 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { ClientMessages } from '@/components/client-messages';
 import { FocusHeading } from '@/components/focus-heading';
 import { BookSpacePicker } from '@/components/parking/book-space-picker';
+import { FavouriteButton } from '@/components/parking/favourite-button';
 import { FeatureBadges, SecurityBadges, SpaceLimits } from '@/components/parking/feature-badges';
 import { HoursExceptions } from '@/components/parking/hours-exceptions';
 import { ListingPhotoImage } from '@/components/parking/listing-photo';
@@ -31,9 +32,11 @@ import { timeOptions } from '@/i18n/formats';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { loadListing } from '@/lib/api.server';
+import { loadFavouriteState, loadVehicles } from '@/lib/bookings.server';
 import { parseListingWindow, type SearchParams, windowQuery } from '@/lib/search';
 import { getLayoutSession } from '@/lib/session';
 import { validationArgs } from '@/lib/validation-args';
+import { vehicleLabel } from '@/lib/vehicle-label';
 
 interface ListingPageProps {
   params: Promise<{ locale: string; slug: string }>;
@@ -90,8 +93,17 @@ export default async function ListingPage(props: ListingPageProps) {
   // so a "just taken" refusal stays on the page that the refresh brings back.
   const offered = Boolean(listing.bookingOpen && availability?.open);
   const bookable = offered && available;
-  // Booking needs an account (decision #8); the layout has read the session already.
-  const signedIn = offered ? Boolean(await getLayoutSession()) : false;
+  // Booking needs an account (decision #8), and favourites are an account's; the layout has read
+  // the session already.
+  const signedIn = Boolean(await getLayoutSession());
+  // A signed-in driver's own: their saved vehicles for the picker (5A.2) and whether this listing
+  // is a favourite. Neither is needed to show the page, so a failed read leaves the piece out.
+  const [vehicles, favourite] = signedIn
+    ? await Promise.all([
+        offered && parsed.window ? loadVehicles() : null,
+        loadFavouriteState(listing.slug),
+      ])
+    : [null, null];
   // Back from a booking's page after letting its space go (3.3): say so, where the choice is made.
   const released = (await props.searchParams).released === '1';
   const windowParams = parsed.window ? windowQuery(parsed.values) : {};
@@ -149,6 +161,11 @@ export default async function ListingPage(props: ListingPageProps) {
             <FeatureBadges features={listing.features} />
             <SecurityBadges security={listing.security} />
           </div>
+          {favourite !== null ? (
+            <ClientMessages namespaces={CLIENT_NAMESPACES.favourite}>
+              <FavouriteButton slug={listing.slug} initial={favourite} />
+            </ClientMessages>
+          ) : null}
         </div>
 
         {firstPhoto ? (
@@ -249,8 +266,20 @@ export default async function ListingPage(props: ListingPageProps) {
                 end={parsed.window.end}
                 initial={cheapest?.id ?? ''}
                 labelledBy="spaces-heading"
+                vehicles={(vehicles ?? []).map((vehicle) => ({
+                  id: vehicle.id,
+                  label: vehicleLabel(vehicle),
+                  heightCm: vehicle.heightCm,
+                  lengthCm: vehicle.lengthCm,
+                  widthCm: vehicle.widthCm,
+                }))}
                 spaces={listing.spaces.map((space) => ({
                   id: space.id,
+                  limits: {
+                    heightCm: space.maxHeightCm,
+                    lengthCm: space.maxLengthCm,
+                    widthCm: space.maxWidthCm,
+                  },
                   // Owner content: Greek "Α1" looks like Latin "A1" but is read differently.
                   label: (
                     <span lang={listing.contentLocale}>

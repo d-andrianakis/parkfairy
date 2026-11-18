@@ -1829,7 +1829,42 @@ only (#46).
         τη νύχτα» or «Φωτισμένος χώρος»; «Κάμερες ασφαλείας» or «Παρακολούθηση με κάμερες»; «εκ.» or «cm»;
         «Οδηγίες άφιξης» or «Οδηγίες πρόσβασης»; «Πώς θα μπείτε» as the booking's label; «θέση» or «χώρος» for
         one space (the owner area says «θέση», the listing page «χώρος»)
-- [ ] **5A.2 Saved vehicles, favourites, one-tap rebook (M)**
+- [~] **5A.2 Saved vehicles, favourites, one-tap rebook (M, 2026-11-18):** a driver's saved vehicles (plate,
+  nickname, sizes; at most ten; `/account/vehicles`), picked on the listing page and the booking page instead
+  of typing a plate, and checked against the space (`VEHICLE_DOES_NOT_FIT` at the hold and again when paying);
+  favourite listings (a heart on the listing page, `/favourites`; at most a hundred); "Book again" on a stay that
+  is over, which holds the same space for the same car at the same weekday and times; migration 0049.
+  `bookings.spaceId` and `vehicleId` are on the driver's booking. Left: the points under Open, below
+  - [x] **Implemented** behind the API's authorization rules (every route the session's own rows only)
+  - [x] **Unit tests:** contracts (`vehicles.test.ts`, fit, confirm and hold inputs), `rebook.test.ts`, web
+        (vehicles manager, favourite and rebook buttons, the confirm form, the space picker, the pages, Greek);
+        integration (`vehicles.integration.test.ts`, 46: ownership, limits at once, fit per size, confirm, a
+        vehicle forgotten, favourites; and three paying tests in `payments.integration.test.ts`)
+  - [x] **Smoke test:** `vehicles-and-favourites.smoke.ts` (saving, changing and removing a vehicle, nobody
+        else's, Greek at 320 px; the fit warning and refusal, saving from the booking page, booking again;
+        favourites, signed out and cross-driver), both new pages in `accessibility.smoke.ts`
+  - [x] **Security** review: no critical, high or medium; the two races (a vehicle or listing deleted between
+        the read and the write) fixed
+  - [x] **Performance** review: nothing high; the fit read under the lock saved a round trip, the favourites
+        index follows the query; open: the per-card message provider on the past bookings list, migration 0049
+        on a big `bookings` table (both in memory.md)
+  - [x] **Accessibility** review: focus after cancel, keep and the last add, a status said again, the held
+        vehicle's button named, a failure with a vehicle chosen, a polite count of spaces too small, the removal
+        notice; left: manual NVDA/VoiceOver (below)
+  - [x] **i18n** review: the Greek of `Favourites.intro`, one word for a vehicle, «διατηρούν», the hint with no
+        referent; left: the wording questions (below)
+  - [x] **Contracts & docs:** OpenAPI and client regenerated, migration 0049 reviewed, memory.md
+  - [ ] Manual NVDA and VoiceOver: the status after add, change and remove; the removal notice on `/favourites`;
+        the pressed heart; «Αλλαγή: …» read aloud; "Book again" with the listing's name; the vehicle select and
+        "too small" descriptions on the radios; the vehicle kept with a payment
+  - [ ] Native speaker: `Vehicles.*`, `Favourites.*`, `Rebook.*`, `Booking.vehicle*`, `Booking.saveVehicle`,
+        `BookSpace.vehicle*`, `tooSmall*`, `pickFits`. Questions: «Νέα κράτηση» or «Κράτηση ξανά» for Book again;
+        «Αγαπημένο» (neuter) for a listing, or «Προσθήκη στα αγαπημένα»; «Αλλαγή» or «Επεξεργασία» for Edit;
+        «Αφαίρεση» or «Διαγραφή»; «Κανένα αποθηκευμένο όχημα» or «Χωρίς αποθηκευμένο όχημα»
+  - [ ] **Open** (small, from the reviews): the size line joins by hand and uses `{value}` where the listing
+        uses plain numbers; `rebookWhen` is a fragment before the date (a `t.rich` tag would let Greek move it);
+        the nickname's too-long message gives no limit (`Validation.textTooLong`); budgets for the new signed-in
+        pages in `performance.smoke.ts`; a CSRF (foreign `Origin`) case for the new routes in `security.smoke.ts`
 - [ ] **5A.3 Reminders, booking pass, offline, calendar file (M):** `booking-ending-soon` and
       `booking-starting-soon`; QR of the reference only; opt-in service worker for the pass page;
       wallet passes deferred (need Apple / Google accounts)

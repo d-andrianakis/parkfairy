@@ -64,6 +64,11 @@ export const BookingHoldInputSchema = z
     spaceId: z.uuid(message('invalid')),
     start: instant,
     end: instant,
+    /**
+     * One of the driver's saved vehicles (5A.2): refused (`VEHICLE_DOES_NOT_FIT`) when the space is
+     * smaller than it, and the one the booking page offers first.
+     */
+    vehicleId: z.uuid(message('invalid')).optional(),
   })
   .strict()
   .superRefine((input, ctx) => checkStayWindow(input, ctx))
@@ -81,9 +86,17 @@ export const BookingConfirmInputSchema = z
       .trim()
       // An empty field is "required" only, not also unreadable.
       .min(1, { message: message('plateRequired'), abort: true })
-      .refine(isVehiclePlate, message('plateInvalid')),
+      .refine(isVehiclePlate, message('plateInvalid'))
+      .optional(),
+    /** A saved vehicle instead of a typed plate: its plate is the booking's (5A.2). */
+    vehicleId: z.uuid(message('invalid')).optional(),
   })
   .strict()
+  // One or the other, never both: two answers to "which car?" would leave the server to choose.
+  .refine((input) => (input.vehiclePlate === undefined) !== (input.vehicleId === undefined), {
+    message: message('plateRequired'),
+    path: ['vehiclePlate'],
+  })
   .register(contractsRegistry, { id: 'BookingConfirmInput' });
 export type BookingConfirmInput = z.infer<typeof BookingConfirmInputSchema>;
 
@@ -119,6 +132,8 @@ export const BookingSchema = z
     status: BookingStatusSchema,
     listing: BookingListingSchema,
     spaceLabel: z.string(),
+    /** The space itself, null once the owner removed it: what "book again" asks for (5A.2). */
+    spaceId: z.uuid().nullable(),
     start: z.iso.datetime(),
     end: z.iso.datetime(),
     /** Agreed when the space was held. */
@@ -130,6 +145,8 @@ export const BookingSchema = z
     /** How many more times the hold may be kept for another HOLD_MINUTES. */
     holdExtensionsLeft: z.int().nonnegative(),
     vehiclePlate: z.string().nullable(),
+    /** The saved vehicle it was held for, if that is still saved: the booking page offers it first. */
+    vehicleId: z.uuid().nullable(),
     confirmedAt: z.iso.datetime().nullable(),
     cancelledAt: z.iso.datetime().nullable(),
     cancelledBy: BookingCancellerSchema.nullable(),
@@ -273,6 +290,10 @@ export const BOOKING_ERROR_CODES = [
   'BOOKING_STARTED',
   'REFUND_CHANGED',
   'HOLD_LIMIT_REACHED',
+  /** A saved vehicle named in a hold or a payment isn't the driver's, or was deleted (5A.2). */
+  'VEHICLE_NOT_FOUND',
+  /** The space is smaller than the saved vehicle (5A.2). */
+  'VEHICLE_DOES_NOT_FIT',
   /** Stripe failed or was too slow paying for a hold; nothing was charged (Phase 4). */
   'PAYMENT_PROVIDER_ERROR',
 ] as const;

@@ -4,14 +4,18 @@ import { screen, within } from '@testing-library/react';
 import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loadBooking, loadBookings } from '@/lib/bookings.server';
+import { loadBooking, loadBookings, loadVehicles } from '@/lib/bookings.server';
 import { requireSession } from '@/lib/session';
 import { renderWithProviders } from '@/test/render';
 
 import BookingPage, { generateMetadata } from './[id]/page';
 import BookingsPage from './page';
 
-vi.mock('@/lib/bookings.server', () => ({ loadBooking: vi.fn(), loadBookings: vi.fn() }));
+vi.mock('@/lib/bookings.server', () => ({
+  loadBooking: vi.fn(),
+  loadBookings: vi.fn(),
+  loadVehicles: vi.fn(() => Promise.resolve([])),
+}));
 vi.mock('@/lib/session', () => ({ requireSession: vi.fn(() => Promise.resolve()) }));
 vi.mock('@/lib/payments.server', () => ({ stripePublishableKey: vi.fn(() => 'pk_test_1') }));
 vi.mock('next/navigation', () => ({
@@ -51,6 +55,8 @@ const booking = (overrides: Partial<Booking> = {}): Booking => ({
     timeZone: 'Europe/Athens',
   },
   spaceLabel: 'Α1',
+  spaceId: 'a1a1a1a1-0000-4000-8000-000000000001',
+  vehicleId: null,
   // Far ahead, so the clock never makes these past: 10:00 to 12:00 in Athens.
   start: '2099-12-10T08:00:00.000Z',
   end: '2099-12-10T10:00:00.000Z',
@@ -536,5 +542,93 @@ describe('the bookings list', () => {
     expect(screen.getByRole('link', { name: 'Find parking' })).toBeInTheDocument();
     await show({}, null);
     expect(screen.getByRole('alert')).toHaveTextContent('try again');
+  });
+});
+
+// Book again, and the vehicles on a booking (5A.2).
+describe('book again', () => {
+  const SPACE = 'a1a1a1a1-0000-4000-8000-000000000001';
+  // Over long ago: Monday 6 January 2020, 10:00 to 12:00 in Athens.
+  const over = (overrides: Partial<Booking> = {}) =>
+    confirmed({
+      start: '2020-01-06T08:00:00.000Z',
+      end: '2020-01-06T10:00:00.000Z',
+      refundIfCancelled: null,
+      vehicleId: 'a0a0a0a0-0000-4000-8000-000000000001',
+      spaceId: SPACE,
+      ...overrides,
+    });
+  const list = (bookings: Booking[]): BookingList => ({ bookings, page: 1, hasMore: false });
+  const showList = async (found: BookingList, searchParams: Record<string, string> = {}) => {
+    vi.mocked(loadBookings).mockResolvedValue(found);
+    return renderWithProviders(
+      await BookingsPage({
+        params: Promise.resolve({ locale: 'en' }),
+        searchParams: Promise.resolve(searchParams),
+      }),
+    );
+  };
+
+  it('offers it on a stay that is over, saying which weekday and times, in the list', async () => {
+    const { container } = await showList(list([over()]), { when: 'past' });
+    const button = screen.getByRole('button', { name: 'Book again' });
+    expect(button).toHaveAccessibleDescription(
+      /^Same weekday and times: Mon.*10:00\sAM.*12:00\sPM Γκαράζ Ερμού$/,
+    );
+    await expectNoAxeViolations(container);
+  });
+
+  it('offers it for none of the others: to come, cancelled, or a space that is gone', async () => {
+    await showList(
+      list([
+        confirmed({ id: 'a' }),
+        over({ id: 'b', status: 'cancelled', refund: { amountMinor: 0, currency: 'EUR' } }),
+        over({ id: 'c', spaceId: null }),
+        booking({ id: 'd', status: 'expired' }),
+      ]),
+      { when: 'past' },
+    );
+    expect(screen.queryByRole('button', { name: 'Book again' })).toBeNull();
+  });
+
+  it('offers it on the booking’s own page, once the stay is over, and not before', async () => {
+    const view = await showBooking(over());
+    expect(screen.getByRole('button', { name: 'Book again' })).toBeInTheDocument();
+    view.unmount();
+    await showBooking(confirmed());
+    expect(screen.queryByRole('button', { name: 'Book again' })).toBeNull();
+  });
+});
+
+describe('a held booking’s vehicles (5A.2)', () => {
+  const WORK = { id: 'a0a0a0a0-0000-4000-8000-000000000001', plate: 'IKB1234', name: 'Work car' };
+  const SPARE = { id: 'a0a0a0a0-0000-4000-8000-000000000002', plate: 'YZM5678', name: null };
+  const sized = (vehicle: { id: string; plate: string; name: string | null }) => ({
+    ...vehicle,
+    heightCm: null,
+    lengthCm: null,
+    widthCm: null,
+  });
+
+  it('puts the driver’s saved vehicles in the form, the one the space was held for chosen', async () => {
+    vi.mocked(loadVehicles).mockResolvedValueOnce([sized(WORK), sized(SPARE)]);
+    await showBooking(booking({ vehicleId: SPARE.id }));
+    const picker = screen.getByRole('combobox', { name: 'Vehicle' });
+    expect(picker).toHaveValue(SPARE.id);
+    expect(screen.queryByRole('textbox', { name: 'Number plate' })).toBeNull();
+  });
+
+  it('asks for a plate as before when none is saved, or the list could not be read', async () => {
+    const first = await showBooking(booking());
+    expect(screen.getByRole('textbox', { name: 'Number plate' })).toBeInTheDocument();
+    first.unmount();
+    vi.mocked(loadVehicles).mockResolvedValueOnce(null);
+    await showBooking(booking());
+    expect(screen.getByRole('textbox', { name: 'Number plate' })).toBeInTheDocument();
+  });
+
+  it('reads no vehicles for a booking that is not asking for the car', async () => {
+    await showBooking(confirmed());
+    expect(loadVehicles).not.toHaveBeenCalled();
   });
 });
