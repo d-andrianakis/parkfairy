@@ -23,11 +23,12 @@ import {
   OwnerTaxInputSchema,
   wallMinutes,
 } from './owner.js';
-import { photoUrl } from './parking.js';
+import { LISTING_LIMITS, photoUrl } from './parking.js';
 import { addDays } from './time.js';
 import {
   HOURS_EXCEPTION_AHEAD_DAYS,
   HOURS_EXCEPTIONS_MAX,
+  SIZE_MESSAGES,
   VALIDATION_MESSAGES,
 } from './validation.js';
 
@@ -176,6 +177,39 @@ describe('location', () => {
     expect(ListingLocationInputSchema.safeParse(corfu).success).toBe(true);
   });
 
+  it('takes arrival instructions and security, and clears them with an empty value', () => {
+    const detailed = {
+      ...location,
+      arrivalInstructions: '  Gate code 4821.\nSecond level.  ',
+      security: ['cctv', 'gated'],
+    };
+    expect(ListingLocationInputSchema.parse(detailed)).toMatchObject({
+      arrivalInstructions: 'Gate code 4821.\nSecond level.',
+      security: ['cctv', 'gated'],
+    });
+    expect(ListingLocationPatchSchema.parse({ arrivalInstructions: '' })).toEqual({
+      arrivalInstructions: null,
+    });
+    expect(ListingLocationPatchSchema.parse({ security: [] })).toEqual({ security: [] });
+  });
+
+  it('holds arrival instructions to their length, and security to its three values', () => {
+    const long = {
+      ...location,
+      arrivalInstructions: 'x'.repeat(LISTING_LIMITS.arrivalInstructions + 1),
+    };
+    expect(messages(ListingLocationInputSchema.safeParse(long))).toEqual(['textTooLong']);
+    const exactly = {
+      ...location,
+      arrivalInstructions: 'x'.repeat(LISTING_LIMITS.arrivalInstructions),
+    };
+    expect(ListingLocationInputSchema.safeParse(exactly).success).toBe(true);
+    expect(ListingLocationPatchSchema.safeParse({ security: ['moat'] }).success).toBe(false);
+    expect(
+      ListingLocationPatchSchema.safeParse({ security: ['cctv', 'lit', 'gated', 'cctv'] }).success,
+    ).toBe(false);
+  });
+
   it('refuses a point abroad', () => {
     const berlin = { ...location, latitude: 52.5, longitude: 13.4 };
     expect(messages(ListingLocationInputSchema.safeParse(berlin))).toEqual(['outsideGreece']);
@@ -220,6 +254,43 @@ describe('spaces', () => {
     const result = ListingSpacesInputSchema.safeParse({ spaces: [space('a1'), space(' A1 ')] });
     expect(messages(result)).toEqual(['spaceLabelDuplicate']);
     expect(result.error?.issues[0]?.path).toEqual(['spaces', 1, 'label']);
+  });
+
+  it('takes the largest vehicle in centimetres, and none as no limit', () => {
+    const sized = { ...space('A1'), maxHeightCm: 190, maxLengthCm: 480, maxWidthCm: 210 };
+    expect(ListingSpacesInputSchema.parse({ spaces: [sized] }).spaces[0]).toMatchObject({
+      maxHeightCm: 190,
+      maxLengthCm: 480,
+      maxWidthCm: 210,
+    });
+    const none = { ...space('A1'), maxHeightCm: null };
+    expect(ListingSpacesInputSchema.safeParse({ spaces: [none] }).success).toBe(true);
+    // Left out altogether, as an older client does.
+    expect(ListingSpacesInputSchema.safeParse({ spaces: [space('A1')] }).success).toBe(true);
+  });
+
+  it('holds sizes to the limits, naming the field, and refuses fractions', () => {
+    for (const [field, value] of [
+      ['maxHeightCm', 99],
+      ['maxHeightCm', 501],
+      ['maxLengthCm', 199],
+      ['maxLengthCm', 1501],
+      ['maxWidthCm', 99],
+      ['maxWidthCm', 401],
+      ['maxHeightCm', 190.5],
+      ['maxHeightCm', 0],
+      ['maxHeightCm', -190],
+    ] as const) {
+      const result = ListingSpacesInputSchema.safeParse({
+        spaces: [{ ...space('A1'), [field]: value }],
+      });
+      const dimension = (
+        { maxHeightCm: 'height', maxLengthCm: 'length', maxWidthCm: 'width' } as const
+      )[field];
+      // Each size says its own limits: the message names the dimension it is about.
+      expect(messages(result), `${field} ${value}`).toEqual([SIZE_MESSAGES[dimension]]);
+      expect(result.error?.issues[0]?.path).toEqual(['spaces', 0, field]);
+    }
   });
 
   it('refuses a rate of nothing', () => {

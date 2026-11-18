@@ -24,6 +24,11 @@ const values: SearchValues = {
   startTime: '09:00',
   endDate: '2026-11-02',
   endTime: '17:30',
+  features: [],
+  security: [],
+  vehicleHeight: '',
+  vehicleLength: '',
+  vehicleWidth: '',
 };
 
 describe('SearchForm', () => {
@@ -45,6 +50,125 @@ describe('SearchForm', () => {
     expect(screen.getByRole('combobox', { name: 'Πού' })).toHaveValue('koukaki');
     expect(screen.getByRole('button', { name: 'Χρήση τοποθεσίας' })).toBeInTheDocument();
     await expectNoAxeViolations(container);
+  });
+
+  describe('filters (5A.1)', () => {
+    const filtered: SearchValues = {
+      ...values,
+      features: ['covered'],
+      security: ['cctv', 'gated'],
+      vehicleHeight: '190',
+      vehicleLength: '',
+      vehicleWidth: '210',
+    };
+
+    it('offers each feature and security box as a native checkbox, so a plain form submit keeps them', () => {
+      renderWithProviders(<SearchForm values={filtered} minDate="2026-10-29" />);
+      const group = screen.getByRole('group', { name: 'Filters' });
+      const covered = within(group).getByRole('checkbox', { name: 'Covered' });
+      expect(covered).toBeChecked();
+      expect(covered).toHaveAttribute('name', 'features');
+      expect(covered).toHaveAttribute('value', 'covered');
+      expect(covered.tagName).toBe('INPUT');
+      expect(within(group).getByRole('checkbox', { name: 'EV charging' })).not.toBeChecked();
+      const cctv = within(group).getByRole('checkbox', { name: 'CCTV' });
+      expect(cctv).toBeChecked();
+      expect(cctv).toHaveAttribute('name', 'security');
+      expect(within(group).getByRole('checkbox', { name: 'Gated entry' })).toBeChecked();
+      expect(within(group).getByRole('checkbox', { name: 'Lit at night' })).not.toBeChecked();
+    });
+
+    it('groups them by what they describe, in Greek too', () => {
+      renderWithProviders(<SearchForm values={filtered} minDate="2026-10-29" />, { locale: 'el' });
+      expect(screen.getByRole('group', { name: 'Φίλτρα' })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: 'Παροχές θέσης' })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: 'Ασφάλεια' })).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: 'Κάμερες ασφαλείας' })).toBeChecked();
+    });
+
+    it('asks for the vehicle’s size in centimetres, keeps what was typed, and says what is left out', () => {
+      renderWithProviders(<SearchForm values={filtered} minDate="2026-10-29" />);
+      const height = screen.getByLabelText('Height (cm)');
+      expect(height).toHaveValue('190');
+      expect(height).toHaveAttribute('name', 'vehicleHeightCm');
+      expect(screen.getByLabelText('Length (cm)')).toHaveValue('');
+      expect(screen.getByLabelText('Width (cm)')).toHaveAttribute('name', 'vehicleWidthCm');
+    });
+
+    it('explains a size with its limits beside that field only, and marks only that field', () => {
+      renderWithProviders(
+        <SearchForm
+          values={{ ...filtered, vehicleHeight: '190', vehicleLength: '99', vehicleWidth: '210' }}
+          errors={{ vehicleLength: 'sizeLengthInvalid' }}
+          minDate="2026-10-29"
+        />,
+      );
+      const length = screen.getByLabelText('Length (cm)');
+      expect(length).toHaveAttribute('aria-invalid', 'true');
+      expect(length).toHaveAccessibleDescription('Enter a length from 200 to 1500 cm');
+      expect(length.id).toBe('search-vehicle-length');
+      // The sizes that are fine are not said to be wrong, nor read the error.
+      for (const name of ['Height (cm)', 'Width (cm)']) {
+        const field = screen.getByLabelText(name);
+        expect(field).not.toHaveAttribute('aria-invalid');
+        expect(field).not.toHaveAttribute('aria-describedby');
+      }
+    });
+
+    it('says each size’s limits in Greek too', () => {
+      renderWithProviders(
+        <SearchForm
+          values={{ ...filtered, vehicleHeight: '99' }}
+          errors={{ vehicleHeight: 'sizeHeightInvalid' }}
+          minDate="2026-10-29"
+        />,
+        { locale: 'el' },
+      );
+      expect(screen.getByLabelText('Ύψος (εκ.)')).toHaveAccessibleDescription(
+        'Εισαγάγετε ύψος από 100 έως 500 εκ.',
+      );
+    });
+
+    it('reads the hint once, for the group of sizes, not after each field', () => {
+      renderWithProviders(<SearchForm values={filtered} minDate="2026-10-29" />);
+      expect(screen.getByRole('group', { name: 'Your vehicle' })).toHaveAccessibleDescription(
+        expect.stringContaining('A space with no stated limit stays'),
+      );
+      for (const name of ['Height (cm)', 'Length (cm)', 'Width (cm)']) {
+        expect(screen.getByLabelText(name)).not.toHaveAttribute('aria-describedby');
+      }
+    });
+
+    it('gives each checkbox a row of at least 24 px (WCAG 2.5.8)', () => {
+      renderWithProviders(<SearchForm values={filtered} minDate="2026-10-29" />);
+      const row = screen.getByRole('checkbox', { name: 'CCTV' }).parentElement;
+      expect(row).toHaveClass('min-h-6');
+    });
+
+    it('works before any script has run, as the rest of the form does', () => {
+      const html = renderToString(
+        <NextIntlClientProvider locale="en" messages={catalogs.en}>
+          <SearchForm values={filtered} minDate="2026-10-29" />
+        </NextIntlClientProvider>,
+      );
+      expect(html).toMatch(/<input[^>]*type="checkbox"[^>]*name="features"[^>]*checked/);
+      expect(html).toContain('name="vehicleHeightCm"');
+    });
+
+    it('is axe clean, with an error and without', async () => {
+      const { container, rerender } = renderWithProviders(
+        <SearchForm values={filtered} minDate="2026-10-29" />,
+      );
+      await expectNoAxeViolations(container);
+      rerender(
+        <SearchForm
+          values={{ ...filtered, vehicleHeight: '99' }}
+          errors={{ vehicleHeight: 'sizeHeightInvalid' }}
+          minDate="2026-10-29"
+        />,
+      );
+      await expectNoAxeViolations(container);
+    });
   });
 
   describe('the address field (decision #40)', () => {

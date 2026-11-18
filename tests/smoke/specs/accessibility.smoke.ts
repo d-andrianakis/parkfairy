@@ -22,7 +22,15 @@ const publicPages = [
   // An invitation to co-own a listing, opened signed out (#56).
   '/owner/invite',
   // Public catalogue (demo listings from pnpm db:seed).
-  ...(DEMO_DATA ? ['/search?area=syntagma', '/parking/syntagma-square-garage'] : []),
+  ...(DEMO_DATA
+    ? [
+        '/search?area=syntagma',
+        '/parking/syntagma-square-garage',
+        // Filters ticked (5A.1), and a vehicle size that will not do.
+        '/search?area=syntagma&features=covered&security=cctv&vehicleHeightCm=190',
+        '/search?area=syntagma&vehicleHeightCm=99&vehicleLengthCm=100',
+      ]
+    : []),
 ];
 const locales = ['el', 'en'] as const;
 const accountNav = { el: 'Λογαριασμός', en: 'Account' } as const;

@@ -90,7 +90,18 @@ async function load({ params, searchParams }: SearchPageProps) {
   const search = await placed(parseSearch(await searchParams, Date.now(), { lookups }), locale);
   const query = search.query;
   const response = query
-    ? await loadSearchResults(query.area, query.latitude, query.longitude, query.start, query.end)
+    ? await loadSearchResults(
+        query.area,
+        query.latitude,
+        query.longitude,
+        query.start,
+        query.end,
+        (query.features ?? []).join(','),
+        (query.security ?? []).join(','),
+        query.vehicleHeightCm,
+        query.vehicleLengthCm,
+        query.vehicleWidthCm,
+      )
     : undefined;
   const t = await getTranslations({ locale, namespace: 'Search' });
   const tAreas = await getTranslations({ locale, namespace: 'Areas' });
@@ -178,8 +189,18 @@ export default async function SearchPage(props: SearchPageProps) {
       ? { latitude: search.query.latitude, longitude: search.query.longitude }
       : null;
   // Each link names its field: two identical "Enter a valid date and time" links would not say which.
-  const fieldNames = { area: 'where', place: 'addressName', start: 'from', end: 'until' } as const;
-  const problems = (['area', 'place', 'start', 'end'] as const).flatMap((field) => {
+  const fieldNames = {
+    area: 'where',
+    place: 'addressName',
+    start: 'from',
+    end: 'until',
+    vehicleHeight: 'vehicleHeight',
+    vehicleLength: 'vehicleLength',
+    vehicleWidth: 'vehicleWidth',
+  } as const;
+  const problems = (
+    ['area', 'place', 'start', 'end', 'vehicleHeight', 'vehicleLength', 'vehicleWidth'] as const
+  ).flatMap((field) => {
     const key = search.errors[field];
     if (!key) return [];
     const message = tValidation(key, validationArgs(key));
@@ -210,7 +231,9 @@ export default async function SearchPage(props: SearchPageProps) {
                   <li key={field}>
                     <a
                       href={`#${SEARCH_FIELD_IDS[field]}`}
-                      className="underline underline-offset-4"
+                      // Each link its own row of at least 24 px (WCAG 2.5.8): with two or more
+                      // problems they sit one above the other.
+                      className="inline-block min-h-6 py-0.5 underline underline-offset-4"
                     >
                       {text}
                     </a>

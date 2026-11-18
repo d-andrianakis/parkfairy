@@ -138,8 +138,22 @@ test('an owner stops partway, comes back to the right place and sends the listin
   const listingUrl = page.url().replace(/\/location$/, '');
   await expectAccessible(page);
   await fillLocation(page, 'Smoke garage');
+  // How to get in is private to booked drivers; what the listing offers is a filter (5A.1).
+  await page.getByLabel('Arrival instructions (optional)').fill('Gate code 4821');
+  await page
+    .getByRole('group', { name: 'Security' })
+    .getByRole('checkbox', { name: 'CCTV' })
+    .check();
   await page.getByRole('button', { name: 'Save and continue' }).click();
   await expect(page).toHaveURL(/\/spaces$/);
+  // Saved: they are there when the step is opened again.
+  await page.goto(`${listingUrl}/location`);
+  await expect(page.getByLabel('Arrival instructions (optional)')).toHaveValue('Gate code 4821');
+  await expect(page.getByRole('checkbox', { name: 'CCTV' })).toBeChecked();
+  await expect(page.getByLabel('Description (optional)')).toHaveAccessibleDescription(
+    /This is public/,
+  );
+  await expectAccessible(page);
 
   // Stop here. Continue opens spaces, the first step not done.
   await page.goto('/en/owner');
@@ -149,12 +163,25 @@ test('an owner stops partway, comes back to the right place and sends the listin
 
   await page.getByLabel('Prefix').fill('A');
   await page.getByLabel('How many').fill('3');
+  await page
+    .getByRole('group', { name: 'Largest vehicle it takes (optional)' })
+    .getByLabel('Maximum vehicle height (cm) (optional)')
+    .fill('200');
   await page.getByRole('button', { name: 'Add spaces' }).click();
   await expect(page.getByRole('heading', { name: '3 spaces' })).toBeVisible();
   await page.getByRole('button', { name: 'Remove A3' }).click();
   await page.getByRole('button', { name: 'Save and continue' }).click();
 
   await expect(page).toHaveURL(/\/hours$/);
+  // The limit went with each space, and is there when the step is opened again.
+  await page.goto(`${listingUrl}/spaces`);
+  await expect(
+    page
+      .getByRole('group', { name: 'Space 2' })
+      .getByLabel('Maximum vehicle height (cm) (optional)'),
+  ).toHaveValue('200');
+  await expectAccessible(page);
+  await page.goto(`${listingUrl}/hours`);
   await expectAccessible(page);
   await page.getByRole('button', { name: 'Open all day, every day' }).click();
   await page.getByRole('button', { name: 'Save and continue' }).click();

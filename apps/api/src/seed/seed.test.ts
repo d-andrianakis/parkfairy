@@ -4,9 +4,11 @@ import {
   addDays,
   DEFAULT_TIME_ZONE,
   findArea,
+  LISTING_LIMITS,
   ListingHoursExceptionsInputSchema,
   PASSWORD_POLICY,
   SEARCH_RADIUS_METERS,
+  SPACE_LIMITS_CM,
   zonedParts,
 } from '@parkfairy/contracts';
 import { PHOTO_LIMITS } from '@parkfairy/contracts';
@@ -146,5 +148,62 @@ describe('demo data', () => {
       if (area) expect(metres(listing, area), listing.slug).toBeLessThan(SEARCH_RADIUS_METERS);
       expect(listing.openingHours.length, listing.slug).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('demo security, sizes and arrival instructions (5A.1)', () => {
+  const listing = (slug: string) => {
+    const found = DEMO_LISTINGS.find((l) => l.slug === slug);
+    if (!found) throw new Error(`No demo listing ${slug}`);
+    return found;
+  };
+
+  it('keeps every size within what a car park holds', () => {
+    for (const { slug, spaces } of DEMO_LISTINGS) {
+      for (const space of spaces) {
+        for (const [key, dimension] of [
+          ['maxHeightCm', 'height'],
+          ['maxLengthCm', 'length'],
+          ['maxWidthCm', 'width'],
+        ] as const) {
+          const value = space[key];
+          if (value === undefined) continue;
+          const { min, max } = SPACE_LIMITS_CM[dimension];
+          expect(value, `${slug} ${space.label} ${key}`).toBeGreaterThanOrEqual(min);
+          expect(value, `${slug} ${space.label} ${key}`).toBeLessThanOrEqual(max);
+        }
+      }
+    }
+  });
+
+  it('keeps arrival instructions within their length, and out of the public description', () => {
+    for (const { slug, arrivalInstructions, description } of DEMO_LISTINGS) {
+      if (arrivalInstructions === undefined) continue;
+      expect(arrivalInstructions.length, slug).toBeGreaterThan(0);
+      expect(arrivalInstructions.length, slug).toBeLessThanOrEqual(
+        LISTING_LIMITS.arrivalInstructions,
+      );
+      expect(description, slug).not.toContain(arrivalInstructions);
+    }
+  });
+
+  // tests/smoke/specs/arrival-and-fit.smoke.ts searches by these: a change here changes what it sees.
+  it('has what the smoke test searches by', () => {
+    const garage = listing('syntagma-square-garage');
+    expect([garage.hasCctv, garage.isLit, garage.isGated]).toEqual([true, true, true]);
+    expect(new Set(garage.spaces.map((s) => s.maxHeightCm))).toEqual(new Set([190, 210]));
+    expect(garage.spaces.some((s) => s.maxWidthCm === 210)).toBe(true);
+    // The word the smoke test looks for in public pages, and finds only here.
+    expect(garage.arrivalInstructions).toContain('φαρμακείο');
+    expect(garage.description).not.toContain('φαρμακείο');
+
+    const ermou = listing('ermou-parking');
+    expect(ermou.hasCctv).toBe(true);
+    expect(ermou.isGated).toBeFalsy();
+    expect(new Set(ermou.spaces.map((s) => s.maxHeightCm))).toEqual(new Set([200]));
+
+    const lot = listing('monastiraki-open-lot');
+    expect([lot.hasCctv, lot.isLit, lot.isGated]).toEqual([undefined, true, undefined]);
+    expect(lot.spaces.every((s) => s.maxHeightCm === undefined)).toBe(true);
   });
 });

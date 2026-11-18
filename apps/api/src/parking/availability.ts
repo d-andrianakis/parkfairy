@@ -1,7 +1,11 @@
+import { BLOCKING_STATUSES, LAPSING_STATUSES } from '@parkfairy/contracts';
 import { schema } from '@parkfairy/database';
 import { type Column, type SQL, sql } from 'drizzle-orm';
 
 const booking = schema.bookings;
+
+/** `'a', 'b'` for a SQL `in (…)`, from trusted constants (never user input). */
+const sqlList = (values: readonly string[]) => sql.raw(values.map((v) => `'${v}'`).join(', '));
 
 export interface Stay {
   start: Date;
@@ -16,8 +20,10 @@ export interface Stay {
  * space's first. `status in (…)` and the range repeat the indexes' own, so they serve.
  */
 function meets({ start, end }: Stay, gapMinutes: Column | SQL): SQL {
-  return sql`b.status in ('held', 'confirmed')
-    and (b.status = 'confirmed' or b.hold_expires_at > now())
+  // The statuses are `BLOCKING_STATUSES`, and the same list as the constraint's and the index's (a
+  // test holds the migrations to it): a status that lapses stops counting at its hold time.
+  return sql`b.status in (${sqlList(BLOCKING_STATUSES)})
+    and (b.status not in (${sqlList(LAPSING_STATUSES)}) or b.hold_expires_at > now())
     and tstzrange(b.starts_at, b.blocked_until, '[)') && tstzrange(${start.toISOString()}::timestamptz,
       ${end.toISOString()}::timestamptz + make_interval(mins => ${gapMinutes}::int), '[)')`;
 }

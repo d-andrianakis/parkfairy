@@ -3,10 +3,15 @@ import {
   currentSlotStart,
   DEFAULT_TIME_ZONE,
   isValidationMessage,
+  PARKING_FEATURES,
+  type ParkingFeature,
   ParkingListingQuerySchema,
   type ParkingSearchQuery,
   ParkingSearchQuerySchema,
   PLACE_QUERY_LIMITS,
+  SECURITY_FEATURES,
+  type SecurityFeature,
+  SIZE_MESSAGES,
   type ValidationMessage,
   zonedParts,
   zonedTimeToUtc,
@@ -48,9 +53,23 @@ export interface SearchValues extends WindowValues {
   placeLocale: string;
   latitude: string;
   longitude: string;
+  /** Filters (5A.1): what the space and the parking must have, and the vehicle's size in cm. */
+  features: ParkingFeature[];
+  security: SecurityFeature[];
+  vehicleHeight: string;
+  vehicleLength: string;
+  vehicleWidth: string;
 }
 
-export type SearchField = 'area' | 'place' | 'start' | 'end';
+export type SearchField =
+  'area' | 'place' | 'start' | 'end' | 'vehicleHeight' | 'vehicleLength' | 'vehicleWidth';
+
+/** The vehicle size each query key carries, and the message that explains it. */
+const VEHICLE_FIELDS = {
+  vehicleHeightCm: { field: 'vehicleHeight', message: SIZE_MESSAGES.height },
+  vehicleLengthCm: { field: 'vehicleLength', message: SIZE_MESSAGES.length },
+  vehicleWidthCm: { field: 'vehicleWidth', message: SIZE_MESSAGES.width },
+} as const;
 export type SearchErrors = Partial<Record<SearchField, ValidationMessage>>;
 
 const WINDOW_KEYS = WINDOW_PARAM_KEYS;
@@ -75,7 +94,24 @@ export function defaultWindow(now = Date.now()): WindowValues {
 
 function fieldOf(path: PropertyKey[]): SearchField {
   const [key] = path;
-  return key === 'start' || key === 'end' ? key : 'area';
+  if (key === 'start' || key === 'end') return key;
+  if (typeof key === 'string' && key in VEHICLE_FIELDS) {
+    return VEHICLE_FIELDS[key as keyof typeof VEHICLE_FIELDS].field;
+  }
+  return 'area';
+}
+
+/** The known values among a list in the URL, in their own order; anything else is not a filter. */
+function listOf<T extends string>(value: string | string[] | undefined, known: readonly T[]): T[] {
+  const given = (Array.isArray(value) ? value : [value])
+    .flatMap((entry) => (entry ?? '').split(','))
+    .map((entry) => entry.trim());
+  return known.filter((item) => given.includes(item));
+}
+
+/** A vehicle size as typed; a number with nothing else around it, or it is left for the form to refuse. */
+function sizeOf(value: string | string[] | undefined): string {
+  return first(value).trim();
 }
 
 /** Both ends of a position, each a number within its bounds. */
@@ -101,7 +137,15 @@ function collect(
   const result = { ...errors };
   for (const issue of issues) {
     const field = fieldOf(issue.path);
-    result[field] ??= isValidationMessage(issue.message) ? issue.message : 'invalid';
+    // A size outside what a car park holds is explained with its limits, whether it was text or a
+    // number out of range: the contract's own message for the number, ours for the text.
+    const sized = issue.path[0] as keyof typeof VEHICLE_FIELDS;
+    result[field] ??=
+      field.startsWith('vehicle') && sized in VEHICLE_FIELDS
+        ? VEHICLE_FIELDS[sized].message
+        : isValidationMessage(issue.message)
+          ? issue.message
+          : 'invalid';
   }
   return result;
 }
@@ -168,7 +212,19 @@ export function parseSearch(
   const language = first(params.placeLocale);
   const placeLocale = place && isLocale(language) ? language : '';
   const window = readWindow(params, now);
-  const values = { area, place, placeLocale, latitude, longitude, ...window.values };
+  const values = {
+    area,
+    place,
+    placeLocale,
+    latitude,
+    longitude,
+    ...window.values,
+    features: listOf(params.features, PARKING_FEATURES),
+    security: listOf(params.security, SECURITY_FEATURES),
+    vehicleHeight: sizeOf(params.vehicleHeightCm),
+    vehicleLength: sizeOf(params.vehicleLengthCm),
+    vehicleWidth: sizeOf(params.vehicleWidthCm),
+  };
   const submitted = area !== '' || typed !== '' || latitude !== '' || window.given;
   if (!submitted) return { values, submitted, errors: {} };
 
@@ -179,6 +235,11 @@ export function parseSearch(
     longitude: longitude || undefined,
     start: window.start ?? '',
     end: window.end ?? '',
+    features: values.features.length > 0 ? values.features : undefined,
+    security: values.security.length > 0 ? values.security : undefined,
+    vehicleHeightCm: values.vehicleHeight,
+    vehicleLengthCm: values.vehicleLength,
+    vehicleWidthCm: values.vehicleWidth,
   });
   const errors = collect(
     // Where is the place's to answer once it is looked up, not "choose an area".

@@ -68,6 +68,36 @@ export function BookingFacts({ booking }: { booking: Booking }) {
         ]
       : []),
     [t('cancellation'), tListing(`cancellation.${booking.cancellationPolicy}`)],
+    // Left by the owner but not to be read yet (a gate code can't be read, then refunded): when.
+    ...(booking.arrivalInstructionsFrom
+      ? [
+          [
+            t('arrival'),
+            t('arrivalFrom', {
+              when: format.dateTime(new Date(booking.arrivalInstructionsFrom), {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+                timeZone: listing.timeZone,
+              }),
+            }),
+          ] as const,
+        ]
+      : []),
+    // The owner's words, in their language, with their line breaks (gate codes, which way to turn).
+    ...(booking.arrivalInstructions
+      ? [
+          [
+            t('arrival'),
+            <span
+              key="arrival"
+              lang={booking.arrivalInstructions.contentLocale}
+              className="whitespace-pre-line"
+            >
+              {booking.arrivalInstructions.text}
+            </span>,
+          ] as const,
+        ]
+      : []),
   ];
 
   return (

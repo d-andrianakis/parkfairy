@@ -15,6 +15,9 @@ import {
   OpeningPeriodSchema,
   PARKING_FEATURES,
   ParkingFeatureSchema,
+  SECURITY_FEATURES,
+  SecurityFeatureSchema,
+  spaceSizeCm,
 } from './parking.js';
 import { contractsRegistry } from './registry.js';
 import { addDays, zonedParts } from './time.js';
@@ -269,6 +272,11 @@ const locationFields = {
   latitude: z.number(message('pinRequired')).min(-90).max(90),
   longitude: z.number(message('pinRequired')).min(-180).max(180),
   description: trimmedLines().max(LISTING_LIMITS.description, message('textTooLong')),
+  arrivalInstructions: trimmedLines().max(
+    LISTING_LIMITS.arrivalInstructions,
+    message('textTooLong'),
+  ),
+  security: z.array(SecurityFeatureSchema).max(SECURITY_FEATURES.length),
   contentLocale: LocaleSchema,
 };
 
@@ -281,6 +289,8 @@ export const ListingLocationInputSchema = z
     latitude: locationFields.latitude,
     longitude: locationFields.longitude,
     description: locationFields.description.nullish(),
+    arrivalInstructions: locationFields.arrivalInstructions.nullish(),
+    security: locationFields.security.optional(),
     contentLocale: locationFields.contentLocale,
   })
   .superRefine((location, ctx) => {
@@ -300,6 +310,8 @@ export const ListingLocationPatchSchema = z
     latitude: locationFields.latitude.nullish(),
     longitude: locationFields.longitude.nullish(),
     description: clearable(locationFields.description).optional(),
+    arrivalInstructions: clearable(locationFields.arrivalInstructions).optional(),
+    security: locationFields.security.optional(),
     contentLocale: locationFields.contentLocale.optional(),
   })
   .strict()
@@ -334,6 +346,10 @@ export const ListingSpaceInputSchema = z
     features: z.array(ParkingFeatureSchema).max(PARKING_FEATURES.length),
     /** This space's own hourly rate; null uses the listing's. */
     hourlyRateMinor: rate.nullable(),
+    /** The largest vehicle it takes, in centimetres; null or left out is no stated limit. */
+    maxHeightCm: spaceSizeCm('height').nullish(),
+    maxLengthCm: spaceSizeCm('length').nullish(),
+    maxWidthCm: spaceSizeCm('width').nullish(),
   })
   .register(contractsRegistry, { id: 'ListingSpaceInput' });
 export type ListingSpaceInput = z.infer<typeof ListingSpaceInputSchema>;
@@ -791,6 +807,9 @@ export const OwnerSpaceSchema = z
     label: z.string(),
     features: z.array(ParkingFeatureSchema),
     hourlyRateMinor: z.int().nullable(),
+    maxHeightCm: z.int().nullable(),
+    maxLengthCm: z.int().nullable(),
+    maxWidthCm: z.int().nullable(),
   })
   .register(contractsRegistry, { id: 'OwnerSpace' });
 
@@ -834,6 +853,9 @@ export const OwnerListingSchema = z
       latitude: z.number().nullable(),
       longitude: z.number().nullable(),
       description: z.string().nullable(),
+      /** Private to drivers with a booking: how to find and get into the space. */
+      arrivalInstructions: z.string().nullable(),
+      security: z.array(SecurityFeatureSchema),
       contentLocale: LocaleSchema,
     }),
     spaces: z.array(OwnerSpaceSchema),

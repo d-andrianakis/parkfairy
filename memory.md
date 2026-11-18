@@ -1949,3 +1949,142 @@ Our readings for overstay reports, 5.2c4 (2026-11-17), not asked; change any tha
   an overstay is shown in the staff language's `lang` (Greek runs marked on English pages only).
 - **Translations**: the Greek of this slice was written without a native speaker and sent to the product
   owner as a review form (2026-11-17); answers are in that page's `reviews` collection.
+
+Answered by the product owner on 2026-11-17, for the feature-gap list (Phase 5A, built before Phase 6):
+
+86. **Everything on the gap list is built before Phase 6**, as Phase 5A (slices 5A.0 to 5A.12 in
+    progress.md). Phase 6 keeps its number, so every reference to it still holds. Phase 5A adds its
+    privacy items to Phase 6's retention list (arrival instructions, saved vehicles, billing profiles,
+    review comments, occupied-report notes, calendar feed tokens).
+87. **Monthly bookings bill monthly from day one**: a saved card, one off-session charge per 30-day
+    period, charged 3 days ahead, never a year ahead (the point of #19). New Stripe pieces: a customer per
+    driver, consent text, SCA fallback. Built in test mode like the rest of Phase 4 (#46): live keys stay
+    refused until #18 and #19 are answered.
+88. **"Someone is in my space"**: the driver reports from the booking page and is **moved to a free space
+    in the same listing, otherwise refunded in full**. The owner is told and can report the earlier driver
+    through the existing overstay report (5.2c4).
+89. **Reviews are mutual-reveal**: both sides rate after a completed stay; ratings stay hidden until both
+    are in or 14 days pass. Drivers' ratings of listings are public; owners' ratings of drivers are seen
+    only by owners and co-owners, as an average of at least 3.
+
+Our readings for Phase 5A (2026-11-17), not asked; change any that are wrong:
+
+- **Extending a stay is a continuation booking**: a normal booking starting where its parent ends
+  (`continues_booking_id`), priced as its own stay (the daily cap does not span the join), with its own
+  payment, payees and transfer. The owner's gap should apply once, after the last piece, so the parent
+  waives its own: **`bookings_gap_check` ties `blocked_until` to `gap_minutes`**, so a parent can't just
+  be cut back; 5A.5 adds a `gap_waived` flag the check understands (found while testing 5A.0, 2026-11-17).
+  Monthly billing (#87) reuses the same link.
+- **Statuses that hold a space** are one constant (`BLOCKING_STATUSES`), so request-to-book's `requested`
+  and a monthly renewal's `scheduled` cannot be missed by a predicate.
+- **Request-to-book** is a card authorisation (manual capture): the owner has `min(24 h, until the start)`
+  to accept (capture) or decline (cancel); a decline or lapse moves no money. At most 3 open requests per
+  driver; none for a stay starting in under 30 minutes.
+- **A relocated driver keeps the price they paid**, and must report within 60 minutes of the start, once.
+  A full refund is an exception to #38 (an owner can't cancel a stay under way) because the driver never
+  got the space.
+- **Calendar feeds carry no driver names or plates** (calendars sync to third parties), are reached by a
+  secret token stored hashed and shown once, and re-check the owner's role on every fetch. Import never
+  cancels a booking and is fetched only over https from public addresses.
+- **Monthly periods are 30 days**, not calendar months (`MAX_BOOKING_DAYS` is 30); the long-stay discount
+  tiers set the monthly price; on a request listing the owner approves the first period only.
+- **The earnings estimator is an illustration** with its assumptions shown, never a promise, and the
+  suggested price is never applied automatically. The lawyer (#18) should read the estimator's wording.
+- **Statements use the sent date in Europe/Athens** (as the earnings months do) and carry no VAT until #18.
+  Business accounts get receipts and a monthly CSV, not tax invoices (who issues them is #18).
+- **Wallet passes (Apple, Google) are deferred**: they need developer and issuer accounts.
+
+After the security review of 5A.0 (2026-11-17), what changed and why:
+
+- **2026-11-17 · `bookings_continues_idx` counts live continuations only** (`status` in `BLOCKING_STATUSES`).
+  The first version ignored status, so a continuation that lapsed or was cancelled would have taken the
+  parent's only slot for good, and the stay could never be extended again. The migration guard in
+  `packages/database/src/migrations.test.ts` holds this index to the same list as the exclusion constraint.
+- **2026-11-17 · The iCalendar writer refuses days that don't exist and times past year 9999** (it first
+  rolled `2026-02-31` over to March and wrote `+010000…` for far dates). It throws `RangeError`; **a feed
+  must catch it per event and skip that event** (5A.7), or one bad closure row turns an owner's whole
+  public feed into a 500. The writer sets no size cap either: callers cap events and rate-limit the feed.
+- **`continues_booking_id` is never taken from a client** (5A.5): see progress.md.
+
+- **2026-11-17 · Regenerating a migration you already applied locally needs both databases reset.** The API's
+  `test/global-setup.ts` migrates `TEST_DATABASE_URL` (`parkfairy_test`) on every run, so a first version of
+  0047 had landed there too, and the regenerated one failed with a vitest "Startup Error: code.charCodeAt
+  is not a function" (the real error is "column already exists"; the stack mapper chokes). Reset each
+  database (`alter table … drop column`, delete the last `drizzle.__drizzle_migrations` row) before applying
+  the new file. Only for a migration that has not been committed or shared.
+- **2026-11-17 · A cap can read `blocked_until` only through `gap_minutes`** (`bookings_gap_check`): see the
+  5A.5 note above. Found by writing the constraint test first.
+
+Our readings for 5A.1, arrival, fit and security (2026-11-18), not asked; change any that are wrong:
+
+- **Sizes are whole centimetres**, height 100–500, length 200–1500, width 100–400 (`SPACE_LIMITS_CM`), kept
+  on the space (`max_height_cm`…) with a CHECK. **A space with no stated limit fits any vehicle**: owners say
+  what they know, so a driver's vehicle size leaves out only spaces that say they are too small. The listing
+  shows the limits that exist and says nothing where there are none (never "any size").
+- **A filter is asked of one free space.** Features and the vehicle's size must meet in the same space (a
+  covered space and, elsewhere, a charger is not "covered with a charger"); security is the listing's.
+  `freeSpaces` and the "from" price on a result count only the free spaces that meet the filter, since that
+  is what the driver would book. Features, security and sizes are all optional query keys of
+  `GET /parking/search` (`features`, `security`, `vehicleHeightCm`, `vehicleLengthCm`, `vehicleWidthCm`); a
+  list may repeat its key or be comma-separated, and anything unknown is a 400 (a link edited by hand is
+  quietly cleaned on the web side instead).
+- **Arrival instructions are private, and held back until a cancel would cost something.** They can hold a
+  gate code, so the public listing, search, featured list, owner lists and emails never carry them. A driver
+  reads them (`Booking.arrivalInstructions`) only on a **confirmed** booking, **from when cancelling stops
+  refunding in full** (24 hours before the start, or one hour for the shortest policy: `fullRefundUntil`,
+  held to `refundMinor` by a test) **until 24 hours after the stay ends** (`ARRIVAL_INSTRUCTIONS_HOURS_AFTER`).
+  Before that the booking says when (`arrivalInstructionsFrom`) and shows nothing. _Why:_ the security
+  review of 5A.1 found that "from confirming" let anyone book a space weeks ahead, read the code and cancel
+  for a full refund (nothing limits book-and-cancel). It is read **as the owner has them now**, not as a copy
+  taken at booking (a gate code changes). A hold, a cancelled or expired booking and every other account get
+  none. The description hint tells owners it is public. Phase 6's retention list gains them.
+- **Open: an owner can't change the arrival instructions of a live listing.** They are part of the location
+  step, which is locked once a listing is with staff or live (`isEditable`), so a gate code that changes
+  can't be updated by the owner, though drivers read it as it is now. A small endpoint like closures' (#24,
+  any status, no review, only booked drivers read it) would fix it; not built, waiting for a decision.
+- **Open: staff review does not show the arrival instructions**, though every booked driver will read them
+  (security review 5A.1, L2): free text that is never moderated. Decide with the owner-editing question.
+- **Refusing a hold for a vehicle that does not fit (`VEHICLE_DOES_NOT_FIT`) waits for 5A.2**, where the
+  vehicle is saved; this slice only filters search, which is advice, not a gate.
+- **The search form's checkboxes are native `<input type="checkbox">`, not shadcn's Radix one**: the form is a
+  GET form that works without JavaScript, and Radix's box can't be toggled (nor its choice kept) before
+  hydration. An exception to "shadcn only", like `NativeSelect`; the owner forms, which are client forms,
+  use the shadcn Checkbox.
+- **2026-11-18 · An owner may have 50 listings (`OWNER_LISTINGS_MAX`)**, so an integration block that makes a
+  listing per test runs out (and then every later test in the file fails, old ones too, with a bare 409).
+  Share one listing in the block and reset it in `beforeEach`.
+- **2026-11-18 · jsdom renders a server component's output inside `<ClientMessages>` with the trimmed
+  messages** (the picker's `details`), so a namespace the browser never needs (`Features`) is "missing" there
+  though it is fine in production. Test such a path in the browser (smoke), not in jsdom.
+
+After the five reviews of 5A.1 (2026-11-18), what changed and why:
+
+- **A size says its limits and which size it is**: `sizeHeightInvalid`, `sizeLengthInvalid`, `sizeWidthInvalid`
+  (`Enter a length from 200 to 1500 cm`), not one "enter a whole number" for all three, which told someone who
+  typed 99 to do what they had done. `SPACE_LIMITS_CM` and `SIZE_MESSAGES` live in the zod-free
+  `validation.ts`, so the web's `validationArgs` can fill `{min}` and `{max}` in. On the search form only the
+  size that is wrong is marked and described, and the summary links to it (one field per size, not one for
+  "vehicle").
+- **The search form's group legends are nouns** ("Space features", "Security"), not stems ("The space is"),
+  because the checkbox labels are the badges' own noun phrases and the two must read together in both languages.
+- **A limit says it is about the vehicle** ("Vehicles up to 190 cm high"), so it still reads right inside a
+  radio's description, where the list's name is dropped.
+- **Components that take server data tolerate what is missing** (`SecurityBadges`, `SpaceLimits`): the
+  featured list is cached for five minutes across builds (`unstable_cache`), and a deploy is never in step on
+  every server, so a new field can be absent for a while. A crash on `security.length` was only found because the
+  smoke run met a cached list from the build before.
+- **Greek for a single space is «θέση», for a listing «χώρος»** in the owner area (`Owner.spaces.*`); the search
+  filters and demo text now follow it. The wording questions are in progress.md 5A.1.
+- **Left, with reasons:** the repeated "(optional)" on every size label (a verbose read; the native speaker will
+  say whether to drop the unit or the word); `bookings` migration 0047 adds a foreign key, a check and an index
+  that lock the table while they validate, fine at today's size, `NOT VALID` then `VALIDATE` and a
+  `CONCURRENTLY` index outside the migration runner before a big production table (performance review); the
+  referenced side of that foreign key has no index either, so deleting a booking scans `bookings` (nothing
+  deletes bookings yet; Phase 6's erasure will).
+- **2026-11-18 · `next build` can fail with `SecurityFatalError` ("your version of Next.js is affected by a
+  known security vulnerability") at random**: it asks the npm advisory service and, when that answers one way, stops
+  the build; the next run passes. A failed build leaves the previous `.next` in place, so a smoke run after it
+  tests the old code: check `apps/web/.next/BUILD_ID`'s time after a build. Upgrading Next.js is the real fix.
+- **2026-11-18 · An error summary's links need a 24 px row each** (WCAG 2.5.8): with two or more problems they sit
+  one above the other, and axe's `target-size` failed on the search page's summary only once a second error made
+  a neighbour. The accessibility smoke list now has a two-error page.

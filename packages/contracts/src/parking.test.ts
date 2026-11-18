@@ -102,6 +102,74 @@ describe('ParkingSearchQuerySchema', () => {
   });
 });
 
+describe('search filters (5A.1)', () => {
+  const base = { area: 'syntagma', start: '2026-10-29T09:00:00Z', end: '2026-10-29T11:30:00Z' };
+  const parse = (extra: Record<string, unknown>) =>
+    ParkingSearchQuerySchema.safeParse({ ...base, ...extra });
+
+  it('takes a list as a repeated key, a comma-separated value or a single one', () => {
+    expect(parse({ features: ['covered', 'evCharging'] }).data?.features).toEqual([
+      'covered',
+      'evCharging',
+    ]);
+    expect(parse({ features: 'covered,accessible' }).data?.features).toEqual([
+      'covered',
+      'accessible',
+    ]);
+    expect(parse({ security: 'cctv' }).data?.security).toEqual(['cctv']);
+  });
+
+  it('drops repeats, and counts an empty list as no filter', () => {
+    expect(parse({ features: ['covered', 'covered', 'covered,covered'] }).data?.features).toEqual([
+      'covered',
+    ]);
+    expect(parse({ features: '' }).data?.features).toBeUndefined();
+    expect(parse({ features: [] }).data?.features).toBeUndefined();
+    expect(parse({}).data?.features).toBeUndefined();
+  });
+
+  it('refuses a feature or security value it does not know', () => {
+    expect(parse({ features: 'hovercraft' }).success).toBe(false);
+    expect(parse({ security: ['cctv', 'moat'] }).success).toBe(false);
+    // Features and security are different lists.
+    expect(parse({ features: 'cctv' }).success).toBe(false);
+    expect(parse({ security: 'covered' }).success).toBe(false);
+  });
+
+  it('takes a vehicle size in centimetres from a query string, and a blank as none', () => {
+    const parsed = parse({
+      vehicleHeightCm: '190',
+      vehicleLengthCm: '450',
+      vehicleWidthCm: '',
+    });
+    expect(parsed.data).toMatchObject({ vehicleHeightCm: 190, vehicleLengthCm: 450 });
+    expect(parsed.data?.vehicleWidthCm).toBeUndefined();
+  });
+
+  it('holds sizes to what a car park can take, and to whole numbers', () => {
+    for (const bad of [
+      { vehicleHeightCm: '99' },
+      { vehicleHeightCm: '501' },
+      { vehicleLengthCm: '199' },
+      { vehicleLengthCm: '1501' },
+      { vehicleWidthCm: '99' },
+      { vehicleWidthCm: '401' },
+      { vehicleHeightCm: '190.5' },
+      { vehicleHeightCm: 'tall' },
+      { vehicleHeightCm: '-190' },
+    ]) {
+      const result = parse(bad);
+      expect(result.success, JSON.stringify(bad)).toBe(false);
+      for (const message of issues(result).map((issue) => issue.split(':')[1] ?? '')) {
+        expect(isValidationMessage(message), message).toBe(true);
+      }
+    }
+    expect(
+      parse({ vehicleHeightCm: '100', vehicleLengthCm: '1500', vehicleWidthCm: '400' }).success,
+    ).toBe(true);
+  });
+});
+
 describe('booking horizon and DST', () => {
   const at = (start: string, end: string) =>
     issues(ParkingSearchQuerySchema.safeParse({ area: 'syntagma', start, end }));

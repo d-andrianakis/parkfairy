@@ -12,6 +12,8 @@ import {
   ListingLocationPatchSchema,
   type Locale,
   type OwnerListing,
+  SECURITY_FEATURES,
+  type SecurityFeature,
   SUPPORTED_LOCALES,
 } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
@@ -32,7 +34,13 @@ import { attempt, useOwnerError } from '@/lib/owner-client';
 import { useValidationMessage } from '@/lib/use-validation-message';
 import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 
-import { SelectField, SelectOption, TextareaField, useOptionalLabel } from './fields';
+import {
+  CheckboxField,
+  SelectField,
+  SelectOption,
+  TextareaField,
+  useOptionalLabel,
+} from './fields';
 import type { LocationMapProps } from './location-map';
 import { useFocusAfterRender, useStepNavigation } from './navigation';
 import { SaveStatus, useAutosave } from './save-status';
@@ -41,7 +49,15 @@ import { StepActions } from './step-actions';
 /** About 11 cm: more than a pin on a phone can mean. */
 const COORDINATE_DECIMALS = 6;
 
-const FIELD_ORDER = ['name', 'address', 'latitude', 'longitude', 'areaId', 'description'] as const;
+const FIELD_ORDER = [
+  'name',
+  'address',
+  'latitude',
+  'longitude',
+  'areaId',
+  'description',
+  'arrivalInstructions',
+] as const;
 type Field = (typeof FIELD_ORDER)[number];
 type Errors = Partial<Record<Field, string>>;
 
@@ -64,6 +80,7 @@ export function LocationForm({
 }) {
   const t = useTranslations('Owner.location');
   const tAreas = useTranslations('Areas');
+  const tFeatures = useTranslations('Features');
   const locale = useLocale();
   const go = useStepNavigation();
   const message = useValidationMessage();
@@ -81,6 +98,8 @@ export function LocationForm({
   const [latitude, setLatitude] = useState(location.latitude?.toString() ?? '');
   const [longitude, setLongitude] = useState(location.longitude?.toString() ?? '');
   const [description, setDescription] = useState(location.description ?? '');
+  const [arrival, setArrival] = useState(location.arrivalInstructions ?? '');
+  const [security, setSecurity] = useState<SecurityFeature[]>(location.security);
   const [contentLocale, setContentLocale] = useState<Locale>(location.contentLocale);
   const [matches, setMatches] = useState<AddressMatch[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -114,6 +133,7 @@ export function LocationForm({
     remember('name', location.name ?? '');
     remember('address', location.address ?? '');
     remember('description', location.description ?? '');
+    remember('arrivalInstructions', location.arrivalInstructions ?? '');
   }, [location, remember]);
 
   function mapFailed() {
@@ -128,7 +148,10 @@ export function LocationForm({
     import('./location-map').then(({ default: map }) => setLocationMap(() => map)).catch(mapFailed);
   }
 
-  function saveText(field: 'name' | 'address' | 'description', value: string) {
+  function saveText(
+    field: 'name' | 'address' | 'description' | 'arrivalInstructions',
+    value: string,
+  ) {
     if (ListingLocationPatchSchema.safeParse({ [field]: value }).success) autosave(field, value);
   }
 
@@ -214,6 +237,8 @@ export function LocationForm({
       latitude: toNumber(latitude) ?? undefined,
       longitude: toNumber(longitude) ?? undefined,
       description: description.trim() || null,
+      arrivalInstructions: arrival.trim() || null,
+      security,
       contentLocale,
     };
     const parsed = ListingLocationInputSchema.safeParse(input);
@@ -428,6 +453,42 @@ export function LocationForm({
           onChange={(event) => setDescription(event.target.value)}
           onBlur={() => saveText('description', description)}
         />
+
+        <TextareaField
+          id="location-arrivalInstructions"
+          label={optional(t('arrivalInstructions'))}
+          hint={t('arrivalHint')}
+          lang={contentLocale}
+          rows={4}
+          value={arrival}
+          error={errors.arrivalInstructions}
+          onChange={(event) => setArrival(event.target.value)}
+          onBlur={() => saveText('arrivalInstructions', arrival)}
+        />
+
+        <FieldSet aria-describedby="location-security-hint">
+          <FieldLegend variant="label">{t('securityLegend')}</FieldLegend>
+          <p id="location-security-hint" className="text-sm text-muted-foreground">
+            {t('securityHint')}
+          </p>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            {SECURITY_FEATURES.map((feature) => (
+              <CheckboxField
+                key={feature}
+                id={`location-security-${feature}`}
+                label={tFeatures(feature)}
+                checked={security.includes(feature)}
+                onChange={(on) => {
+                  const next = SECURITY_FEATURES.filter((item) =>
+                    item === feature ? on : security.includes(item),
+                  );
+                  setSecurity(next);
+                  autosave('security', { security: next });
+                }}
+              />
+            ))}
+          </div>
+        </FieldSet>
 
         <SelectField
           id="location-contentLocale"

@@ -18,7 +18,7 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { ClientMessages } from '@/components/client-messages';
 import { FocusHeading } from '@/components/focus-heading';
 import { BookSpacePicker } from '@/components/parking/book-space-picker';
-import { FeatureBadges } from '@/components/parking/feature-badges';
+import { FeatureBadges, SecurityBadges, SpaceLimits } from '@/components/parking/feature-badges';
 import { HoursExceptions } from '@/components/parking/hours-exceptions';
 import { ListingPhotoImage } from '@/components/parking/listing-photo';
 import { OpeningHours } from '@/components/parking/opening-hours';
@@ -147,6 +147,7 @@ export default async function ListingPage(props: ListingPageProps) {
               {tAreas(listing.area)}
             </Badge>
             <FeatureBadges features={listing.features} />
+            <SecurityBadges security={listing.security} />
           </div>
         </div>
 
@@ -259,6 +260,12 @@ export default async function ListingPage(props: ListingPageProps) {
                   details: (
                     <>
                       <FeatureBadges features={space.features} named={false} />
+                      <SpaceLimits
+                        maxHeightCm={space.maxHeightCm}
+                        maxLengthCm={space.maxLengthCm}
+                        maxWidthCm={space.maxWidthCm}
+                        named={false}
+                      />
                       {space.total ? (
                         <span className="text-muted-foreground">
                           {t('spaceTotal', { price: money(space.total) })}

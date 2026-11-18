@@ -54,6 +54,8 @@ export const listingFixture = (overrides: Partial<OwnerListing> = {}): OwnerList
     latitude: null,
     longitude: null,
     description: null,
+    arrivalInstructions: null,
+    security: [],
     contentLocale: 'el',
   },
   spaces: [],

@@ -70,7 +70,16 @@ export async function upsertListing(
     longitude,
     ...columns
   } = listing;
-  const values = { ...columns, location: { latitude, longitude }, status: 'published' as const };
+  // What the demo data doesn't say is reset, so editing a flag out of it takes effect on a re-seed.
+  const values = {
+    hasCctv: false,
+    isLit: false,
+    isGated: false,
+    arrivalInstructions: null,
+    ...columns,
+    location: { latitude, longitude },
+    status: 'published' as const,
+  };
   const rules = { ...NO_PRICE_RULES, ...priceRules };
   await db.transaction(async (tx) => {
     const [row] = await tx

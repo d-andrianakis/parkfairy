@@ -68,6 +68,84 @@ describe('parseSearch', () => {
     });
   });
 
+  describe('filters (5A.1)', () => {
+    const search = (extra: Record<string, string | string[]>) =>
+      parseSearch({ area: 'syntagma', ...window, ...extra }, NOW);
+
+    it('carry the ticked features, security and vehicle size into the query and the form', () => {
+      const parsed = search({
+        features: ['covered', 'evCharging'],
+        security: 'cctv',
+        vehicleHeightCm: '190',
+        vehicleLengthCm: '450',
+        vehicleWidthCm: '180',
+      });
+      expect(parsed.errors).toEqual({});
+      expect(parsed.query).toMatchObject({
+        features: ['covered', 'evCharging'],
+        security: ['cctv'],
+        vehicleHeightCm: 190,
+        vehicleLengthCm: 450,
+        vehicleWidthCm: 180,
+      });
+      expect(parsed.values).toMatchObject({
+        features: ['covered', 'evCharging'],
+        security: ['cctv'],
+        vehicleHeight: '190',
+        vehicleLength: '450',
+        vehicleWidth: '180',
+      });
+    });
+
+    it('read a comma-separated list, in the order of the contract, without repeats', () => {
+      const parsed = search({ features: 'accessible,covered,covered' });
+      expect(parsed.values.features).toEqual(['covered', 'accessible']);
+      expect(parsed.query?.features).toEqual(['covered', 'accessible']);
+    });
+
+    it('leave out what is not a filter instead of refusing the search (a hand-edited link)', () => {
+      const parsed = search({ features: ['hovercraft', 'covered'], security: 'cctv,moat' });
+      expect(parsed.errors).toEqual({});
+      expect(parsed.values.features).toEqual(['covered']);
+      expect(parsed.values.security).toEqual(['cctv']);
+    });
+
+    it('send no filter keys when none is set', () => {
+      const parsed = search({});
+      expect(parsed.query).toBeDefined();
+      expect(parsed.query?.features).toBeUndefined();
+      expect(parsed.query?.security).toBeUndefined();
+      expect(parsed.query?.vehicleHeightCm).toBeUndefined();
+      expect(parsed.values).toMatchObject({ features: [], security: [], vehicleHeight: '' });
+    });
+
+    it('explain a vehicle size outside what a car park holds in centimetres, and keep what was typed', () => {
+      for (const bad of ['99', '501', '190.5', 'tall', '-1']) {
+        const parsed = search({ vehicleHeightCm: bad });
+        expect(parsed.errors.vehicleHeight, bad).toBe('sizeHeightInvalid');
+        expect(parsed.query).toBeUndefined();
+        expect(parsed.values.vehicleHeight).toBe(bad);
+      }
+      // Each size is explained in its own words, and only the one that is wrong.
+      expect(search({ vehicleWidthCm: '401' }).errors).toEqual({
+        vehicleWidth: 'sizeWidthInvalid',
+      });
+      expect(search({ vehicleLengthCm: '10' }).errors).toEqual({
+        vehicleLength: 'sizeLengthInvalid',
+      });
+      expect(
+        search({ vehicleHeightCm: '190', vehicleLengthCm: '99', vehicleWidthCm: 'wide' }).errors,
+      ).toEqual({ vehicleLength: 'sizeLengthInvalid', vehicleWidth: 'sizeWidthInvalid' });
+    });
+
+    it('count a blank size as none', () => {
+      const parsed = search({ vehicleHeightCm: '  ' });
+      expect(parsed.errors).toEqual({});
+      expect(parsed.query).toBeDefined();
+      expect(parsed.query?.vehicleHeightCm).toBeUndefined();
+    });
+  });
+
   it('uses the default window when only an area is given (area links on the home page)', () => {
     expect(parseSearch({ area: 'piraeusPort' }, NOW).query).toMatchObject({
       start: '2026-10-29T08:30:00.000Z',

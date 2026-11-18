@@ -169,6 +169,65 @@
         "operationId": "searchParking",
         "parameters": [
           {
+            "name": "vehicleWidthCm",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "vehicleLengthCm",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "vehicleHeightCm",
+            "required": false,
+            "in": "query",
+            "description": "Leaves out spaces whose stated height limit is lower. No stated limit fits.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "security",
+            "required": false,
+            "in": "query",
+            "description": "Repeat the key, or comma-separate. The listing must have all of them.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "cctv",
+                  "lit",
+                  "gated"
+                ]
+              }
+            }
+          },
+          {
+            "name": "features",
+            "required": false,
+            "in": "query",
+            "description": "Repeat the key, or comma-separate. One free space must have all of them.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "covered",
+                  "evCharging",
+                  "accessible"
+                ]
+              }
+            }
+          },
+          {
             "name": "end",
             "required": true,
             "in": "query",
@@ -6480,6 +6539,14 @@
           "accessible"
         ]
       },
+      "SecurityFeature": {
+        "type": "string",
+        "enum": [
+          "cctv",
+          "lit",
+          "gated"
+        ]
+      },
       "ListingPhoto": {
         "type": "object",
         "properties": {
@@ -6555,6 +6622,12 @@
               "$ref": "#/components/schemas/ParkingFeature"
             }
           },
+          "security": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityFeature"
+            }
+          },
           "spaceCount": {
             "type": "integer",
             "minimum": 0,
@@ -6579,6 +6652,7 @@
           "dailyMax",
           "spacePricesVary",
           "features",
+          "security",
           "spaceCount",
           "coverPhoto"
         ],
@@ -6637,6 +6711,12 @@
               "$ref": "#/components/schemas/ParkingFeature"
             }
           },
+          "security": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityFeature"
+            }
+          },
           "spaceCount": {
             "type": "integer",
             "minimum": 0,
@@ -6680,6 +6760,7 @@
           "dailyMax",
           "spacePricesVary",
           "features",
+          "security",
           "spaceCount",
           "coverPhoto",
           "latitude",
@@ -6818,6 +6899,24 @@
               "$ref": "#/components/schemas/ParkingFeature"
             }
           },
+          "maxHeightCm": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "maxLengthCm": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "maxWidthCm": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
           "hourlyRate": {
             "$ref": "#/components/schemas/Money"
           },
@@ -6834,6 +6933,9 @@
           "id",
           "label",
           "features",
+          "maxHeightCm",
+          "maxLengthCm",
+          "maxWidthCm",
           "hourlyRate",
           "total"
         ],
@@ -7012,6 +7114,12 @@
               "$ref": "#/components/schemas/ParkingFeature"
             }
           },
+          "security": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityFeature"
+            }
+          },
           "spaceCount": {
             "type": "integer",
             "minimum": 0,
@@ -7096,6 +7204,7 @@
           "dailyMax",
           "spacePricesVary",
           "features",
+          "security",
           "spaceCount",
           "coverPhoto",
           "description",
@@ -7396,6 +7505,29 @@
                 "$ref": "#/components/schemas/PaymentStatus"
               }
             ]
+          },
+          "arrivalInstructions": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "contentLocale": {
+                "$ref": "#/components/schemas/Locale"
+              }
+            },
+            "required": [
+              "text",
+              "contentLocale"
+            ],
+            "additionalProperties": false
+          },
+          "arrivalInstructionsFrom": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
           }
         },
         "required": [
@@ -7417,7 +7549,9 @@
           "refund",
           "refundIfCancelled",
           "checkout",
-          "payment"
+          "payment",
+          "arrivalInstructions",
+          "arrivalInstructionsFrom"
         ],
         "additionalProperties": false
       },
@@ -8474,6 +8608,19 @@
             "maxLength": 2000,
             "pattern": "^(?:[^\\p{Cc}\\p{Cs}]|[\\t\\n\\r])*$"
           },
+          "arrivalInstructions": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 1000,
+            "pattern": "^(?:[^\\p{Cc}\\p{Cs}]|[\\t\\n\\r])*$"
+          },
+          "security": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityFeature"
+            }
+          },
           "contentLocale": {
             "$ref": "#/components/schemas/Locale"
           }
@@ -8540,6 +8687,19 @@
             "maxLength": 2000,
             "pattern": "^(?:[^\\p{Cc}\\p{Cs}]|[\\t\\n\\r])*$"
           },
+          "arrivalInstructions": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 1000,
+            "pattern": "^(?:[^\\p{Cc}\\p{Cs}]|[\\t\\n\\r])*$"
+          },
+          "security": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityFeature"
+            }
+          },
           "contentLocale": {
             "allOf": [
               {
@@ -8571,6 +8731,24 @@
             "type": "integer",
             "minimum": 10,
             "maximum": 100000
+          },
+          "maxHeightCm": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 500
+          },
+          "maxLengthCm": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 200,
+            "maximum": 1500
+          },
+          "maxWidthCm": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 400
           }
         },
         "required": [
@@ -9399,13 +9577,34 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "maxHeightCm": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "maxLengthCm": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "maxWidthCm": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
           "id",
           "label",
           "features",
-          "hourlyRateMinor"
+          "hourlyRateMinor",
+          "maxHeightCm",
+          "maxLengthCm",
+          "maxWidthCm"
         ],
         "additionalProperties": false
       },
@@ -9593,6 +9792,16 @@
                 "nullable": true,
                 "type": "string"
               },
+              "arrivalInstructions": {
+                "nullable": true,
+                "type": "string"
+              },
+              "security": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SecurityFeature"
+                }
+              },
               "contentLocale": {
                 "$ref": "#/components/schemas/Locale"
               }
@@ -9604,6 +9813,8 @@
               "latitude",
               "longitude",
               "description",
+              "arrivalInstructions",
+              "security",
               "contentLocale"
             ],
             "additionalProperties": false

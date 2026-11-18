@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  BLOCKING_STATUSES,
   HOURS_EXCEPTIONS_MAX,
+  LAPSING_STATUSES,
   type ListingHoursCopyInput,
   type ListingHoursExceptionsCopyInput,
   type ListingHoursExceptionsInput,
@@ -40,11 +42,28 @@ import {
   PHOTO_LIMITS,
   PROOF_LIMITS,
   type ProofKind,
+  SECURITY_FEATURES,
+  type SecurityFeature,
   wallMinutes,
   zonedParts,
 } from '@parkfairy/contracts';
 import { type Database, runsListing, schema } from '@parkfairy/database';
-import { and, asc, count, desc, eq, gt, gte, inArray, lt, ne, not, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  lt,
+  ne,
+  not,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 
 import { type HoursChange, strandedBookings } from '../bookings/stranded.js';
 import { DB } from '../database/database.module.js';
@@ -112,6 +131,13 @@ const FEATURE_COLUMNS: Record<ParkingFeature, 'isCovered' | 'hasEvCharging' | 'i
   evCharging: 'hasEvCharging',
   accessible: 'isAccessible',
 };
+
+/** The listing columns behind each security feature (5A.1). */
+const SECURITY_COLUMNS = {
+  cctv: 'hasCctv',
+  lit: 'isLit',
+  gated: 'isGated',
+} as const satisfies Record<SecurityFeature, 'hasCctv' | 'isLit' | 'isGated'>;
 
 const PDF_MAGIC = Buffer.from('%PDF-');
 const JPEG_MAGIC = Buffer.from([0xff, 0xd8, 0xff]);
@@ -295,12 +321,17 @@ export class OwnerListingsService {
         latitude: row.location?.latitude ?? null,
         longitude: row.location?.longitude ?? null,
         description: row.description,
+        arrivalInstructions: row.arrivalInstructions,
+        security: SECURITY_FEATURES.filter((feature) => row[SECURITY_COLUMNS[feature]]),
         contentLocale: row.contentLocale,
       },
       spaces: spaces.map((s) => ({
         id: s.id,
         label: s.label,
         hourlyRateMinor: s.hourlyRateMinor,
+        maxHeightCm: s.maxHeightCm,
+        maxLengthCm: s.maxLengthCm,
+        maxWidthCm: s.maxWidthCm,
         features: (Object.keys(FEATURE_COLUMNS) as ParkingFeature[]).filter(
           (feature) => s[FEATURE_COLUMNS[feature]],
         ),
@@ -390,7 +421,7 @@ export class OwnerListingsService {
     id: string,
     patch: ListingLocationPatch,
   ): Promise<OwnerListingProgress> {
-    const { latitude, longitude, ...columns } = patch;
+    const { latitude, longitude, security, ...columns } = patch;
     const point =
       latitude === undefined || longitude === undefined
         ? undefined
@@ -400,7 +431,17 @@ export class OwnerListingsService {
     await this.edit(userId, id, (tx, row) =>
       tx
         .update(listing)
-        .set({ ...columns, location: point })
+        .set({
+          ...columns,
+          location: point,
+          ...(security === undefined
+            ? {}
+            : {
+                hasCctv: security.includes('cctv'),
+                isLit: security.includes('lit'),
+                isGated: security.includes('gated'),
+              }),
+        })
         .where(eq(listing.id, row.id)),
     );
     return this.progress(userId, id);
@@ -432,9 +473,17 @@ export class OwnerListingsService {
           .where(
             and(
               inArray(booking.spaceId, removed),
+              // Still taking the space: a lapsing status until its hold time, any other until it ends.
               or(
-                and(eq(booking.status, 'confirmed'), gt(booking.endsAt, sql`now()`)),
-                and(eq(booking.status, 'held'), gt(booking.holdExpiresAt, sql`now()`)),
+                and(
+                  inArray(booking.status, [...BLOCKING_STATUSES]),
+                  notInArray(booking.status, [...LAPSING_STATUSES]),
+                  gt(booking.endsAt, sql`now()`),
+                ),
+                and(
+                  inArray(booking.status, [...LAPSING_STATUSES]),
+                  gt(booking.holdExpiresAt, sql`now()`),
+                ),
               ),
             ),
           );
@@ -444,19 +493,27 @@ export class OwnerListingsService {
       await tx
         .insert(space)
         .values(
-          spaces.map(({ label, features, hourlyRateMinor }) => ({
-            locationId: row.id,
-            label,
-            hourlyRateMinor,
-            isCovered: features.includes('covered'),
-            hasEvCharging: features.includes('evCharging'),
-            isAccessible: features.includes('accessible'),
-          })),
+          spaces.map(
+            ({ label, features, hourlyRateMinor, maxHeightCm, maxLengthCm, maxWidthCm }) => ({
+              locationId: row.id,
+              label,
+              hourlyRateMinor,
+              maxHeightCm: maxHeightCm ?? null,
+              maxLengthCm: maxLengthCm ?? null,
+              maxWidthCm: maxWidthCm ?? null,
+              isCovered: features.includes('covered'),
+              hasEvCharging: features.includes('evCharging'),
+              isAccessible: features.includes('accessible'),
+            }),
+          ),
         )
         .onConflictDoUpdate({
           target: [space.locationId, space.label],
           set: {
             hourlyRateMinor: sql`excluded.hourly_rate_minor`,
+            maxHeightCm: sql`excluded.max_height_cm`,
+            maxLengthCm: sql`excluded.max_length_cm`,
+            maxWidthCm: sql`excluded.max_width_cm`,
             isCovered: sql`excluded.is_covered`,
             hasEvCharging: sql`excluded.has_ev_charging`,
             isAccessible: sql`excluded.is_accessible`,

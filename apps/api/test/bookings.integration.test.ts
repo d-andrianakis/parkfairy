@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import {
   addDays,
+  BLOCKING_STATUSES,
   type Booking,
   BOOKING_REFERENCE_PATTERN,
   BookingListSchema,
@@ -1836,6 +1837,457 @@ describe('bookings', () => {
       expect(await stranded(14, 20, '09:00')).toBe(1);
       // Closing before 18:00 shuts a car in (#38), however much of the stay is behind it.
       expect(await stranded(8, 16, '15:00')).toBe(1);
+    });
+  });
+
+  describe('arrival instructions (5A.1)', () => {
+    const CODE = 'Gate code 4821. Second level, bay by the lift.';
+    const view = (id: string, user: TestUser) =>
+      api(user, 'get', `/bookings/${id}`)
+        .expect(200)
+        .then((response) => BookingSchema.parse(response.body));
+    const setInstructions = (listing: Fixture, text: string | null) =>
+      db
+        .update(schema.parkingLocations)
+        .set({ arrivalInstructions: text })
+        .where(eq(schema.parkingLocations.id, listing.id));
+    /** Moves a booking so its two-hour stay starts in `hours` hours (a gap of none, so one move). */
+    const startsIn = (id: string, hours: number) => {
+      const startsAt = new Date(Date.now() + hours * 3_600_000);
+      const endsAt = new Date(startsAt.getTime() + 2 * 3_600_000);
+      return db
+        .update(schema.bookings)
+        .set({ startsAt, endsAt, blockedUntil: endsAt })
+        .where(eq(schema.bookings.id, id));
+    };
+    const withCode = async (name: string, policy?: CancellationPolicy) => {
+      const listing = await addListing(name, { gap: 0, ...(policy ? { policy } : {}) });
+      await setInstructions(listing, CODE);
+      return listing;
+    };
+
+    it('keeps them back while cancelling would still refund in full: no reading a code, then cancelling', async () => {
+      const user = await driver();
+      const listing = await withCode('arrival-early');
+      const day = freshDay();
+      const confirmed = await booked(user, listing, 'A1', stayOn(day));
+      // Weeks ahead, and cancelling is free: nothing yet, but when it will be there.
+      expect(confirmed.arrivalInstructions).toBeNull();
+      expect(confirmed.arrivalInstructionsFrom).toBe(
+        new Date(new Date(confirmed.start).getTime() - 24 * 3_600_000).toISOString(),
+      );
+      await startsIn(confirmed.id, 25);
+      expect((await view(confirmed.id, user)).arrivalInstructions).toBeNull();
+      // The cancel an attacker would make next is refunded in full, with nothing learned.
+      const refused = await view(confirmed.id, user);
+      expect(JSON.stringify(refused)).not.toContain('4821');
+    });
+
+    it('gives them once a cancel would cost something, in the language they are written in', async () => {
+      const user = await driver();
+      const listing = await withCode('arrival-now');
+      const confirmed = await booked(user, listing, 'A1', stayOn(freshDay()));
+      await startsIn(confirmed.id, 23);
+      const shown = await view(confirmed.id, user);
+      expect(shown.arrivalInstructions).toEqual({ text: CODE, contentLocale: 'el' });
+      expect(shown.arrivalInstructionsFrom).toBeNull();
+      const list = BookingListSchema.parse(
+        (await api(user, 'get', '/bookings').query({ when: 'upcoming' }).expect(200)).body,
+      );
+      expect(list.bookings.find((b) => b.id === confirmed.id)?.arrivalInstructions?.text).toBe(
+        CODE,
+      );
+    });
+
+    it('follows the booking’s own terms: an hour before for the shortest policy', async () => {
+      const user = await driver();
+      const listing = await withCode('arrival-hour', 'oneHour');
+      const confirmed = await booked(user, listing, 'A1', stayOn(freshDay()));
+      await startsIn(confirmed.id, 2);
+      expect((await view(confirmed.id, user)).arrivalInstructions).toBeNull();
+      await startsIn(confirmed.id, 0.9);
+      expect((await view(confirmed.id, user)).arrivalInstructions?.text).toBe(CODE);
+    });
+
+    it('gives them a day ahead when the second half is refunded only in part (oneDayThenHalf)', async () => {
+      const user = await driver();
+      const listing = await withCode('arrival-half', 'oneDayThenHalf');
+      const confirmed = await booked(user, listing, 'A1', stayOn(freshDay()));
+      await startsIn(confirmed.id, 25);
+      expect((await view(confirmed.id, user)).arrivalInstructions).toBeNull();
+      await startsIn(confirmed.id, 23);
+      expect((await view(confirmed.id, user)).arrivalInstructions?.text).toBe(CODE);
+    });
+
+    it('is not on a hold, whenever the stay is', async () => {
+      const user = await driver();
+      const listing = await withCode('arrival-hold');
+      const held = BookingSchema.parse(
+        (await hold(user, listing, 'A1', stayOn(freshDay())).expect(201)).body,
+      );
+      await startsIn(held.id, 1);
+      const seen = await view(held.id, user);
+      expect(seen.arrivalInstructions).toBeNull();
+      expect(seen.arrivalInstructionsFrom).toBeNull();
+    });
+
+    it('is the owner’s words as they are now, not as they were when booked', async () => {
+      const user = await driver();
+      const listing = await withCode('arrival-edit');
+      await setInstructions(listing, 'Old code 1111');
+      const confirmed = await booked(user, listing, 'A1', stayOn(freshDay()));
+      await startsIn(confirmed.id, 2);
+      expect((await view(confirmed.id, user)).arrivalInstructions?.text).toBe('Old code 1111');
+      await setInstructions(listing, 'New code 2222');
+      expect((await view(confirmed.id, user)).arrivalInstructions?.text).toBe('New code 2222');
+      // Taken away: nothing, and no promise of it either.
+      await setInstructions(listing, null);
+      const cleared = await view(confirmed.id, user);
+      expect(cleared.arrivalInstructions).toBeNull();
+      expect(cleared.arrivalInstructionsFrom).toBeNull();
+    });
+
+    it('stays readable for a day after the stay ends, and not past it', async () => {
+      const user = await driver();
+      const listing = await withCode('arrival-after');
+      const confirmed = await booked(user, listing, 'A1', stayOn(freshDay()));
+      // The stay ended 23 hours ago, then 25.
+      await startsIn(confirmed.id, -25);
+      expect((await view(confirmed.id, user)).arrivalInstructions?.text).toBe(CODE);
+      await startsIn(confirmed.id, -27);
+      const gone = await view(confirmed.id, user);
+      expect(gone.arrivalInstructions).toBeNull();
+      expect(gone.arrivalInstructionsFrom).toBeNull();
+    });
+
+    it('is not on a booking that was called off', async () => {
+      const user = await driver();
+      const listing = await withCode('arrival-cancelled');
+      const confirmed = await booked(user, listing, 'A1', stayOn(freshDay()));
+      await startsIn(confirmed.id, 2);
+      expect((await view(confirmed.id, user)).arrivalInstructions?.text).toBe(CODE);
+      await api(owner, 'post', `/owner/listings/${listing.id}/bookings/${confirmed.id}/cancel`)
+        .send()
+        .expect(204);
+      const after = await view(confirmed.id, user);
+      expect(after.arrivalInstructions).toBeNull();
+      expect(after.arrivalInstructionsFrom).toBeNull();
+    });
+
+    it('is not on a hold that lapsed or was let go', async () => {
+      const user = await driver();
+      const listing = await withCode('arrival-lapsed');
+      const held = BookingSchema.parse(
+        (await hold(user, listing, 'A1', stayOn(freshDay())).expect(201)).body,
+      );
+      await db
+        .update(schema.bookings)
+        .set({ status: 'expired' })
+        .where(eq(schema.bookings.id, held.id));
+      expect((await view(held.id, user)).arrivalInstructions).toBeNull();
+    });
+
+    it('is not for another driver, who is told no such booking exists', async () => {
+      const user = await driver();
+      const stranger = await driver();
+      const listing = await withCode('arrival-stranger');
+      const confirmed = await booked(user, listing, 'A1', stayOn(freshDay()));
+      await startsIn(confirmed.id, 2);
+      const response = await api(stranger, 'get', `/bookings/${confirmed.id}`).expect(404);
+      expect(JSON.stringify(response.body)).not.toContain('4821');
+      const theirs = BookingListSchema.parse(
+        (await api(stranger, 'get', '/bookings').expect(200)).body,
+      );
+      expect(JSON.stringify(theirs)).not.toContain('4821');
+      await api(null, 'get', `/bookings/${confirmed.id}`).expect(401);
+    });
+
+    it('never goes into an email about the booking, nor the owner’s view of it', async () => {
+      const user = await driver();
+      const listing = await withCode('arrival-mail');
+      const confirmed = await booked(user, listing, 'A1', stayOn(freshDay()));
+      await startsIn(confirmed.id, 2);
+      const payloads = await db
+        .select({ payload: schema.emailOutbox.payload })
+        .from(schema.emailOutbox)
+        .where(sql`${schema.emailOutbox.payload} -> 'booking' ->> 'id' = ${confirmed.id}`);
+      expect(payloads.length).toBeGreaterThan(0);
+      expect(JSON.stringify(payloads)).not.toContain('4821');
+      const owners = await api(owner, 'get', `/owner/listings/${listing.id}/bookings`).expect(200);
+      expect(JSON.stringify(owners.body)).not.toContain('4821');
+    });
+  });
+
+  describe('what takes a space (5A.0, BLOCKING_STATUSES)', () => {
+    const detail = async (listing: Fixture, stay: { start: string; end: string }) =>
+      ParkingListingDetailSchema.parse(
+        (await api(null, 'get', `/parking/${listing.slug}`).query(stay).expect(200)).body,
+      );
+    const searched = async (listing: Fixture, stay: { start: string; end: string }) =>
+      ParkingSearchResponseSchema.parse(
+        (
+          await api(null, 'get', '/parking/search')
+            .query({ ...HERE, ...stay })
+            .expect(200)
+        ).body,
+      ).results.find((result) => result.slug === listing.slug);
+    const backdateHold = (id: string) =>
+      db
+        .update(schema.bookings)
+        .set({ holdExpiresAt: new Date(Date.now() - 3_600_000) })
+        .where(eq(schema.bookings.id, id));
+    const sendBack = (listing: Fixture) =>
+      db
+        .update(schema.parkingLocations)
+        .set({ status: 'changes_requested' })
+        .where(eq(schema.parkingLocations.id, listing.id));
+    const keepOnly = (listing: Fixture, label: string) =>
+      api(owner, 'put', `/owner/listings/${listing.id}/spaces`).send({
+        spaces: [{ label, features: [], hourlyRateMinor: null }],
+      });
+
+    it('counts a confirmed booking as taken after its own hold time went by', async () => {
+      const stay = stayOn(freshDay(), '10:00', '12:00');
+      const listing = await addListing('confirmed-late', { spaces: [{ label: 'C1' }] });
+      const confirmed = await booked(await driver(), listing, 'C1', stay);
+      // The hold's ten minutes are long gone; the booking is not a hold.
+      await backdateHold(confirmed.id);
+      expect((await detail(listing, stay)).availability?.freeSpaces).toBe(0);
+      expect(await searched(listing, stay)).toBeUndefined();
+    });
+
+    it('counts a lapsed hold the sweep has not marked yet as free', async () => {
+      const stay = stayOn(freshDay(), '10:00', '12:00');
+      const listing = await addListing('lapsed-unswept', { spaces: [{ label: 'U1' }] });
+      const held = BookingSchema.parse(
+        (await hold(await driver(), listing, 'U1', stay).expect(201)).body,
+      );
+      expect((await detail(listing, stay)).availability?.freeSpaces).toBe(0);
+      await backdateHold(held.id);
+      // Still `held` in the table, but past its time: a stranger may see and take the space.
+      expect((await row(held.id)).status).toBe('held');
+      expect((await detail(listing, stay)).availability?.freeSpaces).toBe(1);
+      expect((await searched(listing, stay))?.freeSpaces).toBe(1);
+    });
+
+    it('does not count a hold that was let go or lapsed, or a booking called off', async () => {
+      const day = freshDay();
+      const listing = await addListing('given-back', { spaces: [{ label: 'G1' }] });
+      for (const [n, status] of (['released', 'expired'] as const).entries()) {
+        const stay = stayOn(
+          day,
+          `${String(8 + n * 3).padStart(2, '0')}:00`,
+          `${String(10 + n * 3).padStart(2, '0')}:00`,
+        );
+        const held = BookingSchema.parse(
+          (await hold(await driver(), listing, 'G1', stay).expect(201)).body,
+        );
+        expect((await detail(listing, stay)).availability?.freeSpaces).toBe(0);
+        // Its hold time is still ahead, so only the status says it gave the space back.
+        await db.update(schema.bookings).set({ status }).where(eq(schema.bookings.id, held.id));
+        expect((await detail(listing, stay)).availability?.freeSpaces).toBe(1);
+      }
+      const stay = stayOn(day, '14:00', '16:00');
+      const confirmed = await booked(await driver(), listing, 'G1', stay);
+      expect((await detail(listing, stay)).availability?.freeSpaces).toBe(0);
+      await api(owner, 'post', `/owner/listings/${listing.id}/bookings/${confirmed.id}/cancel`)
+        .send()
+        .expect(204);
+      expect((await detail(listing, stay)).availability?.freeSpaces).toBe(1);
+    });
+
+    it('refuses removing a space whose confirmed booking outlived its hold time', async () => {
+      const listing = await addListing('remove-confirmed', {
+        spaces: [{ label: 'R1' }, { label: 'R2' }],
+      });
+      const confirmed = await booked(await driver(), listing, 'R1', stayOn(freshDay()));
+      await backdateHold(confirmed.id);
+      await sendBack(listing);
+      expect((await keepOnly(listing, 'R2').expect(409)).body).toMatchObject({
+        code: 'SPACES_BOOKED',
+        bookings: 1,
+      });
+    });
+
+    it('lets a space go once its confirmed booking has ended', async () => {
+      const listing = await addListing('remove-ended', {
+        spaces: [{ label: 'E1' }, { label: 'E2' }],
+        gap: 0,
+      });
+      const confirmed = await booked(await driver(), listing, 'E1', stayOn(freshDay()));
+      await sendBack(listing);
+      await keepOnly(listing, 'E2').expect(409);
+      // The stay ended yesterday (the gap is none, so blocked_until moves with it).
+      const ended = new Date(Date.now() - 86_400_000);
+      await db
+        .update(schema.bookings)
+        .set({
+          startsAt: new Date(ended.getTime() - 3_600_000),
+          endsAt: ended,
+          blockedUntil: ended,
+        })
+        .where(eq(schema.bookings.id, confirmed.id));
+      await keepOnly(listing, 'E2').expect(200);
+    });
+
+    it('ignores released and expired holds when a space is removed', async () => {
+      const listing = await addListing('remove-dead', {
+        spaces: [{ label: 'D1' }, { label: 'D2' }],
+      });
+      const held = BookingSchema.parse(
+        (await hold(await driver(), listing, 'D1', stayOn(freshDay())).expect(201)).body,
+      );
+      await sendBack(listing);
+      await keepOnly(listing, 'D2').expect(409);
+      await db
+        .update(schema.bookings)
+        .set({ status: 'released' })
+        .where(eq(schema.bookings.id, held.id));
+      await keepOnly(listing, 'D2').expect(200);
+    });
+
+    it('is the same list in the database as in BLOCKING_STATUSES', async () => {
+      const definition = async (query: ReturnType<typeof sql>) => {
+        const { rows } = await db.execute<{ def: string }>(query);
+        return rows[0]?.def ?? '';
+      };
+      const statusesIn = (text: string) =>
+        [
+          ...(
+            /status\S*\s+(?:=\s+ANY\s*\(ARRAY\[|IN\s*\()([^\])]*)/i.exec(text)?.[1] ?? ''
+          ).matchAll(/'([a-z_]+)'/g),
+        ]
+          .map((m) => m[1])
+          .sort();
+      const expected = [...BLOCKING_STATUSES].sort();
+      for (const text of [
+        await definition(
+          sql`select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'bookings_space_no_overlap'`,
+        ),
+        await definition(
+          sql`select indexdef as def from pg_indexes where indexname = 'bookings_taken_by_listing_idx'`,
+        ),
+        await definition(
+          sql`select indexdef as def from pg_indexes where indexname = 'bookings_continues_idx'`,
+        ),
+      ]) {
+        expect(statusesIn(text), text).toEqual(expected);
+      }
+    });
+  });
+
+  describe('a booking that carries on from another (5A.0)', () => {
+    const cause = (constraint: string) => ({ cause: { constraint } });
+
+    /** A confirmed one-hour stay on A1, inserted as the service would write it. */
+    async function stayRow(user: TestUser, listing: Fixture, startsAt: Date, continues?: string) {
+      const endsAt = new Date(startsAt.getTime() + 3_600_000);
+      const [created] = await db
+        .insert(schema.bookings)
+        .values({
+          reference: newBookingReference(),
+          userId: user.id,
+          locationId: listing.id,
+          spaceId: listing.space.A1 ?? null,
+          spaceLabel: 'A1',
+          listingLocale: 'el' as const,
+          startsAt,
+          endsAt,
+          gapMinutes: 0,
+          blockedUntil: endsAt,
+          status: 'confirmed' as const,
+          holdExpiresAt: startsAt,
+          totalMinor: 200,
+          currency: 'EUR',
+          cancellationPolicy: 'oneDay' as const,
+          commissionBps: 1000,
+          vehiclePlate: 'IKB1234',
+          confirmedAt: new Date(),
+          continuesBookingId: continues ?? null,
+        })
+        .returning({ id: schema.bookings.id, endsAt: schema.bookings.endsAt });
+      if (!created) throw new Error('No booking');
+      return created;
+    }
+
+    it('is stored, one continuation at most, and never its own parent', async () => {
+      const user = await driver();
+      const listing = await addListing('continues', { gap: 0 });
+      const start = new Date(at(freshDay(), '10:00'));
+      const parent = await stayRow(user, listing, start);
+      const child = await stayRow(user, listing, parent.endsAt, parent.id);
+      expect((await row(child.id)).continuesBookingId).toBe(parent.id);
+      expect((await row(parent.id)).continuesBookingId).toBeNull();
+
+      // A second booking can't also carry on from the same parent…
+      await expect(
+        stayRow(user, listing, new Date(child.endsAt.getTime() + 3_600_000), parent.id),
+      ).rejects.toMatchObject(cause('bookings_continues_idx'));
+      // …a booking can't carry on from itself…
+      await expect(
+        db
+          .update(schema.bookings)
+          .set({ continuesBookingId: parent.id })
+          .where(eq(schema.bookings.id, parent.id)),
+      ).rejects.toMatchObject(cause('bookings_continues_check'));
+      // …nor from one that isn't there.
+      await expect(
+        stayRow(user, listing, new Date(child.endsAt.getTime() + 7_200_000), randomUUID()),
+      ).rejects.toMatchObject(cause('bookings_continues_booking_id_bookings_id_fk'));
+    });
+
+    it('keeps a parent that a continuation still points at', async () => {
+      const user = await driver();
+      const listing = await addListing('orphan', { gap: 0 });
+      const parent = await stayRow(user, listing, new Date(at(freshDay(), '10:00')));
+      await stayRow(user, listing, parent.endsAt, parent.id);
+      await expect(
+        db.delete(schema.bookings).where(eq(schema.bookings.id, parent.id)),
+      ).rejects.toMatchObject(cause('bookings_continues_booking_id_bookings_id_fk'));
+      expect(await row(parent.id)).toBeDefined();
+    });
+
+    it('lets a stay be continued again once the first continuation died', async () => {
+      const user = await driver();
+      const listing = await addListing('second-try', { gap: 0 });
+      const parent = await stayRow(user, listing, new Date(at(freshDay(), '10:00')));
+      const first = await stayRow(user, listing, parent.endsAt, parent.id);
+      // A continuation that lapsed (or was let go) no longer counts…
+      await db
+        .update(schema.bookings)
+        .set({ status: 'expired' })
+        .where(eq(schema.bookings.id, first.id));
+      const second = await stayRow(user, listing, parent.endsAt, parent.id);
+      expect((await row(second.id)).continuesBookingId).toBe(parent.id);
+      // …but a live one still does.
+      await expect(stayRow(user, listing, second.endsAt, parent.id)).rejects.toMatchObject(
+        cause('bookings_continues_idx'),
+      );
+    });
+
+    it('goes with its parent when a whole chain is deleted in one statement', async () => {
+      const user = await driver();
+      const listing = await addListing('chain', { gap: 0 });
+      const parent = await stayRow(user, listing, new Date(at(freshDay(), '10:00')));
+      const child = await stayRow(user, listing, parent.endsAt, parent.id);
+      await db.delete(schema.bookings).where(inArray(schema.bookings.id, [parent.id, child.id]));
+      const left = await db
+        .select({ id: schema.bookings.id })
+        .from(schema.bookings)
+        .where(inArray(schema.bookings.id, [parent.id, child.id]));
+      expect(left).toEqual([]);
+    });
+
+    it('still takes the space on its own, so a stranger cannot hold the join', async () => {
+      const user = await driver();
+      const other = await driver();
+      const listing = await addListing('join', { gap: 0 });
+      const day = freshDay();
+      const parent = await stayRow(user, listing, new Date(at(day, '10:00')));
+      await stayRow(user, listing, parent.endsAt, parent.id);
+      // 11:00 to 12:00 is the continuation's: the exclusion constraint sees it like any booking.
+      await hold(other, listing, 'A1', stayOn(day, '11:00', '12:00')).expect(409);
+      await hold(other, listing, 'A1', stayOn(day, '10:00', '11:00')).expect(409);
     });
   });
 });

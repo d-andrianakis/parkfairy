@@ -12,7 +12,7 @@ import { useFormatter, useTranslations } from 'next-intl';
 
 import { Link } from '@/i18n/navigation';
 
-import { FeatureBadges } from './feature-badges';
+import { FeatureBadges, SecurityBadges } from './feature-badges';
 import { ListingPhotoImage } from './listing-photo';
 import { PlaceWords } from './place-words';
 
@@ -110,6 +110,7 @@ export function ListingCard({
           ) : null}
         </div>
         <FeatureBadges features={listing.features} />
+        <SecurityBadges security={listing.security} />
         <div className="flex flex-wrap items-end justify-between gap-2">
           <p className="text-sm text-muted-foreground">
             {result

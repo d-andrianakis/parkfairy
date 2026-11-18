@@ -87,7 +87,16 @@
     "pickFailed": "We couldn’t find where that is. Press “Search” to look it up again, or choose another suggestion.",
     "suggestionsBy": "Suggestions by Mapbox.",
     "addressName": "Address or place",
-    "suggestionsLabel": "Address suggestions"
+    "suggestionsLabel": "Address suggestions",
+    "filters": "Filters",
+    "spaceFeatures": "Space features",
+    "securityFeatures": "Security",
+    "vehicleHeading": "Your vehicle",
+    "vehicleHint": "Spaces that say they are too small are left out. A space with no stated limit stays.",
+    "vehicleHeight": "Height (cm)",
+    "vehicleLength": "Length (cm)",
+    "vehicleWidth": "Width (cm)",
+    "vehicle": "Vehicle size"
   },
   "Search": {
     "metaTitle": "Search for parking",
@@ -184,7 +193,15 @@
     "label": "Features",
     "covered": "Covered",
     "evCharging": "EV charging",
-    "accessible": "Accessible space"
+    "accessible": "Accessible space",
+    "cctv": "CCTV",
+    "lit": "Lit at night",
+    "gated": "Gated entry",
+    "securityLabel": "Security",
+    "heightLimit": "Vehicles up to {value} cm high",
+    "lengthLimit": "Vehicles up to {value} cm long",
+    "widthLimit": "Vehicles up to {value} cm wide",
+    "limitsLabel": "Largest vehicle it takes"
   },
   "Cities": {
     "athens": "Athens",
@@ -356,7 +373,10 @@
     "placeNotFound": "We couldn’t find that address or place. Check it, or choose an area",
     "placeUnavailable": "Address search isn’t available right now. Choose an area or use your location",
     "shareInvalid": "Enter a whole percentage from 0 to 100",
-    "sharesTotal": "The shares must add up to 100%"
+    "sharesTotal": "The shares must add up to 100%",
+    "sizeHeightInvalid": "Enter a height from {min} to {max} cm",
+    "sizeLengthInvalid": "Enter a length from {min} to {max} cm",
+    "sizeWidthInvalid": "Enter a width from {min} to {max} cm"
   },
   "Forms": {
     "invalidSummary": "{count, plural, one {# field needs your attention} other {# fields need your attention}}",
@@ -652,7 +672,7 @@
       "areaHint": "Chosen from the position, and you can change it.",
       "areaPlaceholder": "Choose an area",
       "description": "Description",
-      "descriptionHint": "What helps a driver: how to find the entrance, height limits, how to get in.",
+      "descriptionHint": "What helps a driver choose. This is public, so put gate codes in the arrival instructions below.",
       "language": "Language of your text",
       "languageHint": "So screen readers pronounce it properly.",
       "showMap": "Show the map",
@@ -662,7 +682,11 @@
       "mapZoomIn": "Zoom in",
       "mapZoomOut": "Zoom out",
       "mapAttribution": "Show map information",
-      "mapLogo": "Mapbox home page"
+      "mapLogo": "Mapbox home page",
+      "arrivalInstructions": "Arrival instructions",
+      "arrivalHint": "How to find the entrance and get in: gate or door codes, which way to turn. Only drivers with a booking can read this, from when they book until a day after their stay.",
+      "securityLegend": "Security",
+      "securityHint": "Drivers can filter on these. Tick only what is true."
     },
     "spaces": {
       "addHeading": "Add spaces",
@@ -681,7 +705,12 @@
       "remove": "Remove <space>{label}</space>",
       "featureOf": "{feature}: {label}",
       "removed": "{label} removed",
-      "rowLabel": "Space {number}"
+      "rowLabel": "Space {number}",
+      "maxHeight": "Maximum vehicle height (cm)",
+      "maxLength": "Maximum vehicle length (cm)",
+      "maxWidth": "Maximum vehicle width (cm)",
+      "sizeHint": "Leave a limit empty if there is none, or you don’t know it. A driver searching with a larger vehicle won’t be shown a space that says it is too small.",
+      "groupSizeHeading": "Largest vehicle it takes (optional)"
     },
     "hours": {
       "allWeek": "Open all day, every day",
@@ -1352,7 +1381,9 @@
     "refundToCard": "It goes back to the card you paid with and can take a few days to show on your card or bank statement.",
     "paymentRefunding": "Your payment is being refunded",
     "plateKept": "Kept with this payment.",
-    "changePlate": "Change the number plate"
+    "changePlate": "Change the number plate",
+    "arrival": "How to get in",
+    "arrivalFrom": "Shown here from {when}"
   },
   "Bookings": {
     "metaTitle": "Your bookings",

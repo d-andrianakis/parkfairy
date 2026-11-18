@@ -4,6 +4,8 @@ import {
   CITIES,
   MAX_BOOKING_DAYS,
   MAX_START_AHEAD_DAYS,
+  PARKING_FEATURES,
+  SECURITY_FEATURES,
   type ValidationMessage,
 } from '@parkfairy/contracts';
 import { Button } from '@parkfairy/ui/components/button';
@@ -14,6 +16,8 @@ import {
   FieldLegend,
   FieldSet,
 } from '@parkfairy/ui/components/field';
+import { Input } from '@parkfairy/ui/components/input';
+import { Label } from '@parkfairy/ui/components/label';
 import {
   NativeSelect,
   NativeSelectOptGroup,
@@ -50,6 +54,9 @@ export const SEARCH_FIELD_IDS = {
   place: 'search-place',
   start: 'search-start-date',
   end: 'search-end-date',
+  vehicleHeight: 'search-vehicle-height',
+  vehicleLength: 'search-vehicle-length',
+  vehicleWidth: 'search-vehicle-width',
 } as const;
 
 function useValidationText() {
@@ -223,11 +230,142 @@ export function SearchForm({
             />
           </div>
         </StayFields>
+        <SearchFilters values={values} errors={errors} />
         <Button type="submit" size="lg" className="sm:w-fit">
           <Search aria-hidden />
           {t('submit')}
         </Button>
       </FieldGroup>
     </form>
+  );
+}
+
+/**
+ * A native checkbox, not the Radix one: this form is a plain GET form that works without
+ * JavaScript, and Radix's box can't be toggled (or its choice kept) until the page is hydrated.
+ */
+function FilterCheckbox({
+  id,
+  name,
+  value,
+  checked,
+  label,
+}: {
+  id: string;
+  name: string;
+  value: string;
+  checked: boolean;
+  label: string;
+}) {
+  return (
+    <div className="flex min-h-6 items-center gap-2">
+      <input
+        type="checkbox"
+        id={id}
+        name={name}
+        value={value}
+        defaultChecked={checked}
+        className="size-4 shrink-0 accent-primary"
+      />
+      <Label htmlFor={id} className="min-h-6 py-0.5 leading-snug font-normal">
+        {label}
+      </Label>
+    </div>
+  );
+}
+
+/**
+ * Filters (5A.1): what the space and the parking must have, and the vehicle's size. One free space
+ * with every feature chosen is enough, and a space with no stated limit fits any vehicle.
+ */
+function SearchFilters({ values, errors }: { values: SearchValues; errors: SearchErrors }) {
+  const t = useTranslations('SearchForm');
+  const tFeatures = useTranslations('Features');
+  const errorText = useValidationText();
+  const sizes = [
+    {
+      part: 'Height',
+      field: 'vehicleHeight',
+      name: 'vehicleHeightCm',
+      value: values.vehicleHeight,
+    },
+    {
+      part: 'Length',
+      field: 'vehicleLength',
+      name: 'vehicleLengthCm',
+      value: values.vehicleLength,
+    },
+    { part: 'Width', field: 'vehicleWidth', name: 'vehicleWidthCm', value: values.vehicleWidth },
+  ] as const;
+
+  return (
+    <FieldSet>
+      <FieldLegend variant="label">{t('filters')}</FieldLegend>
+      <FieldSet>
+        <FieldLegend variant="label" className="text-muted-foreground">
+          {t('spaceFeatures')}
+        </FieldLegend>
+        <div className="flex flex-wrap gap-x-6 gap-y-1">
+          {PARKING_FEATURES.map((feature) => (
+            <FilterCheckbox
+              key={feature}
+              id={`search-feature-${feature}`}
+              name="features"
+              value={feature}
+              checked={values.features.includes(feature)}
+              label={tFeatures(feature)}
+            />
+          ))}
+        </div>
+      </FieldSet>
+      <FieldSet>
+        <FieldLegend variant="label" className="text-muted-foreground">
+          {t('securityFeatures')}
+        </FieldLegend>
+        <div className="flex flex-wrap gap-x-6 gap-y-1">
+          {SECURITY_FEATURES.map((feature) => (
+            <FilterCheckbox
+              key={feature}
+              id={`search-security-${feature}`}
+              name="security"
+              value={feature}
+              checked={values.security.includes(feature)}
+              label={tFeatures(feature)}
+            />
+          ))}
+        </div>
+      </FieldSet>
+      {/* The hint belongs to the group, so it is read once, not after each of the three fields. */}
+      <FieldSet aria-describedby="search-vehicle-hint">
+        <FieldLegend variant="label" className="text-muted-foreground">
+          {t('vehicleHeading')}
+        </FieldLegend>
+        <FieldDescription id="search-vehicle-hint">{t('vehicleHint')}</FieldDescription>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {sizes.map(({ part, field, name, value }) => {
+            const error = errors[field];
+            const id = SEARCH_FIELD_IDS[field];
+            return (
+              <PlainField key={name} data-invalid={error ? true : undefined}>
+                <FieldLabel htmlFor={id}>{t(`vehicle${part}`)}</FieldLabel>
+                <Input
+                  id={id}
+                  name={name}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  defaultValue={value}
+                  // Only the field that is wrong is said to be, and only it hears why.
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? `${id}-error` : undefined}
+                />
+                {error ? (
+                  <PlainFieldError id={`${id}-error`}>{errorText(error)}</PlainFieldError>
+                ) : null}
+              </PlainField>
+            );
+          })}
+        </div>
+      </FieldSet>
+    </FieldSet>
   );
 }

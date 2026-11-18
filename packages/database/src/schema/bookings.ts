@@ -8,6 +8,7 @@
  * copied in, so later changes to the listing never rewrite a booking.
  */
 import {
+  BLOCKING_STATUSES,
   BOOKING_CANCELLERS,
   BOOKING_GAPS,
   BOOKING_STATUSES,
@@ -29,6 +30,7 @@ import {
 } from '@parkfairy/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   char,
   check,
   index,
@@ -68,6 +70,16 @@ export const bookings = pgTable(
      */
     spaceId: uuid('space_id').references(() => parkingSpaces.id, { onDelete: 'set null' }),
     spaceLabel: text('space_label').notNull(),
+    /**
+     * The booking this one carries on from (Phase 5A): an extension of a stay under way, or the next
+     * 30-day period of a monthly booking. It starts where the parent ends, on the same space and
+     * for the same driver; the service keeps that true (no constraint can see another row). The
+     * owner's gap should come once, after the last piece, so 5A.5 gives the parent a flag that waives
+     * its own gap (`bookings_gap_check` ties `blocked_until` to `gap_minutes` today, so it can't just
+     * be cut back). A booking has at most one continuation (the unique index). No action on delete,
+     * not restrict: it is checked when the statement ends, so a whole chain can go in one.
+     */
+    continuesBookingId: uuid('continues_booking_id').references((): AnyPgColumn => bookings.id),
     /**
      * The listing's name, address and their language when booked: what the driver's pages and
      * emails show, so text an owner changes later (a listing sent back is edited unreviewed) never
@@ -159,6 +171,18 @@ export const bookings = pgTable(
       .where(sql`${t.status} = 'cancelled'`),
     // Removing a space sets its bookings' space to null; without it, a scan per space.
     index('bookings_space_idx').on(t.spaceId),
+    // A booking has one *live* continuation at most (a hold, or a booking that stands): one that
+    // lapsed, was let go or was cancelled stays as history and must not block the next try. Also
+    // what finding "what carries on from this?" reads. The statuses are the ones that take a space.
+    uniqueIndex('bookings_continues_idx')
+      .on(t.continuesBookingId)
+      .where(
+        sql`${t.continuesBookingId} is not null and ${t.status} in (${sqlList(BLOCKING_STATUSES)})`,
+      ),
+    check(
+      'bookings_continues_check',
+      sql`${t.continuesBookingId} is null or ${t.continuesBookingId} <> ${t.id}`,
+    ),
     // Deleting an account that called bookings off sets this null: without it, a scan per account.
     index('bookings_cancelled_by_user_idx')
       .on(t.cancelledByUserId)

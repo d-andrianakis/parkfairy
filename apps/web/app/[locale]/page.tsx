@@ -47,6 +47,11 @@ export default async function HomePage({ params }: LocaleParams) {
                   latitude: '',
                   longitude: '',
                   ...defaultWindow(),
+                  features: [],
+                  security: [],
+                  vehicleHeight: '',
+                  vehicleLength: '',
+                  vehicleWidth: '',
                 }}
                 minDate={today()}
                 addressSearch={mapboxToken() !== null}

@@ -28,6 +28,10 @@ export interface DemoSpace {
   isAccessible?: boolean;
   /** This space's own rate, for listings whose spaces differ. */
   hourlyRateMinor?: number;
+  /** The largest vehicle it takes, in centimetres. */
+  maxHeightCm?: number;
+  maxLengthCm?: number;
+  maxWidthCm?: number;
 }
 
 /** A closure or special hours as an owner enters them, its days counted from the seed's run. */
@@ -41,6 +45,11 @@ export interface DemoListing {
   name: string;
   address: string;
   description: string;
+  /** How to get in: only a driver with a booking reads it. */
+  arrivalInstructions?: string;
+  hasCctv?: boolean;
+  isLit?: boolean;
+  isGated?: boolean;
   areaId: AreaId;
   latitude: number;
   longitude: number;
@@ -85,6 +94,11 @@ export const DEMO_LISTINGS: DemoListing[] = [
     name: 'Γκαράζ Πλατείας Συντάγματος',
     address: 'Όθωνος 10, Αθήνα 105 57',
     description: 'Υπόγειο γκαράζ δύο λεπτά από την πλατεία, ανοιχτό όλο το 24ωρο.',
+    arrivalInstructions:
+      'Η είσοδος είναι στην οδό Όθωνος, δεξιά από το φαρμακείο. Πατήστε το κουδούνι της μπάρας και δώστε τον κωδικό κράτησης. Οι θέσεις A1 έως A3 έχουν φορτιστή στον τοίχο.',
+    hasCctv: true,
+    isLit: true,
+    isGated: true,
     areaId: 'syntagma',
     latitude: 37.9752,
     longitude: 23.7357,
@@ -95,6 +109,10 @@ export const DEMO_LISTINGS: DemoListing[] = [
       isCovered: true,
       hasEvCharging: n <= 3,
       isAccessible: n === 12,
+      // An underground garage: low ceiling by the ramp, taller further in, wide at the accessible bay.
+      maxHeightCm: n <= 8 ? 190 : 210,
+      maxLengthCm: 480,
+      maxWidthCm: n === 12 ? 260 : 210,
     })),
   },
   {
@@ -103,6 +121,9 @@ export const DEMO_LISTINGS: DemoListing[] = [
     name: 'Πάρκινγκ Ερμού',
     address: 'Ερμού 45, Αθήνα 105 63',
     description: 'Στεγασμένος χώρος στην αρχή της Ερμού, ιδανικός για ψώνια.',
+    arrivalInstructions:
+      'Η είσοδος είναι στον πεζόδρομο της Ερμού, δίπλα στο κατάστημα με τα παπούτσια.',
+    hasCctv: true,
     areaId: 'syntagma',
     latitude: 37.9762,
     longitude: 23.73,
@@ -121,7 +142,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
       },
       { label: 'Ετήσια συντήρηση', fromDay: 150, toDay: 150, hours: null, closedHours: null },
     ],
-    spaces: spaces('P', 8, () => ({ isCovered: true })),
+    spaces: spaces('P', 8, () => ({ isCovered: true, maxHeightCm: 200 })),
   },
   {
     slug: 'monastiraki-open-lot',
@@ -129,6 +150,7 @@ export const DEMO_LISTINGS: DemoListing[] = [
     name: 'Υπαίθριος χώρος Μοναστηρακίου',
     address: 'Αστίγγος 6, Αθήνα 105 55',
     description: 'Υπαίθριο πάρκινγκ δίπλα στον σταθμό του μετρό.',
+    isLit: true,
     areaId: 'monastiraki',
     latitude: 37.977,
     longitude: 23.724,

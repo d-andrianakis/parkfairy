@@ -1,13 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  BLOCKING_STATUSES,
   BOOKING_REFERENCE_PATTERN,
+  BOOKING_STATUSES,
   BookingConfirmInputSchema,
   BookingHoldInputSchema,
   BookingListQuerySchema,
   BOOKINGS_MAX_PAGE,
   bookingsCursor,
   isVehiclePlate,
+  LAPSING_STATUSES,
   normalizeVehiclePlate,
   OwnerBookingsQuerySchema,
   parseBookingsCursor,
@@ -183,4 +186,30 @@ it('writes references without letters people misread', () => {
   for (const reference of ['K7M4Q2ZD', 'K7M4-Q2ZO', 'I7M4-Q2ZD', 'k7m4-q2zd']) {
     expect(BOOKING_REFERENCE_PATTERN.test(reference), reference).toBe(false);
   }
+});
+
+describe('statuses that take a space', () => {
+  it('are real statuses, and the lapsing ones are among them', () => {
+    for (const status of BLOCKING_STATUSES) expect(BOOKING_STATUSES).toContain(status);
+    for (const status of LAPSING_STATUSES) expect(BLOCKING_STATUSES).toContain(status);
+  });
+
+  it('keep a confirmed booking out of the lapsing ones, whose time is a hold time', () => {
+    expect(BLOCKING_STATUSES).toContain('confirmed');
+    expect(LAPSING_STATUSES).not.toContain('confirmed');
+  });
+
+  it('are never empty and are plain words, since they are written into SQL', () => {
+    expect(BLOCKING_STATUSES.length).toBeGreaterThan(0);
+    expect(LAPSING_STATUSES.length).toBeGreaterThan(0);
+    for (const status of [...BLOCKING_STATUSES, ...LAPSING_STATUSES]) {
+      expect(status).toMatch(/^[a-z_]+$/);
+    }
+  });
+
+  it('leave out every status that gave the space back', () => {
+    for (const status of ['cancelled', 'expired', 'released'] as const) {
+      expect(BLOCKING_STATUSES).not.toContain(status);
+    }
+  });
 });

@@ -43,7 +43,7 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import sharp from 'sharp';
 import request from 'supertest';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { DB } from '../src/database/database.module.js';
 import { OWNER_LISTINGS_MAX } from '../src/owner/owner-listings.service.js';
@@ -963,6 +963,161 @@ describe('owner onboarding', () => {
     });
   });
 
+  describe('arrival instructions, security and sizes (5A.1)', () => {
+    const read = async (user: TestUser, id: string) =>
+      OwnerListingSchema.parse((await api(user, 'get', `/listings/${id}`).expect(200)).body);
+    const patch = (user: TestUser, id: string, body: Record<string, unknown>) =>
+      api(user, 'patch', `/listings/${id}/location`).send(body);
+    const sized = (label: string, sizes: Record<string, unknown> = {}) => ({
+      label,
+      features: [],
+      hourlyRateMinor: null,
+      ...sizes,
+    });
+    const saveSpaces = (user: TestUser, id: string, list: unknown[]) =>
+      api(user, 'put', `/listings/${id}/spaces`).send({ spaces: list });
+
+    let id: string;
+    beforeAll(async () => {
+      id = await newListing(owner);
+    });
+    beforeEach(async () => {
+      await patch(owner, id, { arrivalInstructions: '', security: [] }).expect(200);
+      await saveSpaces(owner, id, [sized('A1')]).expect(200);
+    });
+
+    it('saves them with the location, and reads them back', async () => {
+      await patch(owner, id, {
+        arrivalInstructions: 'Gate code 4821.\nSecond level.',
+        security: ['gated', 'cctv'],
+      }).expect(200);
+      const { location: saved } = await read(owner, id);
+      expect(saved.arrivalInstructions).toBe('Gate code 4821.\nSecond level.');
+      // In the contract's order, whatever order they were sent in.
+      expect(saved.security).toEqual(['cctv', 'gated']);
+    });
+
+    it('keeps what a patch does not mention, and clears with an empty value', async () => {
+      await patch(owner, id, { arrivalInstructions: 'Code 1', security: ['lit'] }).expect(200);
+      await patch(owner, id, { name: 'Άλλο όνομα' }).expect(200);
+      expect((await read(owner, id)).location).toMatchObject({
+        arrivalInstructions: 'Code 1',
+        security: ['lit'],
+      });
+      await patch(owner, id, { arrivalInstructions: '', security: [] }).expect(200);
+      expect((await read(owner, id)).location).toMatchObject({
+        arrivalInstructions: null,
+        security: [],
+      });
+    });
+
+    it('trims the instructions, and holds them to their length', async () => {
+      await patch(owner, id, { arrivalInstructions: '   Left at the gate   ' }).expect(200);
+      expect((await read(owner, id)).location.arrivalInstructions).toBe('Left at the gate');
+      await patch(owner, id, { arrivalInstructions: 'x'.repeat(1000) }).expect(200);
+      const long = await patch(owner, id, { arrivalInstructions: 'x'.repeat(1001) }).expect(400);
+      expect(JSON.stringify(long.body)).toContain('textTooLong');
+    });
+
+    it('refuses security it does not know, and fields it never takes', async () => {
+      await patch(owner, id, { security: ['moat'] }).expect(400);
+      await patch(owner, id, { hasCctv: true }).expect(400);
+      await patch(owner, id, { arrival_instructions: 'x' }).expect(400);
+      expect((await read(owner, id)).location.security).toEqual([]);
+      // A repeat is the same feature: stored once.
+      await patch(owner, id, { security: ['cctv', 'cctv'] }).expect(200);
+      expect((await read(owner, id)).location.security).toEqual(['cctv']);
+    });
+
+    it('is for the listing’s owners, not for a stranger', async () => {
+      await patch(stranger, id, { arrivalInstructions: 'Mine now' }).expect(404);
+      await saveSpaces(stranger, id, [sized('Z1', { maxHeightCm: 100 })]).expect(404);
+      expect((await read(owner, id)).location.arrivalInstructions).toBeNull();
+    });
+
+    it('saves each space’s largest vehicle, and none as no limit', async () => {
+      await saveSpaces(owner, id, [
+        sized('A1', { maxHeightCm: 190, maxLengthCm: 480, maxWidthCm: 210 }),
+        sized('A2', { maxHeightCm: null }),
+        sized('A3'),
+      ]).expect(200);
+      const byLabel = Object.fromEntries(
+        (await read(owner, id)).spaces.map((space) => [space.label, space]),
+      );
+      expect(byLabel.A1).toMatchObject({ maxHeightCm: 190, maxLengthCm: 480, maxWidthCm: 210 });
+      expect(byLabel.A2).toMatchObject({ maxHeightCm: null, maxLengthCm: null, maxWidthCm: null });
+      expect(byLabel.A3).toMatchObject({ maxHeightCm: null, maxLengthCm: null, maxWidthCm: null });
+    });
+
+    it('keeps a space’s row when its size changes, so a booking still points at it', async () => {
+      await saveSpaces(owner, id, [sized('A1', { maxHeightCm: 190 })]).expect(200);
+      const before = (await read(owner, id)).spaces[0];
+      await saveSpaces(owner, id, [sized('A1', { maxHeightCm: 205, maxWidthCm: 220 })]).expect(200);
+      const after = (await read(owner, id)).spaces[0];
+      expect(after?.id).toBe(before?.id);
+      expect(after).toMatchObject({ maxHeightCm: 205, maxWidthCm: 220 });
+    });
+
+    it('treats a save without sizes as a list without limits, as it does a rate', async () => {
+      await saveSpaces(owner, id, [sized('A1', { maxHeightCm: 190 })]).expect(200);
+      await saveSpaces(owner, id, [sized('A1')]).expect(200);
+      expect((await read(owner, id)).spaces[0]?.maxHeightCm).toBeNull();
+    });
+
+    it.each([
+      { maxHeightCm: 99 },
+      { maxHeightCm: 501 },
+      { maxLengthCm: 199 },
+      { maxLengthCm: 1501 },
+      { maxWidthCm: 99 },
+      { maxWidthCm: 401 },
+      { maxHeightCm: 190.5 },
+      { maxHeightCm: '190' },
+      { maxHeightCm: -1 },
+    ])('refuses a size that will not do: %j', async (bad) => {
+      const before = (await read(owner, id)).spaces;
+      const response = await saveSpaces(owner, id, [sized('A1', bad)]).expect(400);
+      expect(JSON.stringify(response.body)).toMatch(/size(Height|Length|Width)Invalid/);
+      expect((await read(owner, id)).spaces).toEqual(before);
+    });
+
+    it('accepts the limits themselves', async () => {
+      await saveSpaces(owner, id, [
+        sized('Low', { maxHeightCm: 100, maxLengthCm: 200, maxWidthCm: 100 }),
+        sized('High', { maxHeightCm: 500, maxLengthCm: 1500, maxWidthCm: 400 }),
+      ]).expect(200);
+    });
+
+    describe('and the database’s own rules', () => {
+      const cause = (constraint: string) => ({ cause: { constraint } });
+
+      it('refuses a size outside what a car park holds, whatever the API lets through', async () => {
+        await saveSpaces(owner, id, [sized('A1')]).expect(200);
+        for (const set of [
+          { maxHeightCm: 50 },
+          { maxHeightCm: 600 },
+          { maxLengthCm: 100 },
+          { maxWidthCm: 500 },
+        ]) {
+          await expect(
+            db.update(schema.parkingSpaces).set(set).where(eq(schema.parkingSpaces.locationId, id)),
+          ).rejects.toMatchObject(cause('parking_spaces_size_check'));
+        }
+      });
+
+      it('refuses empty arrival instructions (null is none) and over-long ones', async () => {
+        for (const text of ['', 'x'.repeat(1001)]) {
+          await expect(
+            db
+              .update(schema.parkingLocations)
+              .set({ arrivalInstructions: text })
+              .where(eq(schema.parkingLocations.id, id)),
+          ).rejects.toMatchObject(cause('parking_locations_arrival_instructions_check'));
+        }
+      });
+    });
+  });
+
   describe('the database’s own rules', () => {
     it('refuses to take an incomplete listing past draft, whoever asks', async () => {
       const id = await newListing(owner);
@@ -1061,6 +1216,17 @@ describe('owner onboarding', () => {
         .send({ name: 'Άλλο' })
         .expect(409);
       expect((editing.body as { code: string }).code).toBe('LISTING_LOCKED');
+      // The new fields are held with the rest of the step (5A.1): staff review what drivers will read.
+      for (const body of [{ arrivalInstructions: 'Code 4821' }, { security: ['cctv'] }]) {
+        const refused = await api(submitter, 'patch', `/listings/${id}/location`)
+          .send(body)
+          .expect(409);
+        expect((refused.body as { code: string }).code).toBe('LISTING_LOCKED');
+      }
+      const sized = await api(submitter, 'put', `/listings/${id}/spaces`)
+        .send({ spaces: [{ label: 'A1', features: [], hourlyRateMinor: null, maxHeightCm: 190 }] })
+        .expect(409);
+      expect((sized.body as { code: string }).code).toBe('LISTING_LOCKED');
       await upload(submitter, id, await jpeg(1000, 700, 200)).expect(409);
       await api(submitter, 'delete', `/listings/${id}`).expect(409);
 

@@ -47,6 +47,36 @@ describe('loadSearchResults', () => {
     expect(options).not.toHaveProperty('credentials');
   });
 
+  it('sends the filters as lists and numbers, and leaves them out when there are none (5A.1)', async () => {
+    api.searchParking.mockResolvedValue({ data: { ...window, results: [] } });
+    await loadSearchResults(
+      'syntagma',
+      undefined,
+      undefined,
+      window.start,
+      window.end,
+      'covered,evCharging',
+      'cctv',
+      190,
+      450,
+      undefined,
+    );
+    const [filtered] = api.searchParking.mock.calls[0] as [{ query: Record<string, unknown> }];
+    expect(filtered.query).toMatchObject({
+      features: ['covered', 'evCharging'],
+      security: ['cctv'],
+      vehicleHeightCm: 190,
+      vehicleLengthCm: 450,
+    });
+    expect(filtered.query.vehicleWidthCm).toBeUndefined();
+
+    api.searchParking.mockClear();
+    await loadSearchResults('syntagma', undefined, undefined, window.start, window.end, '', '');
+    const [plain] = api.searchParking.mock.calls[0] as [{ query: Record<string, unknown> }];
+    expect(plain.query.features).toBeUndefined();
+    expect(plain.query.security).toBeUndefined();
+  });
+
   it('sends no forwarding header when the request has none', async () => {
     request.headers = new Headers();
     api.searchParking.mockResolvedValue({ data: { ...window, results: [] } });

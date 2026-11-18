@@ -48,6 +48,9 @@ const space = (id: string, label: string, total: number) => ({
   id,
   label,
   features: [],
+  maxHeightCm: null,
+  maxLengthCm: null,
+  maxWidthCm: null,
   hourlyRate: money(200),
   total: money(total),
 });
@@ -62,6 +65,7 @@ const listing = (overrides: Partial<ParkingListingDetail> = {}): ParkingListingD
   dailyMax: null,
   spacePricesVary: true,
   features: [],
+  security: [],
   spaceCount: 3,
   coverPhoto: null,
   description: null,
@@ -180,6 +184,27 @@ describe('the listing page’s booking', () => {
     expect(screen.queryByRole('link', { name: /to book it/ })).not.toBeInTheDocument();
     // The booked spaces aren't "more" spaces.
     expect(screen.queryByText(/more/)).not.toBeInTheDocument();
+  });
+
+  it('shows the listing’s security, and each space’s limits where there are some (5A.1)', async () => {
+    const sized = listing({
+      security: ['lit', 'gated'],
+      spaces: [
+        { ...space('11111111-1111-4111-8111-111111111111', 'Α1', 400), maxHeightCm: 190 },
+        space('22222222-2222-4222-8222-222222222222', 'Α2', 800),
+      ],
+      availability: null,
+    });
+    await show(sized, true, {} as typeof windowParams);
+    expect(screen.getByRole('list', { name: 'Security' })).toHaveTextContent('Lit at night');
+    const spaces = screen.getByRole('list', { name: 'Spaces' });
+    const item = (label: string) =>
+      within(spaces)
+        .getAllByRole('listitem')
+        .find((entry) => entry.textContent?.includes(label));
+    expect(item('Α1')).toHaveTextContent('Vehicles up to 190 cm high');
+    // No limit given: nothing said, rather than that any size will do.
+    expect(item('Α2')).not.toHaveTextContent('cm');
   });
 
   it('shows the spaces as before when no stay is chosen', async () => {

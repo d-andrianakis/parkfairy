@@ -50,6 +50,9 @@ export const VALIDATION_MESSAGES = [
   'hoursOrder',
   'hoursOverlap',
   'rateInvalid',
+  'sizeHeightInvalid',
+  'sizeLengthInvalid',
+  'sizeWidthInvalid',
   'dailyMaxBelowRate',
   'nightWindowInvalid',
   'dateRangeInvalid',
@@ -90,6 +93,30 @@ export const MAX_START_AHEAD_DAYS = 365;
 export const HOURS_EXCEPTIONS_MAX = 30;
 /** Closures and special hours past this reach no stay: the latest starts and lasts its 30 days. */
 export const HOURS_EXCEPTION_AHEAD_DAYS = MAX_START_AHEAD_DAYS + MAX_BOOKING_DAYS;
+
+/**
+ * The largest vehicle a space takes, in whole centimetres, as an owner may state it. A space with no
+ * stated limit is taken to fit any vehicle: owners say what they know, and a driver reads the
+ * limits that are there.
+ */
+export const SPACE_LIMITS_CM = {
+  height: { min: 100, max: 500 },
+  length: { min: 200, max: 1500 },
+  width: { min: 100, max: 400 },
+} as const;
+export type SpaceDimension = keyof typeof SPACE_LIMITS_CM;
+export const SPACE_DIMENSIONS = [
+  'height',
+  'length',
+  'width',
+] as const satisfies readonly SpaceDimension[];
+
+/** The message of a size outside its limits, which says the limits (`{min}` and `{max}`). */
+export const SIZE_MESSAGES = {
+  height: 'sizeHeightInvalid',
+  length: 'sizeLengthInvalid',
+  width: 'sizeWidthInvalid',
+} as const satisfies Record<SpaceDimension, ValidationMessage>;
 
 /** How long a space is kept for a driver while they confirm (decision #3). */
 export const HOLD_MINUTES = 10;

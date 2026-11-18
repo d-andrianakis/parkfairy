@@ -7,6 +7,9 @@ import {
   HAS_DATABASE,
   publishListing,
   refundOf,
+  setStay,
+  stayIn,
+  stayOf,
   unpublishListing,
 } from '../support/db';
 import { waitForEmail } from '../support/email';
@@ -66,7 +69,12 @@ test('a driver books a space, the owner sees who is coming, and closing that day
   const ownerEmail = uniqueEmail('booking-owner');
   await registerAndSignIn(page, ownerEmail, 'Owner Booking');
   const name = `Γκαράζ κρατήσεων ${randomUUID().slice(0, 6)}`;
-  const { id, slug } = await listingWithStaff(page, name);
+  const arrival = `Κωδικός πύλης ${randomUUID().slice(0, 6)}, δεύτερο επίπεδο.`;
+  const { id, slug } = await listingWithStaff(page, name, {
+    arrivalInstructions: arrival,
+    security: ['cctv', 'gated'],
+    maxHeightCm: 200,
+  });
   await publishListing(id);
   const day = athensDay(15);
 
@@ -95,6 +103,15 @@ test('a driver books a space, the owner sees who is coming, and closing that day
     await signIn(driver, driverEmail);
     await expect(driver).toHaveURL(stayUrl('en', slug, day));
     await expect(driver.getByText('The space is free for your stay.')).toBeVisible();
+    // What the listing offers, and the space's limit, are public; how to get in is not (5A.1).
+    await expect(driver.getByRole('list', { name: 'Security' })).toContainText('CCTV');
+    await expect(driver.getByRole('list', { name: 'Security' })).toContainText('Gated entry');
+    await expect(driver.getByRole('radio', { name: 'K1' })).toHaveAccessibleDescription(
+      /Vehicles up to 200 cm high/,
+    );
+    await expect(driver.getByText(arrival)).toHaveCount(0);
+    const publicApi = await driver.request.get(`/api/v1/parking/${slug}`);
+    expect(await publicApi.text()).not.toContain(arrival);
     await expectAccessible(driver);
 
     // One press holds the space; the booking's page asks for the car.
@@ -104,6 +121,8 @@ test('a driver books a space, the owner sees who is coming, and closing that day
     const bookingUrl = new URL(driver.url()).pathname;
     await expect(driver.getByRole('heading', { level: 1 })).toHaveText('Complete your booking');
     await expect(driver.getByText(/We’re keeping space K1 for you until/)).toBeVisible();
+    // A hold is not a booking: no way in yet.
+    await expect(driver.getByText(arrival)).toHaveCount(0);
     await expectAccessible(driver);
     // More time, at a press (WCAG 2.2.1): confirming works only while the hold runs (#37).
     await driver.getByRole('button', { name: 'Keep it for 10 more minutes' }).click();
@@ -125,7 +144,33 @@ test('a driver books a space, the owner sees who is coming, and closing that day
     await expect(driver.getByText('IKB1234')).toBeVisible();
     const reference = (await driver.getByText(REFERENCE).textContent())?.trim() ?? '';
     expect(reference).toMatch(REFERENCE);
+    // Fifteen days ahead, where cancelling is still free: the way in is left for later, with when
+    // (a gate code can't be read from a booking that is then cancelled for a full refund).
+    await expect(driver.getByText('How to get in')).toBeVisible();
+    await expect(driver.getByText(/Shown here from /)).toBeVisible();
+    await expect(driver.getByText(arrival)).toHaveCount(0);
     await expectAccessible(driver);
+    // Close to the stay it is there, in the owner's language, as they wrote it.
+    const stay = await stayOf(reference);
+    await setStay(reference, stayIn(2));
+    await driver.goto(bookingUrl);
+    const way = driver.getByText(arrival);
+    await expect(way).toBeVisible();
+    await expect(way).toHaveAttribute('lang', 'el');
+    await expect(driver.getByText(/Shown here from /)).toHaveCount(0);
+    await expectAccessible(driver);
+    // The way in is for the driver alone: a signed-out visitor and another account (the owner) are
+    // told no such booking exists, and never see it in what they get.
+    const bookingApi = `/api/v1/bookings/${bookingUrl.split('/').pop()}`;
+    const nobody = await visitor(browser);
+    const asNobody = await nobody.page.request.get(bookingApi);
+    expect(asNobody.status()).toBe(401);
+    expect(await asNobody.text()).not.toContain(arrival);
+    await nobody.context.close();
+    const asOwner = await page.request.get(bookingApi);
+    expect(asOwner.status()).toBe(404);
+    expect(await asOwner.text()).not.toContain(arrival);
+    await setStay(reference, stay);
 
     // Both sides hear of it, from the worker, the Greek listing's name read in Greek in their
     // English emails, and its address beside it.
@@ -136,6 +181,8 @@ test('a driver books a space, the owner sees who is coming, and closing that day
     );
     expect(booked.html).toContain(`Your space at “<span lang="el">${name}</span>” is booked.`);
     expect(booked.html).toMatch(/<td lang="el"[^>]*>Οδός Δοκιμής 1, Ηράκλειο<\/td>/);
+    // The email never carries the gate code: it is read on the booking's page, signed in.
+    expect(booked.html).not.toContain(arrival);
     const received = await waitForEmail(ownerEmail, `New booking for “${name}”`, WORKER_EMAIL);
     expect(received.html).toContain(
       `A driver has booked a space at “<span lang="el">${name}</span>”.`,

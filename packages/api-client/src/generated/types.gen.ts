@@ -30,6 +30,8 @@ export type Money = {
 
 export type ParkingFeature = 'covered' | 'evCharging' | 'accessible';
 
+export type SecurityFeature = 'cctv' | 'lit' | 'gated';
+
 export type ListingPhoto = {
   key: string;
   width: number;
@@ -48,6 +50,7 @@ export type ParkingListingSummary = {
   dailyMax: Money | null;
   spacePricesVary: boolean;
   features: Array<ParkingFeature>;
+  security: Array<SecurityFeature>;
   spaceCount: number;
   coverPhoto: ListingPhoto | null;
 };
@@ -66,6 +69,7 @@ export type ParkingSearchResult = {
   dailyMax: Money | null;
   spacePricesVary: boolean;
   features: Array<ParkingFeature>;
+  security: Array<SecurityFeature>;
   spaceCount: number;
   coverPhoto: ListingPhoto | null;
   latitude: number;
@@ -104,6 +108,9 @@ export type ParkingSpace = {
   id: string;
   label: string;
   features: Array<ParkingFeature>;
+  maxHeightCm: number | null;
+  maxLengthCm: number | null;
+  maxWidthCm: number | null;
   hourlyRate: Money;
   total: Money | null;
 };
@@ -146,6 +153,7 @@ export type ParkingListingDetail = {
   dailyMax: Money | null;
   spacePricesVary: boolean;
   features: Array<ParkingFeature>;
+  security: Array<SecurityFeature>;
   spaceCount: number;
   coverPhoto: ListingPhoto | null;
   description: string | null;
@@ -234,6 +242,11 @@ export type Booking = {
   refundIfCancelled: Money | null;
   checkout: CheckoutKind;
   payment: PaymentStatus | null;
+  arrivalInstructions: {
+    text: string;
+    contentLocale: Locale;
+  } | null;
+  arrivalInstructionsFrom: string | null;
 };
 
 export type BookingListQuery = {
@@ -553,6 +566,8 @@ export type ListingLocationInput = {
   latitude: number;
   longitude: number;
   description?: string | null;
+  arrivalInstructions?: string | null;
+  security?: Array<SecurityFeature>;
   contentLocale: Locale;
 };
 
@@ -574,6 +589,8 @@ export type ListingLocationPatch = {
   latitude?: number | null;
   longitude?: number | null;
   description?: string | null;
+  arrivalInstructions?: string | null;
+  security?: Array<SecurityFeature>;
   contentLocale?: Locale;
 };
 
@@ -581,6 +598,9 @@ export type ListingSpaceInput = {
   label: string;
   features: Array<ParkingFeature>;
   hourlyRateMinor: number | null;
+  maxHeightCm?: number | null;
+  maxLengthCm?: number | null;
+  maxWidthCm?: number | null;
 };
 
 export type ListingSpacesInput = {
@@ -752,6 +772,9 @@ export type OwnerSpace = {
   label: string;
   features: Array<ParkingFeature>;
   hourlyRateMinor: number | null;
+  maxHeightCm: number | null;
+  maxLengthCm: number | null;
+  maxWidthCm: number | null;
 };
 
 export type OwnerPrices = {
@@ -791,6 +814,8 @@ export type OwnerListing = {
     latitude: number | null;
     longitude: number | null;
     description: string | null;
+    arrivalInstructions: string | null;
+    security: Array<SecurityFeature>;
     contentLocale: Locale;
   };
   spaces: Array<OwnerSpace>;
@@ -1393,6 +1418,20 @@ export type SearchParkingData = {
   body?: never;
   path?: never;
   query: {
+    vehicleWidthCm?: number;
+    vehicleLengthCm?: number;
+    /**
+     * Leaves out spaces whose stated height limit is lower. No stated limit fits.
+     */
+    vehicleHeightCm?: number;
+    /**
+     * Repeat the key, or comma-separate. The listing must have all of them.
+     */
+    security?: Array<'cctv' | 'lit' | 'gated'>;
+    /**
+     * Repeat the key, or comma-separate. One free space must have all of them.
+     */
+    features?: Array<'covered' | 'evCharging' | 'accessible'>;
     /**
      * Instant (UTC, ISO 8601) on a half hour.
      */

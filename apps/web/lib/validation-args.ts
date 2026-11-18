@@ -5,11 +5,17 @@ import {
   NAME_MAX_LENGTH,
   PASSWORD_POLICY,
   PLACE_QUERY_LIMITS,
+  SIZE_MESSAGES,
+  SPACE_DIMENSIONS,
+  SPACE_LIMITS_CM,
   type ValidationMessage,
 } from '@parkfairy/contracts/validation';
 
 /** ICU arguments for `Validation.*` messages (server and client components alike). */
 export function validationArgs(key: ValidationMessage) {
+  // A size says its limits (whole centimetres, as a car park can hold them).
+  const dimension = SPACE_DIMENSIONS.find((candidate) => SIZE_MESSAGES[candidate] === key);
+  if (dimension) return SPACE_LIMITS_CM[dimension];
   const max =
     key === 'nameTooLong'
       ? NAME_MAX_LENGTH

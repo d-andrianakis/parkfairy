@@ -4,7 +4,14 @@ import { AREA_IDS, AreaIdSchema } from './areas.js';
 import { DEFAULT_TIME_ZONE, LocaleSchema } from './i18n.js';
 import { contractsRegistry } from './registry.js';
 import { wallClockMs } from './time.js';
-import { MAX_BOOKING_DAYS, MAX_START_AHEAD_DAYS, message } from './validation.js';
+import {
+  MAX_BOOKING_DAYS,
+  MAX_START_AHEAD_DAYS,
+  message,
+  SIZE_MESSAGES,
+  SPACE_LIMITS_CM,
+  type SpaceDimension,
+} from './validation.js';
 
 /** Bookings and searches move in half-hour steps. Athens' UTC offset is whole hours, so
  * local :00/:30 boundaries are UTC :00/:30 boundaries too. */
@@ -21,7 +28,16 @@ export const LISTING_LIMITS = {
   address: 200,
   description: 2000,
   spaceLabel: 20,
+  /** How to find and get into the space: private to a driver with a booking (5A.1). */
+  arrivalInstructions: 1000,
 } as const;
+
+/** A space limit or a vehicle size in centimetres, within what a car park can hold. */
+export const spaceSizeCm = (dimension: SpaceDimension) =>
+  z
+    .int(message(SIZE_MESSAGES[dimension]))
+    .min(SPACE_LIMITS_CM[dimension].min, message(SIZE_MESSAGES[dimension]))
+    .max(SPACE_LIMITS_CM[dimension].max, message(SIZE_MESSAGES[dimension]));
 
 /** A listing's life. Drafts and listings sent back may be incomplete; the rest may not. */
 export const LISTING_STATUSES = [
@@ -67,6 +83,14 @@ export const ParkingFeatureSchema = z.enum(PARKING_FEATURES).register(contractsR
   id: 'ParkingFeature',
 });
 export type ParkingFeature = z.infer<typeof ParkingFeatureSchema>;
+
+/** What a whole listing offers for the safety of a car left there (5A.1): a driver filters on these. */
+export const SECURITY_FEATURES = ['cctv', 'lit', 'gated'] as const;
+export const SecurityFeatureSchema = z.enum(SECURITY_FEATURES).register(contractsRegistry, {
+  id: 'SecurityFeature',
+  description: 'cctv: cameras cover it. lit: lit at night. gated: entry through a gate or barrier.',
+});
+export type SecurityFeature = z.infer<typeof SecurityFeatureSchema>;
 
 /** Start of the half-hour slot containing `now`: searches may begin there, not earlier. */
 export function currentSlotStart(now: number = Date.now()): number {
@@ -122,6 +146,33 @@ const coordinate = (limit: number) =>
     .min(-limit, message('invalid'))
     .max(limit, message('invalid'));
 
+/**
+ * A list in a query string: `?features=a&features=b`, `?features=a,b` or one value, without
+ * duplicates. Anything else is left for the schema to refuse.
+ */
+const listParam = <T extends z.ZodType>(item: T) =>
+  z.preprocess(
+    (value) => {
+      if (value === undefined || value === '') return undefined;
+      const items = (Array.isArray(value) ? value : [value]).flatMap((entry: unknown) =>
+        typeof entry === 'string' ? entry.split(',') : [entry],
+      );
+      const unique = [...new Set(items.filter((entry) => entry !== ''))];
+      return unique.length > 0 ? unique : undefined;
+    },
+    z
+      .array(item)
+      .max(SECURITY_FEATURES.length + PARKING_FEATURES.length)
+      .optional(),
+  );
+
+/** A vehicle's size in a query string; a blank field is no size. */
+const vehicleSize = (dimension: SpaceDimension) =>
+  z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number(message('invalid')).pipe(spaceSizeCm(dimension)).optional(),
+  );
+
 export const ParkingSearchQuerySchema = z
   .object({
     area: z.enum(AREA_IDS, message('invalid')).optional(),
@@ -129,6 +180,14 @@ export const ParkingSearchQuerySchema = z
     longitude: coordinate(180).optional(),
     start: instant,
     end: instant,
+    /** Spaces must have all of these; one free space with all of them is enough (5A.1). */
+    features: listParam(ParkingFeatureSchema),
+    /** The listing must have all of these. */
+    security: listParam(SecurityFeatureSchema),
+    /** The driver's vehicle: spaces with a stated limit below it are left out. */
+    vehicleHeightCm: vehicleSize('height'),
+    vehicleLengthCm: vehicleSize('length'),
+    vehicleWidthCm: vehicleSize('width'),
   })
   .superRefine((query, ctx) => {
     const hasPosition = query.latitude !== undefined && query.longitude !== undefined;
@@ -188,6 +247,8 @@ export const ParkingListingSummarySchema = z
     /** Spaces cost different amounts, so prices read "from". */
     spacePricesVary: z.boolean(),
     features: z.array(ParkingFeatureSchema),
+    /** What the whole listing offers for the car's safety (5A.1). */
+    security: z.array(SecurityFeatureSchema),
     spaceCount: z.int().nonnegative(),
     coverPhoto: ListingPhotoSchema.nullable(),
   })
@@ -259,6 +320,10 @@ export const ParkingSpaceSchema = z
     id: z.uuid(),
     label: z.string(),
     features: z.array(ParkingFeatureSchema),
+    /** The largest vehicle the owner says it takes, in centimetres; null where they gave no limit. */
+    maxHeightCm: z.int().nullable(),
+    maxLengthCm: z.int().nullable(),
+    maxWidthCm: z.int().nullable(),
     hourlyRate: MoneySchema,
     /** For this space and the requested window; null when the request named none. */
     total: MoneySchema.nullable(),

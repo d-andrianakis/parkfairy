@@ -13,12 +13,14 @@ import {
   type FeaturedParkingResponse,
   FeaturedParkingResponseSchema,
   isListingSlug,
+  PARKING_FEATURES,
   type ParkingListingDetail,
   ParkingListingDetailSchema,
   ParkingListingQuerySchema,
   ParkingSearchQuerySchema,
   type ParkingSearchResponse,
   ParkingSearchResponseSchema,
+  SECURITY_FEATURES,
 } from '@parkfairy/contracts';
 
 import { Public } from '../auth/auth.decorators.js';
@@ -52,6 +54,28 @@ export class ParkingController {
   @ApiQuery({ name: 'longitude', required: false, type: Number })
   @ApiQuery({ name: 'start', required: true, type: String, description: WINDOW_DOC })
   @ApiQuery({ name: 'end', required: true, type: String, description: WINDOW_DOC })
+  @ApiQuery({
+    name: 'features',
+    required: false,
+    enum: PARKING_FEATURES,
+    isArray: true,
+    description: 'Repeat the key, or comma-separate. One free space must have all of them.',
+  })
+  @ApiQuery({
+    name: 'security',
+    required: false,
+    enum: SECURITY_FEATURES,
+    isArray: true,
+    description: 'Repeat the key, or comma-separate. The listing must have all of them.',
+  })
+  @ApiQuery({
+    name: 'vehicleHeightCm',
+    required: false,
+    type: Number,
+    description: 'Leaves out spaces whose stated height limit is lower. No stated limit fits.',
+  })
+  @ApiQuery({ name: 'vehicleLengthCm', required: false, type: Number })
+  @ApiQuery({ name: 'vehicleWidthCm', required: false, type: Number })
   @ApiOkResponse({ schema: schemaRef(ParkingSearchResponseSchema) })
   @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
   async searchParking(@Query() rawQuery: unknown): Promise<ParkingSearchResponse> {

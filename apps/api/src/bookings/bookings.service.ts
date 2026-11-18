@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   addDays,
+  ARRIVAL_INSTRUCTIONS_HOURS_AFTER,
   type Booking,
   type BookingCancelInput,
   type BookingConfirmInput,
@@ -60,7 +61,7 @@ import { isOpenThroughout } from '../parking/opening-hours.js';
 import { NO_PRICE_RULES, quoteStayMinor } from '../parking/pricing.js';
 import { PAYMENTS } from '../payments/payments.tokens.js';
 import { newBookingReference } from './booking-reference.js';
-import { refundMinor } from './refunds.js';
+import { fullRefundUntil, refundMinor } from './refunds.js';
 
 const booking = schema.bookings;
 const listing = schema.parkingLocations;
@@ -95,6 +96,7 @@ const listingInfo = {
   address: listing.address,
   contentLocale: listing.contentLocale,
   timeZone: listing.timeZone,
+  arrivalInstructions: listing.arrivalInstructions,
 };
 interface ListingInfo {
   slug: string;
@@ -102,6 +104,8 @@ interface ListingInfo {
   address: string | null;
   contentLocale: Locale;
   timeZone: string;
+  /** The owner's words as they are now (not copied onto the booking), in the listing's language. */
+  arrivalInstructions: string | null;
 }
 
 /** What a hold or confirmation reads of the listing, under its `FOR SHARE` lock. */
@@ -159,6 +163,31 @@ function booked(row: BookingRow, info: ListingInfo): ListingInfo {
 }
 
 /**
+ * How to get in, for the driver of a booking that stands: from when cancelling stops refunding in
+ * full until a day after the stay ends. It can hold a gate code, so a hold, a cancelled booking and a
+ * stranger never see it (5A.1). It is the listing's words as they are now, in the language they are written in.
+ */
+function arrivalOf(
+  row: BookingRow,
+  info: ListingInfo,
+  now: Date,
+): Pick<Booking, 'arrivalInstructions' | 'arrivalInstructionsFrom'> {
+  const none = { arrivalInstructions: null, arrivalInstructionsFrom: null };
+  if (row.status !== 'confirmed' || !info.arrivalInstructions) return none;
+  const readableUntil = row.endsAt.getTime() + ARRIVAL_INSTRUCTIONS_HOURS_AFTER * 3_600_000;
+  if (now.getTime() > readableUntil) return none;
+  // Not while cancelling would still refund in full: book far ahead, read the code, cancel.
+  const from = fullRefundUntil(row.cancellationPolicy, row.startsAt);
+  if (now.getTime() <= from.getTime()) {
+    return { arrivalInstructions: null, arrivalInstructionsFrom: from.toISOString() };
+  }
+  return {
+    arrivalInstructions: { text: info.arrivalInstructions, contentLocale: info.contentLocale },
+    arrivalInstructionsFrom: null,
+  };
+}
+
+/**
  * The booking as its driver reads it; `now` decides what cancelling would give back, `checkout`
  * how a hold becomes a booking here (paying, or the stand-in press of #33).
  */
@@ -195,6 +224,7 @@ function viewOf(row: BookingRow, info: ListingInfo, now: Date, checkout: Checkou
       : null,
     checkout,
     payment: row.paymentStatus,
+    ...arrivalOf(row, info, now),
   });
 }
 

@@ -48,6 +48,18 @@ describe('LocaleSwitcher', () => {
     );
   });
 
+  it('keeps every value of a repeated filter, not only the last (5A.1)', () => {
+    setPathname(
+      '/search',
+      'area=syntagma&features=covered&features=evCharging&security=cctv&vehicleHeightCm=190',
+    );
+    renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });
+    expect(screen.getByRole('link', { name: 'English' })).toHaveAttribute(
+      'href',
+      '/en/search?area=syntagma&features=covered&features=evCharging&security=cctv&vehicleHeightCm=190',
+    );
+  });
+
   it('drops query parameters that are not part of a search (tokens and the like)', () => {
     setPathname('/search', 'area=syntagma&token=secret&next=%2Faccount');
     renderInSubtree(<LocaleSwitcher signedIn={false} />, { locale: 'el' });

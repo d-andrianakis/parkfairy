@@ -1,7 +1,7 @@
 import type { ParkingListingDetail } from '@parkfairy/contracts';
 import { useFormatter, useTranslations } from 'next-intl';
 
-import { FeatureBadges } from './feature-badges';
+import { FeatureBadges, SpaceLimits } from './feature-badges';
 import { PlaceWords } from './place-words';
 
 /**
@@ -40,6 +40,11 @@ export function SpaceList({
                 <PlaceWords text={space.label} lang={listing.contentLocale} />
               </span>
               <FeatureBadges features={space.features} />
+              <SpaceLimits
+                maxHeightCm={space.maxHeightCm}
+                maxLengthCm={space.maxLengthCm}
+                maxWidthCm={space.maxWidthCm}
+              />
               {/* Only where prices differ; otherwise the price card has already said it. */}
               {listing.spacePricesVary ? (
                 <span className="basis-full text-sm text-muted-foreground">

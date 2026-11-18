@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { refundMinor } from './refunds.js';
+import { fullRefundUntil, refundMinor } from './refunds.js';
 
 const start = new Date('2026-12-10T10:00:00Z');
 const before = (hours: number, minutes = 0) =>
@@ -36,6 +36,22 @@ describe('refundMinor', () => {
   it('refunds in full when the owner calls it off, whatever the policy and time', () => {
     for (const at of [before(48), before(0, 5)]) {
       expect(refundMinor({ policy: 'oneHour', totalMinor: 750, start, at, by: 'owner' })).toBe(750);
+    }
+  });
+});
+
+describe('fullRefundUntil', () => {
+  it('is the last moment a cancel still gives everything back, for each policy', () => {
+    expect(fullRefundUntil('oneHour', start)).toEqual(before(1));
+    expect(fullRefundUntil('oneDay', start)).toEqual(before(24));
+    expect(fullRefundUntil('oneDayThenHalf', start)).toEqual(before(24));
+  });
+
+  it('agrees with refundMinor: full at that moment, less a moment later', () => {
+    for (const policy of ['oneHour', 'oneDay', 'oneDayThenHalf'] as const) {
+      const until = fullRefundUntil(policy, start);
+      expect(refund(policy, until)).toBe(1001);
+      expect(refund(policy, new Date(until.getTime() + 1))).toBeLessThan(1001);
     }
   });
 });

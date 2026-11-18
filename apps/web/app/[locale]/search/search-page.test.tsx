@@ -54,6 +54,7 @@ const result = (
   dailyMax: null,
   spacePricesVary: false,
   features: [],
+  security: [],
   spaceCount: 3,
   coverPhoto: null,
   latitude: 37.976,
@@ -83,6 +84,64 @@ beforeEach(() => {
   request.headers = new Headers({ 'sec-fetch-site': 'same-origin' });
   vi.mocked(mapboxToken).mockReturnValue('pk.test');
   vi.mocked(loadSearchResults).mockResolvedValue(answer([]));
+});
+
+describe('filters (5A.1)', () => {
+  it('asks the API for each filter in its own place', async () => {
+    await show({
+      area: 'syntagma',
+      ...stay,
+      features: 'covered,evCharging',
+      security: 'cctv',
+      vehicleHeightCm: '190',
+      vehicleWidthCm: '210',
+    });
+    expect(loadSearchResults).toHaveBeenCalledWith(
+      'syntagma',
+      undefined,
+      undefined,
+      expect.any(String),
+      expect.any(String),
+      'covered,evCharging',
+      'cctv',
+      190,
+      undefined,
+      210,
+    );
+    // And the form shows them back.
+    expect(screen.getByRole('checkbox', { name: 'Covered' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'CCTV' })).toBeChecked();
+    expect(screen.getByLabelText('Height (cm)')).toHaveValue('190');
+  });
+
+  it('explains a size that will not do, linked to that field, and searches nothing', async () => {
+    const { container, metadata } = await show({
+      area: 'syntagma',
+      ...stay,
+      vehicleLengthCm: '99',
+    });
+    expect(loadSearchResults).not.toHaveBeenCalled();
+    expect(metadata.title).toMatch(/^Error: /);
+    const summary = screen.getByRole('alert');
+    expect(
+      within(summary).getByRole('link', {
+        name: 'Length (cm): Enter a length from 200 to 1500 cm',
+      }),
+    ).toHaveAttribute('href', '#search-vehicle-length');
+    expect(screen.getByLabelText('Length (cm)')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Height (cm)')).not.toHaveAttribute('aria-invalid');
+    await expectNoAxeViolations(container);
+  });
+
+  it('names a size in Greek, with its limits', async () => {
+    await show({ area: 'syntagma', ...stay, vehicleWidthCm: '500' }, 'el');
+    const summary = screen.getByRole('alert');
+    expect(
+      within(summary).getByRole('link', {
+        name: 'Πλάτος (εκ.): Εισαγάγετε πλάτος από 100 έως 400 εκ.',
+      }),
+    ).toHaveAttribute('href', '#search-vehicle-width');
+  });
 });
 
 describe('a place typed or picked (decision #40)', () => {
@@ -175,6 +234,12 @@ describe('a place typed or picked (decision #40)', () => {
       23.7348,
       expect.any(String),
       expect.any(String),
+      // No filters: no features, no security, no vehicle size.
+      '',
+      '',
+      undefined,
+      undefined,
+      undefined,
     );
   });
 

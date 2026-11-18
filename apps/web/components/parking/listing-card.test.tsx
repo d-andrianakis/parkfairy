@@ -16,6 +16,7 @@ const listing: ParkingListingSummary = {
   hourlyRate: { amountMinor: 350, currency: 'EUR' },
   dailyMax: { amountMinor: 2500, currency: 'EUR' },
   features: ['covered', 'evCharging'],
+  security: [],
   spaceCount: 12,
   spacePricesVary: false,
   coverPhoto: null,
@@ -49,6 +50,28 @@ describe('ListingCard', () => {
       <ListingCard listing={{ ...listing, coverPhoto: photo }} />,
     );
     expect(container.querySelector('img')).toHaveAttribute('alt', '');
+  });
+
+  it('shows what the listing offers for a car’s safety, beside its features', () => {
+    renderWithProviders(<ListingCard listing={{ ...result, security: ['cctv', 'gated'] }} />);
+    const security = screen.getByRole('list', { name: 'Security' });
+    expect(security).toHaveTextContent('CCTV');
+    expect(security).toHaveTextContent('Gated entry');
+    expect(screen.getByRole('list', { name: 'Features' })).toHaveTextContent('Covered');
+  });
+
+  it('says it in Greek', () => {
+    renderWithProviders(<ListingCard listing={{ ...result, security: ['lit', 'gated'] }} />, {
+      locale: 'el',
+    });
+    const security = screen.getByRole('list', { name: 'Ασφάλεια' });
+    expect(security).toHaveTextContent('Φωτισμός τη νύχτα');
+    expect(security).toHaveTextContent('Είσοδος με πύλη');
+  });
+
+  it('has no security list for a listing that offers none', () => {
+    renderWithProviders(<ListingCard listing={result} />);
+    expect(screen.queryByRole('list', { name: 'Security' })).not.toBeInTheDocument();
   });
 
   it('reads “from” when spaces cost different amounts', () => {

@@ -610,6 +610,7 @@ export type {
   SearchParkingErrors,
   SearchParkingResponse,
   SearchParkingResponses,
+  SecurityFeature,
   SetListingSharesData,
   SetListingSharesError,
   SetListingSharesErrors,

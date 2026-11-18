@@ -1764,6 +1764,91 @@ payments, overstay reports, removing two-factor).
 - [x] Support removes two-factor after an identity check: audited action, email to the address,
       written procedure (#13): done (5.2c1; the procedure is in GETTING_STARTED.md)
 
+## Phase 5A: Marketplace depth (planned 2026-11-17, decisions #86–#89)
+
+The feature-gap list (ratings, an occupied-space flow, arrival help, extending and rebooking, reminders
+and passes, favourites and vehicles, pricing help, statements, calendar sync, request-to-book, business
+accounts, monthly bookings), built before Phase 6. Each slice copies the Definition of Done above under
+its own heading when it starts; none is started. The design (continuation bookings, `BLOCKING_STATUSES`)
+is in memory.md under the 2026-11-17 readings. Money slices (5A.5, 5A.8, 5A.12) run in Stripe's test mode
+only (#46).
+
+- [x] **5A.0 Prep (S, 2026-11-17):** `BLOCKING_STATUSES` / `LAPSING_STATUSES` behind every
+      takes-the-space predicate (`availability.ts`, `saveSpaces`; the constraint and two indexes are held
+      to them by a test of the migrations and one of the live database); `bookings.continues_booking_id`
+      (migration 0047: not itself, one live continuation, a chain deletes in one statement);
+      `packages/contracts/src/ics.ts` writer; decisions #86–#89 (memory.md). Predicates that are not
+      about taking a space (`list`, `stranded.ts`, `admin-listings`) still name `confirmed` on purpose
+  - [x] **Implemented** (no endpoint or page: a foundation for 5A.1 to 5A.12)
+  - [x] **Unit tests:** contracts (`ics.test.ts`, `bookings.test.ts`), `migrations.test.ts` (with fixtures
+        that show the guard failing on drift); integration (`bookings.integration.test.ts`, 12 new: a
+        confirmed booking past its hold time, a lapsed hold not yet swept, released/expired/cancelled,
+        removing a space, the continuation constraints, the live definitions). Two deliberate breaks of
+        `availability.ts` were each caught
+  - [x] **Smoke test:** n/a, no page or route (the .ics file's smoke arrives with 5A.3 and 5A.7)
+  - [x] **Security** review: no critical, high or medium; L1 (impossible days, years past 9999), L2 (the
+        unique index counted dead continuations) fixed; L3 (never take `continues_booking_id` from a
+        client) is a requirement of 5A.5
+  - [x] **Performance:** n/a, the availability SQL is the same predicate (reviewed by the security and
+        test reviewers), the new index is partial and unused until 5A.5
+  - [x] **Accessibility / i18n:** n/a, no UI or text
+  - [x] **Contracts & docs:** no API contract change; migration 0047 reviewed; memory.md
+- [~] **5A.1 Arrival, vehicle fit, security filters (M, 2026-11-18):** arrival instructions (private: shown to
+  the driver of a confirmed booking once a cancel would no longer refund in full, until a day after the
+  stay), CCTV / lit / gated on the listing, the largest vehicle per space in centimetres, and search
+  filters (features and the vehicle's size asked of one free space; security of the listing); migration
+  0048; demo data. Left: owners can't change the instructions of a live listing, and staff review does not
+  show them (both in memory.md, waiting for a decision); refusing a hold for a vehicle that doesn't fit
+  waits for 5A.2
+  - [x] **Implemented** behind the API's authorization rules
+  - [x] **Unit tests:** contracts, `refunds.test.ts`, seed, web (parser, form, badges, booking facts, owner
+        forms, Greek); integration: `parking-filters` (28: one space, taken spaces, length and width, injection),
+        bookings (the reveal rule, per policy, a hold, cancelled, a stranger, emails), owner (saving, sizes,
+        database rules, locked). Mutations of the filter and of the reveal rule were each caught
+  - [x] **Smoke test:** `arrival-and-fit.smoke.ts` (the filters through the form, size, the error, language
+        switch, listing, 320 px, no JavaScript, nothing public), `booking.smoke.ts` (a hold shows nothing, a
+        confirmed booking far ahead says when, close to the stay shows the way in, others get 401 and 404, the
+        email has none), `owner-onboarding.smoke.ts` (the new fields through the steps, and saved),
+        `accessibility.smoke.ts`
+  - [x] **Security** review: the Medium (read the code, cancel for a refund) fixed by the reveal rule; the
+        staff-review gap and live-listing editing are open (memory.md); nothing else
+  - [x] **Performance** review: no index needed (measured with EXPLAIN); budgets hold; notes on migration 0047
+        for a large table in memory.md
+  - [x] **Accessibility** review: the size errors per field with their limits, nouns for the legends, a
+        24 px row for each checkbox, `role="list"`, the field count; left: the repeated "(optional)"
+  - [x] **i18n** review: the legends, the limits' wording, the size messages, the demo text
+  - [x] **Contracts & docs:** OpenAPI and client regenerated, migration 0048 reviewed, memory.md
+  - [ ] Manual NVDA and VoiceOver: the filters (nested groups, the three size fields), the picker's
+        description with a limit in Greek («εκ.» read as letters?), the list names in Safari, the owner's
+        size group when errors appear
+  - [ ] Native speaker: `Features.cctv`, `lit`, `gated`, `securityLabel`, `heightLimit`, `lengthLimit`,
+        `widthLimit`, `limitsLabel`; `SearchForm.filters` to `vehicle`; `Validation.sizeHeightInvalid`,
+        `sizeLengthInvalid`, `sizeWidthInvalid`; `Owner.spaces.maxHeight` to `groupSizeHeading`;
+        `Owner.location.arrivalInstructions`, `arrivalHint`, `securityLegend`, `securityHint`,
+        `descriptionHint`; `Booking.arrival`, `arrivalFrom`; the demo text in `demo-data.ts`. Questions: «Φωτισμός
+        τη νύχτα» or «Φωτισμένος χώρος»; «Κάμερες ασφαλείας» or «Παρακολούθηση με κάμερες»; «εκ.» or «cm»;
+        «Οδηγίες άφιξης» or «Οδηγίες πρόσβασης»; «Πώς θα μπείτε» as the booking's label; «θέση» or «χώρος» for
+        one space (the owner area says «θέση», the listing page «χώρος»)
+- [ ] **5A.2 Saved vehicles, favourites, one-tap rebook (M)**
+- [ ] **5A.3 Reminders, booking pass, offline, calendar file (M):** `booking-ending-soon` and
+      `booking-starting-soon`; QR of the reference only; opt-in service worker for the pass page;
+      wallet passes deferred (need Apple / Google accounts)
+- [ ] **5A.4 "Someone is in my space" (M):** relocate within the listing or refund in full (#88); owner
+      email linking to the existing overstay report
+- [ ] **5A.5 Extend a stay in progress (L, money):** continuation bookings; the parent waives its gap
+      with a new `gap_waived` flag (`bookings_gap_check` must allow it). **`continues_booking_id` is
+      never accepted from a client**: the service derives it from a parent that the session's driver
+      owns (security review of 5A.0, L3), or the unique index becomes an existence oracle
+- [ ] **5A.6 Suggested pricing and the landing-page earnings estimator (M);** fixes the stale "Online
+      booking is coming soon" copy
+- [ ] **5A.7 Calendar sync (L):** iCal export, per-space blocks, iCal import (SSRF-safe fetch)
+- [ ] **5A.8 Request-to-book (L, money):** manual capture, `requested` / `declined`, 24 h window
+- [ ] **5A.9 Ratings and reviews, both directions (L):** mutual reveal (#89), moderation
+- [ ] **5A.10 Tax-year earnings statements (M):** per-payee gross and commission, CSV, DAC7-shaped
+      (the platform's own DAC7 filing stays in Phase 6)
+- [ ] **5A.11 Business accounts for drivers (M):** billing profile, fleet, receipts (not tax invoices, #18)
+- [ ] **5A.12 Monthly and recurring bookings (XL, money):** 30-day periods billed off-session (#87)
+
 ## Phase 6: Production readiness
 
 - [ ] Security + privacy review, GDPR retention and data-subject workflows (unconfirmed

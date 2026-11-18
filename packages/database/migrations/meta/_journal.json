@@ -330,6 +330,20 @@
       "when": 1794937611238,
       "tag": "0046_damp_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1794945809480,
+      "tag": "0047_late_spencer_smythe",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1794946884061,
+      "tag": "0048_bright_quentin_quire",
+      "breakpoints": true
     }
   ]
 }

@@ -70,11 +70,30 @@ export const loadSearchResults = cache(
     longitude: number | undefined,
     start: string,
     end: string,
+    /** Filters, as primitives so `cache` can tell two searches apart: lists comma-joined. */
+    features = '',
+    security = '',
+    vehicleHeightCm?: number,
+    vehicleLengthCm?: number,
+    vehicleWidthCm?: number,
   ): Promise<ParkingSearchResponse | null> => {
     try {
+      const listOf = <T>(joined: string) =>
+        joined === '' ? undefined : (joined.split(',') as unknown as T);
       const { data } = await searchParking({
         client: serverApi,
-        query: { area: area as ParkingSearchQuery['area'], latitude, longitude, start, end },
+        query: {
+          area: area as ParkingSearchQuery['area'],
+          latitude,
+          longitude,
+          start,
+          end,
+          features: listOf<NonNullable<ParkingSearchQuery['features']>>(features),
+          security: listOf<NonNullable<ParkingSearchQuery['security']>>(security),
+          vehicleHeightCm,
+          vehicleLengthCm,
+          vehicleWidthCm,
+        },
         headers: await forwardedFor(),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });

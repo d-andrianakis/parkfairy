@@ -29,6 +29,7 @@ import {
   PROOF_KINDS,
   type ProofKind,
   SLUG_PATTERN,
+  SPACE_LIMITS_CM,
   SUPPORTED_LOCALES,
   SUPPORTED_TIME_ZONES,
 } from '@parkfairy/contracts';
@@ -107,6 +108,15 @@ export const parkingLocations = pgTable(
     slug: text('slug').notNull().unique(),
     name: text('name'),
     description: text('description'),
+    /**
+     * How to find and get into the space, in `content_locale`. Private: it can hold a gate code, so
+     * only a driver with a booking reads it (5A.1). Phase 6 sets how long it is kept.
+     */
+    arrivalInstructions: text('arrival_instructions'),
+    /** What the listing offers for a car's safety; a driver can filter on each (5A.1). */
+    hasCctv: boolean('has_cctv').notNull().default(false),
+    isLit: boolean('is_lit').notNull().default(false),
+    isGated: boolean('is_gated').notNull().default(false),
     address: text('address'),
     areaId: text('area_id').$type<AreaId>(),
     /** Language the owner wrote name, address and description in. */
@@ -178,6 +188,10 @@ export const parkingLocations = pgTable(
       sql`(${t.name} is null or char_length(${t.name}) between 1 and ${limit(LISTING_LIMITS.name)}) and (${t.address} is null or char_length(${t.address}) between 1 and ${limit(LISTING_LIMITS.address)}) and (${t.description} is null or char_length(${t.description}) <= ${limit(LISTING_LIMITS.description)})`,
     ),
     check(
+      'parking_locations_arrival_instructions_check',
+      sql`${t.arrivalInstructions} is null or char_length(${t.arrivalInstructions}) between 1 and ${limit(LISTING_LIMITS.arrivalInstructions)}`,
+    ),
+    check(
       'parking_locations_area_check',
       sql`${t.areaId} is null or ${t.areaId} in (${sqlList(AREA_IDS)})`,
     ),
@@ -212,6 +226,10 @@ export const parkingSpaces = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     /** This space's own rate; the listing's other prices scale with it. Null uses the listing's. */
     hourlyRateMinor: integer('hourly_rate_minor'),
+    /** The largest vehicle it takes, in centimetres; null is no stated limit, which fits anything. */
+    maxHeightCm: smallint('max_height_cm'),
+    maxLengthCm: smallint('max_length_cm'),
+    maxWidthCm: smallint('max_width_cm'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -224,6 +242,10 @@ export const parkingSpaces = pgTable(
     check(
       'parking_spaces_hourly_rate_check',
       sql`${t.hourlyRateMinor} is null or ${t.hourlyRateMinor} > 0`,
+    ),
+    check(
+      'parking_spaces_size_check',
+      sql`(${t.maxHeightCm} is null or ${t.maxHeightCm} between ${limit(SPACE_LIMITS_CM.height.min)} and ${limit(SPACE_LIMITS_CM.height.max)}) and (${t.maxLengthCm} is null or ${t.maxLengthCm} between ${limit(SPACE_LIMITS_CM.length.min)} and ${limit(SPACE_LIMITS_CM.length.max)}) and (${t.maxWidthCm} is null or ${t.maxWidthCm} between ${limit(SPACE_LIMITS_CM.width.min)} and ${limit(SPACE_LIMITS_CM.width.max)})`,
     ),
     index('parking_spaces_location_active_idx')
       .on(t.locationId)

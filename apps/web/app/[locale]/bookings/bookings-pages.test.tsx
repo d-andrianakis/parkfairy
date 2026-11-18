@@ -39,6 +39,8 @@ vi.mock('next-intl/server', async () => {
 const ID = 'b0b0b0b0-0000-4000-8000-000000000001';
 const booking = (overrides: Partial<Booking> = {}): Booking => ({
   id: ID,
+  arrivalInstructions: null,
+  arrivalInstructionsFrom: null,
   reference: 'K7M4-Q2ZD',
   status: 'held',
   listing: {

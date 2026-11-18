@@ -76,7 +76,18 @@ export async function listingWithStaff(
   {
     spaces = ['K1'],
     contentLocale = 'el',
-  }: { spaces?: string[]; contentLocale?: 'el' | 'en' } = {},
+    arrivalInstructions,
+    security,
+    maxHeightCm,
+  }: {
+    spaces?: string[];
+    contentLocale?: 'el' | 'en';
+    /** How to get in: private to a driver with a booking (5A.1). */
+    arrivalInstructions?: string;
+    security?: ('cctv' | 'lit' | 'gated')[];
+    /** The largest vehicle every space takes, in centimetres. */
+    maxHeightCm?: number;
+  } = {},
 ): Promise<{ id: string; slug: string }> {
   const headers = { origin: WEB_URL };
   const call = async (method: 'patch' | 'put' | 'post', path: string, data: unknown) => {
@@ -93,9 +104,16 @@ export async function listingWithStaff(
     latitude: 35.3387,
     longitude: 25.1442,
     contentLocale,
+    ...(arrivalInstructions ? { arrivalInstructions } : {}),
+    ...(security ? { security } : {}),
   });
   await call('put', `/listings/${id}/spaces`, {
-    spaces: spaces.map((label) => ({ label, features: [], hourlyRateMinor: null })),
+    spaces: spaces.map((label) => ({
+      label,
+      features: [],
+      hourlyRateMinor: null,
+      ...(maxHeightCm ? { maxHeightCm } : {}),
+    })),
   });
   await call('put', `/listings/${id}/hours`, {
     periods: WEEK.map((weekday) => ({ weekday, opens: '00:00', closes: '24:00' })),

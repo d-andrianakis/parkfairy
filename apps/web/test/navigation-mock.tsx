@@ -18,12 +18,17 @@ export function setPathname(pathname: string, search = '') {
   currentSearchParams = new URLSearchParams(search);
 }
 
-type Href = string | { pathname: string; query?: Record<string, string> };
+type Href = string | { pathname: string; query?: Record<string, string | string[]> };
 type LinkProps = Omit<ComponentProps<'a'>, 'href'> & { href: Href; locale?: string };
 
 function toPath(href: Href): string {
   if (typeof href === 'string') return href;
-  const query = new URLSearchParams(href.query).toString();
+  // As Next writes a query: an array repeats its key (`features=a&features=b`).
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(href.query ?? {})) {
+    for (const item of Array.isArray(value) ? value : [value]) params.append(key, item);
+  }
+  const query = params.toString();
   return query ? `${href.pathname}?${query}` : href.pathname;
 }
 

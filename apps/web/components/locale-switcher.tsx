@@ -32,9 +32,14 @@ export function LocaleSwitcher({ signedIn }: { signedIn: boolean }) {
   const pathname = usePathname();
   // Same page in the other language, search and stay window included.
   const carried = [...CARRIED_PARAMS, ...(LINK_PARAMS[pathname] ?? [])];
-  const query = Object.fromEntries(
-    [...(useSearchParams() ?? [])].filter(([key]) => carried.includes(key)),
-  );
+  // A key may repeat (`features=a&features=b`): all of them go, not only the last.
+  const query: Record<string, string | string[]> = {};
+  for (const [key, value] of useSearchParams() ?? []) {
+    if (!carried.includes(key)) continue;
+    const before = query[key];
+    query[key] =
+      before === undefined ? value : [...(Array.isArray(before) ? before : [before]), value];
+  }
 
   function rememberPreference(locale: Locale) {
     // Keep the account's language (used for emails) in step with the UI choice. The auth

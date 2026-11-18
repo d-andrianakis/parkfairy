@@ -12,6 +12,9 @@ const spaces = (count: number) =>
     id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
     label: `P${i + 1}`,
     features: [],
+    maxHeightCm: null,
+    maxLengthCm: null,
+    maxWidthCm: null,
     hourlyRate: { amountMinor: 300, currency: 'EUR' as const },
     total: null,
   }));
@@ -33,6 +36,27 @@ function renderList(spaceCount: number, locale: 'el' | 'en' = 'en') {
     { locale },
   );
 }
+
+describe('limits (5A.1)', () => {
+  it('shows the limits an owner gave, and nothing for a space that has none', () => {
+    const [first, second] = spaces(2);
+    renderWithProviders(
+      <SpaceList
+        labelledBy="spaces"
+        listing={{
+          spaces: [{ ...first!, maxHeightCm: 190, maxWidthCm: 210 }, second!],
+          spaceCount: 2,
+          contentLocale: 'el',
+          spacePricesVary: false,
+        }}
+      />,
+    );
+    const row = (label: string) => screen.getByText(label).closest('li');
+    expect(row('P1')).toHaveTextContent('Vehicles up to 190 cm high');
+    expect(row('P1')).toHaveTextContent('Vehicles up to 210 cm wide');
+    expect(row('P2')).not.toHaveTextContent('cm');
+  });
+});
 
 describe('SpaceList', () => {
   it('counts only free spaces past those shown when a stay was asked about', () => {

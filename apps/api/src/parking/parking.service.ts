@@ -17,12 +17,14 @@ import {
   type ParkingSearchResult,
   ParkingSearchResultSchema,
   SEARCH_RADIUS_METERS,
+  SECURITY_FEATURES,
+  type SecurityFeature,
   SUPPORTED_TIME_ZONES,
   zonedParts,
 } from '@parkfairy/contracts';
 import { type Database, type GeoPoint, payableListing, schema } from '@parkfairy/database';
 import type { PaymentsGateway } from '@parkfairy/payments';
-import { and, asc, eq, exists, inArray, not, or, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, inArray, not, or, type SQL, sql } from 'drizzle-orm';
 
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
@@ -63,9 +65,66 @@ const listingColumns = {
   hourlyRateMinor: listing.hourlyRateMinor,
   dailyMaxMinor: listing.dailyMaxMinor,
   currency: listing.currency,
+  hasCctv: listing.hasCctv,
+  isLit: listing.isLit,
+  isGated: listing.isGated,
 };
 
 type FeatureFlags = Record<ParkingFeature, boolean>;
+
+/** The listing columns behind each security feature (5A.1). */
+const SECURITY_COLUMNS = {
+  cctv: listing.hasCctv,
+  lit: listing.isLit,
+  gated: listing.isGated,
+} satisfies Record<SecurityFeature, unknown>;
+
+/** The space columns behind each space feature, by their names in SQL. */
+const FEATURE_SQL: Record<ParkingFeature, string> = {
+  covered: 'is_covered',
+  evCharging: 'has_ev_charging',
+  accessible: 'is_accessible',
+};
+
+/** What a space must be for a search to count it: its features, and a size that fits the vehicle. */
+interface SpaceFilter {
+  features: ParkingFeature[];
+  heightCm?: number;
+  lengthCm?: number;
+  widthCm?: number;
+}
+
+/** A search's space filter, or none when it asked for no feature and gave no vehicle size. */
+function spaceFilterOf(query: ParkingSearchQuery): SpaceFilter | undefined {
+  const features = query.features ?? [];
+  const sizes = {
+    ...(query.vehicleHeightCm === undefined ? {} : { heightCm: query.vehicleHeightCm }),
+    ...(query.vehicleLengthCm === undefined ? {} : { lengthCm: query.vehicleLengthCm }),
+    ...(query.vehicleWidthCm === undefined ? {} : { widthCm: query.vehicleWidthCm }),
+  };
+  return features.length === 0 && Object.keys(sizes).length === 0
+    ? undefined
+    : { features, ...sizes };
+}
+
+/**
+ * Whether a space (a row of `parking_spaces` under `alias`) meets the filter. A space with no stated
+ * limit fits any vehicle: owners say what they know. Built from the filter's own validated values and
+ * constants only; the sizes go in as parameters.
+ */
+function qualifies(alias: 's' | 'taken', filter: SpaceFilter | undefined): SQL {
+  if (!filter) return sql`true`;
+  const column = (name: string) => sql.raw(`${alias}.${name}`);
+  const parts: SQL[] = filter.features.map((feature) => column(FEATURE_SQL[feature]));
+  const fits = (name: string, size: number | undefined) => {
+    if (size !== undefined)
+      parts.push(sql`(${column(name)} is null or ${column(name)} >= ${size})`);
+  };
+  fits('max_height_cm', filter.heightCm);
+  fits('max_length_cm', filter.lengthCm);
+  fits('max_width_cm', filter.widthCm);
+  return parts.length === 0 ? sql`true` : sql.join(parts, sql` and `);
+}
 
 interface SpaceStats extends FeatureFlags {
   /** Active spaces, free or not. */
@@ -94,6 +153,9 @@ interface ListingRow {
   hourlyRateMinor: number;
   dailyMaxMinor: number | null;
   currency: string;
+  hasCctv: boolean;
+  isLit: boolean;
+  isGated: boolean;
 }
 
 const NO_SPACES: SpaceStats = {
@@ -123,6 +185,16 @@ function spaceRates(row: ListingRow, stats: SpaceStats) {
   return { lowest, vary: all.length > 0 && Math.max(...all) !== lowest };
 }
 
+function securityOf(row: ListingRow): SecurityFeature[] {
+  return SECURITY_FEATURES.filter((feature) => row[SECURITY_ROW_KEYS[feature]]);
+}
+
+const SECURITY_ROW_KEYS = {
+  cctv: 'hasCctv',
+  lit: 'isLit',
+  gated: 'isGated',
+} as const satisfies Record<SecurityFeature, keyof ListingRow>;
+
 function summary(
   row: ListingRow,
   stats: SpaceStats,
@@ -131,6 +203,7 @@ function summary(
   const { lowest, vary } = spaceRates(row, stats);
   return ParkingListingSummarySchema.parse({
     ...row,
+    security: securityOf(row),
     spaceCount: stats.spaceCount,
     hourlyRate: money(lowest, row.currency),
     spacePricesVary: vary,
@@ -194,10 +267,13 @@ export class ParkingService {
    * active spaces than active spaces taken, in one probe of the listing's bookings. Probing each
    * space instead made a full garage, the very thing at peak hours, cost hundreds of them.
    */
-  private hasFreeSpace(window: Window) {
-    return sql`(select count(*) from ${space} s where s.location_id = ${listing.id} and s.is_active)
+  private hasFreeSpace(window: Window, filter?: SpaceFilter) {
+    // With a filter, only the spaces that meet it count, in both reads: one free space that has the
+    // features and fits the vehicle, not a listing that has each of them somewhere.
+    return sql`(select count(*) from ${space} s where s.location_id = ${listing.id} and s.is_active
+        and ${qualifies('s', filter)})
       > (select count(distinct t.space_id) from (${takenSpaceIds(listing.id, window, listing.bookingGapMinutes)}) t
-        join ${space} taken on taken.id = t.space_id and taken.is_active)`;
+        join ${space} taken on taken.id = t.space_id and taken.is_active and ${qualifies('taken', filter)})`;
   }
 
   /**
@@ -268,6 +344,9 @@ export class ParkingService {
     const longitude = area?.longitude ?? query.longitude ?? 0;
     const point = sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography`;
     const window = { start: new Date(query.start), end: new Date(query.end) };
+    const filter = spaceFilterOf(query);
+    // Security is the listing's, so it is plain columns, all of which must be there.
+    const secured = (query.security ?? []).map((feature) => eq(SECURITY_COLUMNS[feature], true));
     // A day either side, so the window's local days are covered in any zone.
     const firstDay = addDays(utcDay(window.start), -1);
     const lastDay = addDays(utcDay(window.end), 1);
@@ -285,7 +364,8 @@ export class ParkingService {
           and(
             published,
             sql`ST_DWithin(${listing.location}, ${point}, ${SEARCH_RADIUS_METERS})`,
-            this.hasFreeSpace(window),
+            this.hasFreeSpace(window, filter),
+            ...secured,
             not(this.closedAllDayDuring(window)),
             or(this.exceptionDuring(window), this.weekCovers(window)),
           ),
@@ -304,7 +384,7 @@ export class ParkingService {
       const [periods, exceptions, stats, priceRules, covers] = await Promise.all([
         openingHoursOf(this.db, ids),
         hoursExceptionsOf(this.db, ids, firstDay, lastDay),
-        this.spaceStats(ids, window),
+        this.spaceStats(ids, window, filter),
         priceRulesOf(this.db, ids, { parallel: true }),
         this.coverPhotos(ids),
       ]);
@@ -371,6 +451,9 @@ export class ParkingService {
           evCharging: space.hasEvCharging,
           accessible: space.isAccessible,
           ownRate: space.hourlyRateMinor,
+          maxHeightCm: space.maxHeightCm,
+          maxLengthCm: space.maxLengthCm,
+          maxWidthCm: space.maxWidthCm,
         })
         .from(space)
         .where(and(eq(space.locationId, row.id), sql`${space.isActive}`)),
@@ -442,6 +525,9 @@ export class ParkingService {
         id: s.id,
         label: s.label,
         features: features(s),
+        maxHeightCm: s.maxHeightCm,
+        maxLengthCm: s.maxLengthCm,
+        maxWidthCm: s.maxWidthCm,
         hourlyRate: money(s.ownRate ?? row.hourlyRateMinor, row.currency),
         total: window ? total(row, priceRules, s.ownRate ?? row.hourlyRateMinor, window) : null,
       })),
@@ -511,6 +597,7 @@ export class ParkingService {
   private async spaceStats(
     locationIds: string[],
     window?: Window,
+    filter?: SpaceFilter,
   ): Promise<Map<string, SpaceStats>> {
     if (locationIds.length === 0) return new Map();
     const taken = window
@@ -523,13 +610,13 @@ export class ParkingService {
     >(sql`
       select s.location_id as "locationId",
         count(*)::int as "spaceCount",
-        (count(*) filter (where t.space_id is null))::int as "freeCount",
+        (count(*) filter (where t.space_id is null and ${qualifies('s', filter)}))::int as "freeCount",
         bool_or(s.is_covered) as "covered",
         bool_or(s.has_ev_charging) as "evCharging",
         bool_or(s.is_accessible) as "accessible",
-        (min(s.hourly_rate_minor) filter (where t.space_id is null))::int as "minOwnRate",
-        (max(s.hourly_rate_minor) filter (where t.space_id is null))::int as "maxOwnRate",
-        (count(*) filter (where t.space_id is null and s.hourly_rate_minor is null))::int
+        (min(s.hourly_rate_minor) filter (where t.space_id is null and ${qualifies('s', filter)}))::int as "minOwnRate",
+        (max(s.hourly_rate_minor) filter (where t.space_id is null and ${qualifies('s', filter)}))::int as "maxOwnRate",
+        (count(*) filter (where t.space_id is null and ${qualifies('s', filter)} and s.hourly_rate_minor is null))::int
           as "atListingRate"
       from ${space} s
       left join (${taken}) t on t.space_id = s.id

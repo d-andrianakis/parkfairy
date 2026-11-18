@@ -61,7 +61,17 @@ describe('SpacesForm', () => {
   it('refuses removing booked spaces, with the way to the bookings; another refusal has none', async () => {
     save.mockResolvedValueOnce(booked('SPACES_BOOKED', 2) as never);
     const listing = listingFixture({
-      spaces: [{ id: 'a', label: 'A1', features: [], hourlyRateMinor: null }],
+      spaces: [
+        {
+          id: 'a',
+          label: 'A1',
+          features: [],
+          hourlyRateMinor: null,
+          maxHeightCm: null,
+          maxLengthCm: null,
+          maxWidthCm: null,
+        },
+      ],
     });
     renderInSubtree(<SpacesForm listing={listing} />);
     await userEvent.click(continueButton());
@@ -108,7 +118,14 @@ describe('SpacesForm', () => {
     await userEvent.click(continueButton());
     await waitFor(() => expect(save).toHaveBeenCalledOnce());
     const body = save.mock.calls[0]?.[0].body;
-    expect(body?.spaces[0]).toEqual({ label: 'A1', features: ['covered'], hourlyRateMinor: null });
+    expect(body?.spaces[0]).toEqual({
+      label: 'A1',
+      features: ['covered'],
+      hourlyRateMinor: null,
+      maxHeightCm: null,
+      maxLengthCm: null,
+      maxWidthCm: null,
+    });
   });
 
   it('names what each checkbox and button is about', async () => {
@@ -121,8 +138,24 @@ describe('SpacesForm', () => {
   it('reads a space’s label in the listing’s language on its remove button, Greek marked', async () => {
     const english = listingFixture({
       spaces: [
-        { id: 'a', label: 'Α1', features: [], hourlyRateMinor: null },
-        { id: 'b', label: 'B2', features: [], hourlyRateMinor: null },
+        {
+          id: 'a',
+          label: 'Α1',
+          features: [],
+          hourlyRateMinor: null,
+          maxHeightCm: null,
+          maxLengthCm: null,
+          maxWidthCm: null,
+        },
+        {
+          id: 'b',
+          label: 'B2',
+          features: [],
+          hourlyRateMinor: null,
+          maxHeightCm: null,
+          maxLengthCm: null,
+          maxWidthCm: null,
+        },
       ],
     });
     const { container } = renderInSubtree(
@@ -201,7 +234,17 @@ describe('SpacesForm', () => {
 
   it('goes to the step the server says is next', async () => {
     const listing = listingFixture({
-      spaces: [{ id: LISTING_ID, label: 'A1', features: [], hourlyRateMinor: null }],
+      spaces: [
+        {
+          id: LISTING_ID,
+          label: 'A1',
+          features: [],
+          hourlyRateMinor: null,
+          maxHeightCm: null,
+          maxLengthCm: null,
+          maxWidthCm: null,
+        },
+      ],
     });
     renderInSubtree(<SpacesForm listing={listing} />);
     await userEvent.click(continueButton());
@@ -212,7 +255,17 @@ describe('SpacesForm', () => {
 
   it('saves and returns to the dashboard when finishing later', async () => {
     const listing = listingFixture({
-      spaces: [{ id: LISTING_ID, label: 'A1', features: [], hourlyRateMinor: null }],
+      spaces: [
+        {
+          id: LISTING_ID,
+          label: 'A1',
+          features: [],
+          hourlyRateMinor: null,
+          maxHeightCm: null,
+          maxLengthCm: null,
+          maxWidthCm: null,
+        },
+      ],
     });
     renderInSubtree(<SpacesForm listing={listing} />);
     await userEvent.click(screen.getByRole('button', { name: 'Save and finish later' }));
@@ -818,6 +871,8 @@ describe('LocationForm', () => {
         latitude: 37.97,
         longitude: 23.73,
         description: null,
+        arrivalInstructions: null,
+        security: [],
         contentLocale: 'el',
       },
     });
@@ -825,5 +880,238 @@ describe('LocationForm', () => {
     renderInSubtree(<LocationForm listing={listing} mapboxToken={null} />);
     await userEvent.click(continueButton());
     expect(await screen.findByText('This listing can’t be changed right now.')).toBeInTheDocument();
+  });
+});
+
+describe('the largest vehicle of a space (5A.1)', () => {
+  const save = vi.mocked(saveListingSpaces);
+  const rowOf = (number: number) => screen.getByRole('group', { name: `Space ${number}` });
+
+  async function addThree() {
+    await userEvent.type(screen.getByLabelText('Prefix (optional)'), 'A');
+    await userEvent.clear(screen.getByLabelText('How many'));
+    await userEvent.type(screen.getByLabelText('How many'), '3');
+    await userEvent.click(screen.getByRole('button', { name: 'Add spaces' }));
+  }
+  const groupSize = (name: string) =>
+    within(
+      screen.getByRole('group', { name: 'Largest vehicle it takes (optional)' }),
+    ).getByLabelText(name);
+
+  it('gives a run of spaces the size typed for it, and saves each in centimetres', async () => {
+    renderInSubtree(<SpacesForm listing={listingFixture()} />);
+    await userEvent.type(groupSize('Maximum vehicle height (cm) (optional)'), '190');
+    await userEvent.type(groupSize('Maximum vehicle width (cm) (optional)'), '210');
+    await addThree();
+    for (const number of [1, 2, 3]) {
+      expect(
+        within(rowOf(number)).getByLabelText('Maximum vehicle height (cm) (optional)'),
+      ).toHaveValue('190');
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    for (const space of save.mock.calls[0]?.[0].body.spaces ?? []) {
+      expect(space).toMatchObject({ maxHeightCm: 190, maxLengthCm: null, maxWidthCm: 210 });
+    }
+  });
+
+  it('changes one space without touching its neighbours', async () => {
+    renderInSubtree(<SpacesForm listing={listingFixture()} />);
+    await addThree();
+    await userEvent.type(
+      within(rowOf(2)).getByLabelText('Maximum vehicle length (cm) (optional)'),
+      '480',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0]?.[0].body.spaces.map((s) => s.maxLengthCm)).toEqual([
+      null,
+      480,
+      null,
+    ]);
+  });
+
+  it('shows the limits that are saved, and clears one when the field is emptied', async () => {
+    const listing = listingFixture({
+      spaces: [
+        {
+          id: 'a',
+          label: 'A1',
+          features: [],
+          hourlyRateMinor: null,
+          maxHeightCm: 190,
+          maxLengthCm: null,
+          maxWidthCm: 210,
+        },
+      ],
+    });
+    renderInSubtree(<SpacesForm listing={listing} />);
+    const height = within(rowOf(1)).getByLabelText('Maximum vehicle height (cm) (optional)');
+    expect(height).toHaveValue('190');
+    expect(within(rowOf(1)).getByLabelText('Maximum vehicle length (cm) (optional)')).toHaveValue(
+      '',
+    );
+    await userEvent.clear(height);
+    await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0]?.[0].body.spaces[0]).toMatchObject({
+      maxHeightCm: null,
+      maxWidthCm: 210,
+    });
+  });
+
+  it('refuses a size a car park cannot have, beside the field, and saves nothing', async () => {
+    renderInSubtree(<SpacesForm listing={listingFixture()} />);
+    await addThree();
+    const height = within(rowOf(1)).getByLabelText('Maximum vehicle height (cm) (optional)');
+    await userEvent.type(height, '99');
+    await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await waitFor(() => expect(height).toHaveAttribute('aria-invalid', 'true'));
+    expect(height).toHaveAccessibleDescription(
+      expect.stringContaining('Enter a height from 100 to 500 cm'),
+    );
+    expect(height).toHaveFocus();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('refuses text and fractions as a size', async () => {
+    renderInSubtree(<SpacesForm listing={listingFixture()} />);
+    await addThree();
+    const width = within(rowOf(3)).getByLabelText('Maximum vehicle width (cm) (optional)');
+    for (const bad of ['wide', '210.5']) {
+      await userEvent.clear(width);
+      await userEvent.type(width, bad);
+      await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+      await waitFor(() => expect(width).toHaveAttribute('aria-invalid', 'true'));
+    }
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('says a size that will not do before the run is added, and adds nothing', async () => {
+    renderInSubtree(<SpacesForm listing={listingFixture()} />);
+    const size = groupSize('Maximum vehicle height (cm) (optional)');
+    await userEvent.type(size, '700');
+    await userEvent.type(screen.getByLabelText('Prefix (optional)'), 'A');
+    await userEvent.click(screen.getByRole('button', { name: 'Add spaces' }));
+    expect(size).toHaveAttribute('aria-invalid', 'true');
+    expect(size).toHaveFocus();
+    expect(screen.queryByLabelText('Name of space 1')).not.toBeInTheDocument();
+  });
+
+  it('is axe clean with the size fields in a row', async () => {
+    const { container } = renderInSubtree(<SpacesForm listing={listingFixture()} />);
+    await addThree();
+    await expectNoAxeViolations(container);
+  });
+});
+
+describe('arrival instructions and security (5A.1)', () => {
+  const save = vi.mocked(saveListingLocation);
+
+  it('saves the instructions when the field is left, and says they are for bookers', async () => {
+    renderInSubtree(<LocationForm listing={listingFixture()} mapboxToken={null} />);
+    const field = screen.getByLabelText('Arrival instructions (optional)');
+    expect(field).toHaveAccessibleDescription(
+      expect.stringContaining('Only drivers with a booking'),
+    );
+    await userEvent.type(field, 'Gate code 4821');
+    await userEvent.tab();
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith({
+        path: { id: LISTING_ID },
+        body: { arrivalInstructions: 'Gate code 4821' },
+      }),
+    );
+  });
+
+  it('keeps gate codes out of the public description, and says why', () => {
+    renderInSubtree(<LocationForm listing={listingFixture()} mapboxToken={null} />);
+    expect(screen.getByLabelText('Description (optional)')).toHaveAccessibleDescription(
+      expect.stringContaining('This is public'),
+    );
+  });
+
+  it('saves each security feature as it is ticked, and untick takes it away', async () => {
+    renderInSubtree(<LocationForm listing={listingFixture()} mapboxToken={null} />);
+    const group = screen.getByRole('group', { name: 'Security' });
+    await userEvent.click(within(group).getByRole('checkbox', { name: 'Gated entry' }));
+    await userEvent.click(within(group).getByRole('checkbox', { name: 'CCTV' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    // In the order of the contract, whatever the order they were ticked in.
+    expect(save).toHaveBeenLastCalledWith({
+      path: { id: LISTING_ID },
+      body: { security: ['cctv', 'gated'] },
+    });
+    await userEvent.click(within(group).getByRole('checkbox', { name: 'CCTV' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(3));
+    expect(save).toHaveBeenLastCalledWith({
+      path: { id: LISTING_ID },
+      body: { security: ['gated'] },
+    });
+  });
+
+  it('shows what is saved, and sends it again with the step', async () => {
+    const listing = listingFixture({
+      location: {
+        name: 'Γκαράζ',
+        address: 'Ερμού 1',
+        areaId: 'syntagma',
+        latitude: 37.97,
+        longitude: 23.73,
+        description: null,
+        arrivalInstructions: 'Second level',
+        security: ['lit'],
+        contentLocale: 'el',
+      },
+    });
+    renderInSubtree(<LocationForm listing={listing} mapboxToken={null} />);
+    expect(screen.getByLabelText('Arrival instructions (optional)')).toHaveValue('Second level');
+    expect(screen.getByRole('checkbox', { name: 'Lit at night' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'CCTV' })).not.toBeChecked();
+    save.mockClear();
+    await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls.at(-1)?.[0].body).toMatchObject({
+      arrivalInstructions: 'Second level',
+      security: ['lit'],
+    });
+  });
+
+  it('marks the instructions with the language they are written in, and is axe clean', async () => {
+    const { container } = renderInSubtree(
+      <LocationForm listing={listingFixture()} mapboxToken={null} />,
+    );
+    expect(screen.getByLabelText('Arrival instructions (optional)')).toHaveAttribute('lang', 'el');
+    await expectNoAxeViolations(container);
+  });
+});
+
+describe('the owner forms in Greek (5A.1)', () => {
+  it('names the size fields, and says a size’s limits in Greek', async () => {
+    renderInSubtree(<SpacesForm listing={listingFixture()} />, { locale: 'el' });
+    await userEvent.type(screen.getByLabelText('Πρόθεμα (προαιρετικά)'), 'Α');
+    await userEvent.click(screen.getByRole('button', { name: 'Προσθήκη θέσεων' }));
+    const row = screen.getByRole('group', { name: 'Θέση 1' });
+    const height = within(row).getByLabelText('Μέγιστο ύψος οχήματος (εκ.) (προαιρετικά)');
+    expect(within(row).getByLabelText('Μέγιστο μήκος οχήματος (εκ.) (προαιρετικά)')).toBeVisible();
+    expect(within(row).getByLabelText('Μέγιστο πλάτος οχήματος (εκ.) (προαιρετικά)')).toBeVisible();
+    await userEvent.type(height, '99');
+    await userEvent.click(screen.getByRole('button', { name: 'Αποθήκευση και συνέχεια' }));
+    await waitFor(() => expect(height).toHaveAttribute('aria-invalid', 'true'));
+    expect(height).toHaveAccessibleDescription('Εισαγάγετε ύψος από 100 έως 500 εκ.');
+  });
+
+  it('names the arrival instructions and the security group', () => {
+    renderInSubtree(<LocationForm listing={listingFixture()} mapboxToken={null} />, {
+      locale: 'el',
+    });
+    expect(screen.getByLabelText('Οδηγίες άφιξης (προαιρετικά)')).toHaveAttribute('lang', 'el');
+    const group = screen.getByRole('group', { name: 'Ασφάλεια' });
+    expect(within(group).getByRole('checkbox', { name: 'Κάμερες ασφαλείας' })).toBeInTheDocument();
+    expect(within(group).getByRole('checkbox', { name: 'Φωτισμός τη νύχτα' })).toBeInTheDocument();
+    expect(within(group).getByRole('checkbox', { name: 'Είσοδος με πύλη' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Περιγραφή (προαιρετικά)')).toHaveAccessibleDescription(
+      expect.stringContaining('Είναι δημόσιο'),
+    );
   });
 });

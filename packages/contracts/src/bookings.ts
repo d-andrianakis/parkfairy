@@ -25,6 +25,23 @@ export const BookingStatusSchema = z.enum(BOOKING_STATUSES).register(contractsRe
 });
 export type BookingStatus = z.infer<typeof BookingStatusSchema>;
 
+/**
+ * The statuses that take a space (Phase 5A, #86). The exclusion constraint `bookings_space_no_overlap`
+ * (migration 0015), the index `bookings_taken_by_listing_idx` (0017) and every query that asks "is it
+ * free?" mean exactly these, and a test holds the migrations to this list. A new status that must hold
+ * a space (a request waiting for the owner, a renewal waiting to be charged) is added here, in a
+ * migration that recreates both, and in `LAPSING_STATUSES` if it stops holding at `hold_expires_at`.
+ */
+export const BLOCKING_STATUSES = ['held', 'confirmed'] as const satisfies readonly BookingStatus[];
+
+/**
+ * Of those, the ones that stop taking the space when `hold_expires_at` passes, whether or not the
+ * sweep has marked them yet. A confirmed booking takes it until `blocked_until`.
+ */
+export const LAPSING_STATUSES = ['held'] as const satisfies readonly BlockingStatus[];
+
+export type BlockingStatus = (typeof BLOCKING_STATUSES)[number];
+
 /** Who called a booking off. */
 export const BOOKING_CANCELLERS = ['driver', 'owner'] as const;
 export const BookingCancellerSchema = z.enum(BOOKING_CANCELLERS).register(contractsRegistry, {
@@ -124,8 +141,23 @@ export const BookingSchema = z
     checkout: CheckoutKindSchema,
     /** Its payment, once one was asked for: null before, and always where nothing is paid. */
     payment: PaymentStatusSchema.nullable(),
+    /**
+     * How to find and get into the space, as the owner has it now, in the language they wrote it in.
+     * Only on a booking that stands, and only once cancelling would no longer give everything back
+     * (a gate code can't be read and then refunded), until ARRIVAL_INSTRUCTIONS_HOURS_AFTER after it
+     * ends: it can hold a gate code, so it is private to the driver who booked (5A.1).
+     */
+    arrivalInstructions: z.object({ text: z.string(), contentLocale: LocaleSchema }).nullable(),
+    /**
+     * When the instructions the owner left will appear, for a booking they can't be read on yet; null
+     * when they are shown, or there are none.
+     */
+    arrivalInstructionsFrom: z.iso.datetime().nullable(),
   })
   .register(contractsRegistry, { id: 'Booking' });
+
+/** How long after a stay ends its arrival instructions stay readable. */
+export const ARRIVAL_INSTRUCTIONS_HOURS_AFTER = 24;
 export type Booking = z.infer<typeof BookingSchema>;
 
 export const BOOKINGS_PAGE_SIZE = 20;

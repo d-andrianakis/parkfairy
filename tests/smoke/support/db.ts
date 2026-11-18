@@ -369,3 +369,33 @@ export async function overstayOf(bookingId: string): Promise<{
   );
   return row ?? null;
 }
+
+/** A booking's stay as stored, to put back after a test moves it. */
+export async function stayOf(reference: string): Promise<{ startsAt: Date; endsAt: Date }> {
+  const [row] = await run<{ starts_at: Date; ends_at: Date }>(
+    `select starts_at, ends_at from bookings where reference = $1`,
+    [reference],
+  );
+  if (!row) throw new Error(`No booking ${reference}`);
+  return { startsAt: row.starts_at, endsAt: row.ends_at };
+}
+
+/**
+ * Puts a booking's stay somewhere else (the listing's gap none, so one move), for tests that need it
+ * near: some things, the way in, are shown only close to the stay. Put it back with the stay it had.
+ */
+export async function setStay(
+  reference: string,
+  { startsAt, endsAt }: { startsAt: Date; endsAt: Date },
+): Promise<void> {
+  await run(
+    `update bookings set starts_at = $2, ends_at = $3, blocked_until = $3 where reference = $1`,
+    [reference, startsAt, endsAt],
+  );
+}
+
+/** A stay two hours long, starting in `hours` hours. */
+export const stayIn = (hours: number) => {
+  const startsAt = new Date(Date.now() + hours * 3_600_000);
+  return { startsAt, endsAt: new Date(startsAt.getTime() + 2 * 3_600_000) };
+};
