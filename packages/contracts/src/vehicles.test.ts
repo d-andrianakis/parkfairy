@@ -57,7 +57,7 @@ describe('SavedVehicleInputSchema (5A.2)', () => {
   it('refuses a name that is too long or has a control character', () => {
     expect(
       issues(SavedVehicleInputSchema.safeParse({ plate: 'IKB1234', name: 'x'.repeat(41) })),
-    ).toEqual(['name:textTooLong']);
+    ).toEqual(['name:nameTooLong']);
     expect(
       issues(SavedVehicleInputSchema.safeParse({ plate: 'IKB1234', name: 'a\u0000b' })),
     ).toEqual(['name:invalid']);

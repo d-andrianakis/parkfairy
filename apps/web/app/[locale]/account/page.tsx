@@ -14,10 +14,12 @@ import { PersonName } from '@/components/parking/place-words';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { Link } from '@/i18n/navigation';
 import { localeFromParams, type LocaleParams } from '@/i18n/params';
+import { loadReminders } from '@/lib/bookings.server';
 import { requireSession } from '@/lib/session';
 
 import { ApiIdentity } from './api-identity';
 import { Providers } from './providers';
+import { ReminderSetting } from './reminder-setting';
 import { SignOutButton } from './sign-out-button';
 import { TwoFactorSettings } from './two-factor-settings';
 
@@ -31,6 +33,10 @@ export default async function AccountPage({ params }: LocaleParams) {
   const session = await requireSession('/account');
   const t = await getTranslations({ locale, namespace: 'Account' });
   const tTwoFactor = await getTranslations({ locale, namespace: 'TwoFactorSettings' });
+  // Started now, in parallel with the translations, and waited for just before it is shown.
+  const remindersRead = loadReminders();
+
+  const reminders = await remindersRead;
 
   return (
     <div className="mx-auto grid w-full max-w-2xl gap-6 px-4 py-12">
@@ -101,6 +107,13 @@ export default async function AccountPage({ params }: LocaleParams) {
               </Link>
             </li>
           </ul>
+          {reminders === null ? null : (
+            <div className="mt-4 border-t pt-4">
+              <ClientMessages namespaces={CLIENT_NAMESPACES.account}>
+                <ReminderSetting initial={reminders} />
+              </ClientMessages>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

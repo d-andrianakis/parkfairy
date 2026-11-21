@@ -282,7 +282,12 @@
     "parkingHeading": "Your parking",
     "parkingIntro": "Vehicles and places you’ve saved, so booking takes fewer steps.",
     "vehiclesLink": "Saved vehicles",
-    "favouritesLink": "Favourite parking"
+    "favouritesLink": "Favourite parking",
+    "remindersLabel": "Email me before a stay starts and shortly before it ends",
+    "remindersHint": "Two emails for each booking: about two hours before you arrive, and about half an hour before you must leave.",
+    "remindersOn": "Reminders are on.",
+    "remindersOff": "Reminders are off.",
+    "remindersError": "We couldn’t save that. Check your connection and try again."
   },
   "TwoFactorSettings": {
     "heading": "Two-factor authentication",
@@ -1401,7 +1406,8 @@
     "vehicleOther": "Another vehicle",
     "vehicleChosen": "The owner will see this plate: {plate}.",
     "saveVehicle": "Save this vehicle for next time",
-    "changeVehicle": "Change the vehicle"
+    "changeVehicle": "Change the vehicle",
+    "openPass": "Open the booking pass"
   },
   "Bookings": {
     "metaTitle": "Your bookings",
@@ -1418,7 +1424,7 @@
     "next": "Next page",
     "unavailable": "Your bookings can’t be shown right now. Please try again in a moment.",
     "space": "Space: <space>{label}</space>",
-    "rebookWhen": "Same weekday and times:"
+    "rebookWhen": "Same weekday and times: <stay></stay>"
   },
   "Vehicles": {
     "metaTitle": "Saved vehicles",
@@ -1455,9 +1461,9 @@
     "changed": "Changes saved.",
     "removed": "Vehicle removed.",
     "full": "You’ve saved the most vehicles you can ({max}). Remove one to add another.",
-    "sizeHigh": "{value} cm high",
-    "sizeLong": "{value} cm long",
-    "sizeWide": "{value} cm wide",
+    "sizeHigh": "{value, number} cm high",
+    "sizeLong": "{value, number} cm long",
+    "sizeWide": "{value, number} cm wide",
     "noSizes": "No size given",
     "errors": {
       "generic": "Something went wrong. Check your connection and try again.",
@@ -1490,5 +1496,26 @@
     "button": "Book again",
     "holding": "Holding the space…",
     "chooseOther": "Choose another space or time"
+  },
+  "Pass": {
+    "metaTitle": "Booking pass",
+    "heading": "Your booking pass",
+    "lead": "Show this reference if you’re asked.",
+    "reference": "Booking reference",
+    "qrLabel": "QR code of the booking reference {reference}",
+    "qrHint": "The code holds only the reference.",
+    "back": "Back to the booking",
+    "notYet": "A pass is available once the booking is confirmed.",
+    "addToCalendar": "Add to calendar",
+    "calendarHint": "A calendar file with the place, the space and the reference. It doesn’t include the way in.",
+    "keepOffline": "Keep this pass offline",
+    "keepHint": "Saves this page on this device until a day after your stay, so you can open it without a connection. It includes how to get in once that is shown, and signing out removes it. Don’t keep it on a device other people use.",
+    "keeping": "Saving…",
+    "kept": "Kept on this device until {when}.",
+    "removeOffline": "Remove from this device",
+    "removed": "Removed from this device.",
+    "unsupported": "This browser can’t keep pages offline.",
+    "error": "We couldn’t save it. Check your connection and try again.",
+    "removing": "Removing…"
   }
 }

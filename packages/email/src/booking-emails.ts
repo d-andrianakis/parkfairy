@@ -8,6 +8,9 @@ export const BOOKING_EMAIL_KINDS = [
   'booking-cancelled',
   // A payment that couldn't book the space (too late for it, or for a hold let go: #3).
   'booking-payment-refunded',
+  // To the driver, as a reminder (5A.3): a couple of hours before the stay, and shortly before it ends.
+  'booking-starting-soon',
+  'booking-ending-soon',
   'booking-received',
   'booking-cancelled-by-driver',
   // To the primary owner, when a co-owner or a manager called a booking off (#69).
@@ -123,6 +126,20 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         action: 'Δείτε την κράτηση',
         note: 'Μπορεί να χρειαστούν μερικές ημέρες για να φανεί στην κίνηση της κάρτας ή της τράπεζάς σας.',
       },
+      'booking-starting-soon': {
+        subject: (reference) => `Η στάθμευσή σας ξεκινά σύντομα (${reference})`,
+        heading: 'Η στάθμευσή σας ξεκινά σύντομα',
+        body: (listing) => `Σε λίγο ξεκινά η στάθμευσή σας στον χώρο «${listing}».`,
+        action: 'Ανοίξτε την κάρτα κράτησης',
+        note: 'Στην κάρτα κράτησης βλέπετε τον κωδικό κράτησης και τις οδηγίες πρόσβασης, και μπορείτε να την κρατήσετε διαθέσιμη χωρίς σύνδεση.',
+      },
+      'booking-ending-soon': {
+        subject: (reference) => `Η στάθμευσή σας λήγει σύντομα (${reference})`,
+        heading: 'Η στάθμευσή σας λήγει σύντομα',
+        body: (listing) => `Σε λίγο λήγει η στάθμευσή σας στον χώρο «${listing}».`,
+        action: 'Δείτε την κράτηση',
+        note: 'Αν μείνετε πέρα από την ώρα αναχώρησης, μπορεί να εμποδίσετε τον επόμενο οδηγό και να έχετε επιβάρυνση.',
+      },
       'booking-received': {
         subject: (_reference, listing) => `Νέα κράτηση για τον χώρο «${listing}»`,
         heading: 'Έχετε νέα κράτηση',
@@ -224,6 +241,20 @@ export const BOOKING_EMAIL_COPY: Record<OwnerEmailLocale, BookingEmailCatalog> =
         action: 'See your booking',
         note: 'It can take a few days to show on your card or bank statement.',
       },
+      'booking-starting-soon': {
+        subject: (reference) => `Your parking starts soon (${reference})`,
+        heading: 'Your parking starts soon',
+        body: (listing) => `Your stay at “${listing}” starts shortly.`,
+        action: 'Open your booking pass',
+        note: 'The pass has the reference and how to get in, and you can keep it available without a connection.',
+      },
+      'booking-ending-soon': {
+        subject: (reference) => `Your parking ends soon (${reference})`,
+        heading: 'Your parking ends soon',
+        body: (listing) => `Your stay at “${listing}” ends shortly.`,
+        action: 'See your booking',
+        note: 'Staying past your departure time can block the next driver, and you may be charged for it.',
+      },
       'booking-received': {
         subject: (_reference, listing) => `New booking for “${listing}”`,
         heading: 'You have a new booking',
@@ -314,6 +345,8 @@ const DRIVER_KINDS = new Set<BookingEmailKind>([
   'booking-confirmed',
   'booking-cancelled',
   'booking-payment-refunded',
+  'booking-starting-soon',
+  'booking-ending-soon',
 ]);
 
 export function renderBookingEmail({
@@ -357,7 +390,8 @@ export function renderBookingEmail({
   ];
   // About the team, not the booking: to where the team is listed (the primary's own page).
   const path = forDriver
-    ? `/${locale}/bookings/${booking.id}`
+    ? // The reminder before a stay opens its pass; every other driver email, the booking.
+      `/${locale}/bookings/${booking.id}${kind === 'booking-starting-soon' ? '/pass' : ''}`
     : kind === 'booking-cancelled-by-team'
       ? `/${locale}/owner/listings/${booking.listingId}/owners`
       : kind === 'dispute-owners-bear'

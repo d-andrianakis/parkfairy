@@ -20,13 +20,14 @@ import { FocusHeading } from '@/components/focus-heading';
 import { placeTag } from '@/components/parking/place-words';
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { timeOptions } from '@/i18n/formats';
-import { Link } from '@/i18n/navigation';
+import { getPathname, Link } from '@/i18n/navigation';
 import { localeFromParams } from '@/i18n/params';
 import { listingStayHref } from '@/lib/booking-links';
 import { loadBooking, loadVehicles } from '@/lib/bookings.server';
 import { stripePublishableKey } from '@/lib/payments.server';
 import { canRebook } from '@/lib/rebook';
 import { requireSession } from '@/lib/session';
+import { WRAPPING_BUTTON } from '@/lib/wrapping-button';
 
 interface BookingPageProps {
   params: Promise<{ locale: string; id: string }>;
@@ -225,6 +226,18 @@ export default async function BookingPage({ params, searchParams }: BookingPageP
               checkout={booking.checkout}
             />
           </ClientMessages>
+        </div>
+      ) : null}
+
+      {booking.status === 'confirmed' ? (
+        <div>
+          <Button asChild variant="outline" className={WRAPPING_BUTTON}>
+            {/* A page load, not a client navigation: only the pass's own policy lets it register the
+                worker that keeps it offline (`allowsOfflinePass`). */}
+            <a href={getPathname({ href: `/bookings/${booking.id}/pass`, locale })}>
+              {t('openPass')}
+            </a>
+          </Button>
         </div>
       ) : null}
 

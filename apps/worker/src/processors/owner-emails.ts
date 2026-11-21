@@ -3,6 +3,7 @@ import {
   type ClaimedEmail,
   countOverdueEmails,
   type Database,
+  enqueueBookingReminders,
   enqueueListingStatusEmails,
   enqueueOnboardingReminders,
   hashInviteToken,
@@ -11,6 +12,7 @@ import {
   mintInviteToken,
   purgeSentEmails,
   releaseEmails,
+  reminderStillDue,
 } from '@parkfairy/database';
 import {
   ACCOUNT_EMAIL_KINDS,
@@ -56,6 +58,8 @@ export const SEND_BATCH = 20;
  */
 export const SEND_RUN_MS = 25_000;
 
+/** The drivers' reminders (5A.3), which are worth nothing once their moment has passed. */
+const REMINDER_KINDS = new Set<string>(['booking-starting-soon', 'booking-ending-soon']);
 const OWNER_KINDS = new Set<string>(OWNER_EMAIL_KINDS);
 const BOOKING_KINDS = new Set<string>(BOOKING_EMAIL_KINDS);
 const HANDOVER_KINDS = new Set<string>(HANDOVER_EMAIL_KINDS);
@@ -114,7 +118,17 @@ async function message(
   row: ClaimedEmail,
   webUrl: string,
 ): Promise<{ email: OutgoingEmail; key: string } | null> {
-  if (row.kind !== 'listing-invite') return { email: render(row, webUrl), key: row.id };
+  if (row.kind !== 'listing-invite') {
+    // A reminder that has gone stale in the outbox (the stay began, the booking was called off) isn't
+    // sent. Only these two kinds ask: every other email is due whenever its turn comes.
+    if (
+      REMINDER_KINDS.has(row.kind) &&
+      !(await reminderStillDue(db, row.kind, row.payload.booking?.id))
+    ) {
+      return null;
+    }
+    return { email: render(row, webUrl), key: row.id };
+  }
   if (!row.inviteId) throw new Error('An invite email without its invite');
   const minted = await mintInviteToken(db, row.inviteId);
   if (!minted) return null;
@@ -145,6 +159,8 @@ export const ownerEmailsProcessor: QueueProcessor = {
   schedules: [
     { id: 'enqueue-listing-status-emails', everyMs: MINUTE_MS },
     { id: 'enqueue-onboarding-reminders', everyMs: 60 * MINUTE_MS },
+    // The drivers' reminders (5A.3): a window of a couple of hours, so each minute is none too often.
+    { id: 'enqueue-booking-reminders', everyMs: MINUTE_MS },
     { id: 'send-owner-emails', everyMs: 30_000 },
     { id: 'purge-sent-emails', everyMs: DAY_MS },
   ],
@@ -153,6 +169,11 @@ export const ownerEmailsProcessor: QueueProcessor = {
       case 'enqueue-listing-status-emails': {
         const queued = await enqueueListingStatusEmails(db);
         if (queued > 0) logger.info({ queued }, 'listing status emails queued');
+        return { queued };
+      }
+      case 'enqueue-booking-reminders': {
+        const queued = await enqueueBookingReminders(db);
+        if (queued > 0) logger.info({ queued }, 'booking reminders queued');
         return { queued };
       }
       case 'enqueue-onboarding-reminders': {

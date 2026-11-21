@@ -52,6 +52,12 @@ const nextConfig: NextConfig = {
         source: `/vendor/mapbox-gl-csp-worker-${mapboxVersion}.js`,
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
+      // The worker that serves a kept booking pass (5A.3): checked for a new version each time, since a
+      // browser would otherwise keep an old one for a day.
+      {
+        source: '/pass-sw.js',
+        headers: [{ key: 'Cache-Control', value: 'no-cache' }],
+      },
       // These URLs hold a live token, and even same-origin requests would repeat it in Referer,
       // which CDN logs record. A header, as a meta tag only applies once the parser reaches it.
       ...['/:locale/reset-password', '/:locale/verify-email'].map((source) => ({

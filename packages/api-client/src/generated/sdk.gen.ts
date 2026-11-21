@@ -118,6 +118,9 @@ import type {
   GetMeData,
   GetMeErrors,
   GetMeResponses,
+  GetMyBookingCalendarData,
+  GetMyBookingCalendarErrors,
+  GetMyBookingCalendarResponses,
   GetMyBookingData,
   GetMyBookingErrors,
   GetMyBookingResponses,
@@ -127,6 +130,9 @@ import type {
   GetMyFavouritesData,
   GetMyFavouritesErrors,
   GetMyFavouritesResponses,
+  GetMyRemindersData,
+  GetMyRemindersErrors,
+  GetMyRemindersResponses,
   GetMyVehiclesData,
   GetMyVehiclesErrors,
   GetMyVehiclesResponses,
@@ -250,6 +256,9 @@ import type {
   SetListingSharesData,
   SetListingSharesErrors,
   SetListingSharesResponses,
+  SetMyRemindersData,
+  SetMyRemindersErrors,
+  SetMyRemindersResponses,
   SettleAdminBookingRefundData,
   SettleAdminBookingRefundErrors,
   SettleAdminBookingRefundResponses,
@@ -338,6 +347,40 @@ export const getMe = <ThrowOnError extends boolean = false>(
     ],
     url: '/v1/me',
     ...options,
+  });
+
+export const getMyReminders = <ThrowOnError extends boolean = false>(
+  options?: Options<GetMyRemindersData, ThrowOnError>,
+): RequestResult<GetMyRemindersResponses, GetMyRemindersErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetMyRemindersResponses, GetMyRemindersErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/me/reminders',
+    ...options,
+  });
+
+export const setMyReminders = <ThrowOnError extends boolean = false>(
+  options: Options<SetMyRemindersData, ThrowOnError>,
+): RequestResult<SetMyRemindersResponses, SetMyRemindersErrors, ThrowOnError> =>
+  (options.client ?? client).put<SetMyRemindersResponses, SetMyRemindersErrors, ThrowOnError>({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/me/reminders',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 export const getListingPhoto = <ThrowOnError extends boolean = false>(
@@ -1644,6 +1687,25 @@ export const holdParkingSpace = <ThrowOnError extends boolean = false>(
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+export const getMyBookingCalendar = <ThrowOnError extends boolean = false>(
+  options: Options<GetMyBookingCalendarData, ThrowOnError>,
+): RequestResult<GetMyBookingCalendarResponses, GetMyBookingCalendarErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetMyBookingCalendarResponses,
+    GetMyBookingCalendarErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: 'cookie',
+        name: 'parkfairy.session_token',
+        type: 'apiKey',
+      },
+    ],
+    url: '/v1/bookings/{id}/calendar',
+    ...options,
   });
 
 export const getMyBooking = <ThrowOnError extends boolean = false>(

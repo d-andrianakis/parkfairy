@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { allowsMaps, allowsPayments, buildContentSecurityPolicy, createNonce } from './csp';
+import {
+  allowsMaps,
+  allowsOfflinePass,
+  allowsPayments,
+  buildContentSecurityPolicy,
+  createNonce,
+} from './csp';
 
 function directives(policy: string): Map<string, string[]> {
   return new Map(
@@ -52,6 +58,31 @@ describe('allowsPayments', () => {
     ]) {
       expect(allowsPayments(path)).toBe(false);
     }
+  });
+});
+
+describe('allowsOfflinePass (5A.3)', () => {
+  const ID = '6f1c0a52-8c1e-4f0e-9b7a-2d3e4f5a6b7c';
+
+  it('is the booking pass, in both languages', () => {
+    for (const path of [`/el/bookings/${ID}/pass`, `/en/bookings/${ID}/pass/`]) {
+      expect(allowsOfflinePass(path)).toBe(true);
+    }
+  });
+
+  it('is no other page, and never the page that pays', () => {
+    for (const path of [
+      `/en/bookings/${ID}`,
+      '/en/bookings/x/pass',
+      `/en/bookings/${ID}/pass/more`,
+      `/en/bookings/${ID}/passes`,
+      '/en/bookings',
+      '/en/owner',
+      `/fr/bookings/${ID}/pass`,
+    ]) {
+      expect(allowsOfflinePass(path)).toBe(false);
+    }
+    expect(allowsPayments(`/en/bookings/${ID}/pass`)).toBe(false);
   });
 });
 
@@ -113,6 +144,22 @@ describe('buildContentSecurityPolicy', () => {
     expect(paying.get('script-src')).toContain("'strict-dynamic'");
     expect(paying.get('script-src')).not.toContain("'unsafe-inline'");
     expect(paying.get('frame-ancestors')).toEqual(["'none'"]);
+  });
+
+  it('lets the booking pass register its worker, and nothing else about it changes (5A.3)', () => {
+    const pass = directives(
+      buildContentSecurityPolicy({
+        nonce: 'abc',
+        isDev: false,
+        upgradeInsecureRequests: true,
+        pass: true,
+      }),
+    );
+    expect(pass.get('worker-src')).toEqual(["'self'"]);
+    expect(pass.get('script-src')).toEqual(production.get('script-src'));
+    expect(pass.get('connect-src')).toEqual(production.get('connect-src'));
+    expect(pass.get('frame-src')).toEqual(production.get('frame-src'));
+    expect(production.has('worker-src')).toBe(false);
   });
 
   it('only runs scripts carrying this response nonce', () => {

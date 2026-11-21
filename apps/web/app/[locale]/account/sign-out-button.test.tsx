@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { authClient } from '@/lib/auth-client';
+import { forgetAllPasses } from '@/lib/offline-pass';
 import { routerMock } from '@/test/navigation-mock';
 import { catalogs, rendererFor } from '@/test/render';
 
@@ -15,12 +16,14 @@ import { SignOutButton } from './sign-out-button';
 const renderInSubtree = rendererFor(CLIENT_NAMESPACES.account);
 
 vi.mock('@/lib/auth-client', () => ({ authClient: { signOut: vi.fn() } }));
+vi.mock('@/lib/offline-pass', () => ({ forgetAllPasses: vi.fn(() => Promise.resolve()) }));
 
 describe('SignOutButton', () => {
   beforeEach(() => {
     vi.mocked(authClient.signOut).mockReset();
     vi.mocked(authClient.signOut).mockResolvedValue({ data: { success: true } } as never);
     routerMock.replace.mockReset();
+    vi.mocked(forgetAllPasses).mockClear();
   });
 
   it('leaves nothing of the visitor in this tab', async () => {
@@ -38,6 +41,23 @@ describe('SignOutButton', () => {
     await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith('/'));
     expect(sessionStorage.getItem('parkfairy.sent-to:/sign-up')).toBeNull();
     expect(queries.getQueryData(['me'])).toBeUndefined();
+  });
+
+  it('takes the booking passes kept on this device off it (5A.3)', async () => {
+    renderInSubtree(<SignOutButton />);
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith('/'));
+    expect(forgetAllPasses).toHaveBeenCalledOnce();
+  });
+
+  it('takes them off it when the server reports an error too', async () => {
+    vi.mocked(authClient.signOut).mockResolvedValue({
+      data: null,
+      error: { status: 500 },
+    } as never);
+    renderInSubtree(<SignOutButton />);
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() => expect(forgetAllPasses).toHaveBeenCalledOnce());
   });
 
   it('clears this tab even when the server reports an error', async () => {

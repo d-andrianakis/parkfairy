@@ -8,6 +8,7 @@ import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 
 import { ClientMessages } from '@/components/client-messages';
+import { PassGuard } from '@/components/pass-guard';
 import { RouteFocus } from '@/components/route-focus';
 import { SessionRefresh } from '@/components/session-refresh';
 import { SiteHeader } from '@/components/site-header';
@@ -59,6 +60,7 @@ export default async function LocaleLayout({
         <ClientMessages namespaces={CLIENT_NAMESPACES.root}>
           <RouteFocus />
           {session && sessionRefreshDue(session.session.expiresAt) ? <SessionRefresh /> : null}
+          <PassGuard signedIn={Boolean(session)} userId={session?.user.id ?? null} />
           <SiteHeader theme={theme} signedIn={Boolean(session)} />
           <main id="main-content" tabIndex={-1} className="outline-none">
             {children}

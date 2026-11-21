@@ -837,6 +837,14 @@ export type OwnerListingCreated = {
 
 export type UserRole = 'user' | 'admin';
 
+export type ReminderPreferences = {
+  reminderEmails: boolean;
+};
+
+export type ReminderPreferencesInput = {
+  reminderEmails: boolean;
+};
+
 export type MeResponse = {
   id: string;
   email: string;
@@ -1410,6 +1418,45 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type GetMyRemindersData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/me/reminders';
+};
+
+export type GetMyRemindersErrors = {
+  401: ErrorResponse;
+};
+
+export type GetMyRemindersError = GetMyRemindersErrors[keyof GetMyRemindersErrors];
+
+export type GetMyRemindersResponses = {
+  200: ReminderPreferences;
+};
+
+export type GetMyRemindersResponse = GetMyRemindersResponses[keyof GetMyRemindersResponses];
+
+export type SetMyRemindersData = {
+  body: ReminderPreferencesInput;
+  path?: never;
+  query?: never;
+  url: '/v1/me/reminders';
+};
+
+export type SetMyRemindersErrors = {
+  400: ErrorResponse;
+  401: ErrorResponse;
+};
+
+export type SetMyRemindersError = SetMyRemindersErrors[keyof SetMyRemindersErrors];
+
+export type SetMyRemindersResponses = {
+  200: ReminderPreferences;
+};
+
+export type SetMyRemindersResponse = SetMyRemindersResponses[keyof SetMyRemindersResponses];
 
 export type GetListingPhotoData = {
   body?: never;
@@ -3068,6 +3115,32 @@ export type HoldParkingSpaceResponses = {
 };
 
 export type HoldParkingSpaceResponse = HoldParkingSpaceResponses[keyof HoldParkingSpaceResponses];
+
+export type GetMyBookingCalendarData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: {
+    locale?: 'el' | 'en';
+  };
+  url: '/v1/bookings/{id}/calendar';
+};
+
+export type GetMyBookingCalendarErrors = {
+  401: ErrorResponse;
+  404: ErrorResponse;
+};
+
+export type GetMyBookingCalendarError =
+  GetMyBookingCalendarErrors[keyof GetMyBookingCalendarErrors];
+
+export type GetMyBookingCalendarResponses = {
+  200: Blob | File;
+};
+
+export type GetMyBookingCalendarResponse =
+  GetMyBookingCalendarResponses[keyof GetMyBookingCalendarResponses];
 
 export type GetMyBookingData = {
   body?: never;

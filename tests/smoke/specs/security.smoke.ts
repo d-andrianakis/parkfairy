@@ -191,6 +191,62 @@ test.describe('signed in', () => {
     }
   });
 
+  test('saved vehicles and favourites cannot be changed from another site', async ({ page }) => {
+    await page.goto('/en');
+    const headers = { origin: 'https://evil.example' };
+    const id = '11111111-1111-4111-8111-111111111111';
+    const writes: ['post' | 'put' | 'delete', string, unknown][] = [
+      ['post', '/api/v1/vehicles', { plate: 'IKB1234' }],
+      ['put', `/api/v1/vehicles/${id}`, { plate: 'IKB1234' }],
+      ['delete', `/api/v1/vehicles/${id}`, undefined],
+      ['put', '/api/v1/favourites/syntagma-square-garage', undefined],
+      ['delete', '/api/v1/favourites/syntagma-square-garage', undefined],
+    ];
+    for (const [method, path, data] of writes) {
+      const response = await page.request[method](path, { headers, data });
+      expect(response.status(), `${method} ${path}`).toBe(403);
+      expect(await response.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
+    }
+  });
+
+  test('the booking pass and the reminders are the signed-in driver’s alone (5A.3)', async ({
+    browser,
+  }) => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    const anonymous = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+      extraHTTPHeaders: { 'x-forwarded-for': `198.51.100.${Math.floor(Math.random() * 250) + 1}` },
+    });
+    const visitor = await anonymous.newPage();
+    expect((await visitor.request.get('/api/v1/me/reminders')).status()).toBe(401);
+    expect((await visitor.request.get(`/api/v1/bookings/${id}/calendar`)).status()).toBe(401);
+    await visitor.goto(`/en/bookings/${id}/pass`);
+    await expect(visitor).toHaveURL(/\/en\/sign-in\?next=/);
+    // The worker file is checked for a new version each time.
+    const worker = await visitor.request.get('/pass-sw.js');
+    expect(worker.status()).toBe(200);
+    expect(worker.headers()['cache-control']).toBe('no-cache');
+    await anonymous.close();
+  });
+
+  test('only the booking pass may register a worker (5A.3)', async ({ page }) => {
+    const policy = async (path: string) =>
+      (await page.request.get(path)).headers()['content-security-policy'] ?? '';
+    const id = '11111111-1111-4111-8111-111111111111';
+    // A page that asks the browser for a worker gets `worker-src 'self'`; no other page does.
+    expect(await policy(`/en/bookings/${id}/pass`)).toContain("worker-src 'self'");
+    for (const path of ['/en', '/en/bookings', `/en/bookings/${id}`, '/en/account']) {
+      expect(await policy(path), path).not.toContain('worker-src');
+    }
+    // And where it does, nothing else about scripts is looser.
+    const scripts =
+      (await policy(`/en/bookings/${id}/pass`))
+        .split('; ')
+        .find((part) => part.startsWith('script-src')) ?? '';
+    expect(scripts).toContain("'strict-dynamic'");
+    expect(scripts).not.toContain("'unsafe-");
+  });
+
   test('sign-in ignores off-site return URLs', async ({ page }) => {
     await page.goto('/en/sign-in?next=//evil.example/phish');
     await expect(page).toHaveURL('/en/account');

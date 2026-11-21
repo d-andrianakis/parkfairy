@@ -12,6 +12,7 @@ import {
   getMyBooking,
   getMyBookings,
   getMyFavourites,
+  getMyReminders,
   getMyVehicles,
   isMyFavourite,
   listOwnerBookings,
@@ -165,6 +166,16 @@ export const loadVehicles = cache(async (): Promise<SavedVehicle[] | null> => {
   try {
     const { data } = await getMyVehicles(await asVisitor());
     return data?.vehicles ?? null;
+  } catch {
+    return null;
+  }
+});
+
+/** Whether the driver wants the reminders around a stay (5A.3); null when the API could not say. */
+export const loadReminders = cache(async (): Promise<boolean | null> => {
+  try {
+    const { data } = await getMyReminders(await asVisitor());
+    return data?.reminderEmails ?? null;
   } catch {
     return null;
   }

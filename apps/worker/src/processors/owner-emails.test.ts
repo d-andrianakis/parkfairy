@@ -4,6 +4,7 @@ import {
   type ClaimedEmail,
   countOverdueEmails,
   type Database,
+  enqueueBookingReminders,
   enqueueListingStatusEmails,
   enqueueOnboardingReminders,
   markEmailFailed,
@@ -11,6 +12,7 @@ import {
   mintInviteToken,
   purgeSentEmails,
   releaseEmails,
+  reminderStillDue,
 } from '@parkfairy/database';
 import { type EmailTransport, resendTransport, SendStopped } from '@parkfairy/email';
 import type { Job } from 'bullmq';
@@ -28,6 +30,7 @@ import {
 vi.mock('@parkfairy/database', () => ({
   claimDueEmails: vi.fn(),
   countOverdueEmails: vi.fn(),
+  enqueueBookingReminders: vi.fn(),
   enqueueListingStatusEmails: vi.fn(),
   enqueueOnboardingReminders: vi.fn(),
   markEmailFailed: vi.fn(),
@@ -37,6 +40,7 @@ vi.mock('@parkfairy/database', () => ({
   hashInviteToken: (token: string) => `hash-of-${token}-padding-padding`,
   purgeSentEmails: vi.fn(),
   releaseEmails: vi.fn(),
+  reminderStillDue: vi.fn(() => Promise.resolve(true)),
 }));
 
 const db = {} as Database;
@@ -79,11 +83,18 @@ describe('owner emails processor', () => {
     // One job at a time over every worker process: two senders would pass Resend's limit.
     expect(ownerEmailsProcessor.globalConcurrency).toBe(1);
     expect(ownerEmailsProcessor.schedules.map((s) => s.id).sort()).toEqual([
+      'enqueue-booking-reminders',
       'enqueue-listing-status-emails',
       'enqueue-onboarding-reminders',
       'purge-sent-emails',
       'send-owner-emails',
     ]);
+  });
+
+  it('queues the drivers’ reminders (5A.3)', async () => {
+    vi.mocked(enqueueBookingReminders).mockResolvedValue(3);
+    await expect(run('enqueue-booking-reminders')).resolves.toEqual({ queued: 3 });
+    expect(enqueueBookingReminders).toHaveBeenCalledOnce();
   });
 
   it('queues status emails', async () => {
@@ -112,6 +123,42 @@ describe('owner emails processor', () => {
     expect(email?.text).toContain('Γκαράζ');
     expect(email?.text).toContain('https://parkfairy.example/el/owner');
     expect(markEmailSent).toHaveBeenCalledWith(db, 'email-1');
+  });
+
+  it('sends a reminder that is still due, and marks one gone stale as sent without sending it (5A.3)', async () => {
+    const reminder = (id: string) =>
+      row({
+        id,
+        kind: 'booking-starting-soon',
+        locale: 'en',
+        payload: {
+          listingName: 'Ermou Garage',
+          booking: {
+            id: `booking-${id}`,
+            listingId: 'l1',
+            reference: 'K7M4-Q2ZD',
+            address: 'Ermou 1',
+            contentLocale: 'en',
+            spaceLabel: 'A1',
+            start: '2027-06-10T08:00:00.000Z',
+            end: '2027-06-10T10:00:00.000Z',
+            timeZone: 'Europe/Athens',
+            totalMinor: 400,
+            currency: 'EUR',
+          },
+        },
+      });
+    vi.mocked(claimDueEmails).mockResolvedValue([reminder('due'), reminder('stale')]);
+    vi.mocked(reminderStillDue).mockImplementation((_db, _kind, bookingId) =>
+      Promise.resolve(bookingId === 'booking-due'),
+    );
+    await expect(run('send-owner-emails')).resolves.toEqual({ sent: 2, failed: 0, handedBack: 0 });
+    // One email, the one still due; both leave the outbox, so the stale one is not tried again.
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0].subject).toContain('K7M4-Q2ZD');
+    expect(markEmailSent).toHaveBeenCalledWith(db, 'due');
+    expect(markEmailSent).toHaveBeenCalledWith(db, 'stale');
+    expect(reminderStillDue).toHaveBeenCalledWith(db, 'booking-starting-soon', 'booking-stale');
   });
 
   it('goes on claiming in a rush, until a claim comes back short', async () => {

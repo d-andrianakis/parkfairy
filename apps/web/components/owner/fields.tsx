@@ -86,6 +86,8 @@ interface CheckboxFieldProps {
   /** Spoken name, when the visible label needs the row's context. */
   ariaLabel?: string;
   disabled?: boolean;
+  /** Guidance read with the box: wired to it, under the label. */
+  hint?: string;
 }
 
 /** A checkbox with its label beside it; the whole label is a target (WCAG 2.5.8). */
@@ -97,6 +99,7 @@ export function CheckboxField({
   error,
   ariaLabel,
   disabled,
+  hint,
 }: CheckboxFieldProps) {
   return (
     <div className="flex items-start gap-2">
@@ -107,7 +110,10 @@ export function CheckboxField({
         onCheckedChange={(value) => onChange(value === true)}
         aria-label={ariaLabel}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={
+          [hint ? `${id}-hint` : null, error ? `${id}-error` : null].filter(Boolean).join(' ') ||
+          undefined
+        }
         className="mt-0.5"
       />
       {/* min-w-0: a long name in the label wraps rather than pushing past the screen. */}
@@ -115,6 +121,11 @@ export function CheckboxField({
         <Label htmlFor={id} className="leading-snug font-normal">
           {label}
         </Label>
+        {hint ? (
+          <p id={`${id}-hint`} className="text-sm text-muted-foreground">
+            {hint}
+          </p>
+        ) : null}
         {error ? <PlainFieldError id={`${id}-error`}>{error}</PlainFieldError> : null}
       </div>
     </div>

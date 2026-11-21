@@ -2135,3 +2135,50 @@ Our readings for 5A.2, saved vehicles, favourites and booking again (2026-11-18)
   returned to the booking's own driver. Phase 6 should know.
 - **Greek shows a plate in Latin letters** (as the API normalizes it), which the form says. Whether to show the
   Greek-letter form is a product question for the native speaker, and the owner side shows the same plate.
+
+Answered by the product owner on 2026-11-19, for 5A.3: reminders **2 h before a stay starts and 30 min before it ends**;
+**one switch on the account page**, on by default; the pass has an **opt-in offline copy**; **one .ics per booking**
+from the pass page (not attached to the confirmation email).
+
+Our readings for 5A.3, reminders, the booking pass and the offline copy (2026-11-21), not asked; change any that are wrong:
+
+- **A reminder is a sweep, not an event**: `enqueueBookingReminders` (every minute, in the email queue) writes outbox
+  rows for confirmed stays inside a window, once each (the dedupe key is kind and booking id, with a `not exists`
+  first so already-queued bookings never use up the limit). A stay confirmed later than the reminder's lead before it
+  gets none (it would arrive with the confirmation); neither does a driver who turned them off, or a suspended
+  account. At send time `reminderStillDue` asks again (the booking stands, the moment is ahead) and a stale one is
+  marked sent unsent: a provider outage can hold a row for hours. The two emails carry no plate and no way in; the
+  starting-soon one links to the pass, the ending-soon one to the booking. The ending sweep orders by `ends_at` on
+  purpose, so the planner can't walk the starts index from the oldest confirmed booking.
+- **The pass is a page of the driver's own, not a document**: `/bookings/:id/pass`, a confirmed booking only (a hold,
+  a cancelled or an expired one has none), another account's the same 404. The QR holds the reference and nothing
+  else (a test compares the drawn path), so a scan tells a stranger nothing and an owner's phone needs no account.
+  It is opened by a **page load**, never a client navigation: only its own policy has `worker-src 'self'`
+  (`allowsOfflinePass`), and a client navigation keeps the policy of the page it started from.
+- **The calendar file leaves out the plate and the way in**, because a calendar syncs to services nobody chose. It is
+  written by `writeIcs` (5A.0), in the page's language (`?locale=`, English by default), as a download with
+  `private, no-store`. Greek summaries make a line longer than 75 octets, so a reader unfolds before comparing.
+- **The offline copy is opt-in and the account's**: `public/pass-sw.js` is registered for one language's bookings
+  (`/en/bookings/`), serves a pass only when the network is gone, and renews it when online; the page itself puts
+  the copy in the `pass-v1` cache (assets first, the page last, so a failure leaves nothing half-kept) with when it
+  stops being served in `x-keep-until` (a day after the stay). Only a response that contains the pass's own marker
+  (`data-pass="reference"`) renews it: the page answers 200 for "can't read it" too. The headers that describe how
+  a body travelled (`content-encoding`, `content-length`) are stripped before storing, or a compressed page would be
+  decoded twice offline (it passed locally only because the dev server doesn't compress).
+- **A device with no network can't ask who is signed in, so every copy is cleared when anyone can**: the sign-out
+  button, and `PassGuard` in the root layout on every online page load (no session, another account, or past its
+  time), which also removes the assets and unregisters the worker with the last pass. A session that ends while
+  offline leaves the copy readable until the next online load; the hint says not to keep it on a shared device.
+- **Gotchas found building it**: `caches.open` creates the cache, so the worker looks up with `caches.match(…,
+{ cacheName })` and `caches.has` or a signed-out device grows an empty one; the page's `fetch` of itself must be
+  `cache: 'reload'`; `Cache.put` of a streamed page holds the response back, so the worker caches inside
+  `waitUntil`, after answering; a vm test of the worker file is the way to unit-test it (`lib/pass-sw.test.ts`,
+  outside `public/`, which Next would serve).
+- **A suspected-stale `pass-sw.js` is served `no-cache`** (`next.config.ts`), or browsers keep an old worker a day.
+- **Migration 0050 adds two partial indexes on `bookings`** (confirmed, by `starts_at` and by `ends_at`) and a CHECK
+  rebuild on `email_outbox`: fine at today's size; `CONCURRENTLY` and `NOT VALID` before a big production table (as
+  0047 and 0049).
+- **The worker's start-up purge must never delete the cache or unregister itself** (found by the smoke test): keeping a
+  pass puts the assets in first and the page last, and a worker still activating (`ready` resolves while `activate`'s
+  `waitUntil` is running) saw assets and no page and cleared everything. Only an expiry found while serving
+  (`purgeExpired(true)`) and the page's own sweep (`sweepPasses`) clear it all.

@@ -47,7 +47,8 @@ describe('renderBookingEmail', () => {
               kind === 'booking-received' ||
               kind === 'dispute-parkfairy-bears'
             ? `/${locale}/owner/listings/${booking.listingId}/bookings`
-            : `/${locale}/bookings/${booking.id}`;
+            : // The reminder before a stay opens its pass (5A.3).
+              `/${locale}/bookings/${booking.id}${kind === 'booking-starting-soon' ? '/pass' : ''}`;
     expect(email.text).toContain(`https://parkfairy.example${path}`);
     expect(email.html).toContain(`href="https://parkfairy.example${path}"`);
   });

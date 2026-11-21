@@ -10,6 +10,8 @@ export interface CspOptions {
   maps?: boolean;
   /** Pages that take a payment (`allowsPayments`). Nothing else gets Stripe's origins. */
   payments?: boolean;
+  /** The booking pass, which registers the worker that keeps it offline (`allowsOfflinePass`). */
+  pass?: boolean;
 }
 
 /**
@@ -34,6 +36,19 @@ const PAYMENT_PAGES = new RegExp(`^/(?:${SUPPORTED_LOCALES.join('|')})/bookings/
 
 export function allowsPayments(pathname: string): boolean {
   return PAYMENT_PAGES.test(pathname);
+}
+
+/**
+ * A booking's pass (5A.3), the one page that registers a service worker, to be kept for a stay
+ * without a connection. Links into it load a real page, as the worker is registered from the page the
+ * driver is on, and any other page's policy would refuse it.
+ */
+const PASS_PAGES = new RegExp(
+  `^/(?:${SUPPORTED_LOCALES.join('|')})/bookings/[0-9a-f-]{36}/pass/?$`,
+);
+
+export function allowsOfflinePass(pathname: string): boolean {
+  return PASS_PAGES.test(pathname);
 }
 
 /**
@@ -63,6 +78,7 @@ export function buildContentSecurityPolicy({
   upgradeInsecureRequests,
   maps = false,
   payments = false,
+  pass = false,
 }: CspOptions): string {
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
@@ -82,7 +98,8 @@ export function buildContentSecurityPolicy({
     // What default-src gave frames before, and Stripe's fields on the page that pays.
     'frame-src': ["'self'", ...(payments ? STRIPE_FRAMES : [])],
     // Falling back to script-src would refuse the map's worker: strict-dynamic ignores 'self'.
-    ...(maps ? { 'worker-src': ["'self'"] } : {}),
+    // The same for the pass's worker, which the script policy would refuse.
+    ...(maps || pass ? { 'worker-src': ["'self'"] } : {}),
     'object-src': ["'none'"],
     'base-uri': ["'self'"],
     'form-action': ["'self'"],

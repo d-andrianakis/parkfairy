@@ -351,6 +351,13 @@
       "when": 1795024971474,
       "tag": "0049_skinny_grey_gargoyle",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1795102567779,
+      "tag": "0050_ambiguous_trish_tilby",
+      "breakpoints": true
     }
   ]
 }

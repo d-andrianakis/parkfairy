@@ -177,6 +177,13 @@ export const bookings = pgTable(
       .where(sql`${t.status} = 'cancelled'`),
     // Removing a space sets its bookings' space to null; without it, a scan per space.
     index('bookings_space_idx').on(t.spaceId),
+    // The worker's reminders (5A.3): confirmed stays about to start, and about to end.
+    index('bookings_confirmed_starts_idx')
+      .on(t.startsAt)
+      .where(sql`${t.status} = 'confirmed'`),
+    index('bookings_confirmed_ends_idx')
+      .on(t.endsAt)
+      .where(sql`${t.status} = 'confirmed'`),
     // Deleting a saved vehicle sets its bookings' vehicle to null; without it, a scan per delete.
     index('bookings_vehicle_idx')
       .on(t.vehicleId)

@@ -268,13 +268,14 @@ function Sizes({ vehicle }: { vehicle: SavedVehicle }) {
   const t = useTranslations('Vehicles');
   const format = useFormatter();
   const parts = [
-    vehicle.heightCm === null ? null : t('sizeHigh', { value: format.number(vehicle.heightCm) }),
-    vehicle.lengthCm === null ? null : t('sizeLong', { value: format.number(vehicle.lengthCm) }),
-    vehicle.widthCm === null ? null : t('sizeWide', { value: format.number(vehicle.widthCm) }),
+    vehicle.heightCm === null ? null : t('sizeHigh', { value: vehicle.heightCm }),
+    vehicle.lengthCm === null ? null : t('sizeLong', { value: vehicle.lengthCm }),
+    vehicle.widthCm === null ? null : t('sizeWide', { value: vehicle.widthCm }),
   ].filter((part) => part !== null);
   return (
     <p className="text-sm text-muted-foreground">
-      {parts.length > 0 ? parts.join(' · ') : t('noSizes')}
+      {/* A list the language's own way: "190 cm high, 440 cm long, 180 cm wide". */}
+      {parts.length > 0 ? format.list(parts, { type: 'unit', style: 'short' }) : t('noSizes')}
     </p>
   );
 }
@@ -293,6 +294,7 @@ function VehicleForm({
 }) {
   const t = useTranslations('Vehicles');
   const validation = useValidationMessage();
+  const tValidation = useTranslations('Validation');
   const invalid = useInvalidSubmitStatus();
   const prefix = vehicle ? `vehicle-${vehicle.id}` : 'vehicle-new';
   const plateRef = useRef<HTMLInputElement>(null);
@@ -316,7 +318,10 @@ function VehicleForm({
     const found: FieldErrors = {};
     if (plate === '') found.plate = validation('plateRequired');
     else if (!isVehiclePlate(plate)) found.plate = validation('plateInvalid');
-    if ([...name].length > VEHICLE_NAME_MAX) found.name = validation('textTooLong');
+    // Says its own limit (the shared message's default is the sign-up name's).
+    if ([...name].length > VEHICLE_NAME_MAX) {
+      found.name = tValidation('nameTooLong', { max: VEHICLE_NAME_MAX });
+    }
     const sizes: Partial<Record<SpaceDimension, number | null>> = {};
     for (const { dimension } of SIZE_FIELDS) {
       const size = sizeOf(sizeRefs.current[dimension]?.value ?? '', dimension);

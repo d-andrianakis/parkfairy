@@ -244,6 +244,20 @@ describe('a booking’s page', () => {
     expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
   });
 
+  it('opens the pass of a booking that stands, as a page load, and offers none for a hold (5A.3)', async () => {
+    const view = await showBooking(confirmed());
+    expect(screen.getByRole('link', { name: 'Open the booking pass' })).toHaveAttribute(
+      'href',
+      `/en/bookings/${ID}/pass`,
+    );
+    view.unmount();
+    for (const status of ['held', 'cancelled', 'expired', 'released'] as const) {
+      const other = await showBooking(booking({ status }));
+      expect(screen.queryByRole('link', { name: 'Open the booking pass' })).toBeNull();
+      other.unmount();
+    }
+  });
+
   it('says a stay under way can’t be cancelled here, and one over is over', async () => {
     await showBooking(confirmed({ refundIfCancelled: null, start: '2020-01-01T08:00:00.000Z' }));
     expect(screen.getByText(/can’t be cancelled here/)).toBeInTheDocument();

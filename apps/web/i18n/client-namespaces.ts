@@ -36,6 +36,8 @@ export const CLIENT_NAMESPACES = {
   favourite: ['Favourites'],
   /** "Book again" on a past booking: its button and the booking refusals (5A.2). */
   rebook: ['Rebook', 'BookingErrors'],
+  /** The booking pass: keeping it on the device, and taking it off (5A.3). */
+  pass: ['Pass'],
   /** A booking's page: the plate, confirming, letting go and cancelling. */
   booking: ['Booking', 'BookingErrors', 'Validation', 'Forms'],
 } as const satisfies Record<string, readonly Namespace[]>;

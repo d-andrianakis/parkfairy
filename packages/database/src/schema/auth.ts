@@ -48,6 +48,8 @@ export const users = pgTable(
     // Preferred UI/email language; set at sign-up and when the user switches language.
     locale: text('locale').$type<Locale>().default(DEFAULT_LOCALE).notNull(),
     twoFactorEnabled: boolean('two_factor_enabled').default(false).notNull(),
+    // Whether the driver wants the two reminders before and at the end of a stay (5A.3); on to begin with.
+    reminderEmails: boolean('reminder_emails').default(true).notNull(),
     // Staff suspended it (5.2c, #79): no sign-in, no session, nothing else of theirs touched. The
     // reason is in the audit log, never here.
     suspendedAt: timestamp('suspended_at', { withTimezone: true }),

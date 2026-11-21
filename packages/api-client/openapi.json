@@ -17,9 +17,7 @@
             }
           }
         },
-        "tags": [
-          "health"
-        ]
+        "tags": ["health"]
       }
     },
     "/health/ready": {
@@ -48,9 +46,7 @@
             }
           }
         },
-        "tags": [
-          "health"
-        ]
+        "tags": ["health"]
       }
     },
     "/v1/me": {
@@ -84,9 +80,93 @@
             "session": []
           }
         ],
-        "tags": [
-          "users"
-        ]
+        "tags": ["users"]
+      }
+    },
+    "/v1/me/reminders": {
+      "get": {
+        "operationId": "getMyReminders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderPreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": ["users"]
+      },
+      "put": {
+        "operationId": "setMyReminders",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderPreferencesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderPreferences"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": ["users"]
       }
     },
     "/v1/media/photos/{key}/{width}.webp": {
@@ -106,11 +186,7 @@
             "required": true,
             "in": "path",
             "schema": {
-              "enum": [
-                "480",
-                "960",
-                "1600"
-              ],
+              "enum": ["480", "960", "1600"],
               "type": "string"
             }
           }
@@ -138,9 +214,7 @@
             }
           }
         },
-        "tags": [
-          "media"
-        ]
+        "tags": ["media"]
       }
     },
     "/v1/parking/featured": {
@@ -159,9 +233,7 @@
             }
           }
         },
-        "tags": [
-          "parking"
-        ]
+        "tags": ["parking"]
       }
     },
     "/v1/parking/search": {
@@ -202,11 +274,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "enum": [
-                  "cctv",
-                  "lit",
-                  "gated"
-                ]
+                "enum": ["cctv", "lit", "gated"]
               }
             }
           },
@@ -219,11 +287,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "enum": [
-                  "covered",
-                  "evCharging",
-                  "accessible"
-                ]
+                "enum": ["covered", "evCharging", "accessible"]
               }
             }
           },
@@ -305,9 +369,7 @@
             }
           }
         },
-        "tags": [
-          "parking"
-        ]
+        "tags": ["parking"]
       }
     },
     "/v1/parking/{slug}": {
@@ -373,9 +435,7 @@
             }
           }
         },
-        "tags": [
-          "parking"
-        ]
+        "tags": ["parking"]
       }
     },
     "/v1/owner/onboarding": {
@@ -409,9 +469,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/profile": {
@@ -445,9 +503,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       },
       "patch": {
         "operationId": "updateOwnerProfile",
@@ -499,9 +555,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/profile/tax": {
@@ -565,9 +619,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings": {
@@ -611,9 +663,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}": {
@@ -666,9 +716,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       },
       "delete": {
         "operationId": "deleteOwnerListing",
@@ -722,9 +770,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/hours-exceptions": {
@@ -777,9 +823,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       },
       "put": {
         "operationId": "saveListingHoursExceptions",
@@ -850,9 +894,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/others": {
@@ -905,9 +947,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/location": {
@@ -990,9 +1030,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/spaces": {
@@ -1075,9 +1113,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/hours": {
@@ -1160,9 +1196,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/hours/copy": {
@@ -1245,9 +1279,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/hours-exceptions/copy": {
@@ -1320,9 +1352,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/prices": {
@@ -1405,9 +1435,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/photos": {
@@ -1503,9 +1531,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/photos/order": {
@@ -1571,9 +1597,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/photos/{photoId}": {
@@ -1647,9 +1671,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       },
       "delete": {
         "operationId": "deleteListingPhoto",
@@ -1711,9 +1733,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/proofs": {
@@ -1741,12 +1761,7 @@
             "required": true,
             "in": "query",
             "schema": {
-              "enum": [
-                "titleDeed",
-                "lease",
-                "operatingLicence",
-                "other"
-              ],
+              "enum": ["titleDeed", "lease", "operatingLicence", "other"],
               "type": "string"
             }
           }
@@ -1831,9 +1846,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/proofs/{proofId}": {
@@ -1917,9 +1930,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       },
       "delete": {
         "operationId": "deleteListingProof",
@@ -1981,9 +1992,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/proof-details": {
@@ -2066,9 +2075,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/submit": {
@@ -2151,9 +2158,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/owners": {
@@ -2206,9 +2211,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/invites": {
@@ -2291,9 +2294,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/invites/{inviteId}": {
@@ -2364,9 +2365,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/shares": {
@@ -2459,9 +2458,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/owners/{ownerId}": {
@@ -2542,9 +2539,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/managers/{managerId}": {
@@ -2615,9 +2610,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/managed": {
@@ -2651,9 +2644,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/handover": {
@@ -2746,9 +2737,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       },
       "delete": {
         "operationId": "withdrawListingHandover",
@@ -2809,9 +2798,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/handover/accept": {
@@ -2874,9 +2861,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/leave": {
@@ -2932,9 +2917,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/invites/preview": {
@@ -2998,9 +2981,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/invites/accept": {
@@ -3074,9 +3055,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/admin/listings": {
@@ -3147,9 +3126,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/listings/{id}": {
@@ -3212,9 +3189,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/listings/{id}/proofs/{proofId}": {
@@ -3308,9 +3283,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/listings/{id}/approve": {
@@ -3383,9 +3356,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/listings/{id}/request-changes": {
@@ -3478,9 +3449,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/users/lookup": {
@@ -3544,9 +3513,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/users/{id}": {
@@ -3609,9 +3576,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/users/{id}/remove-two-factor": {
@@ -3704,9 +3669,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/listings/{id}/suspend": {
@@ -3799,9 +3762,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/listings/{id}/reinstate": {
@@ -3894,9 +3855,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/users/{id}/suspend": {
@@ -3989,9 +3948,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/users/{id}/reinstate": {
@@ -4084,9 +4041,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/bookings/lookup": {
@@ -4150,9 +4105,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/bookings/{id}": {
@@ -4215,9 +4168,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/bookings/{id}/cancel": {
@@ -4310,9 +4261,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/bookings/{id}/refund/retry": {
@@ -4405,9 +4354,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/bookings/{id}/refund/settle": {
@@ -4500,9 +4447,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/payments": {
@@ -4546,9 +4491,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/disputes/{id}/decide": {
@@ -4641,9 +4584,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/overstays": {
@@ -4714,9 +4655,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/overstays/{id}": {
@@ -4779,9 +4718,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/overstays/{id}/resolve": {
@@ -4874,9 +4811,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/admin/audit": {
@@ -4947,9 +4882,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "admin"
-        ]
+        "tags": ["admin"]
       }
     },
     "/v1/bookings": {
@@ -5023,9 +4956,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "bookings"
-        ]
+        "tags": ["bookings"]
       },
       "get": {
         "operationId": "getMyBookings",
@@ -5043,10 +4974,7 @@
             "required": false,
             "in": "query",
             "schema": {
-              "enum": [
-                "upcoming",
-                "past"
-              ],
+              "enum": ["upcoming", "past"],
               "type": "string"
             }
           }
@@ -5088,9 +5016,70 @@
             "session": []
           }
         ],
-        "tags": [
-          "bookings"
-        ]
+        "tags": ["bookings"]
+      }
+    },
+    "/v1/bookings/{id}/calendar": {
+      "get": {
+        "operationId": "getMyBookingCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": ["el", "en"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/calendar": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "text/calendar": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": ["bookings"]
       }
     },
     "/v1/bookings/{id}": {
@@ -5143,9 +5132,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "bookings"
-        ]
+        "tags": ["bookings"]
       }
     },
     "/v1/bookings/{id}/confirm": {
@@ -5228,9 +5215,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "bookings"
-        ]
+        "tags": ["bookings"]
       }
     },
     "/v1/bookings/{id}/payment": {
@@ -5323,9 +5308,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "bookings"
-        ]
+        "tags": ["bookings"]
       }
     },
     "/v1/bookings/{id}/payment/settle": {
@@ -5398,9 +5381,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "bookings"
-        ]
+        "tags": ["bookings"]
       }
     },
     "/v1/bookings/{id}/extend": {
@@ -5463,9 +5444,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "bookings"
-        ]
+        "tags": ["bookings"]
       }
     },
     "/v1/bookings/{id}/cancel": {
@@ -5548,9 +5527,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "bookings"
-        ]
+        "tags": ["bookings"]
       }
     },
     "/v1/owner/listings/{id}/bookings": {
@@ -5629,9 +5606,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/bookings/{bookingId}/cancel": {
@@ -5695,9 +5670,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/listings/{id}/bookings/{bookingId}/overstay": {
@@ -5788,9 +5761,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/earnings": {
@@ -5843,9 +5814,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/calendar": {
@@ -5907,9 +5876,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/bookings": {
@@ -5963,11 +5930,7 @@
             "required": false,
             "in": "query",
             "schema": {
-              "enum": [
-                "upcoming",
-                "past",
-                "cancelled"
-              ],
+              "enum": ["upcoming", "past", "cancelled"],
               "type": "string"
             }
           }
@@ -6009,9 +5972,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/payouts": {
@@ -6055,9 +6016,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/payouts/onboarding": {
@@ -6121,9 +6080,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/owner/payouts/dashboard": {
@@ -6177,9 +6134,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "owner"
-        ]
+        "tags": ["owner"]
       }
     },
     "/v1/places/suggestions": {
@@ -6191,10 +6146,7 @@
             "required": true,
             "in": "query",
             "schema": {
-              "enum": [
-                "el",
-                "en"
-              ],
+              "enum": ["el", "en"],
               "type": "string"
             }
           },
@@ -6268,9 +6220,7 @@
             }
           }
         },
-        "tags": [
-          "places"
-        ]
+        "tags": ["places"]
       }
     },
     "/v1/places/retrieve": {
@@ -6282,10 +6232,7 @@
             "required": true,
             "in": "query",
             "schema": {
-              "enum": [
-                "el",
-                "en"
-              ],
+              "enum": ["el", "en"],
               "type": "string"
             }
           },
@@ -6369,9 +6316,7 @@
             }
           }
         },
-        "tags": [
-          "places"
-        ]
+        "tags": ["places"]
       }
     },
     "/v1/places": {
@@ -6383,10 +6328,7 @@
             "required": true,
             "in": "query",
             "schema": {
-              "enum": [
-                "el",
-                "en"
-              ],
+              "enum": ["el", "en"],
               "type": "string"
             }
           },
@@ -6451,9 +6393,7 @@
             }
           }
         },
-        "tags": [
-          "places"
-        ]
+        "tags": ["places"]
       }
     },
     "/v1/vehicles": {
@@ -6487,9 +6427,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "vehicles"
-        ]
+        "tags": ["vehicles"]
       },
       "post": {
         "operationId": "saveMyVehicle",
@@ -6551,9 +6489,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "vehicles"
-        ]
+        "tags": ["vehicles"]
       }
     },
     "/v1/vehicles/{id}": {
@@ -6636,9 +6572,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "vehicles"
-        ]
+        "tags": ["vehicles"]
       },
       "delete": {
         "operationId": "forgetMyVehicle",
@@ -6689,9 +6623,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "vehicles"
-        ]
+        "tags": ["vehicles"]
       }
     },
     "/v1/favourites": {
@@ -6725,9 +6657,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "favourites"
-        ]
+        "tags": ["favourites"]
       }
     },
     "/v1/favourites/{slug}": {
@@ -6780,9 +6710,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "favourites"
-        ]
+        "tags": ["favourites"]
       },
       "put": {
         "operationId": "favouriteListing",
@@ -6843,9 +6771,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "favourites"
-        ]
+        "tags": ["favourites"]
       },
       "delete": {
         "operationId": "unfavouriteListing",
@@ -6886,9 +6812,7 @@
             "session": []
           }
         ],
-        "tags": [
-          "favourites"
-        ]
+        "tags": ["favourites"]
       }
     }
   },
@@ -6927,26 +6851,15 @@
       },
       "Locale": {
         "type": "string",
-        "enum": [
-          "el",
-          "en"
-        ]
+        "enum": ["el", "en"]
       },
       "ListingStatus": {
         "type": "string",
-        "enum": [
-          "draft",
-          "in_review",
-          "changes_requested",
-          "published",
-          "suspended"
-        ]
+        "enum": ["draft", "in_review", "changes_requested", "published", "suspended"]
       },
       "Currency": {
         "type": "string",
-        "enum": [
-          "EUR"
-        ]
+        "enum": ["EUR"]
       },
       "Money": {
         "type": "object",
@@ -6960,27 +6873,16 @@
             "$ref": "#/components/schemas/Currency"
           }
         },
-        "required": [
-          "amountMinor",
-          "currency"
-        ],
+        "required": ["amountMinor", "currency"],
         "additionalProperties": false
       },
       "ParkingFeature": {
         "type": "string",
-        "enum": [
-          "covered",
-          "evCharging",
-          "accessible"
-        ]
+        "enum": ["covered", "evCharging", "accessible"]
       },
       "SecurityFeature": {
         "type": "string",
-        "enum": [
-          "cctv",
-          "lit",
-          "gated"
-        ]
+        "enum": ["cctv", "lit", "gated"]
       },
       "ListingPhoto": {
         "type": "object",
@@ -7010,13 +6912,7 @@
             "pattern": "^#[0-9a-f]{6}$"
           }
         },
-        "required": [
-          "key",
-          "width",
-          "height",
-          "alt",
-          "color"
-        ],
+        "required": ["key", "width", "height", "alt", "color"],
         "additionalProperties": false
       },
       "ParkingListingSummary": {
@@ -7103,9 +6999,7 @@
             }
           }
         },
-        "required": [
-          "listings"
-        ],
+        "required": ["listings"],
         "additionalProperties": false
       },
       "ParkingSearchResult": {
@@ -7226,11 +7120,7 @@
             }
           }
         },
-        "required": [
-          "start",
-          "end",
-          "results"
-        ],
+        "required": ["start", "end", "results"],
         "additionalProperties": false
       },
       "OpeningPeriod": {
@@ -7250,11 +7140,7 @@
             "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$|^24:00$"
           }
         },
-        "required": [
-          "weekday",
-          "opens",
-          "closes"
-        ],
+        "required": ["weekday", "opens", "closes"],
         "additionalProperties": false
       },
       "HoursException": {
@@ -7283,10 +7169,7 @@
                 "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$|^24:00$"
               }
             },
-            "required": [
-              "opens",
-              "closes"
-            ],
+            "required": ["opens", "closes"],
             "additionalProperties": false
           },
           "closedHours": {
@@ -7302,19 +7185,11 @@
                 "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$|^24:00$"
               }
             },
-            "required": [
-              "from",
-              "to"
-            ],
+            "required": ["from", "to"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "startsOn",
-          "endsOn",
-          "hours",
-          "closedHours"
-        ],
+        "required": ["startsOn", "endsOn", "hours", "closedHours"],
         "additionalProperties": false
       },
       "ParkingSpace": {
@@ -7401,22 +7276,12 @@
             "$ref": "#/components/schemas/Money"
           }
         },
-        "required": [
-          "start",
-          "end",
-          "open",
-          "freeSpaces",
-          "total"
-        ],
+        "required": ["start", "end", "open", "freeSpaces", "total"],
         "additionalProperties": false
       },
       "CancellationPolicy": {
         "type": "string",
-        "enum": [
-          "oneHour",
-          "oneDay",
-          "oneDayThenHalf"
-        ]
+        "enum": ["oneHour", "oneDay", "oneDayThenHalf"]
       },
       "ListingPriceRules": {
         "type": "object",
@@ -7443,11 +7308,7 @@
                 "type": "string"
               }
             },
-            "required": [
-              "rate",
-              "from",
-              "to"
-            ],
+            "required": ["rate", "from", "to"],
             "additionalProperties": false
           },
           "dated": {
@@ -7469,11 +7330,7 @@
                   "$ref": "#/components/schemas/Money"
                 }
               },
-              "required": [
-                "startsOn",
-                "endsOn",
-                "rate"
-              ],
+              "required": ["startsOn", "endsOn", "rate"],
               "additionalProperties": false
             }
           },
@@ -7495,20 +7352,12 @@
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "minDays",
-                "percent"
-              ],
+              "required": ["minDays", "percent"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "weekendRate",
-          "night",
-          "dated",
-          "longStay"
-        ],
+        "required": ["weekendRate", "night", "dated", "longStay"],
         "additionalProperties": false
       },
       "ParkingListingDetail": {
@@ -7659,21 +7508,11 @@
       },
       "CheckoutKind": {
         "type": "string",
-        "enum": [
-          "payment",
-          "confirm"
-        ]
+        "enum": ["payment", "confirm"]
       },
       "PaymentStatus": {
         "type": "string",
-        "enum": [
-          "pending",
-          "processing",
-          "succeeded",
-          "refunding",
-          "refunded",
-          "canceled"
-        ]
+        "enum": ["pending", "processing", "succeeded", "refunding", "refunded", "canceled"]
       },
       "BookingPayment": {
         "type": "object",
@@ -7686,20 +7525,12 @@
             "$ref": "#/components/schemas/PaymentStatus"
           }
         },
-        "required": [
-          "clientSecret",
-          "status"
-        ],
+        "required": ["clientSecret", "status"],
         "additionalProperties": false
       },
       "PayoutStatus": {
         "type": "string",
-        "enum": [
-          "none",
-          "pending",
-          "restricted",
-          "active"
-        ]
+        "enum": ["none", "pending", "restricted", "active"]
       },
       "OwnerPayouts": {
         "type": "object",
@@ -7711,10 +7542,7 @@
             "$ref": "#/components/schemas/PayoutStatus"
           }
         },
-        "required": [
-          "available",
-          "status"
-        ],
+        "required": ["available", "status"],
         "additionalProperties": false
       },
       "PayoutLinkInput": {
@@ -7724,9 +7552,7 @@
             "$ref": "#/components/schemas/Locale"
           }
         },
-        "required": [
-          "locale"
-        ],
+        "required": ["locale"],
         "additionalProperties": false
       },
       "PayoutLink": {
@@ -7737,27 +7563,16 @@
             "format": "uri"
           }
         },
-        "required": [
-          "url"
-        ],
+        "required": ["url"],
         "additionalProperties": false
       },
       "BookingStatus": {
         "type": "string",
-        "enum": [
-          "held",
-          "confirmed",
-          "cancelled",
-          "expired",
-          "released"
-        ]
+        "enum": ["held", "confirmed", "cancelled", "expired", "released"]
       },
       "BookingCanceller": {
         "type": "string",
-        "enum": [
-          "driver",
-          "owner"
-        ]
+        "enum": ["driver", "owner"]
       },
       "BookingHoldInput": {
         "type": "object",
@@ -7786,12 +7601,7 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
-        "required": [
-          "listing",
-          "spaceId",
-          "start",
-          "end"
-        ],
+        "required": ["listing", "spaceId", "start", "end"],
         "additionalProperties": false
       },
       "BookingConfirmInput": {
@@ -7841,13 +7651,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "slug",
-          "name",
-          "address",
-          "contentLocale",
-          "timeZone"
-        ],
+        "required": ["slug", "name", "address", "contentLocale", "timeZone"],
         "additionalProperties": false
       },
       "Booking": {
@@ -7971,10 +7775,7 @@
                 "$ref": "#/components/schemas/Locale"
               }
             },
-            "required": [
-              "text",
-              "contentLocale"
-            ],
+            "required": ["text", "contentLocale"],
             "additionalProperties": false
           },
           "arrivalInstructionsFrom": {
@@ -8017,10 +7818,7 @@
           "when": {
             "default": "upcoming",
             "type": "string",
-            "enum": [
-              "upcoming",
-              "past"
-            ]
+            "enum": ["upcoming", "past"]
           },
           "page": {
             "default": 1,
@@ -8029,10 +7827,7 @@
             "maximum": 50
           }
         },
-        "required": [
-          "when",
-          "page"
-        ],
+        "required": ["when", "page"],
         "additionalProperties": false
       },
       "BookingList": {
@@ -8055,11 +7850,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "bookings",
-          "page",
-          "hasMore"
-        ],
+        "required": ["bookings", "page", "hasMore"],
         "additionalProperties": false
       },
       "OwnerBooking": {
@@ -8159,29 +7950,16 @@
             "pattern": "^(\\d{1,15})_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "contentLocale",
-          "bookings",
-          "previous",
-          "next"
-        ],
+        "required": ["id", "name", "contentLocale", "bookings", "previous", "next"],
         "additionalProperties": false
       },
       "ListingOwnerRole": {
         "type": "string",
-        "enum": [
-          "primary",
-          "co_owner"
-        ]
+        "enum": ["primary", "co_owner"]
       },
       "ListingInviteRole": {
         "type": "string",
-        "enum": [
-          "co_owner",
-          "manager"
-        ]
+        "enum": ["co_owner", "manager"]
       },
       "ListingOwner": {
         "type": "object",
@@ -8219,15 +7997,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "email",
-          "role",
-          "sharePercent",
-          "payouts",
-          "you"
-        ],
+        "required": ["id", "name", "email", "role", "sharePercent", "payouts", "you"],
         "additionalProperties": false
       },
       "ListingInvite": {
@@ -8259,14 +8029,7 @@
             "$ref": "#/components/schemas/ListingInviteRole"
           }
         },
-        "required": [
-          "id",
-          "email",
-          "invitedBy",
-          "expiresAt",
-          "canWithdraw",
-          "role"
-        ],
+        "required": ["id", "email", "invitedBy", "expiresAt", "canWithdraw", "role"],
         "additionalProperties": false
       },
       "ListingManager": {
@@ -8286,11 +8049,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "email"
-        ],
+        "required": ["id", "name", "email"],
         "additionalProperties": false
       },
       "ListingHandover": {
@@ -8313,12 +8072,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "toOwnerId",
-          "expiresAt",
-          "canAccept",
-          "canWithdraw"
-        ],
+        "required": ["toOwnerId", "expiresAt", "canAccept", "canWithdraw"],
         "additionalProperties": false
       },
       "ListingOwners": {
@@ -8415,11 +8169,7 @@
             ]
           }
         },
-        "required": [
-          "email",
-          "locale",
-          "role"
-        ],
+        "required": ["email", "locale", "role"],
         "additionalProperties": false
       },
       "ListingHandoverInput": {
@@ -8431,9 +8181,7 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
-        "required": [
-          "ownerId"
-        ],
+        "required": ["ownerId"],
         "additionalProperties": false
       },
       "ListingSharesInput": {
@@ -8457,17 +8205,12 @@
                   "maximum": 100
                 }
               },
-              "required": [
-                "ownerId",
-                "percent"
-              ],
+              "required": ["ownerId", "percent"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "shares"
-        ],
+        "required": ["shares"],
         "additionalProperties": false
       },
       "InviteTokenInput": {
@@ -8478,9 +8221,7 @@
             "pattern": "^[A-Za-z0-9_-]{43}$"
           }
         },
-        "required": [
-          "token"
-        ],
+        "required": ["token"],
         "additionalProperties": false
       },
       "InvitePreview": {
@@ -8488,11 +8229,7 @@
         "properties": {
           "state": {
             "type": "string",
-            "enum": [
-              "open",
-              "expired",
-              "used"
-            ]
+            "enum": ["open", "expired", "used"]
           },
           "listingName": {
             "nullable": true,
@@ -8512,14 +8249,7 @@
             "$ref": "#/components/schemas/ListingInviteRole"
           }
         },
-        "required": [
-          "state",
-          "listingName",
-          "contentLocale",
-          "invitedBy",
-          "forYou",
-          "role"
-        ],
+        "required": ["state", "listingName", "contentLocale", "invitedBy", "forYou", "role"],
         "additionalProperties": false
       },
       "InviteAccepted": {
@@ -8531,9 +8261,7 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
-        "required": [
-          "listingId"
-        ],
+        "required": ["listingId"],
         "additionalProperties": false
       },
       "ManagedListing": {
@@ -8552,11 +8280,7 @@
             "$ref": "#/components/schemas/Locale"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "contentLocale"
-        ],
+        "required": ["id", "name", "contentLocale"],
         "additionalProperties": false
       },
       "ManagedListings": {
@@ -8570,26 +8294,16 @@
             }
           }
         },
-        "required": [
-          "listings"
-        ],
+        "required": ["listings"],
         "additionalProperties": false
       },
       "OwnerKind": {
         "type": "string",
-        "enum": [
-          "individual",
-          "business"
-        ]
+        "enum": ["individual", "business"]
       },
       "OwnerVerification": {
         "type": "string",
-        "enum": [
-          "unverified",
-          "pending",
-          "verified",
-          "rejected"
-        ]
+        "enum": ["unverified", "pending", "verified", "rejected"]
       },
       "OwnerCountry": {
         "type": "string",
@@ -8628,10 +8342,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "enum": [
-              "individual",
-              "business"
-            ]
+            "enum": ["individual", "business"]
           },
           "firstName": {
             "nullable": true,
@@ -8716,14 +8427,7 @@
             ]
           }
         },
-        "required": [
-          "kind",
-          "phone",
-          "addressLine",
-          "city",
-          "postalCode",
-          "country"
-        ],
+        "required": ["kind", "phone", "addressLine", "city", "postalCode", "country"],
         "additionalProperties": false
       },
       "OwnerProfilePatch": {
@@ -8731,10 +8435,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "enum": [
-              "individual",
-              "business"
-            ]
+            "enum": ["individual", "business"]
           },
           "firstName": {
             "nullable": true,
@@ -8917,9 +8618,7 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
           }
         },
-        "required": [
-          "taxCountry"
-        ],
+        "required": ["taxCountry"],
         "additionalProperties": false
       },
       "OwnerTaxSummary": {
@@ -9081,14 +8780,7 @@
             "$ref": "#/components/schemas/Locale"
           }
         },
-        "required": [
-          "name",
-          "address",
-          "areaId",
-          "latitude",
-          "longitude",
-          "contentLocale"
-        ],
+        "required": ["name", "address", "areaId", "latitude", "longitude", "contentLocale"],
         "additionalProperties": false
       },
       "ListingLocationPatch": {
@@ -9207,11 +8899,7 @@
             "maximum": 400
           }
         },
-        "required": [
-          "label",
-          "features",
-          "hourlyRateMinor"
-        ],
+        "required": ["label", "features", "hourlyRateMinor"],
         "additionalProperties": false
       },
       "ListingSpacesInput": {
@@ -9226,9 +8914,7 @@
             }
           }
         },
-        "required": [
-          "spaces"
-        ],
+        "required": ["spaces"],
         "additionalProperties": false
       },
       "ListingHoursInput": {
@@ -9243,9 +8929,7 @@
             }
           }
         },
-        "required": [
-          "periods"
-        ],
+        "required": ["periods"],
         "additionalProperties": false
       },
       "ListingPricesInput": {
@@ -9264,19 +8948,11 @@
           },
           "bookingGapMinutes": {
             "type": "number",
-            "enum": [
-              0,
-              30,
-              60
-            ]
+            "enum": [0, 30, 60]
           },
           "cancellationPolicy": {
             "type": "string",
-            "enum": [
-              "oneHour",
-              "oneDay",
-              "oneDayThenHalf"
-            ]
+            "enum": ["oneHour", "oneDay", "oneDayThenHalf"]
           },
           "weekendRateMinor": {
             "nullable": true,
@@ -9302,11 +8978,7 @@
                 "pattern": "^(?:[01]\\d|2[0-3]):(?:00|30)$"
               }
             },
-            "required": [
-              "rateMinor",
-              "from",
-              "to"
-            ],
+            "required": ["rateMinor", "from", "to"],
             "additionalProperties": false
           },
           "datedPrices": {
@@ -9337,12 +9009,7 @@
                   "maximum": 100000
                 }
               },
-              "required": [
-                "label",
-                "startsOn",
-                "endsOn",
-                "rateMinor"
-              ],
+              "required": ["label", "startsOn", "endsOn", "rateMinor"],
               "additionalProperties": false
             }
           },
@@ -9363,10 +9030,7 @@
                   "maximum": 90
                 }
               },
-              "required": [
-                "minDays",
-                "percent"
-              ],
+              "required": ["minDays", "percent"],
               "additionalProperties": false
             }
           }
@@ -9421,10 +9085,7 @@
                       "pattern": "^(?:[01]\\d|2[0-3]):(?:00|30)$|^24:00$"
                     }
                   },
-                  "required": [
-                    "opens",
-                    "closes"
-                  ],
+                  "required": ["opens", "closes"],
                   "additionalProperties": false
                 },
                 "closedHours": {
@@ -9440,27 +9101,16 @@
                       "pattern": "^(?:[01]\\d|2[0-3]):(?:00|30)$|^24:00$"
                     }
                   },
-                  "required": [
-                    "from",
-                    "to"
-                  ],
+                  "required": ["from", "to"],
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "label",
-                "startsOn",
-                "endsOn",
-                "hours",
-                "closedHours"
-              ],
+              "required": ["label", "startsOn", "endsOn", "hours", "closedHours"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "exceptions"
-        ],
+        "required": ["exceptions"],
         "additionalProperties": false
       },
       "ListingHoursExceptionsCopyInput": {
@@ -9477,9 +9127,7 @@
             }
           }
         },
-        "required": [
-          "to"
-        ],
+        "required": ["to"],
         "additionalProperties": false
       },
       "OwnerHoursExceptionsCopy": {
@@ -9497,25 +9145,15 @@
                 },
                 "outcome": {
                   "type": "string",
-                  "enum": [
-                    "copied",
-                    "clash",
-                    "full",
-                    "booked"
-                  ]
+                  "enum": ["copied", "clash", "full", "booked"]
                 }
               },
-              "required": [
-                "id",
-                "outcome"
-              ],
+              "required": ["id", "outcome"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "results"
-        ],
+        "required": ["results"],
         "additionalProperties": false
       },
       "ListingHoursCopyInput": {
@@ -9532,9 +9170,7 @@
             }
           }
         },
-        "required": [
-          "to"
-        ],
+        "required": ["to"],
         "additionalProperties": false
       },
       "OwnerHoursCopy": {
@@ -9552,24 +9188,15 @@
                 },
                 "outcome": {
                   "type": "string",
-                  "enum": [
-                    "copied",
-                    "locked",
-                    "booked"
-                  ]
+                  "enum": ["copied", "locked", "booked"]
                 }
               },
-              "required": [
-                "id",
-                "outcome"
-              ],
+              "required": ["id", "outcome"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "results"
-        ],
+        "required": ["results"],
         "additionalProperties": false
       },
       "OwnerHoursException": {
@@ -9598,10 +9225,7 @@
                 "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$|^24:00$"
               }
             },
-            "required": [
-              "opens",
-              "closes"
-            ],
+            "required": ["opens", "closes"],
             "additionalProperties": false
           },
           "closedHours": {
@@ -9617,10 +9241,7 @@
                 "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$|^24:00$"
               }
             },
-            "required": [
-              "from",
-              "to"
-            ],
+            "required": ["from", "to"],
             "additionalProperties": false
           },
           "label": {
@@ -9628,13 +9249,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "startsOn",
-          "endsOn",
-          "hours",
-          "closedHours",
-          "label"
-        ],
+        "required": ["startsOn", "endsOn", "hours", "closedHours", "label"],
         "additionalProperties": false
       },
       "OwnerListingClosures": {
@@ -9659,12 +9274,7 @@
             }
           }
         },
-        "required": [
-          "id",
-          "name",
-          "contentLocale",
-          "exceptions"
-        ],
+        "required": ["id", "name", "contentLocale", "exceptions"],
         "additionalProperties": false
       },
       "OwnerOtherListings": {
@@ -9691,19 +9301,12 @@
                   "$ref": "#/components/schemas/ListingStatus"
                 }
               },
-              "required": [
-                "id",
-                "name",
-                "contentLocale",
-                "status"
-              ],
+              "required": ["id", "name", "contentLocale", "status"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "listings"
-        ],
+        "required": ["listings"],
         "additionalProperties": false
       },
       "OwnerHoursExceptions": {
@@ -9716,9 +9319,7 @@
             }
           }
         },
-        "required": [
-          "exceptions"
-        ],
+        "required": ["exceptions"],
         "additionalProperties": false
       },
       "ListingPhotoUpdate": {
@@ -9731,9 +9332,7 @@
             "pattern": "^[^\\p{Cc}\\p{Cs}]*$"
           }
         },
-        "required": [
-          "alt"
-        ],
+        "required": ["alt"],
         "additionalProperties": false
       },
       "ListingPhotoOrder": {
@@ -9750,9 +9349,7 @@
             }
           }
         },
-        "required": [
-          "ids"
-        ],
+        "required": ["ids"],
         "additionalProperties": false
       },
       "OwnerPhoto": {
@@ -9788,24 +9385,12 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
-        "required": [
-          "key",
-          "width",
-          "height",
-          "alt",
-          "color",
-          "id"
-        ],
+        "required": ["key", "width", "height", "alt", "color", "id"],
         "additionalProperties": false
       },
       "ProofKind": {
         "type": "string",
-        "enum": [
-          "titleDeed",
-          "lease",
-          "operatingLicence",
-          "other"
-        ]
+        "enum": ["titleDeed", "lease", "operatingLicence", "other"]
       },
       "OwnerProof": {
         "type": "object",
@@ -9824,11 +9409,7 @@
           },
           "contentType": {
             "type": "string",
-            "enum": [
-              "application/pdf",
-              "image/jpeg",
-              "image/png"
-            ]
+            "enum": ["application/pdf", "image/jpeg", "image/png"]
           },
           "sizeBytes": {
             "type": "integer",
@@ -9842,14 +9423,7 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "fileName",
-          "contentType",
-          "sizeBytes",
-          "createdAt"
-        ],
+        "required": ["id", "kind", "fileName", "contentType", "sizeBytes", "createdAt"],
         "additionalProperties": false
       },
       "ListingProofPatch": {
@@ -9871,9 +9445,7 @@
             ]
           }
         },
-        "required": [
-          "landRegistrationNumber"
-        ],
+        "required": ["landRegistrationNumber"],
         "additionalProperties": false
       },
       "ListingSubmitInput": {
@@ -9881,34 +9453,19 @@
         "properties": {
           "confirmed": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           }
         },
-        "required": [
-          "confirmed"
-        ],
+        "required": ["confirmed"],
         "additionalProperties": false
       },
       "AccountStep": {
         "type": "string",
-        "enum": [
-          "profile",
-          "tax"
-        ]
+        "enum": ["profile", "tax"]
       },
       "ListingStep": {
         "type": "string",
-        "enum": [
-          "location",
-          "spaces",
-          "hours",
-          "prices",
-          "photos",
-          "proof",
-          "review"
-        ]
+        "enum": ["location", "spaces", "hours", "prices", "photos", "proof", "review"]
       },
       "OwnerListingProgress": {
         "type": "object",
@@ -10004,11 +9561,7 @@
             }
           }
         },
-        "required": [
-          "started",
-          "doneAccountSteps",
-          "listings"
-        ],
+        "required": ["started", "doneAccountSteps", "listings"],
         "additionalProperties": false
       },
       "OwnerSpace": {
@@ -10114,11 +9667,7 @@
                 "type": "string"
               }
             },
-            "required": [
-              "rateMinor",
-              "from",
-              "to"
-            ],
+            "required": ["rateMinor", "from", "to"],
             "additionalProperties": false
           },
           "datedPrices": {
@@ -10146,12 +9695,7 @@
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "label",
-                "startsOn",
-                "endsOn",
-                "rateMinor"
-              ],
+              "required": ["label", "startsOn", "endsOn", "rateMinor"],
               "additionalProperties": false
             }
           },
@@ -10171,10 +9715,7 @@
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "minDays",
-                "percent"
-              ],
+              "required": ["minDays", "percent"],
               "additionalProperties": false
             }
           }
@@ -10340,17 +9881,32 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
-        "required": [
-          "id"
-        ],
+        "required": ["id"],
         "additionalProperties": false
       },
       "UserRole": {
         "type": "string",
-        "enum": [
-          "user",
-          "admin"
-        ]
+        "enum": ["user", "admin"]
+      },
+      "ReminderPreferences": {
+        "type": "object",
+        "properties": {
+          "reminderEmails": {
+            "type": "boolean"
+          }
+        },
+        "required": ["reminderEmails"],
+        "additionalProperties": false
+      },
+      "ReminderPreferencesInput": {
+        "type": "object",
+        "properties": {
+          "reminderEmails": {
+            "type": "boolean"
+          }
+        },
+        "required": ["reminderEmails"],
+        "additionalProperties": false
       },
       "MeResponse": {
         "type": "object",
@@ -10424,20 +9980,13 @@
           "status": {
             "default": "in_review",
             "type": "string",
-            "enum": [
-              "in_review",
-              "changes_requested",
-              "published",
-              "suspended"
-            ]
+            "enum": ["in_review", "changes_requested", "published", "suspended"]
           },
           "after": {
             "type": "string"
           }
         },
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "additionalProperties": false
       },
       "AdminQueueItem": {
@@ -10473,15 +10022,7 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
           }
         },
-        "required": [
-          "id",
-          "status",
-          "name",
-          "address",
-          "contentLocale",
-          "owner",
-          "submittedAt"
-        ],
+        "required": ["id", "status", "name", "address", "contentLocale", "owner", "submittedAt"],
         "additionalProperties": false
       },
       "AdminQueue": {
@@ -10499,10 +10040,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "listings",
-          "next"
-        ],
+        "required": ["listings", "next"],
         "additionalProperties": false
       },
       "AdminOwner": {
@@ -10615,14 +10153,7 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "fileName",
-          "contentType",
-          "sizeBytes",
-          "createdAt"
-        ],
+        "required": ["id", "kind", "fileName", "contentType", "sizeBytes", "createdAt"],
         "additionalProperties": false
       },
       "AdminListingReview": {
@@ -10759,10 +10290,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "note",
-          "cancelBookings"
-        ],
+        "required": ["note", "cancelBookings"],
         "additionalProperties": false
       },
       "AdminReasonInput": {
@@ -10775,9 +10303,7 @@
             "pattern": "^(?:[^\\p{Cc}\\p{Cf}\\p{Cs}\\p{Zl}\\p{Zp}\\p{Default_Ignorable_Code_Point}]|[\\t\\n\\r])*$"
           }
         },
-        "required": [
-          "note"
-        ],
+        "required": ["note"],
         "additionalProperties": false
       },
       "AdminChangesInput": {
@@ -10790,9 +10316,7 @@
             "pattern": "^(?:[^\\p{Cc}\\p{Cf}\\p{Cs}\\p{Zl}\\p{Zp}\\p{Default_Ignorable_Code_Point}]|[\\t\\n\\r])*$"
           }
         },
-        "required": [
-          "note"
-        ],
+        "required": ["note"],
         "additionalProperties": false
       },
       "AdminUserLookup": {
@@ -10805,9 +10329,7 @@
             "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
           }
         },
-        "required": [
-          "email"
-        ],
+        "required": ["email"],
         "additionalProperties": false
       },
       "AdminUser": {
@@ -10890,9 +10412,7 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
-        "required": [
-          "id"
-        ],
+        "required": ["id"],
         "additionalProperties": false
       },
       "AdminRemoveTwoFactorInput": {
@@ -10905,9 +10425,7 @@
             "pattern": "^(?:[^\\p{Cc}\\p{Cf}\\p{Cs}\\p{Zl}\\p{Zp}\\p{Default_Ignorable_Code_Point}]|[\\t\\n\\r])*$"
           }
         },
-        "required": [
-          "note"
-        ],
+        "required": ["note"],
         "additionalProperties": false
       },
       "AdminAuditQuery": {
@@ -10957,21 +10475,12 @@
                 "type": "string"
               }
             },
-            "required": [
-              "id",
-              "name",
-              "email"
-            ],
+            "required": ["id", "name", "email"],
             "additionalProperties": false
           },
           "targetType": {
             "type": "string",
-            "enum": [
-              "listing",
-              "user",
-              "booking",
-              "dispute"
-            ]
+            "enum": ["listing", "user", "booking", "dispute"]
           },
           "targetId": {
             "type": "string",
@@ -10994,23 +10503,13 @@
                 {
                   "type": "string",
                   "nullable": true,
-                  "enum": [
-                    null
-                  ]
+                  "enum": [null]
                 }
               ]
             }
           }
         },
-        "required": [
-          "id",
-          "at",
-          "action",
-          "actor",
-          "targetType",
-          "targetId",
-          "details"
-        ],
+        "required": ["id", "at", "action", "actor", "targetType", "targetId", "details"],
         "additionalProperties": false
       },
       "AuditLog": {
@@ -11028,10 +10527,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "entries",
-          "next"
-        ],
+        "required": ["entries", "next"],
         "additionalProperties": false
       },
       "AdminBookingLookup": {
@@ -11042,9 +10538,7 @@
             "pattern": "^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$"
           }
         },
-        "required": [
-          "reference"
-        ],
+        "required": ["reference"],
         "additionalProperties": false
       },
       "AdminBookingLookupResult": {
@@ -11057,9 +10551,7 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
-        "required": [
-          "id"
-        ],
+        "required": ["id"],
         "additionalProperties": false
       },
       "AdminDispute": {
@@ -11103,10 +10595,7 @@
           "decision": {
             "nullable": true,
             "type": "string",
-            "enum": [
-              "parkfairy_bears",
-              "owners_bear"
-            ]
+            "enum": ["parkfairy_bears", "owners_bear"]
           },
           "decidedAt": {
             "nullable": true,
@@ -11169,12 +10658,7 @@
                 "$ref": "#/components/schemas/Locale"
               }
             },
-            "required": [
-              "id",
-              "name",
-              "address",
-              "contentLocale"
-            ],
+            "required": ["id", "name", "address", "contentLocale"],
             "additionalProperties": false
           },
           "spaceLabel": {
@@ -11205,11 +10689,7 @@
                 "type": "string"
               }
             },
-            "required": [
-              "id",
-              "name",
-              "email"
-            ],
+            "required": ["id", "name", "email"],
             "additionalProperties": false
           },
           "vehiclePlate": {
@@ -11233,12 +10713,7 @@
               "status": {
                 "nullable": true,
                 "type": "string",
-                "enum": [
-                  "owed",
-                  "sent",
-                  "failed",
-                  "settled"
-                ]
+                "enum": ["owed", "sent", "failed", "settled"]
               },
               "amount": {
                 "nullable": true,
@@ -11254,11 +10729,7 @@
                 "maximum": 9007199254740991
               }
             },
-            "required": [
-              "status",
-              "amount",
-              "attempts"
-            ],
+            "required": ["status", "amount", "attempts"],
             "additionalProperties": false
           },
           "cancelledBy": {
@@ -11278,10 +10749,7 @@
           "transferStatus": {
             "nullable": true,
             "type": "string",
-            "enum": [
-              "sending",
-              "sent"
-            ]
+            "enum": ["sending", "sent"]
           },
           "disputes": {
             "type": "array",
@@ -11327,10 +10795,7 @@
         "properties": {
           "decision": {
             "type": "string",
-            "enum": [
-              "parkfairy_bears",
-              "owners_bear"
-            ]
+            "enum": ["parkfairy_bears", "owners_bear"]
           },
           "note": {
             "type": "string",
@@ -11339,10 +10804,7 @@
             "pattern": "^(?:[^\\p{Cc}\\p{Cf}\\p{Cs}\\p{Zl}\\p{Zp}\\p{Default_Ignorable_Code_Point}]|[\\t\\n\\r])*$"
           }
         },
-        "required": [
-          "decision",
-          "note"
-        ],
+        "required": ["decision", "note"],
         "additionalProperties": false
       },
       "AdminPaymentItem": {
@@ -11459,20 +10921,11 @@
                 "type": "boolean"
               }
             },
-            "required": [
-              "lostDisputes",
-              "openDisputes",
-              "failedRefunds"
-            ],
+            "required": ["lostDisputes", "openDisputes", "failedRefunds"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "lostDisputes",
-          "openDisputes",
-          "failedRefunds",
-          "more"
-        ],
+        "required": ["lostDisputes", "openDisputes", "failedRefunds", "more"],
         "additionalProperties": false
       },
       "ErrorResponse": {
@@ -11503,10 +10956,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "statusCode",
-          "message"
-        ],
+        "required": ["statusCode", "message"],
         "additionalProperties": false
       },
       "HealthResponse": {
@@ -11514,41 +10964,26 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "ok",
-              "error"
-            ]
+            "enum": ["ok", "error"]
           },
           "checks": {
             "type": "object",
             "additionalProperties": {
               "type": "string",
-              "enum": [
-                "up",
-                "down"
-              ]
+              "enum": ["up", "down"]
             }
           }
         },
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "additionalProperties": false
       },
       "EarningHold": {
         "type": "string",
-        "enum": [
-          "account",
-          "dispute",
-          "lost"
-        ]
+        "enum": ["account", "dispute", "lost"]
       },
       "EarningState": {
         "type": "string",
-        "enum": [
-          "sending",
-          "sent"
-        ]
+        "enum": ["sending", "sent"]
       },
       "OwnerEarningsQuery": {
         "type": "object",
@@ -11575,11 +11010,7 @@
             "$ref": "#/components/schemas/Locale"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "contentLocale"
-        ],
+        "required": ["id", "name", "contentLocale"],
         "additionalProperties": false
       },
       "EarningLine": {
@@ -11623,16 +11054,7 @@
             ]
           }
         },
-        "required": [
-          "id",
-          "reference",
-          "listing",
-          "end",
-          "state",
-          "amount",
-          "sentAt",
-          "hold"
-        ],
+        "required": ["id", "reference", "listing", "end", "state", "amount", "sentAt", "hold"],
         "additionalProperties": false
       },
       "EarningMonth": {
@@ -11646,10 +11068,7 @@
             "$ref": "#/components/schemas/Money"
           }
         },
-        "required": [
-          "month",
-          "amount"
-        ],
+        "required": ["month", "amount"],
         "additionalProperties": false
       },
       "EarningListingTotal": {
@@ -11662,10 +11081,7 @@
             "$ref": "#/components/schemas/Money"
           }
         },
-        "required": [
-          "listing",
-          "amount"
-        ],
+        "required": ["listing", "amount"],
         "additionalProperties": false
       },
       "OwnerEarnings": {
@@ -11696,10 +11112,7 @@
                 "maximum": 9007199254740991
               }
             },
-            "required": [
-              "account",
-              "dispute"
-            ],
+            "required": ["account", "dispute"],
             "additionalProperties": false
           },
           "months": {
@@ -11751,10 +11164,7 @@
       },
       "OverstayStatus": {
         "type": "string",
-        "enum": [
-          "open",
-          "resolved"
-        ]
+        "enum": ["open", "resolved"]
       },
       "OverstayReportInput": {
         "type": "object",
@@ -11766,9 +11176,7 @@
             "pattern": "^(?:[^\\p{Cc}\\p{Cf}\\p{Cs}\\p{Zl}\\p{Zp}\\p{Default_Ignorable_Code_Point}]|[\\t\\n\\r])*$"
           }
         },
-        "required": [
-          "note"
-        ],
+        "required": ["note"],
         "additionalProperties": false
       },
       "OwnerOverstay": {
@@ -11783,10 +11191,7 @@
             "$ref": "#/components/schemas/OverstayStatus"
           }
         },
-        "required": [
-          "reportedAt",
-          "status"
-        ],
+        "required": ["reportedAt", "status"],
         "additionalProperties": false
       },
       "AdminOverstaysQuery": {
@@ -11804,9 +11209,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "additionalProperties": false
       },
       "AdminOverstayItem": {
@@ -11874,10 +11277,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "reports",
-          "next"
-        ],
+        "required": ["reports", "next"],
         "additionalProperties": false
       },
       "AdminOverstay": {
@@ -11904,9 +11304,7 @@
                 "maxLength": 100
               }
             },
-            "required": [
-              "name"
-            ],
+            "required": ["name"],
             "additionalProperties": false
           },
           "note": {
@@ -11941,11 +11339,7 @@
                     "$ref": "#/components/schemas/Locale"
                   }
                 },
-                "required": [
-                  "id",
-                  "name",
-                  "contentLocale"
-                ],
+                "required": ["id", "name", "contentLocale"],
                 "additionalProperties": false
               },
               "spaceLabel": {
@@ -11962,14 +11356,7 @@
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
               }
             },
-            "required": [
-              "id",
-              "reference",
-              "listing",
-              "spaceLabel",
-              "startsAt",
-              "endsAt"
-            ],
+            "required": ["id", "reference", "listing", "spaceLabel", "startsAt", "endsAt"],
             "additionalProperties": false
           },
           "resolution": {
@@ -11989,9 +11376,7 @@
                     "maxLength": 100
                   }
                 },
-                "required": [
-                  "name"
-                ],
+                "required": ["name"],
                 "additionalProperties": false
               },
               "note": {
@@ -11999,11 +11384,7 @@
                 "maxLength": 100
               }
             },
-            "required": [
-              "at",
-              "by",
-              "note"
-            ],
+            "required": ["at", "by", "note"],
             "additionalProperties": false
           },
           "canResolve": {
@@ -12057,11 +11438,7 @@
             "$ref": "#/components/schemas/Locale"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "contentLocale"
-        ],
+        "required": ["id", "name", "contentLocale"],
         "additionalProperties": false
       },
       "CalendarBooking": {
@@ -12131,10 +11508,7 @@
             }
           }
         },
-        "required": [
-          "date",
-          "bookings"
-        ],
+        "required": ["date", "bookings"],
         "additionalProperties": false
       },
       "OwnerCalendar": {
@@ -12178,24 +11552,12 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "month",
-          "previous",
-          "next",
-          "listing",
-          "listings",
-          "days",
-          "truncated"
-        ],
+        "required": ["month", "previous", "next", "listing", "listings", "days", "truncated"],
         "additionalProperties": false
       },
       "OwnerBookingStatus": {
         "type": "string",
-        "enum": [
-          "upcoming",
-          "past",
-          "cancelled"
-        ]
+        "enum": ["upcoming", "past", "cancelled"]
       },
       "OwnerBookingListQuery": {
         "type": "object",
@@ -12230,19 +11592,12 @@
             "type": "string"
           }
         },
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "additionalProperties": false
       },
       "OwnerBookingState": {
         "type": "string",
-        "enum": [
-          "upcoming",
-          "underWay",
-          "ended",
-          "cancelled"
-        ]
+        "enum": ["upcoming", "underWay", "ended", "cancelled"]
       },
       "OwnerBookingListItem": {
         "type": "object",
@@ -12382,16 +11737,7 @@
             "pattern": "^(\\d{1,15})_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
           }
         },
-        "required": [
-          "status",
-          "listing",
-          "from",
-          "to",
-          "listings",
-          "bookings",
-          "previous",
-          "next"
-        ],
+        "required": ["status", "listing", "from", "to", "listings", "bookings", "previous", "next"],
         "additionalProperties": false
       },
       "PlaceSuggestion": {
@@ -12407,11 +11753,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "detail"
-        ],
+        "required": ["id", "name", "detail"],
         "additionalProperties": false
       },
       "PlaceSuggestions": {
@@ -12425,9 +11767,7 @@
             }
           }
         },
-        "required": [
-          "suggestions"
-        ],
+        "required": ["suggestions"],
         "additionalProperties": false
       },
       "Place": {
@@ -12448,11 +11788,7 @@
             "maximum": 180
           }
         },
-        "required": [
-          "label",
-          "latitude",
-          "longitude"
-        ],
+        "required": ["label", "latitude", "longitude"],
         "additionalProperties": false
       },
       "PlaceList": {
@@ -12466,9 +11802,7 @@
             }
           }
         },
-        "required": [
-          "places"
-        ],
+        "required": ["places"],
         "additionalProperties": false
       },
       "SavedVehicle": {
@@ -12506,14 +11840,7 @@
             "maximum": 9007199254740991
           }
         },
-        "required": [
-          "id",
-          "plate",
-          "name",
-          "heightCm",
-          "lengthCm",
-          "widthCm"
-        ],
+        "required": ["id", "plate", "name", "heightCm", "lengthCm", "widthCm"],
         "additionalProperties": false
       },
       "SavedVehicleList": {
@@ -12527,9 +11854,7 @@
             }
           }
         },
-        "required": [
-          "vehicles"
-        ],
+        "required": ["vehicles"],
         "additionalProperties": false
       },
       "SavedVehicleInput": {
@@ -12564,9 +11889,7 @@
             "maximum": 400
           }
         },
-        "required": [
-          "plate"
-        ],
+        "required": ["plate"],
         "additionalProperties": false
       },
       "FavouriteState": {
@@ -12576,9 +11899,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "favourite"
-        ],
+        "required": ["favourite"],
         "additionalProperties": false
       },
       "FavouriteList": {
@@ -12592,9 +11913,7 @@
             }
           }
         },
-        "required": [
-          "listings"
-        ],
+        "required": ["listings"],
         "additionalProperties": false
       }
     }

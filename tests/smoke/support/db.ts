@@ -399,3 +399,13 @@ export const stayIn = (hours: number) => {
   const startsAt = new Date(Date.now() + hours * 3_600_000);
   return { startsAt, endsAt: new Date(startsAt.getTime() + 2 * 3_600_000) };
 };
+
+/**
+ * Makes a booking look confirmed a day ago: the reminders (5A.3) skip a stay confirmed closer to its
+ * start than the reminder's lead, so a test that moves a stay near must also move its confirmation.
+ */
+export async function backdateConfirmation(reference: string): Promise<void> {
+  await run(`update bookings set confirmed_at = now() - interval '1 day' where reference = $1`, [
+    reference,
+  ]);
+}

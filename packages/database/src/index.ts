@@ -2,6 +2,7 @@
 // bundlers for app code never see the migrations folder reference.
 export * from './account-cleanup.js';
 export * from './audit.js';
+export * from './booking-reminders.js';
 export * from './bookings.js';
 export * from './client.js';
 export * from './disputes.js';

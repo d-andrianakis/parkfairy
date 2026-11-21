@@ -76,7 +76,7 @@ describe('VehiclesManager (5A.2)', () => {
     const [work, spare] = within(list).getAllByRole('listitem');
     expect(work).toHaveTextContent('IKB1234');
     expect(work).toHaveTextContent('Work car');
-    expect(work).toHaveTextContent('190 cm high · 440 cm long');
+    expect(work).toHaveTextContent('190 cm high, 440 cm long');
     expect(spare).toHaveTextContent('YZM5678');
     expect(spare).toHaveTextContent('No size given');
     // The driver's own words are isolated, so a name in another script keeps its order.
@@ -112,7 +112,7 @@ describe('VehiclesManager (5A.2)', () => {
       await userEvent.type(name, 'x'.repeat(41));
       await userEvent.click(submit);
       expect(plate).toHaveAccessibleDescription(/as it is on the car/);
-      expect(name).toHaveAccessibleDescription(/This is too long/);
+      expect(name).toHaveAccessibleDescription(/Use at most 40 characters/);
       // Each size says its own limits.
       expect(height).toHaveAccessibleDescription('Enter a height from 100 to 500 cm');
       expect(save).not.toHaveBeenCalled();
@@ -234,7 +234,7 @@ describe('VehiclesManager (5A.2)', () => {
       );
       const edit = await screen.findByRole('button', { name: 'Edit Old car · IKB1234' });
       expect(edit).toHaveFocus();
-      expect(said()).toContain('Changes saved.');
+      await waitFor(() => expect(said()).toContain('Changes saved.'));
     });
 
     it('clears a size that is emptied', async () => {

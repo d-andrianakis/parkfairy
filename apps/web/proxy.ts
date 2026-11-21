@@ -4,6 +4,7 @@ import createIntlMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import {
   allowsMaps,
+  allowsOfflinePass,
   allowsPayments,
   buildContentSecurityPolicy,
   createNonce,
@@ -25,6 +26,7 @@ export default function proxy(request: NextRequest) {
       request.nextUrl.protocol === 'https:' || request.headers.get('x-forwarded-proto') === 'https',
     maps: allowsMaps(request.nextUrl.pathname),
     payments: allowsPayments(request.nextUrl.pathname),
+    pass: allowsOfflinePass(request.nextUrl.pathname),
   });
 
   const requestHeaders = new Headers(request.headers);

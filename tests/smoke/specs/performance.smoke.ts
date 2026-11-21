@@ -288,9 +288,18 @@ test.describe('signed in', () => {
     }
   });
 
-  test('/en/bookings stays within the first-visit budget', async ({ page }) => {
-    await expectWithinBudget(page, '/en/bookings');
-  });
+  // The driver's own pages (5A.2): the past list, where each stay may carry "Book again", and what a
+  // driver keeps for next time.
+  for (const path of [
+    '/en/bookings',
+    '/en/bookings?when=past',
+    '/en/account/vehicles',
+    '/en/favourites',
+  ]) {
+    test(`${path} stays within the first-visit budget`, async ({ page }) => {
+      await expectWithinBudget(page, path);
+    });
+  }
 
   test('/en/account does not shift while the API answers, on a phone', async ({ page }) => {
     const cls = await measureLayoutShift(page, '/en/account', () =>

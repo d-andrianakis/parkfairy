@@ -35,6 +35,7 @@ import {
   OwnerListingBookingsSchema,
   parseBookingsCursor,
   vehicleFitsSpace,
+  writeIcs,
 } from '@parkfairy/contracts';
 import {
   copyPayees,
@@ -1064,6 +1065,53 @@ export class BookingsService {
       .where(and(eq(booking.id, id), eq(booking.userId, userId)));
     if (!row) throw notFound('BOOKING_NOT_FOUND');
     return this.view(row.booking, row.info);
+  }
+
+  /**
+   * A calendar entry for a booking that stands (5A.3), for the driver who made it: what a calendar
+   * needs to remind them, and nothing it would carry to the services it syncs with. No plate and no way
+   * in (a gate code would sit in a third party's calendar), only the place, the space and the
+   * reference. A hold, a cancelled or an expired booking has no entry: the same 404 as any other.
+   */
+  async calendarFile(
+    userId: string,
+    id: string,
+    locale: Locale,
+  ): Promise<{ ics: string; fileName: string }> {
+    if (!UUID.test(id)) throw notFound('BOOKING_NOT_FOUND');
+    const [row] = await this.db
+      .select({ booking, info: listingInfo })
+      .from(booking)
+      .innerJoin(listing, eq(listing.id, booking.locationId))
+      .where(and(eq(booking.id, id), eq(booking.userId, userId)));
+    if (!row || row.booking.status !== 'confirmed') throw notFound('BOOKING_NOT_FOUND');
+    const { booking: found } = row;
+    const name = found.listingName;
+    const greek = locale === 'el';
+    const ics = writeIcs({
+      prodId: '-//Parkfairy//Bookings//EN',
+      name: 'Parkfairy',
+      events: [
+        {
+          uid: `booking-${found.id}@parkfairy`,
+          stamp: found.confirmedAt ?? found.createdAt,
+          start: found.startsAt,
+          end: found.endsAt,
+          summary: name
+            ? greek
+              ? `Στάθμευση: ${name}`
+              : `Parking at ${name}`
+            : greek
+              ? 'Στάθμευση'
+              : 'Parking',
+          description: greek
+            ? `Θέση ${found.spaceLabel}. Κωδικός κράτησης ${found.reference}.`
+            : `Space ${found.spaceLabel}. Booking reference ${found.reference}.`,
+          ...(found.listingAddress ? { location: found.listingAddress } : {}),
+        },
+      ],
+    });
+    return { ics, fileName: `parkfairy-${found.reference}.ics` };
   }
 
   /**

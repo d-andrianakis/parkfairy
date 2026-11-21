@@ -50,7 +50,7 @@ export const SavedVehicleInputSchema = z
     name: z
       .string(message('invalid'))
       .trim()
-      .max(VEHICLE_LIMITS.name, message('textTooLong'))
+      .max(VEHICLE_LIMITS.name, message('nameTooLong'))
       .regex(CONTROL_CHARACTERS, message('invalid'))
       .nullish(),
     heightCm: spaceSizeCm('height').nullish(),

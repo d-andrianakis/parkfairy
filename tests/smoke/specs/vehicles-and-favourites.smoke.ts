@@ -74,7 +74,7 @@ test('a driver saves, changes and forgets vehicles, and nobody else sees them', 
     const list = page.getByRole('list', { name: 'Your saved vehicles' });
     const work = list.getByRole('listitem').filter({ hasText: 'IKB1234' });
     await expect(work).toContainText('Work car');
-    await expect(work).toContainText('190 cm high · 440 cm long');
+    await expect(work).toContainText('190 cm high, 440 cm long');
     await expect.poll(() => said(page)).toContain('Vehicle saved.');
     await expect(plate).toBeFocused();
     await expect(plate).toHaveValue('');
@@ -94,7 +94,7 @@ test('a driver saves, changes and forgets vehicles, and nobody else sees them', 
     await page.goto('/el/account/vehicles');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Αποθηκευμένα οχήματα');
     await expect(page.getByText('IKB1234')).toBeVisible();
-    await expect(page.getByText('ύψος 190 εκ. · μήκος 440 εκ.')).toBeVisible();
+    await expect(page.getByText('ύψος 190 εκ., μήκος 440 εκ.')).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth - document.body.clientWidth),
     ).toBeLessThanOrEqual(0);

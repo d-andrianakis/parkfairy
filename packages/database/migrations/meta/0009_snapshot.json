@@ -111,13 +111,9 @@
         "accounts_user_id_users_id_fk": {
           "name": "accounts_user_id_users_id_fk",
           "tableFrom": "accounts",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -205,13 +201,9 @@
         "sessions_user_id_users_id_fk": {
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -220,9 +212,7 @@
       "uniqueConstraints": {
         "sessions_token_unique": {
           "name": "sessions_token_unique",
-          "columns": [
-            "token"
-          ],
+          "columns": ["token"],
           "nullsNotDistinct": false
         }
       },
@@ -301,13 +291,9 @@
         "two_factors_user_id_users_id_fk": {
           "name": "two_factors_user_id_users_id_fk",
           "tableFrom": "two_factors",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -316,9 +302,7 @@
       "uniqueConstraints": {
         "two_factors_user_id_unique": {
           "name": "two_factors_user_id_unique",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "nullsNotDistinct": false
         }
       },
@@ -421,9 +405,7 @@
       "uniqueConstraints": {
         "users_email_unique": {
           "name": "users_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "nullsNotDistinct": false
         }
       },
@@ -691,13 +673,9 @@
         "owner_profiles_user_id_users_id_fk": {
           "name": "owner_profiles_user_id_users_id_fk",
           "tableFrom": "owner_profiles",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -706,9 +684,7 @@
       "uniqueConstraints": {
         "owner_profiles_user_id_unique": {
           "name": "owner_profiles_user_id_unique",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "nullsNotDistinct": false
         }
       },
@@ -950,13 +926,9 @@
         "parking_locations_owner_id_owner_profiles_id_fk": {
           "name": "parking_locations_owner_id_owner_profiles_id_fk",
           "tableFrom": "parking_locations",
-          "columnsFrom": [
-            "owner_id"
-          ],
+          "columnsFrom": ["owner_id"],
           "tableTo": "owner_profiles",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -965,9 +937,7 @@
       "uniqueConstraints": {
         "parking_locations_slug_unique": {
           "name": "parking_locations_slug_unique",
-          "columns": [
-            "slug"
-          ],
+          "columns": ["slug"],
           "nullsNotDistinct": false
         }
       },
@@ -1089,13 +1059,9 @@
         "parking_opening_hours_location_id_parking_locations_id_fk": {
           "name": "parking_opening_hours_location_id_parking_locations_id_fk",
           "tableFrom": "parking_opening_hours",
-          "columnsFrom": [
-            "location_id"
-          ],
+          "columnsFrom": ["location_id"],
           "tableTo": "parking_locations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1203,13 +1169,9 @@
         "parking_photos_location_id_parking_locations_id_fk": {
           "name": "parking_photos_location_id_parking_locations_id_fk",
           "tableFrom": "parking_photos",
-          "columnsFrom": [
-            "location_id"
-          ],
+          "columnsFrom": ["location_id"],
           "tableTo": "parking_locations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1218,10 +1180,7 @@
       "uniqueConstraints": {
         "parking_photos_location_key_unique": {
           "name": "parking_photos_location_key_unique",
-          "columns": [
-            "location_id",
-            "key"
-          ],
+          "columns": ["location_id", "key"],
           "nullsNotDistinct": false
         }
       },
@@ -1367,13 +1326,9 @@
         "parking_price_rules_location_id_parking_locations_id_fk": {
           "name": "parking_price_rules_location_id_parking_locations_id_fk",
           "tableFrom": "parking_price_rules",
-          "columnsFrom": [
-            "location_id"
-          ],
+          "columnsFrom": ["location_id"],
           "tableTo": "parking_locations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1481,13 +1436,9 @@
         "parking_proof_documents_location_id_parking_locations_id_fk": {
           "name": "parking_proof_documents_location_id_parking_locations_id_fk",
           "tableFrom": "parking_proof_documents",
-          "columnsFrom": [
-            "location_id"
-          ],
+          "columnsFrom": ["location_id"],
           "tableTo": "parking_locations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1496,9 +1447,7 @@
       "uniqueConstraints": {
         "parking_proof_documents_storage_key_unique": {
           "name": "parking_proof_documents_storage_key_unique",
-          "columns": [
-            "storage_key"
-          ],
+          "columns": ["storage_key"],
           "nullsNotDistinct": false
         }
       },
@@ -1613,13 +1562,9 @@
         "parking_spaces_location_id_parking_locations_id_fk": {
           "name": "parking_spaces_location_id_parking_locations_id_fk",
           "tableFrom": "parking_spaces",
-          "columnsFrom": [
-            "location_id"
-          ],
+          "columnsFrom": ["location_id"],
           "tableTo": "parking_locations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1628,10 +1573,7 @@
       "uniqueConstraints": {
         "parking_spaces_location_label_unique": {
           "name": "parking_spaces_location_label_unique",
-          "columns": [
-            "location_id",
-            "label"
-          ],
+          "columns": ["location_id", "label"],
           "nullsNotDistinct": false
         }
       },
@@ -1690,13 +1632,9 @@
         "parking_stay_discounts_location_id_parking_locations_id_fk": {
           "name": "parking_stay_discounts_location_id_parking_locations_id_fk",
           "tableFrom": "parking_stay_discounts",
-          "columnsFrom": [
-            "location_id"
-          ],
+          "columnsFrom": ["location_id"],
           "tableTo": "parking_locations",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1705,10 +1643,7 @@
       "uniqueConstraints": {
         "parking_stay_discounts_location_days_unique": {
           "name": "parking_stay_discounts_location_days_unique",
-          "columns": [
-            "location_id",
-            "min_days"
-          ],
+          "columns": ["location_id", "min_days"],
           "nullsNotDistinct": false
         }
       },
@@ -1824,13 +1759,9 @@
         "email_outbox_user_id_users_id_fk": {
           "name": "email_outbox_user_id_users_id_fk",
           "tableFrom": "email_outbox",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1839,9 +1770,7 @@
       "uniqueConstraints": {
         "email_outbox_dedupe_key_unique": {
           "name": "email_outbox_dedupe_key_unique",
-          "columns": [
-            "dedupe_key"
-          ],
+          "columns": ["dedupe_key"],
           "nullsNotDistinct": false
         }
       },

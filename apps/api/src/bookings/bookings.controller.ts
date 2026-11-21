@@ -1,4 +1,16 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Res,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -7,6 +19,7 @@ import {
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiProduces,
   ApiQuery,
   ApiServiceUnavailableResponse,
   ApiTags,
@@ -27,7 +40,9 @@ import {
   BookingPaymentSchema,
   BookingSchema,
   ErrorResponseSchema,
+  SUPPORTED_LOCALES,
 } from '@parkfairy/contracts';
+import type { Response } from 'express';
 
 import { CurrentUser } from '../auth/auth.decorators.js';
 import { parseOrThrow } from '../common/validation.js';
@@ -75,6 +90,30 @@ export class BookingsController {
   @ApiBadRequestResponse({ schema: schemaRef(ErrorResponseSchema) })
   getMyBookings(@CurrentUser() user: AuthUser, @Query() rawQuery: unknown): Promise<BookingList> {
     return this.bookings.list(user.id, parseOrThrow(BookingListQuerySchema, rawQuery));
+  }
+
+  /**
+   * The booking as a calendar entry (5A.3), as a file: the place, the space and the reference, never
+   * the plate or the way in. Confirmed bookings only; anything else is `BOOKING_NOT_FOUND`.
+   */
+  @Get(':id/calendar')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiProduces('text/calendar')
+  @ApiQuery({ name: 'locale', required: false, enum: SUPPORTED_LOCALES })
+  @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
+  @ApiNotFoundResponse({ schema: schemaRef(ErrorResponseSchema) })
+  async getMyBookingCalendar(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query('locale') locale: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    const asked = SUPPORTED_LOCALES.find((supported) => supported === locale) ?? 'en';
+    const { ics, fileName } = await this.bookings.calendarFile(user.id, id, asked);
+    response.attachment(fileName);
+    // After `attachment`, which guesses the type from the name's extension.
+    response.type('text/calendar; charset=utf-8');
+    return new StreamableFile(Buffer.from(ics, 'utf8'), { type: 'text/calendar; charset=utf-8' });
   }
 
   @Get(':id')

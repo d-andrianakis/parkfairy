@@ -1861,13 +1861,42 @@ only (#46).
         `BookSpace.vehicle*`, `tooSmall*`, `pickFits`. Questions: «Νέα κράτηση» or «Κράτηση ξανά» for Book again;
         «Αγαπημένο» (neuter) for a listing, or «Προσθήκη στα αγαπημένα»; «Αλλαγή» or «Επεξεργασία» for Edit;
         «Αφαίρεση» or «Διαγραφή»; «Κανένα αποθηκευμένο όχημα» or «Χωρίς αποθηκευμένο όχημα»
-  - [ ] **Open** (small, from the reviews): the size line joins by hand and uses `{value}` where the listing
-        uses plain numbers; `rebookWhen` is a fragment before the date (a `t.rich` tag would let Greek move it);
-        the nickname's too-long message gives no limit (`Validation.textTooLong`); budgets for the new signed-in
-        pages in `performance.smoke.ts`; a CSRF (foreign `Origin`) case for the new routes in `security.smoke.ts`
-- [ ] **5A.3 Reminders, booking pass, offline, calendar file (M):** `booking-ending-soon` and
-      `booking-starting-soon`; QR of the reference only; opt-in service worker for the pass page;
-      wallet passes deferred (need Apple / Google accounts)
+  - [x] **Open items from the reviews** (2026-11-19): the size line is ICU numbers joined as the language joins a
+        list; `rebookWhen` is a rich message around the date; the nickname's message gives its limit; first-visit
+        budgets for `/bookings`, its past list, `/account/vehicles` and `/favourites` in `performance.smoke.ts`; a
+        foreign-`Origin` case for the vehicle and favourite writes in `security.smoke.ts`
+- [~] **5A.3 Reminders, booking pass, offline, calendar file (M, 2026-11-21):** two reminder emails (2 h before a
+  stay starts, 30 min before it ends; skipped for a stay booked closer than that, for a driver who turned them off,
+  and when stale at send time), one switch on `/account` (`users.reminder_emails`, on by default); a booking pass
+  at `/bookings/:id/pass` (the reference as text and a QR of the reference alone, the facts and the way in once it
+  shows, a calendar file `GET /bookings/:id/calendar`); an opt-in offline copy of the pass by a service worker.
+  Migration 0050. Wallet passes stay deferred (Apple / Google accounts)
+  - [x] **Implemented** behind the API's authorization rules (every route the session's own rows only)
+  - [x] **Unit tests:** the sweep and the send-time check (`booking-reminders.integration.test.ts`, 17: windows both
+        sides, the lead boundary, statuses, opt-out, suspended, concurrent sweeps, payload), the calendar and the
+        switch (`booking-pass.integration.test.ts`, 11), the worker (`pass-sw.test.ts` runs the real file in a vm),
+        offline helpers and sweep, the guard, the button, the switch, the pass page (QR content, the end it keeps
+        until), CSP, email kinds, the worker job and the stale skip
+  - [x] **Smoke test:** `booking-pass.smoke.ts` (the pass from the booking, the calendar file, kept and opened with
+        no network and styled, taken away, a session that ends without the button, signing out; the reminder email
+        and the switch), CSP and unauthenticated cases in `security.smoke.ts`
+  - [x] **Security** review: no critical or high. Fixed: a kept pass outliving a sign-out that isn't the button (a
+        guard on every page load, per-account), expired copies never purged, the renewal overwriting a good copy
+        with an error page, stale reminders sent after their moment, headers that say how the body travelled
+  - [x] **Performance** review: nothing high. Fixed: the worker is registered for one language's bookings only and
+        removes itself with the last pass, the cache write runs after the page is answered, the ending sweep orders
+        by its own index. Open: migration 0050 on a big table; the pass page's budget (needs a booking)
+  - [x] **Accessibility** review: the switch keeps its focus (never `disabled`) and is described by its hint, the
+        buttons wrap, "Removing…", the hint stays when kept, a long reference wraps; left: manual passes (below)
+  - [x] **i18n** review: the kept-until time on a 24-hour clock in Greek, «κωδικός κράτησης» in the reminder
+  - [x] **Contracts & docs:** OpenAPI and client regenerated, migration 0050 reviewed, memory.md
+  - [ ] Manual NVDA and VoiceOver: the pass page in Greek (the Latin reference read by a Greek voice); the keep and
+        remove status; the switch's hint; the calendar download; the pass opened offline, whose links to the booking
+        and the calendar fail with the browser's own offline error
+  - [ ] **Open** (small): the hints give "two hours", "half an hour" and "a day" as words, not from the constants;
+        the calendar's text is a `greek ? … : …` in the API (a third language would get English);
+        `QrCode` ignores forced-colors and its quiet zone is 2 modules (scanners like 4); the pass page's first-visit
+        budget; an unsubscribe line in the reminder email's footer; the ending-soon email end to end
 - [ ] **5A.4 "Someone is in my space" (M):** relocate within the listing or refund in full (#88); owner
       email linking to the existing overstay report
 - [ ] **5A.5 Extend a stay in progress (L, money):** continuation bookings; the parent waives its gap

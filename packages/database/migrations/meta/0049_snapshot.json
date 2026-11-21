@@ -157,12 +157,8 @@
           "name": "audit_log_actor_id_users_id_fk",
           "tableFrom": "audit_log",
           "tableTo": "users",
-          "columnsFrom": [
-            "actor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -294,12 +290,8 @@
           "name": "accounts_user_id_users_id_fk",
           "tableFrom": "accounts",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -388,12 +380,8 @@
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -403,9 +391,7 @@
         "sessions_token_unique": {
           "name": "sessions_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -484,12 +470,8 @@
           "name": "two_factors_user_id_users_id_fk",
           "tableFrom": "two_factors",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -499,9 +481,7 @@
         "two_factors_user_id_unique": {
           "name": "two_factors_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id"
-          ]
+          "columns": ["user_id"]
         }
       },
       "policies": {},
@@ -610,9 +590,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -1254,12 +1232,8 @@
           "name": "bookings_user_id_users_id_fk",
           "tableFrom": "bookings",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1267,12 +1241,8 @@
           "name": "bookings_location_id_parking_locations_id_fk",
           "tableFrom": "bookings",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1280,12 +1250,8 @@
           "name": "bookings_space_id_parking_spaces_id_fk",
           "tableFrom": "bookings",
           "tableTo": "parking_spaces",
-          "columnsFrom": [
-            "space_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["space_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1293,12 +1259,8 @@
           "name": "bookings_continues_booking_id_bookings_id_fk",
           "tableFrom": "bookings",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "continues_booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["continues_booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1306,12 +1268,8 @@
           "name": "bookings_vehicle_id_saved_vehicles_id_fk",
           "tableFrom": "bookings",
           "tableTo": "saved_vehicles",
-          "columnsFrom": [
-            "vehicle_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["vehicle_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1319,12 +1277,8 @@
           "name": "bookings_cancelled_by_user_id_users_id_fk",
           "tableFrom": "bookings",
           "tableTo": "users",
-          "columnsFrom": [
-            "cancelled_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cancelled_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1334,16 +1288,12 @@
         "bookings_reference_unique": {
           "name": "bookings_reference_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "reference"
-          ]
+          "columns": ["reference"]
         },
         "bookings_payment_intent_id_unique": {
           "name": "bookings_payment_intent_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "payment_intent_id"
-          ]
+          "columns": ["payment_intent_id"]
         }
       },
       "policies": {},
@@ -1567,12 +1517,8 @@
           "name": "email_outbox_user_id_users_id_fk",
           "tableFrom": "email_outbox",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1580,12 +1526,8 @@
           "name": "email_outbox_invite_id_listing_invites_id_fk",
           "tableFrom": "email_outbox",
           "tableTo": "listing_invites",
-          "columnsFrom": [
-            "invite_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["invite_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1595,9 +1537,7 @@
         "email_outbox_dedupe_key_unique": {
           "name": "email_outbox_dedupe_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "dedupe_key"
-          ]
+          "columns": ["dedupe_key"]
         }
       },
       "policies": {},
@@ -1781,12 +1721,8 @@
           "name": "booking_payees_booking_id_bookings_id_fk",
           "tableFrom": "booking_payees",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1794,12 +1730,8 @@
           "name": "booking_payees_owner_id_owner_profiles_id_fk",
           "tableFrom": "booking_payees",
           "tableTo": "owner_profiles",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1948,12 +1880,8 @@
           "name": "listing_handovers_location_id_parking_locations_id_fk",
           "tableFrom": "listing_handovers",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1961,12 +1889,8 @@
           "name": "listing_handovers_from_owner_id_owner_profiles_id_fk",
           "tableFrom": "listing_handovers",
           "tableTo": "owner_profiles",
-          "columnsFrom": [
-            "from_owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["from_owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1974,12 +1898,8 @@
           "name": "listing_handovers_to_owner_id_owner_profiles_id_fk",
           "tableFrom": "listing_handovers",
           "tableTo": "owner_profiles",
-          "columnsFrom": [
-            "to_owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["to_owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2165,12 +2085,8 @@
           "name": "listing_invites_location_id_parking_locations_id_fk",
           "tableFrom": "listing_invites",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2178,12 +2094,8 @@
           "name": "listing_invites_invited_by_owner_profiles_id_fk",
           "tableFrom": "listing_invites",
           "tableTo": "owner_profiles",
-          "columnsFrom": [
-            "invited_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["invited_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2193,9 +2105,7 @@
         "listing_invites_token_hash_unique": {
           "name": "listing_invites_token_hash_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token_hash"
-          ]
+          "columns": ["token_hash"]
         }
       },
       "policies": {},
@@ -2297,12 +2207,8 @@
           "name": "listing_managers_location_id_parking_locations_id_fk",
           "tableFrom": "listing_managers",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2310,12 +2216,8 @@
           "name": "listing_managers_user_id_users_id_fk",
           "tableFrom": "listing_managers",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2428,12 +2330,8 @@
           "name": "listing_owners_location_id_parking_locations_id_fk",
           "tableFrom": "listing_owners",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2441,12 +2339,8 @@
           "name": "listing_owners_owner_id_owner_profiles_id_fk",
           "tableFrom": "listing_owners",
           "tableTo": "owner_profiles",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2609,12 +2503,8 @@
           "name": "overstay_reports_booking_id_bookings_id_fk",
           "tableFrom": "overstay_reports",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2622,12 +2512,8 @@
           "name": "overstay_reports_reported_by_users_id_fk",
           "tableFrom": "overstay_reports",
           "tableTo": "users",
-          "columnsFrom": [
-            "reported_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reported_by"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2635,12 +2521,8 @@
           "name": "overstay_reports_resolved_by_users_id_fk",
           "tableFrom": "overstay_reports",
           "tableTo": "users",
-          "columnsFrom": [
-            "resolved_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["resolved_by"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2650,9 +2532,7 @@
         "overstay_reports_booking_id_unique": {
           "name": "overstay_reports_booking_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "booking_id"
-          ]
+          "columns": ["booking_id"]
         }
       },
       "policies": {},
@@ -2826,12 +2706,8 @@
           "name": "owner_profiles_user_id_users_id_fk",
           "tableFrom": "owner_profiles",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2841,9 +2717,7 @@
         "owner_profiles_user_id_unique": {
           "name": "owner_profiles_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id"
-          ]
+          "columns": ["user_id"]
         }
       },
       "policies": {},
@@ -2966,12 +2840,8 @@
           "name": "parking_hours_exceptions_location_id_parking_locations_id_fk",
           "tableFrom": "parking_hours_exceptions",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3240,12 +3110,8 @@
           "name": "parking_locations_owner_id_owner_profiles_id_fk",
           "tableFrom": "parking_locations",
           "tableTo": "owner_profiles",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -3255,9 +3121,7 @@
         "parking_locations_slug_unique": {
           "name": "parking_locations_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -3383,12 +3247,8 @@
           "name": "parking_opening_hours_location_id_parking_locations_id_fk",
           "tableFrom": "parking_opening_hours",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3512,12 +3372,8 @@
           "name": "parking_photos_location_id_parking_locations_id_fk",
           "tableFrom": "parking_photos",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3527,10 +3383,7 @@
         "parking_photos_location_key_unique": {
           "name": "parking_photos_location_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "location_id",
-            "key"
-          ]
+          "columns": ["location_id", "key"]
         }
       },
       "policies": {},
@@ -3676,12 +3529,8 @@
           "name": "parking_price_rules_location_id_parking_locations_id_fk",
           "tableFrom": "parking_price_rules",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3790,12 +3639,8 @@
           "name": "parking_proof_documents_location_id_parking_locations_id_fk",
           "tableFrom": "parking_proof_documents",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3805,9 +3650,7 @@
         "parking_proof_documents_storage_key_unique": {
           "name": "parking_proof_documents_storage_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "storage_key"
-          ]
+          "columns": ["storage_key"]
         }
       },
       "policies": {},
@@ -3940,12 +3783,8 @@
           "name": "parking_spaces_location_id_parking_locations_id_fk",
           "tableFrom": "parking_spaces",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3955,10 +3794,7 @@
         "parking_spaces_location_label_unique": {
           "name": "parking_spaces_location_label_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "location_id",
-            "label"
-          ]
+          "columns": ["location_id", "label"]
         }
       },
       "policies": {},
@@ -4021,12 +3857,8 @@
           "name": "parking_stay_discounts_location_id_parking_locations_id_fk",
           "tableFrom": "parking_stay_discounts",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4036,10 +3868,7 @@
         "parking_stay_discounts_location_days_unique": {
           "name": "parking_stay_discounts_location_days_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "location_id",
-            "min_days"
-          ]
+          "columns": ["location_id", "min_days"]
         }
       },
       "policies": {},
@@ -4147,12 +3976,8 @@
           "name": "ledger_entries_booking_id_bookings_id_fk",
           "tableFrom": "ledger_entries",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4160,12 +3985,8 @@
           "name": "ledger_entries_owner_id_owner_profiles_id_fk",
           "tableFrom": "ledger_entries",
           "tableTo": "owner_profiles",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4175,11 +3996,7 @@
         "ledger_entries_booking_kind_owner_key": {
           "name": "ledger_entries_booking_kind_owner_key",
           "nullsNotDistinct": true,
-          "columns": [
-            "booking_id",
-            "kind",
-            "owner_id"
-          ]
+          "columns": ["booking_id", "kind", "owner_id"]
         }
       },
       "policies": {},
@@ -4362,12 +4179,8 @@
           "name": "payment_disputes_booking_id_bookings_id_fk",
           "tableFrom": "payment_disputes",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4375,12 +4188,8 @@
           "name": "payment_disputes_decided_by_users_id_fk",
           "tableFrom": "payment_disputes",
           "tableTo": "users",
-          "columnsFrom": [
-            "decided_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["decided_by"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4390,9 +4199,7 @@
         "payment_disputes_stripe_dispute_id_unique": {
           "name": "payment_disputes_stripe_dispute_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "stripe_dispute_id"
-          ]
+          "columns": ["stripe_dispute_id"]
         }
       },
       "policies": {},
@@ -4471,12 +4278,8 @@
           "name": "payout_accounts_owner_id_owner_profiles_id_fk",
           "tableFrom": "payout_accounts",
           "tableTo": "owner_profiles",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4486,16 +4289,12 @@
         "payout_accounts_owner_id_unique": {
           "name": "payout_accounts_owner_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "owner_id"
-          ]
+          "columns": ["owner_id"]
         },
         "payout_accounts_stripe_account_id_unique": {
           "name": "payout_accounts_stripe_account_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "stripe_account_id"
-          ]
+          "columns": ["stripe_account_id"]
         }
       },
       "policies": {},
@@ -4550,9 +4349,7 @@
         "platform_settings_singleton_unique": {
           "name": "platform_settings_singleton_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "singleton"
-          ]
+          "columns": ["singleton"]
         }
       },
       "policies": {},
@@ -4622,9 +4419,7 @@
         "stripe_events_stripe_event_id_unique": {
           "name": "stripe_events_stripe_event_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "stripe_event_id"
-          ]
+          "columns": ["stripe_event_id"]
         }
       },
       "policies": {},
@@ -4711,12 +4506,8 @@
           "name": "favourite_listings_user_id_users_id_fk",
           "tableFrom": "favourite_listings",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4724,12 +4515,8 @@
           "name": "favourite_listings_location_id_parking_locations_id_fk",
           "tableFrom": "favourite_listings",
           "tableTo": "parking_locations",
-          "columnsFrom": [
-            "location_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4739,10 +4526,7 @@
         "favourite_listings_user_location_unique": {
           "name": "favourite_listings_user_location_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id",
-            "location_id"
-          ]
+          "columns": ["user_id", "location_id"]
         }
       },
       "policies": {},
@@ -4839,12 +4623,8 @@
           "name": "saved_vehicles_user_id_users_id_fk",
           "tableFrom": "saved_vehicles",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4854,10 +4634,7 @@
         "saved_vehicles_user_plate_unique": {
           "name": "saved_vehicles_user_plate_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id",
-            "plate"
-          ]
+          "columns": ["user_id", "plate"]
         }
       },
       "policies": {},

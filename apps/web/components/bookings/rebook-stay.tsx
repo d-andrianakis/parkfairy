@@ -32,7 +32,7 @@ export function RebookStay({
   return (
     <div className="grid gap-2">
       <p id={when} className="text-sm text-muted-foreground">
-        {t('rebookWhen')} <StayRange start={stay.start} end={stay.end} />
+        {t.rich('rebookWhen', { stay: () => <StayRange start={stay.start} end={stay.end} /> })}
       </p>
       {/* Around the button alone: the text above is this server component's, with its own messages. */}
       <ClientMessages namespaces={CLIENT_NAMESPACES.rebook}>

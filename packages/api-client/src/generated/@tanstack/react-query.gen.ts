@@ -50,8 +50,10 @@ import {
   getManagedListings,
   getMe,
   getMyBooking,
+  getMyBookingCalendar,
   getMyBookings,
   getMyFavourites,
+  getMyReminders,
   getMyVehicles,
   getOtherOwnerListings,
   getOwnerListing,
@@ -94,6 +96,7 @@ import {
   saveOwnerTaxDetails,
   searchParking,
   setListingShares,
+  setMyReminders,
   settleAdminBookingRefund,
   settleMyPayment,
   startPayoutOnboarding,
@@ -224,6 +227,9 @@ import type {
   GetMeData,
   GetMeError,
   GetMeResponse,
+  GetMyBookingCalendarData,
+  GetMyBookingCalendarError,
+  GetMyBookingCalendarResponse,
   GetMyBookingData,
   GetMyBookingError,
   GetMyBookingResponse,
@@ -233,6 +239,9 @@ import type {
   GetMyFavouritesData,
   GetMyFavouritesError,
   GetMyFavouritesResponse,
+  GetMyRemindersData,
+  GetMyRemindersError,
+  GetMyRemindersResponse,
   GetMyVehiclesData,
   GetMyVehiclesError,
   GetMyVehiclesResponse,
@@ -356,6 +365,9 @@ import type {
   SetListingSharesData,
   SetListingSharesError,
   SetListingSharesResponse,
+  SetMyRemindersData,
+  SetMyRemindersError,
+  SetMyRemindersResponse,
   SettleAdminBookingRefundData,
   SettleAdminBookingRefundError,
   SettleAdminBookingRefundResponse,
@@ -495,6 +507,48 @@ export const getMeOptions = (options?: Options<GetMeData>) =>
     },
     queryKey: getMeQueryKey(options),
   });
+
+export const getMyRemindersQueryKey = (options?: Options<GetMyRemindersData>) =>
+  createQueryKey('getMyReminders', options);
+
+export const getMyRemindersOptions = (options?: Options<GetMyRemindersData>) =>
+  queryOptions<
+    GetMyRemindersResponse,
+    GetMyRemindersError,
+    GetMyRemindersResponse,
+    ReturnType<typeof getMyRemindersQueryKey>
+  >({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await getMyReminders({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      });
+      return data;
+    },
+    queryKey: getMyRemindersQueryKey(options),
+  });
+
+export const setMyRemindersMutation = (
+  options?: Partial<Options<SetMyRemindersData>>,
+): UseMutationOptions<SetMyRemindersResponse, SetMyRemindersError, Options<SetMyRemindersData>> => {
+  const mutationOptions: UseMutationOptions<
+    SetMyRemindersResponse,
+    SetMyRemindersError,
+    Options<SetMyRemindersData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await setMyReminders({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};
 
 export const getListingPhotoQueryKey = (options: Options<GetListingPhotoData>) =>
   createQueryKey('getListingPhoto', options);
@@ -2344,6 +2398,28 @@ export const holdParkingSpaceMutation = (
   };
   return mutationOptions;
 };
+
+export const getMyBookingCalendarQueryKey = (options: Options<GetMyBookingCalendarData>) =>
+  createQueryKey('getMyBookingCalendar', options);
+
+export const getMyBookingCalendarOptions = (options: Options<GetMyBookingCalendarData>) =>
+  queryOptions<
+    GetMyBookingCalendarResponse,
+    GetMyBookingCalendarError,
+    GetMyBookingCalendarResponse,
+    ReturnType<typeof getMyBookingCalendarQueryKey>
+  >({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await getMyBookingCalendar({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      });
+      return data;
+    },
+    queryKey: getMyBookingCalendarQueryKey(options),
+  });
 
 export const getMyBookingQueryKey = (options: Options<GetMyBookingData>) =>
   createQueryKey('getMyBooking', options);

@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 import { useRouter } from '@/i18n/navigation';
 import { authClient } from '@/lib/auth-client';
+import { forgetAllPasses } from '@/lib/offline-pass';
 import { forgetEverySentTo } from '@/lib/remembered-email';
 
 export function SignOutButton() {
@@ -21,6 +22,8 @@ export function SignOutButton() {
     // Drop every cached response that belonged to the signed-out user.
     queryClient.clear();
     forgetEverySentTo();
+    // Booking passes kept on this device (5A.3) were this account's.
+    await forgetAllPasses();
     router.replace('/');
     router.refresh();
   }

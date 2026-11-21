@@ -126,6 +126,13 @@ export const VEHICLE_LIMITS = {
   perDriver: 10,
 } as const;
 
+/**
+ * When the driver is reminded (5A.3, decided 2026-11-19): two hours before a stay starts and half an
+ * hour before it ends. A stay booked closer than that gets no reminder for it: it would arrive with
+ * the confirmation.
+ */
+export const BOOKING_REMINDER_MINUTES = { starting: 120, ending: 30 } as const;
+
 /** How long a space is kept for a driver while they confirm (decision #3). */
 export const HOLD_MINUTES = 10;
 /**

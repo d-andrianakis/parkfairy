@@ -1,0 +1,5 @@
+ALTER TABLE "email_outbox" DROP CONSTRAINT "email_outbox_kind_check";--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "reminder_emails" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+CREATE INDEX "bookings_confirmed_starts_idx" ON "bookings" USING btree ("starts_at") WHERE "bookings"."status" = 'confirmed';--> statement-breakpoint
+CREATE INDEX "bookings_confirmed_ends_idx" ON "bookings" USING btree ("ends_at") WHERE "bookings"."status" = 'confirmed';--> statement-breakpoint
+ALTER TABLE "email_outbox" ADD CONSTRAINT "email_outbox_kind_check" CHECK ("email_outbox"."kind" in ('listing-submitted', 'listing-approved', 'listing-changes-requested', 'onboarding-reminder', 'booking-confirmed', 'booking-cancelled', 'booking-payment-refunded', 'booking-starting-soon', 'booking-ending-soon', 'booking-received', 'booking-cancelled-by-driver', 'booking-cancelled-by-team', 'listing-invite', 'listing-handover-offered', 'listing-handover-accepted', 'two-factor-removed', 'listing-suspended', 'listing-reinstated', 'account-suspended', 'account-reinstated', 'booking-cancelled-by-staff', 'dispute-parkfairy-bears', 'dispute-owners-bear'));

@@ -21,6 +21,9 @@ export const OUTBOX_EMAIL_KINDS = [
   'booking-confirmed',
   'booking-cancelled',
   'booking-payment-refunded',
+  // To the driver, a reminder: shortly before the stay starts, and shortly before it ends (5A.3).
+  'booking-starting-soon',
+  'booking-ending-soon',
   // To the listing's owner.
   'booking-received',
   'booking-cancelled-by-driver',
